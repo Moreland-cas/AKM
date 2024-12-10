@@ -38,7 +38,7 @@ class PlanningDemo():
         self.viewer.set_camera_xyz(x=1.2, y=0.25, z=0.4)
         self.viewer.set_camera_rpy(r=0, p=-0.4, y=2.7)
         
-        self.asset_prefix = "/home/zby/Programs/Sapien/assets"
+        self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
         # Robot
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.fix_root_link = True
@@ -83,8 +83,8 @@ class PlanningDemo():
         pygame.display.set_caption("Keyboard Control")
     def save_recoreded_data(self):
         assert isinstance(self.recorded_data, dict)
-        prefix = "/home/zby/Programs/Sapien/assets/recorded_data"
-        np.savez(prefix + '/recorded_data_1.npz', **self.recorded_data)
+        prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
+        np.savez(prefix + '/recorded_data_2.npz', **self.recorded_data)
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
         joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
@@ -212,7 +212,7 @@ class PlanningDemo():
                 w = self.camera.get_width()
                 h = self.camera.get_height()
                 u, v = world_to_normalized_uv(cp, K, Tw2c, w, h)
-                cp_2d.append(np.array(u, v))
+                cp_2d.append(np.array([u, v]))
                 
             # record rgb image and display to pygame screen
             rgb_np = self.capture_rgb()

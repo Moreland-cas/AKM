@@ -1,6 +1,8 @@
 import pygame
 from PIL import Image
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+import cv2
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -120,3 +122,91 @@ def world_to_normalized_uv(world_point, K, Tw2c, image_width, image_height):
     u_normalized, v_normalized = camera_to_image(camera_point, K, image_width, image_height)
     
     return u_normalized, v_normalized
+
+def draw_red_dot(image: Image, u: float, v: float, radius: int = 1):
+    """
+    在给定的 PIL 图像上，在归一化坐标 (u, v) 处画一个红色的点。
+    
+    参数：
+    - image: 输入的 PIL Image 对象
+    - u: x 坐标，归一化到 [0, 1]
+    - v: y 坐标，归一化到 [0, 1]
+    
+    返回：
+    - 修改后的 PIL Image 对象
+    """
+    # 获取图像的宽度和高度
+    width, height = image.size
+    
+    # 将归一化坐标转换为像素坐标
+    x = int(u * width)
+    y = int(v * height)
+    
+    # 创建 ImageDraw 对象
+    draw = ImageDraw.Draw(image)
+    
+    # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
+    if radius == 1:
+        draw.point((x, y), fill=(255, 0, 0))  # (255, 0, 0) 表示红色
+    else:
+        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 0, 0))
+    return image
+
+def pil_images_to_mp4(pil_images, output_filename, fps=30):
+    """
+    将一系列PIL图像保存为MP4视频。
+
+    Args:
+        pil_images (list of PIL.Image): PIL图像对象的列表。
+        output_filename (str): 输出视频文件的路径。
+        fps (int): 每秒的帧数，控制视频的帧率。
+    """
+    # 获取图像的尺寸 (假设所有图像的大小相同)
+    width, height = pil_images[0].size
+
+    # 定义视频编写器
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 使用 mp4 编码
+    video_writer = cv2.VideoWriter(output_filename, fourcc, fps, (width, height))
+
+    # 将 PIL 图像逐一转换为 NumPy 数组并写入视频
+    for pil_img in pil_images:
+        # 将 PIL 图像转换为 NumPy 数组
+        img_array = np.array(pil_img)
+
+        # 将 RGB 图像转换为 BGR（OpenCV 默认的颜色顺序是 BGR）
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+        # 写入视频帧
+        video_writer.write(img_array)
+
+    # 释放资源
+    video_writer.release()
+    print(f"Video saved as {output_filename}")
+    
+def add_text_to_image(image, text, position=(10, 10), font_size=30):
+    """
+    在图像的指定位置添加文本。
+    
+    Args:
+        image (PIL.Image): 输入的PIL图像。
+        text (str): 要添加的文本。
+        position (tuple): 文本的左上角位置（默认在左上角，坐标为(10, 10)）。
+        font_size (int): 字体大小（默认30）。
+    
+    Returns:
+        PIL.Image: 添加了文本的图像。
+    """
+    # 创建ImageDraw对象
+    draw = ImageDraw.Draw(image)
+    
+    # 使用默认字体，如果需要可以提供路径
+    font = ImageFont.load_default()  # 使用Pillow默认字体
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)  # 如果有系统字体，可以选择
+    except IOError:
+        print("Arial font not found, using default font.")
+    
+    # 在图像上绘制文本
+    draw.text(position, text, font=font, fill="black")  # fill指定文本颜色，黑色
+    
+    return image
