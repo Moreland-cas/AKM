@@ -3,3 +3,9 @@ Name: embodied_analogy
 Version: 1.0
 Author: Boyuan Zhang
 Author-email: zhangboyuan17@mails.ucas.ac.cn
+Requires-Dist: open3d
+Requires-Dist: opencv-python
+Requires-Dist: pygame==2.6.1
+Requires-Dist: sapien==3.0.0b1
+Requires-Dist: transforms3d
+Requires-Dist: trimesh

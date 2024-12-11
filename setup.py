@@ -1,9 +1,17 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='embodied_analogy',  # 你的包的名字
-    version='1.0',  # 版本号
-    packages=find_packages(),  # 自动查找当前目录下所有包
+    name='embodied_analogy',  
+    version='1.0',  
+    packages=find_packages(),  
+    install_requires=[
+        'open3d',
+        'opencv-python',
+        'pygame==2.6.1',
+        'sapien==3.0.0b1',
+        'transforms3d',
+        'trimesh',
+    ],
     author='Boyuan Zhang',
     author_email='zhangboyuan17@mails.ucas.ac.cn',
 )

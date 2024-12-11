@@ -113,4 +113,3 @@ dependencies:
       - werkzeug==3.0.6
       - widgetsnbextension==4.0.13
       - zipp==3.21.0
-prefix: /home/zby/ProgramFiles/anaconda3/envs/embodied_analogy

@@ -1,0 +1,6 @@
+open3d
+opencv-python
+pygame==2.6.1
+sapien==3.0.0b1
+transforms3d
+trimesh

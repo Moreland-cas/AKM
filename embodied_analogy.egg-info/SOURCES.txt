@@ -1,12 +1,16 @@
 setup.py
 embodied_analogy/__init__.py
 embodied_analogy/camera.py
+embodied_analogy/image_matching.py
 embodied_analogy/lift_header.py
 embodied_analogy/manipulate_franka.py
+embodied_analogy/play_recorded_data.py
 embodied_analogy/test_pygame.py
 embodied_analogy/test_viewer.py
 embodied_analogy/trimesh_utils.py
+embodied_analogy/utils.py
 embodied_analogy.egg-info/PKG-INFO
 embodied_analogy.egg-info/SOURCES.txt
 embodied_analogy.egg-info/dependency_links.txt
+embodied_analogy.egg-info/requires.txt
 embodied_analogy.egg-info/top_level.txt
