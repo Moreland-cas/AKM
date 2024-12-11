@@ -11,6 +11,8 @@ setup(
         'sapien==3.0.0b1',
         'transforms3d',
         'trimesh',
+        "ftfy",
+        "regex"
     ],
     author='Boyuan Zhang',
     author_email='zhangboyuan17@mails.ucas.ac.cn',
