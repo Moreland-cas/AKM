@@ -9,3 +9,5 @@ Requires-Dist: pygame==2.6.1
 Requires-Dist: sapien==3.0.0b1
 Requires-Dist: transforms3d
 Requires-Dist: trimesh
+Requires-Dist: ftfy
+Requires-Dist: regex

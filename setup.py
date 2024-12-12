@@ -12,7 +12,8 @@ setup(
         'transforms3d',
         'trimesh',
         "ftfy",
-        "regex"
+        "regex",
+        "mplib==0.2.1"
     ],
     author='Boyuan Zhang',
     author_email='zhangboyuan17@mails.ucas.ac.cn',

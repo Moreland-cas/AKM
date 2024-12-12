@@ -4,3 +4,5 @@ pygame==2.6.1
 sapien==3.0.0b1
 transforms3d
 trimesh
+ftfy
+regex

@@ -2,12 +2,13 @@ conda create -n embodied_analogy python=3.10
 
 # conda install torch
 conda install pytorch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 pytorch-cuda=12.1 -c pytorch -c nvidia
-
 # for compilation of curobo
 conda install nvidia/label/cuda-12.1.0::cuda-toolkit
 
-# install g++ and ninja
-conda install gcc=9
+# install g++ 
+# make sure you have gxx installed in your system
+
+# install ninja
 pip install ninja
 
 # add symbolic link to libcudart.so under lib64 folder
