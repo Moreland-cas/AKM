@@ -19,6 +19,10 @@ class RecordEnv(BaseEnv):
         self.phy_timestep = phy_timestep
         self.record_fps = record_fps
         
+        # load articulated object
+        # self.load_articulated_object(index=100015)
+        self.load_articulated_object(index=100051)
+        
         self.setup_camera()
         self.setup_record()
         self.setup_pygame() # setup pygame after camera
@@ -93,7 +97,7 @@ class RecordEnv(BaseEnv):
                 "after_close": after_close,
                 "panda_hand_pos": ee_pos,
                 "panda_hand_quat": ee_quat,
-                "rgb_np": rgb_np, 
+                # "rgb_np": rgb_np, 
                 "contact_points_3d": np.array(cp_3d), # N x 3
                 "contact_points_2d": np.array(cp_2d), # N x 2
             }
@@ -157,5 +161,4 @@ class RecordEnv(BaseEnv):
     
 if __name__ == '__main__':
     demo = RecordEnv()
-    demo.load_articulated_object(index=100015)
     demo.manipulate_and_record()

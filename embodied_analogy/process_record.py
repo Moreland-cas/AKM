@@ -2,13 +2,15 @@ import numpy as np
 from embodied_analogy.utils import draw_red_dot, pil_images_to_mp4
 from PIL import Image
 
-class DataReader():
+class RecordDataReader():
     def __init__(self, record_path_prefix, file_name) -> None:
         self.record_path_prefix = record_path_prefix
         self.filename = file_name
         self.data = np.load(record_path_prefix + file_name, allow_pickle=True)
         
     def process_data(self):
+        self.source_img = self.get_first_view_img(idx=10)
+        
         # 读取 after_contact 之后的first contact point
         for data_dict in self.data["traj"]:
             after_close = data_dict["after_close"]
@@ -39,11 +41,6 @@ class DataReader():
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])
         return pil_img
     
-    def get_processed_data(self):
-        fview_img = self.get_first_view_img(idx=10)
-        self.process_data()
-        return fview_img, self.panda_hand_pos, self.panda_hand_quat
-    
     def visualize_contact_as_video(self):
         rgb_pil_with_contact = []
         for data_dict in self.data["traj"]:
@@ -64,7 +61,7 @@ class DataReader():
 if __name__ == "__main__":
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
     file_name = "/2024-12-12_11-23-38.npz"
-    dr = DataReader(record_path_prefix, file_name)
+    dr = RecordDataReader(record_path_prefix, file_name)
     dr.visualize_contact_as_video()
     
     # 显示contact point在第一frame上的投影

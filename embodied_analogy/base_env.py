@@ -3,7 +3,7 @@ import numpy as np
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 from embodied_analogy.utils import *
-
+from PIL import Image, ImageColor
 
 class BaseEnv():
     def __init__(
@@ -53,6 +53,7 @@ class BaseEnv():
         #     link.disable_gravity = True
         
         self.cur_steps = 0
+        self.after_try_to_close = 0
         self.setup_planner()
         
     def setup_camera(self):
@@ -124,20 +125,36 @@ class BaseEnv():
         
         # get depth image
         depth = -position[..., 2]
-        depth_image = (depth * 1000.0).astype(np.uint16)
-        depth_pil = Image.fromarray(depth_image)
+        depth_numpy = np.array(depth)
+        # depth_numpy = (depth * 1000.0).astype(np.uint16)
+        # depth_pil = Image.fromarray(depth_numpy)
         depth_valid_mask = position[..., 3] < 1 # H, W
         depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
-        
-        # return rgb_pil, depth_pil, depth_valid_mask_pil
-        return rgb_pil, depth_pil
+        return rgb_numpy, depth_numpy
     
-    def load_articulated_object(self, index=100015, scale=0.4):
+    def capture_segmentation(self):
+        camera = self.camera
+        camera.take_picture()
+        # visual_id is the unique id of each visual shape
+        seg_labels = camera.get_picture("Segmentation")  # [H, W, 4]
+        colormap = sorted(set(ImageColor.colormap.values()))
+        color_palette = np.array(
+            [ImageColor.getrgb(color) for color in colormap], dtype=np.uint8
+        )
+        label0_image = seg_labels[..., 0].astype(np.uint8)  # mesh-level
+        label1_image = seg_labels[..., 1].astype(np.uint8)  # actor-level
+        # Or you can use aliases below
+        # label0_image = camera.get_visual_segmentation()
+        # label1_image = camera.get_actor_segmentation()
+        label0_pil = Image.fromarray(color_palette[label0_image])
+        label0_pil.save("label0.png")
+        
+    def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale
         loader.fix_root_link = True
         self.asset = loader.load(self.asset_prefix + f"/{index}/mobility.urdf")
-        self.asset.set_root_pose(sapien.Pose([0.4, 0.4, 0.2], [1, 0, 0, 0]))
+        self.asset.set_root_pose(sapien.Pose(pose, [1, 0, 0, 0]))
         
         lift_joint = self.asset.get_joints()[-1]
         lift_joint.set_limit(np.array([0, 0.3]))
@@ -162,7 +179,7 @@ class BaseEnv():
             
     def follow_path(self, result):
         n_step = result['position'].shape[0]
-        print("n_step:", n_step)
+        # print("n_step:", n_step)
         for i in range(n_step):  
             qf = self.robot.compute_passive_force(
                 gravity=True, 

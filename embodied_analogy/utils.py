@@ -143,14 +143,15 @@ def draw_red_dot(image: Image, u: float, v: float, radius: int = 1):
     y = int(v * height)
     
     # 创建 ImageDraw 对象
-    draw = ImageDraw.Draw(image)
+    image_draw = image.copy()
+    draw = ImageDraw.Draw(image_draw)
     
     # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
     if radius == 1:
         draw.point((x, y), fill=(255, 0, 0))  # (255, 0, 0) 表示红色
     else:
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 0, 0))
-    return image
+    return image_draw
 
 def pil_images_to_mp4(pil_images, output_filename, fps=30):
     """
@@ -210,3 +211,55 @@ def add_text_to_image(image, text, position=(10, 10), font_size=30):
     draw.text(position, text, font=font, fill="black")  # fill指定文本颜色，黑色
     
     return image
+
+def uv_to_camera(u, v, depth, K, image_width, image_height):
+    """
+    将归一化的像素坐标和深度值转换为三维空间中的点（相机坐标系）。
+    
+    Args:
+    - u (float): 归一化的水平像素坐标，范围 [0, 1]
+    - v (float): 归一化的垂直像素坐标，范围 [0, 1]
+    - depth (float): 深度值，表示该像素点到相机的距离（单位：米）
+    - K (np.array): 相机内参矩阵(3x3), 包括焦距和主点坐标
+    - image_width (int): 图像的宽度（单位：像素）
+    - image_height (int): 图像的高度（单位：像素）
+    
+    Returns:
+    - (X, Y, Z) (tuple): 在相机坐标系下的三维坐标（单位：米）
+    """
+    # 1. 计算实际的像素坐标
+    x_pixel = u * image_width
+    y_pixel = v * image_height
+
+    # 2. 获取相机内参
+    f_x = K[0, 0]  # 水平焦距 (单位: 像素)
+    f_y = K[1, 1]  # 垂直焦距 (单位: 像素)
+    c_x = K[0, 2]  # 主点 x 坐标 (单位: 像素)
+    c_y = K[1, 2]  # 主点 y 坐标 (单位: 像素)
+    
+    # 3. 计算三维坐标 (X, Y, Z)
+    Z = depth  # 深度值，单位：米
+    X = (x_pixel - c_x) * Z / f_x
+    Y = (y_pixel - c_y) * Z / f_y
+    
+    return np.array([X, Y, Z])
+
+def camera_to_world(point_camera, extrinsic_matrix):
+    """
+    将相机坐标系中的点转换到世界坐标系。
+    
+    Args:
+    - point_camera (np.array): 相机坐标系中的点
+    - extrinsic_matrix (np.array): Tw2c, 外参矩阵(3, 4), 形式为 [R | t]
+    
+    Returns:
+    - point_world (np.array): 世界坐标系中的点 (3x1)
+    """
+    # 从外参矩阵中提取旋转矩阵 R 和平移向量 t
+    R = extrinsic_matrix[:, :3]  # 旋转矩阵
+    t = extrinsic_matrix[:, 3]   # 平移向量
+    
+    # 计算从相机坐标系到世界坐标系的转换
+    point_world = np.dot(R.T, (point_camera - t))  # R^T * (P_camera - t)
+    
+    return point_world
