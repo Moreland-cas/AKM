@@ -21,7 +21,7 @@ class RecordEnv(BaseEnv):
         
         # load articulated object
         # self.load_articulated_object(index=100015)
-        self.load_articulated_object(index=100051)
+        self.load_articulated_object(index=100051, scale=0.2)
         
         self.setup_camera()
         self.setup_record()
@@ -97,13 +97,13 @@ class RecordEnv(BaseEnv):
                 "after_close": after_close,
                 "panda_hand_pos": ee_pos,
                 "panda_hand_quat": ee_quat,
-                # "rgb_np": rgb_np, 
+                "rgb_np": rgb_np, 
                 "contact_points_3d": np.array(cp_3d), # N x 3
                 "contact_points_2d": np.array(cp_2d), # N x 2
             }
             if "traj" not in self.recorded_data.keys():
                 self.recorded_data["traj"] = []
-            self.recorded_data["traj"].append(cur_dict)
+            # self.recorded_data["traj"].append(cur_dict)
 
     def follow_path(self, result):
         n_step = result['position'].shape[0]
@@ -116,13 +116,13 @@ class RecordEnv(BaseEnv):
             for j in range(7):
                 self.active_joints[j].set_drive_target(result['position'][i][j])
                 self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
-            for joint in self.active_joints[-2:]:
-                if self.after_try_to_close:
-                    print("try close")
-                    joint.set_drive_target(-0.1)
-                else:
-                    print("try open")
-                    joint.set_drive_target(0.4)
+            # for joint in self.active_joints[-2:]:
+            #     if self.after_try_to_close:
+            #         print("try close")
+            #         joint.set_drive_target(-0.1)
+            #     else:
+            #         print("try open")
+            #         joint.set_drive_target(0.4)
             self.step()            
     def manipulate_and_record(self):
         pos_scale_factor = 0.1
