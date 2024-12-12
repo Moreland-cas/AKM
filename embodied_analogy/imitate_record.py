@@ -17,7 +17,8 @@ class ImitateEvc(BaseEnv):
         ):
         super().__init__(phy_timestep)
         
-        self.load_articulated_object(index=100015, pose=[0.4, 0.4, 0.2], scale=0.4)
+        # self.load_articulated_object(index=100015, pose=[0.4, 0.4, 0.2], scale=0.4)
+        self.load_articulated_object(index=100051, pose=[0.4, 0.4, 0.2], scale=0.4)
         self.setup_camera()
         
         self.DataReader = RecordDataReader(record_path_prefix, record_file_name)
@@ -79,7 +80,7 @@ class ImitateEvc(BaseEnv):
             resize=798, 
             device="cuda",
             is_pil=True,
-            show_matching=False,
+            show_matching=True,
             nms_threshold=0.002
         )
         
