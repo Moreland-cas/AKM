@@ -4,6 +4,7 @@ import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 from embodied_analogy.utils import *
 from PIL import Image, ImageColor
+import trimesh
 
 class BaseEnv():
     def __init__(
@@ -34,6 +35,9 @@ class BaseEnv():
         self.viewer.set_camera_rpy(r=0, p=-0.4, y=2.7)
         
         self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
+        self.cur_steps = 0
+    
+    def load_franka_arm(self):
         # Robot
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.fix_root_link = True
@@ -51,10 +55,6 @@ class BaseEnv():
         # disable joints gravity
         # for link in self.robot.get_links():
         #     link.disable_gravity = True
-        
-        self.cur_steps = 0
-        self.after_try_to_close = 0
-        self.setup_planner()
         
     def setup_camera(self):
         # camera config
@@ -104,7 +104,7 @@ class BaseEnv():
         # rgb_pil = Image.fromarray(rgb_numpy)
         return rgb_numpy
     
-    def capture_rgb_depth(self):
+    def capture_rgb_depth(self, return_point_cloud=False, show_pc=False):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
@@ -120,9 +120,13 @@ class BaseEnv():
         points_opengl = position[..., :3][position[..., 3] < 1] # num_valid_points, 3
         points_color = rgba[position[..., 3] < 1] # num_valid_points, 3
         model_matrix = camera.get_model_matrix() # opengl camera to world, must be called after scene.update_render()
-        points_world = points_opengl @ model_matrix[:3, :3].T + model_matrix[:3, 3]
+        points_world = points_opengl @ model_matrix[:3, :3].T + model_matrix[:3, 3] # N. 3
         points_color = (np.clip(points_color, 0, 1) * 255).astype(np.uint8)
         
+        if show_pc:
+            pc = trimesh.points.PointCloud(points_world, colors=points_color)
+            pc.show()
+            
         # get depth image
         depth = -position[..., 2]
         depth_numpy = np.array(depth)
@@ -130,7 +134,11 @@ class BaseEnv():
         # depth_pil = Image.fromarray(depth_numpy)
         depth_valid_mask = position[..., 3] < 1 # H, W
         depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
-        return rgb_numpy, depth_numpy
+        
+        if return_point_cloud:
+            return rgb_numpy, depth_numpy, points_world
+        else:    
+            return rgb_numpy, depth_numpy
     
     def capture_segmentation(self):
         camera = self.camera
@@ -147,7 +155,10 @@ class BaseEnv():
         # label0_image = camera.get_visual_segmentation()
         # label1_image = camera.get_actor_segmentation()
         label0_pil = Image.fromarray(color_palette[label0_image])
-        label0_pil.save("label0.png")
+        label1_pil = Image.fromarray(color_palette[label1_image])
+        label1_pil.show()
+        # label0_pil.save("label0.png")
+        return label1_image
         
     def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
@@ -212,23 +223,43 @@ class BaseEnv():
             self.step()
         self.after_try_to_close = 1
 
+    def reset_franka_arm(self):
+        # Set initial joint positions
+        init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
+        self.robot.set_qpos(init_qpos)
+        # self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
+        for i in range(200):
+            self.step()
+    
     def move_to_pose_with_RRTConnect(self, pose, wrt_world):
         result = self.planner.plan_pose(
             goal_pose=pose, 
             current_qpos=self.robot.get_qpos(), 
             time_step=0.1, 
             rrt_range=0.1,
-            planning_time=1,
+            # planning_time=1,
+            planning_time=0.5,
             wrt_world=wrt_world
         )
         if result['status'] != "Success":
-            print(result['status'])
+            # print(result['status'])
             return -1
         self.follow_path(result)
         return 0
     
     def move_to_pose(self, pose, wrt_world):
-        return self.move_to_pose_with_RRTConnect(pose, wrt_world)
+        # 加一个循环尝试，如果当前target_pose不行，就尝试 0.99 * target_pose + 0.01 * current_pose
+        # target_pos = pose.p.copy()
+        # current_pos = self.get_ee_pose()[0]
+        # max_num_tries = 3
+        # cur_tries = 0
+        status = self.move_to_pose_with_RRTConnect(pose, wrt_world)
+        # while status < 0 and cur_tries < max_num_tries:
+        #     pose.p = 0.95 * pose.p + 0.05 * current_pos
+        #     status = self.move_to_pose_with_RRTConnect(pose, wrt_world)
+        #     cur_tries += 1
+        #     print(f"try again, now: start_p = {current_pos}, inter_p = {pose.p}, target_p = {target_pos}")
+        return status
     
     def get_ee_pose(self):
         # 获取ee_pos和ee_quat

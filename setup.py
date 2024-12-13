@@ -13,7 +13,8 @@ setup(
         'trimesh',
         "ftfy",
         "regex",
-        "mplib==0.2.1"
+        "mplib==0.2.1",
+        "pyglet<2"
     ],
     author='Boyuan Zhang',
     author_email='zhangboyuan17@mails.ucas.ac.cn',
