@@ -120,10 +120,12 @@ class BaseEnv():
         # get pointcloud
         position = camera.get_picture("Position")  # [H, W, 4], 格式为(x, y, z, render_depth), 其中 render_depth < 1 的点是有效的
         points_opengl = position[..., :3][position[..., 3] < 1] # num_valid_points, 3
-        points_color = rgba[position[..., 3] < 1] # num_valid_points, 3
+        points_color = rgba[position[..., 3] < 1] # num_valid_points, 4
         model_matrix = camera.get_model_matrix() # opengl camera to world, must be called after scene.update_render()
         points_world = points_opengl @ model_matrix[:3, :3].T + model_matrix[:3, 3] # N. 3
-        points_color = (np.clip(points_color, 0, 1) * 255).astype(np.uint8)
+        points_world = points_world.astype(np.float64)
+        points_color = (np.clip(points_color, 0, 1)).astype(np.float64)
+        points_color = points_color[..., :3]
         
         if show_pc:
             pc = trimesh.points.PointCloud(points_world, colors=points_color)
@@ -138,9 +140,9 @@ class BaseEnv():
         depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
         
         if return_point_cloud:
-            return rgb_numpy, depth_numpy, points_world
+            return rgb_numpy, depth_numpy, points_world, points_color
         else:    
-            return rgb_numpy, depth_numpy
+            return rgb_numpy, depth_numpy, None, None
     
     def capture_segmentation(self):
         camera = self.camera
@@ -271,16 +273,27 @@ class BaseEnv():
         ee_quat = ee_link.get_pose().q
         return ee_pos, ee_quat # numpy array
     
-    def detect_grasp_anygrasp(self, points, colors, vis=False):
+    def detect_grasp_anygrasp(self, points, colors, vis=True):
         '''
         If you want to use AnyGrasp, check out https://github.com/graspnet/anygrasp_sdk to setup the SDK and put the `checkpoint_detection.tar` checkpoint to `assets/ckpts/`.
         
         And `gsnet.so`, `lib_cxx.so`, and `license/` should be in the project root directory.
         '''
+        # 这里由于传入的 points 是在世界坐标系下，且世界坐标系的z轴默认向上，但是 anygrasp 需要 z 轴是向下的，所以需要坐标系转换
         points = points.astype(np.float32)
         colors = colors.astype(np.float32)
-        points_input = points.copy()
+        points_input = points.copy() # N, 3
         colors_input = colors.copy()
+        
+        # 坐标系转换,将世界坐标系绕着 x 轴旋转 180 度得到 grasp 坐标系
+        Tw2grasp = np.array([
+            [1, 0, 0],
+            [0, -1, 0],
+            [0, 0, -1]
+        ])
+        points_input = points_input @ Tw2grasp.T
+        points_input = points_input.astype(np.float32)
+        Tgrasp2w = Tw2grasp.T
         
         from gsnet import AnyGrasp # gsnet.so
         # get a argument namespace
@@ -289,19 +302,29 @@ class BaseEnv():
         cfgs.max_gripper_width = 0.1
         cfgs.gripper_height = 0.03
         cfgs.top_down_grasp = False
-        cfgs.debug = False
+        cfgs.debug = vis
         model = AnyGrasp(cfgs)
         model.load_net()
         
         lims = [-1, 1, -1, 1, -1, 1]
         gg, cloud = model.get_grasp(points_input, colors_input, lims, \
-            # apply_object_mask=True, dense_grasp=True, collision_detection=True
+            apply_object_mask=True, dense_grasp=False, collision_detection=True
                                        )
         print('grasp num:', len(gg))
+        gg = gg.nms().sort_by_score()
+        gg = gg[0:20]
+        
         if vis:
             grippers = gg.to_open3d_geometry_list()
             o3d.visualization.draw_geometries([*grippers, cloud])
+            
         # gg[0] has .score .width .rotation_matrix .translation
         # 输出的 gripper 的坐标系为 x 指向物体内部，y 指向物体的宽度
+        
+        # 将预测的 grasp pose 从 grasp 坐标系转换回世界坐标系
+        zero_translation = np.array([[0], [0], [0]])
+        Tgrasp2w = np.hstack((Tgrasp2w, zero_translation))
+        for grasp in gg:
+            grasp.transform(Tgrasp2w)
         return gg
     

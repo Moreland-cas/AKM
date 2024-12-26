@@ -2,7 +2,7 @@ import sapien
 import mplib
 from embodied_analogy.base_env import BaseEnv
 from embodied_analogy.process_record import RecordDataReader
-from embodied_analogy.utils import draw_red_dot, uv_to_camera, camera_to_world
+from embodied_analogy.utils import draw_red_dot, uv_to_camera, camera_to_world, visualize_pc
 from embodied_analogy.image_matching import match_points
 from PIL import Image
 import numpy as np
@@ -65,10 +65,19 @@ class ImitateEnv(BaseEnv):
             self.step()
             
         # 获取target场景初始位置的rgb图
-        target_img_np, target_depth_np, target_pc = self.capture_rgb_depth(
+        target_img_np, target_depth_np, target_pc, target_pc_color = self.capture_rgb_depth(
             return_point_cloud=True,
             show_pc=False,
         )
+        # 测试抓取
+        # visualize_pc(target_pc, target_pc_color)
+        
+        # mask 掉地面
+        ground_mask = target_pc[:, 2] > 0.01
+        target_pc = target_pc[ground_mask] 
+        target_pc_color = target_pc_color[ground_mask]
+        
+        self.detect_grasp_anygrasp(target_pc, target_pc_color, vis=True)
         
         # load franka after capture first image so that franka pc are not in the captured data
         self.load_franka_arm()
@@ -77,14 +86,11 @@ class ImitateEnv(BaseEnv):
         for i in range(100):
             self.step()
         
-            
         self.setup_planner()
         
         # update pointcloud to avoid collision
-        target_pc = target_pc[target_pc[:, 2] > 0.01] # 去除地面的point cloud
-        import trimesh
-        pc = trimesh.points.PointCloud(target_pc)
-        pc.show()
+        # pc = trimesh.points.PointCloud(target_pc)
+        # pc.show()
         self.update_pointcloud_for_avoidance(target_pc)
         
         target_img_pil = Image.fromarray(target_img_np)

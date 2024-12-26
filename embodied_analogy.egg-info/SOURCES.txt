@@ -1,7 +1,10 @@
 setup.py
 embodied_analogy/__init__.py
-embodied_analogy/manipulate_franka.py
-embodied_analogy/play_recorded_data.py
+embodied_analogy/base_env.py
+embodied_analogy/image_matching.py
+embodied_analogy/imitate_record.py
+embodied_analogy/process_record.py
+embodied_analogy/record_data.py
 embodied_analogy/trimesh_utils.py
 embodied_analogy/utils.py
 embodied_analogy.egg-info/PKG-INFO

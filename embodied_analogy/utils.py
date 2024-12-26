@@ -3,6 +3,7 @@ from PIL import Image
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import cv2
+import open3d as o3d
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -263,3 +264,10 @@ def camera_to_world(point_camera, extrinsic_matrix):
     point_world = np.dot(R.T, (point_camera - t))  # R^T * (P_camera - t)
     
     return point_world
+
+def visualize_pc(points, colors):
+    # visualize pointcloud
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+    o3d.visualization.draw_geometries([pcd])

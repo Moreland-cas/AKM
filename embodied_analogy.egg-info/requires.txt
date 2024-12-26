@@ -6,3 +6,5 @@ transforms3d
 trimesh
 ftfy
 regex
+mplib==0.2.1
+pyglet<2

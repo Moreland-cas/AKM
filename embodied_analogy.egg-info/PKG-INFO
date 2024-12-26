@@ -11,3 +11,5 @@ Requires-Dist: transforms3d
 Requires-Dist: trimesh
 Requires-Dist: ftfy
 Requires-Dist: regex
+Requires-Dist: mplib==0.2.1
+Requires-Dist: pyglet<2
