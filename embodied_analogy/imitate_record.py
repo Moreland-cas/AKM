@@ -76,6 +76,8 @@ class ImitateEnv(BaseEnv):
         # 让机械手臂复原
         for i in range(100):
             self.step()
+        
+            
         self.setup_planner()
         
         # update pointcloud to avoid collision
@@ -113,6 +115,7 @@ class ImitateEnv(BaseEnv):
         
         ph_pos = self.DataReader.panda_hand_pos
         ph_quat = self.DataReader.panda_hand_quat
+         
             
         for i in range(len(target_uvs)):
             # print(i)

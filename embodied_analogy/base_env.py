@@ -1,10 +1,12 @@
 import mplib
 import numpy as np
+import argparse
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 from embodied_analogy.utils import *
 from PIL import Image, ImageColor
 import trimesh
+import open3d as o3d
 
 class BaseEnv():
     def __init__(
@@ -268,4 +270,38 @@ class BaseEnv():
         ee_pos = ee_link.get_pose().p
         ee_quat = ee_link.get_pose().q
         return ee_pos, ee_quat # numpy array
+    
+    def detect_grasp_anygrasp(self, points, colors, vis=False):
+        '''
+        If you want to use AnyGrasp, check out https://github.com/graspnet/anygrasp_sdk to setup the SDK and put the `checkpoint_detection.tar` checkpoint to `assets/ckpts/`.
+        
+        And `gsnet.so`, `lib_cxx.so`, and `license/` should be in the project root directory.
+        '''
+        points = points.astype(np.float32)
+        colors = colors.astype(np.float32)
+        points_input = points.copy()
+        colors_input = colors.copy()
+        
+        from gsnet import AnyGrasp # gsnet.so
+        # get a argument namespace
+        cfgs = argparse.Namespace()
+        cfgs.checkpoint_path = 'assets/ckpts/checkpoint_detection.tar'
+        cfgs.max_gripper_width = 0.1
+        cfgs.gripper_height = 0.03
+        cfgs.top_down_grasp = False
+        cfgs.debug = False
+        model = AnyGrasp(cfgs)
+        model.load_net()
+        
+        lims = [-1, 1, -1, 1, -1, 1]
+        gg, cloud = model.get_grasp(points_input, colors_input, lims, \
+            # apply_object_mask=True, dense_grasp=True, collision_detection=True
+                                       )
+        print('grasp num:', len(gg))
+        if vis:
+            grippers = gg.to_open3d_geometry_list()
+            o3d.visualization.draw_geometries([*grippers, cloud])
+        # gg[0] has .score .width .rotation_matrix .translation
+        # 输出的 gripper 的坐标系为 x 指向物体内部，y 指向物体的宽度
+        return gg
     
