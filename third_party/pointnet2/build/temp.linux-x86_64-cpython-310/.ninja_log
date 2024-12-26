@@ -1,0 +1,23 @@
+# ninja log v5
+0	8327	1735020287036812704	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query_gpu.o	2d40408e63946eff
+0	8604	1735020287316813933	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query.o	643e6ab2efeed58e
+0	8622	1735020287336814021	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query.o	6194de260c994ff2
+0	8823	1735020287536814900	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/bindings.o	1ca2b4af7f17f9f
+8330	16866	1735020295572850714	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query_gpu.o	7b93e96959c4f31c
+8623	17108	1735020295816851817	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points_gpu.o	4a05e7b9c0a13c9c
+8604	17279	1735020295988852593	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points.o	9eb9c86d0267bfc4
+8823	17702	1735020296416854534	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate.o	4cd0e32b9d1c1075
+16866	25234	1735020303944889096	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate_gpu.o	744aa6477668034f
+17108	25674	1735020304388891164	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling.o	8c0f8b19e057bd48
+17279	25796	1735020304504891704	/home/zby/Programs/anygrasp_sdk/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling_gpu.o	b2f07ee6bf84b02e
+2	9325	1735203207240469275	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query.o	4a7041b853778528
+2	9338	1735203207248469200	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points.o	a530a31597d3ebbc
+2	9425	1735203207340468336	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate.o	a47fc2c0c3d601a4
+2	9661	1735203207572466159	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query_gpu.o	5b9ed3e57552c232
+3	9747	1735203207664465296	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling.o	b9802fbf7697e8a8
+2	10021	1735203207940462706	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query.o	d7b857200435d289
+2	10171	1735203208084461355	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query_gpu.o	2653f41a8ed0986e
+2	10412	1735203208324459105	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points_gpu.o	2c49837a2cad5d4c
+3	10946	1735203208860454081	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling_gpu.o	5e096271d455766
+2	12295	1735203210208441459	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate_gpu.o	bd39592f928de366
+2	12893	1735203210812435808	/home/zby/Programs/Embodied_Analogy/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/bindings.o	d450f01fd154235b
