@@ -99,16 +99,18 @@ def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
     
     return np.array(selected_points), np.array(selected_probs)
 
-def match_points(image_path_1, 
-                 image_path_2, 
-                 left_point, 
-                 top_k=100, 
-                 max_return=5,
-                 resize=224, 
-                 device="cuda", 
-                 is_pil=False, 
-                 show_matching=False, 
-                 nms_threshold=0.05):
+def match_points(
+    image_path_1, 
+    image_path_2, 
+    left_point, 
+    top_k=100, 
+    max_return=5,
+    resize=224, 
+    device="cuda", 
+    is_pil=False, 
+    nms_threshold=0.05,
+    visualize=False, 
+    ):
     """
     在右图上找到与左图指定点匹配的点。根据相似度分布采样若干个点。
     
@@ -166,7 +168,7 @@ def match_points(image_path_1,
     # 应用NMS选择最终的匹配点
     final_points_uv, final_probs = nms_selection(target_points_uv, target_points_probs, threshold=nms_threshold, max_points=max_return)
     
-    if show_matching:
+    if visualize:
         plot_matching(unnorm(tensor_1)[0], unnorm(tensor_2)[0], hr_feats_1[0], hr_feats_2[0], similarity_map)
     
     return final_points_uv, final_probs, similarity_map

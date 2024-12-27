@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import cv2
 import open3d as o3d
+import graspnetAPI
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -265,9 +266,17 @@ def camera_to_world(point_camera, extrinsic_matrix):
     
     return point_world
 
-def visualize_pc(points, colors):
+def visualize_pc(points, colors, grasp):
     # visualize pointcloud
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
-    pcd.colors = o3d.utility.Vector3dVector(colors)
-    o3d.visualization.draw_geometries([pcd])
+    if colors is not None:
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+    if isinstance(grasp, graspnetAPI.grasp.Grasp):
+        grasp_o3d = grasp.to_open3d_geometry()
+        o3d.visualization.draw_geometries([grasp_o3d, pcd])
+    elif isinstance(grasp, graspnetAPI.grasp.GraspGroup):
+        grasp_o3ds = grasp.to_open3d_geometry_list()
+        o3d.visualization.draw_geometries([*grasp_o3ds, pcd])
+    else:
+        o3d.visualization.draw_geometries([pcd])

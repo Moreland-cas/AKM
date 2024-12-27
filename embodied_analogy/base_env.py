@@ -5,7 +5,6 @@ import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 from embodied_analogy.utils import *
 from PIL import Image, ImageColor
-import trimesh
 import open3d as o3d
 
 class BaseEnv():
@@ -106,7 +105,7 @@ class BaseEnv():
         # rgb_pil = Image.fromarray(rgb_numpy)
         return rgb_numpy
     
-    def capture_rgb_depth(self, return_point_cloud=False, show_pc=False):
+    def capture_rgbd(self, return_point_cloud=False, visualize=False):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
@@ -127,9 +126,8 @@ class BaseEnv():
         points_color = (np.clip(points_color, 0, 1)).astype(np.float64)
         points_color = points_color[..., :3]
         
-        if show_pc:
-            pc = trimesh.points.PointCloud(points_world, colors=points_color)
-            pc.show()
+        if visualize:
+            visualize_pc(points_world, points_color, None)
             
         # get depth image
         depth = -position[..., 2]
@@ -160,7 +158,7 @@ class BaseEnv():
         # label1_image = camera.get_actor_segmentation()
         label0_pil = Image.fromarray(color_palette[label0_image])
         label1_pil = Image.fromarray(color_palette[label1_image])
-        label1_pil.show()
+        # label1_pil.show()
         # label0_pil.save("label0.png")
         return label1_image
         
@@ -173,7 +171,15 @@ class BaseEnv():
         
         lift_joint = self.asset.get_joints()[-1]
         lift_joint.set_limit(np.array([0, 0.3]))
-
+        
+    def load_panda_hand(self, scale=1., pos=[0, 0, 0], quat=[1, 0, 0, 0]):
+        loader: sapien.URDFLoader = self.scene.create_urdf_loader()
+        loader.scale = scale
+        loader.fix_root_link = True
+        self.asset = loader.load(self.asset_prefix + f"/panda/panda_v2_gripper.urdf")
+        self.asset.set_root_pose(sapien.Pose(pos, quat))
+        return self.asset
+        
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
         joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
@@ -235,7 +241,7 @@ class BaseEnv():
         for i in range(200):
             self.step()
     
-    def move_to_pose_with_RRTConnect(self, pose, wrt_world):
+    def move_to_pose_with_RRTConnect(self, pose: mplib.pymp.Pose, wrt_world: bool):
         result = self.planner.plan_pose(
             goal_pose=pose, 
             current_qpos=self.robot.get_qpos(), 
@@ -251,18 +257,8 @@ class BaseEnv():
         self.follow_path(result)
         return 0
     
-    def move_to_pose(self, pose, wrt_world):
-        # 加一个循环尝试，如果当前target_pose不行，就尝试 0.99 * target_pose + 0.01 * current_pose
-        # target_pos = pose.p.copy()
-        # current_pos = self.get_ee_pose()[0]
-        # max_num_tries = 3
-        # cur_tries = 0
+    def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
         status = self.move_to_pose_with_RRTConnect(pose, wrt_world)
-        # while status < 0 and cur_tries < max_num_tries:
-        #     pose.p = 0.95 * pose.p + 0.05 * current_pos
-        #     status = self.move_to_pose_with_RRTConnect(pose, wrt_world)
-        #     cur_tries += 1
-        #     print(f"try again, now: start_p = {current_pos}, inter_p = {pose.p}, target_p = {target_pos}")
         return status
     
     def get_ee_pose(self):
@@ -273,13 +269,16 @@ class BaseEnv():
         ee_quat = ee_link.get_pose().q
         return ee_pos, ee_quat # numpy array
     
-    def detect_grasp_anygrasp(self, points, colors, vis=True):
+    def detect_grasp_anygrasp(self, points, colors, visualize=True):
         '''
-        If you want to use AnyGrasp, check out https://github.com/graspnet/anygrasp_sdk to setup the SDK and put the `checkpoint_detection.tar` checkpoint to `assets/ckpts/`.
+        输入世界坐标系下的点云和颜色, 返回 grasp_group
         
-        And `gsnet.so`, `lib_cxx.so`, and `license/` should be in the project root directory.
+        定义 grasp 坐标系为 xy 轴平行地面, z 轴指向重力方向
+        定义 gripper 坐标系为 x 轴指向物体内部, y 轴指向物体的宽度
+        
         '''
-        # 这里由于传入的 points 是在世界坐标系下，且世界坐标系的z轴默认向上，但是 anygrasp 需要 z 轴是向下的，所以需要坐标系转换
+        # 传入的点是在世界坐标系下的(xy 轴平行地面, z 轴指向重力反方向)
+        # 因此首先将世界坐标系下的点转换到 grasp 坐标系下
         points = points.astype(np.float32)
         colors = colors.astype(np.float32)
         points_input = points.copy() # N, 3
@@ -291,18 +290,18 @@ class BaseEnv():
             [0, -1, 0],
             [0, 0, -1]
         ])
-        points_input = points_input @ Tw2grasp.T
+        points_input = points_input @ Tw2grasp.T # N, 3
         points_input = points_input.astype(np.float32)
-        Tgrasp2w = Tw2grasp.T
         
         from gsnet import AnyGrasp # gsnet.so
         # get a argument namespace
         cfgs = argparse.Namespace()
         cfgs.checkpoint_path = 'assets/ckpts/checkpoint_detection.tar'
         cfgs.max_gripper_width = 0.1
-        cfgs.gripper_height = 0.03
+        # cfgs.gripper_height = 0.03
+        cfgs.gripper_height = 0.0
         cfgs.top_down_grasp = False
-        cfgs.debug = vis
+        cfgs.debug = visualize
         model = AnyGrasp(cfgs)
         model.load_net()
         
@@ -311,20 +310,17 @@ class BaseEnv():
             apply_object_mask=True, dense_grasp=False, collision_detection=True
                                        )
         print('grasp num:', len(gg))
-        gg = gg.nms().sort_by_score()
-        gg = gg[0:20]
         
-        if vis:
+        if visualize:
             grippers = gg.to_open3d_geometry_list()
             o3d.visualization.draw_geometries([*grippers, cloud])
             
-        # gg[0] has .score .width .rotation_matrix .translation
-        # 输出的 gripper 的坐标系为 x 指向物体内部，y 指向物体的宽度
-        
+        # 此时的 gg 中的 rotation 和 translation 对应 Tgripper2grasp
         # 将预测的 grasp pose 从 grasp 坐标系转换回世界坐标系
         zero_translation = np.array([[0], [0], [0]])
+        Tgrasp2w = Tw2grasp.T
         Tgrasp2w = np.hstack((Tgrasp2w, zero_translation))
-        for grasp in gg:
-            grasp.transform(Tgrasp2w)
+        gg.transform(Tgrasp2w)
+        # 此时的 gg 中的 rotation 和 translation 对应 Tgripper2world
         return gg
     

@@ -59,15 +59,33 @@ class ImitateEnv(BaseEnv):
     
     def is_task_success(self):
         return False
+    
+    def find_nearest_grasp(self, grasp_group, contact_point):
+        '''
+            grasp_group: graspnetAPI 
+            contact_point: (3, )
+        '''
+        # 找到 grasp_group 中距离 contact_point 最近的 grasp 并返回
+        # 首先根据 grasp 的 score 排序, 筛选出前20
+        grasp_group = grasp_group.nms().sort_by_score()
+        grasp_group = grasp_group[0:50]
+        
+        # 找到距离 contact_point 最近的 grasp
+        translations = grasp_group.translations # N, 3
+        distances = np.linalg.norm(translations - contact_point, axis=1)
+        nearest_index = np.argmin(distances)
+        nearest_index = int(nearest_index)
+        return grasp_group[nearest_index]
+    
     def imitate_from_record(self):
         # 让物体落下
         for i in range(100):
             self.step()
             
         # 获取target场景初始位置的rgb图
-        target_img_np, target_depth_np, target_pc, target_pc_color = self.capture_rgb_depth(
+        target_img_np, target_depth_np, target_pc, target_pc_color = self.capture_rgbd(
             return_point_cloud=True,
-            show_pc=False,
+            visualize=False,
         )
         # 测试抓取
         # visualize_pc(target_pc, target_pc_color)
@@ -77,7 +95,8 @@ class ImitateEnv(BaseEnv):
         target_pc = target_pc[ground_mask] 
         target_pc_color = target_pc_color[ground_mask]
         
-        self.detect_grasp_anygrasp(target_pc, target_pc_color, vis=True)
+        self.grasp_group = self.detect_grasp_anygrasp(target_pc, target_pc_color, visualize=False)
+        # visualize_pc(target_pc, target_pc_color, self.grasp_group)
         
         # load franka after capture first image so that franka pc are not in the captured data
         self.load_franka_arm()
@@ -89,8 +108,6 @@ class ImitateEnv(BaseEnv):
         self.setup_planner()
         
         # update pointcloud to avoid collision
-        # pc = trimesh.points.PointCloud(target_pc)
-        # pc.show()
         self.update_pointcloud_for_avoidance(target_pc)
         
         target_img_pil = Image.fromarray(target_img_np)
@@ -106,8 +123,8 @@ class ImitateEnv(BaseEnv):
             resize=798, 
             device="cuda",
             is_pil=True,
-            show_matching=True,
-            nms_threshold=0.002
+            nms_threshold=0.002,
+            visualize=False
         )
         
         # for i in range(len(target_uvs)):
@@ -139,20 +156,50 @@ class ImitateEnv(BaseEnv):
             
             point_camera = uv_to_camera(target_u, target_v, depth, K, depth_w, depth_h)
             extrinsic_matric = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
-            contact_pos = camera_to_world(point_camera, extrinsic_matric)
+            contact_point = camera_to_world(point_camera, extrinsic_matric)
             
+            # 如果 contact_point 没有落在物体上
             if actor_level_seg[row, col] < 2:
-                self.spawn_cube(contact_pos, color=[1, 0, 0])
+                self.spawn_cube(contact_point, color=[1, 0, 0])
                 print(f"{i} not in mask")
                 continue
             else:
-                self.spawn_cube(contact_pos, color=[0, 1, 0])
-                
-            contact_pos += np.array([0, 0, 0.08])
+                self.spawn_cube(contact_point, color=[0, 1, 0])
+            
+            # 找到与 contact_point 最近的 grasp, 即得到了 Tgrasp2w, 但这里的 grasp 和 panda_hand 坐标系还不同
+            grasp = self.find_nearest_grasp(self.grasp_group, contact_point)
+            visualize_pc(target_pc, target_pc_color, grasp)
+            Tgrasp2w_R = grasp.rotation_matrix # 3, 3
+            Tgrasp2w_t = grasp.translation # 3
+            Tgrasp2w = np.hstack((Tgrasp2w_R, Tgrasp2w_t[..., None])) # 3, 4
+            Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
+            
+            # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
+            Tph2grasp = np.array([
+                [0, 0, 1, -0.07], 
+                [0, 1, 0, 0], 
+                [-1, 0, 0, 0], 
+                [0, 0, 0, 1]
+            ])
+            Tph2w = Tgrasp2w @ Tph2grasp # 4, 4
+            
             self.open_gripper()
             
-            target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
-            target_pose = mplib.Pose(p=contact_pos, q=target_quat)
+            # target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
+            # target_pose = mplib.Pose(p=contact_point, q=target_quat)
+            target_pose = mplib.Pose(Tph2w)
+            
+            if False:
+                step = 0
+                ph = self.load_panda_hand(pos=Tph2w[:3, 3] + [0, 0, 2], quat=t3d.quaternions.mat2quat(Tph2w[:3, :3]))
+                while not self.viewer.closed:
+                    step += 1
+                    step = step % 200
+                    if step % 200 == 0:
+                        self.scene.remove_articulation(ph)
+                        ph = self.load_panda_hand(pos=Tph2w[:3, 3] + [0, 0, 0.3], quat=t3d.quaternions.mat2quat(Tph2w[:3, :3]))
+                    self.step()   
+            
             status = self.move_to_pose(target_pose, wrt_world=True)
             
             if status < 0:
@@ -163,8 +210,8 @@ class ImitateEnv(BaseEnv):
             
             cur_pos, cur_quat = self.get_ee_pose()
             # 只执行一半的lift motion
-            for i in range(int(len(ph_pos) * 0.5)):
-                self.move_to_pose(mplib.Pose(p=cur_pos + ph_pos[i], q=ph_quat[i]), wrt_world=True)
+            for i in range(int(len(ph_pos) * 0.25)):
+                self.move_to_pose(mplib.Pose(p=cur_pos + ph_pos[i], q=t3d.quaternions.mat2quat(Tph2w[:3, :3])), wrt_world=True)
                 
             if self.is_task_success():
                 break
