@@ -299,7 +299,7 @@ class BaseEnv():
         cfgs.checkpoint_path = 'assets/ckpts/checkpoint_detection.tar'
         cfgs.max_gripper_width = 0.1
         # cfgs.gripper_height = 0.03
-        cfgs.gripper_height = 0.0
+        cfgs.gripper_height = 0.01
         cfgs.top_down_grasp = False
         cfgs.debug = visualize
         model = AnyGrasp(cfgs)
