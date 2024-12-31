@@ -3,7 +3,7 @@ import mplib
 from embodied_analogy.base_env import BaseEnv
 from embodied_analogy.process_record import RecordDataReader
 from embodied_analogy.utils import draw_red_dot, uv_to_camera, camera_to_world, visualize_pc
-from embodied_analogy.image_matching import match_points
+from embodied_analogy.dino_featup import match_points_dino_featup
 from PIL import Image
 import numpy as np
 import transforms3d as t3d
@@ -101,6 +101,10 @@ class ImitateEnv(BaseEnv):
         # load franka after capture first image so that franka pc are not in the captured data
         self.load_franka_arm()
         
+        # while not self.viewer.closed:
+        #     self.step()  
+            
+        
         # 让机械手臂复原
         for i in range(100):
             self.step()
@@ -114,7 +118,7 @@ class ImitateEnv(BaseEnv):
         source_img_pil = self.DataReader.source_img
         source_u, source_v = self.DataReader.first_cp_2d
         
-        target_uvs, target_probs, similarity_map = match_points(
+        target_uvs, target_probs, similarity_map = match_points_dino_featup(
             source_img_pil, 
             target_img_pil, 
             (source_u, source_v), 
@@ -160,23 +164,25 @@ class ImitateEnv(BaseEnv):
             
             # 如果 contact_point 没有落在物体上
             if actor_level_seg[row, col] < 2:
-                self.spawn_cube(contact_point, color=[1, 0, 0])
+                # self.spawn_cube(contact_point, color=[1, 0, 0])
                 print(f"{i} not in mask")
                 continue
             else:
-                self.spawn_cube(contact_point, color=[0, 1, 0])
+                pass
+                # self.spawn_cube(contact_point, color=[0, 1, 0])
             
             # 找到与 contact_point 最近的 grasp, 即得到了 Tgrasp2w, 但这里的 grasp 和 panda_hand 坐标系还不同
             grasp = self.find_nearest_grasp(self.grasp_group, contact_point)
-            visualize_pc(target_pc, target_pc_color, grasp)
+            # visualize_pc(target_pc, target_pc_color, grasp)
             Tgrasp2w_R = grasp.rotation_matrix # 3, 3
             Tgrasp2w_t = grasp.translation # 3
             Tgrasp2w = np.hstack((Tgrasp2w_R, Tgrasp2w_t[..., None])) # 3, 4
             Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
             
             # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
+            offset = 0.03
             Tph2grasp = np.array([
-                [0, 0, 1, -0.07], 
+                [0, 0, 1, -(0.045 + 0.069 - offset)], 
                 [0, 1, 0, 0], 
                 [-1, 0, 0, 0], 
                 [0, 0, 0, 1]
@@ -188,35 +194,22 @@ class ImitateEnv(BaseEnv):
             # target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
             # target_pose = mplib.Pose(p=contact_point, q=target_quat)
             target_pose = mplib.Pose(Tph2w)
-            
-            if False:
-                step = 0
-                ph = self.load_panda_hand(pos=Tph2w[:3, 3] + [0, 0, 2], quat=t3d.quaternions.mat2quat(Tph2w[:3, :3]))
-                while not self.viewer.closed:
-                    step += 1
-                    step = step % 200
-                    if step % 200 == 0:
-                        self.scene.remove_articulation(ph)
-                        ph = self.load_panda_hand(pos=Tph2w[:3, 3] + [0, 0, 0.3], quat=t3d.quaternions.mat2quat(Tph2w[:3, :3]))
-                    self.step()   
-            
             status = self.move_to_pose(target_pose, wrt_world=True)
             
             if status < 0:
                 print(f"{i} not reachable")
                 continue
-                
+            
             self.close_gripper()
             
+            # traj imitation
             cur_pos, cur_quat = self.get_ee_pose()
-            # 只执行一半的lift motion
-            for i in range(int(len(ph_pos) * 0.25)):
+            for i in range(int(len(ph_pos) * 0.1)):
                 self.move_to_pose(mplib.Pose(p=cur_pos + ph_pos[i], q=t3d.quaternions.mat2quat(Tph2w[:3, :3])), wrt_world=True)
                 
-            if self.is_task_success():
-                break
-            else:
-                self.reset_franka_arm()
+            self.reset_franka_arm()
+            # for i in range(100):
+            #     self.step()
         
         while not self.viewer.closed:
             self.step()        

@@ -1,10 +1,15 @@
 import pygame
+import torch
 from PIL import Image
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import cv2
 import open3d as o3d
 import graspnetAPI
+from pytorch_lightning import seed_everything
+from featup.util import pca, remove_axes
+import matplotlib.pyplot as plt
+from scipy.spatial.distance import cdist
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -280,3 +285,58 @@ def visualize_pc(points, colors, grasp):
         o3d.visualization.draw_geometries([*grasp_o3ds, pcd])
     else:
         o3d.visualization.draw_geometries([pcd])
+        
+
+@torch.no_grad()
+def plot_matching(image1, image2, hr1, hr2, span):
+    seed_everything(0)
+    [hr_feats_pca_1, hr_feats_pca_2], _ = pca([hr1.unsqueeze(0), hr2.unsqueeze(0)])
+    fig, ax = plt.subplots(1, 5, figsize=(25, 5))
+    ax[0].imshow(image1.permute(1, 2, 0).detach().cpu())
+    ax[0].set_title("Image 1")
+    ax[1].imshow(image2.permute(1, 2, 0).detach().cpu())
+    ax[1].set_title("Image 2")
+    ax[2].imshow(hr_feats_pca_1[0].permute(1, 2, 0).detach().cpu())
+    ax[2].set_title("Features 1")
+    ax[3].imshow(hr_feats_pca_2[0].permute(1, 2, 0).detach().cpu())
+    ax[3].set_title("Features 2")
+    ax[4].imshow(span.detach().cpu(), cmap='jet') # "viridis"
+    ax[4].set_title("Span")
+    remove_axes(ax)
+    plt.show()
+
+def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
+    """
+    Apply Non-Maximum Suppression (NMS) to the selected points to ensure they are not too close to each other.
+    
+    Args:
+    - points_uv (np.array): List of points' (u, v) coordinates from the top-k selection, shape (num_points, 2).
+    - probs (np.array): Corresponding probability values of the points.
+    - threshold (float): Minimum distance between points (in normalized coordinates) for them to be kept.
+    - max_points (int): Maximum number of points to return after NMS.
+    
+    Returns:
+    - nms_points (np.array): The selected points after applying NMS.
+    - nms_probs (np.array): Corresponding probability values of the NMS points.
+    """
+    selected_points = []
+    selected_probs = []
+    
+    # Keep track of the remaining candidates
+    candidates = list(range(len(points_uv)))
+    
+    while candidates and len(selected_points) < max_points:
+        # Select the point with the highest probability
+        best_idx = np.argmax(probs[candidates])
+        best_point = points_uv[candidates[best_idx]]
+        best_prob = probs[candidates[best_idx]]
+        
+        # Add the best point to the selected list
+        selected_points.append(best_point)
+        selected_probs.append(best_prob)
+        
+        # Remove candidates that are too close to the selected point
+        distances = cdist([best_point], points_uv[candidates], metric='euclidean')
+        candidates = [i for i, dist in zip(candidates, distances[0]) if dist >= threshold]
+    
+    return np.array(selected_points), np.array(selected_probs)

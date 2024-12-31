@@ -1,34 +1,13 @@
 import torch
 from PIL import Image
 import numpy as np
-import random
 from sklearn.metrics.pairwise import cosine_similarity
+from typing import List, Union
 from featup.util import norm, unnorm
 import torchvision.transforms as T
 import torch.nn.functional as F
 from featup.plotting import plot_feats, plot_lang_heatmaps
-from pytorch_lightning import seed_everything
-from featup.util import pca, remove_axes
-import matplotlib.pyplot as plt
-from scipy.spatial.distance import cdist
-
-@torch.no_grad()
-def plot_matching(image1, image2, hr1, hr2, span):
-    seed_everything(0)
-    [hr_feats_pca_1, hr_feats_pca_2], _ = pca([hr1.unsqueeze(0), hr2.unsqueeze(0)])
-    fig, ax = plt.subplots(1, 5, figsize=(25, 5))
-    ax[0].imshow(image1.permute(1, 2, 0).detach().cpu())
-    ax[0].set_title("Image 1")
-    ax[1].imshow(image2.permute(1, 2, 0).detach().cpu())
-    ax[1].set_title("Image 2")
-    ax[2].imshow(hr_feats_pca_1[0].permute(1, 2, 0).detach().cpu())
-    ax[2].set_title("Features 1")
-    ax[3].imshow(hr_feats_pca_2[0].permute(1, 2, 0).detach().cpu())
-    ax[3].set_title("Features 2")
-    ax[4].imshow(span.detach().cpu(), cmap='jet') # "viridis"
-    ax[4].set_title("Span")
-    remove_axes(ax)
-    plt.show()
+from embodied_analogy.utils import plot_matching, nms_selection
     
 def load_featup_dino_model(device="cuda"):
     """
@@ -63,43 +42,25 @@ def extract_features(image_tensor, model):
         hr_feats = model(image_tensor) # 1 384 h w
     return hr_feats
 
-def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
-    """
-    Apply Non-Maximum Suppression (NMS) to the selected points to ensure they are not too close to each other.
-    
-    Args:
-    - points_uv (np.array): List of points' (u, v) coordinates from the top-k selection, shape (num_points, 2).
-    - probs (np.array): Corresponding probability values of the points.
-    - threshold (float): Minimum distance between points (in normalized coordinates) for them to be kept.
-    - max_points (int): Maximum number of points to return after NMS.
-    
-    Returns:
-    - nms_points (np.array): The selected points after applying NMS.
-    - nms_probs (np.array): Corresponding probability values of the NMS points.
-    """
-    selected_points = []
-    selected_probs = []
-    
-    # Keep track of the remaining candidates
-    candidates = list(range(len(points_uv)))
-    
-    while candidates and len(selected_points) < max_points:
-        # Select the point with the highest probability
-        best_idx = np.argmax(probs[candidates])
-        best_point = points_uv[candidates[best_idx]]
-        best_prob = probs[candidates[best_idx]]
-        
-        # Add the best point to the selected list
-        selected_points.append(best_point)
-        selected_probs.append(best_prob)
-        
-        # Remove candidates that are too close to the selected point
-        distances = cdist([best_point], points_uv[candidates], metric='euclidean')
-        candidates = [i for i, dist in zip(candidates, distances[0]) if dist >= threshold]
-    
-    return np.array(selected_points), np.array(selected_probs)
+def match_point_with_featmap(
+    feat_1: torch.Tensor, 
+    feat_2: torch.Tensor,
+    uv_1: List[float],
+    visualize: bool=False, 
+):
+    """_summary_
 
-def match_points(
+    Args:
+        feat_1 (torch.Tensor): 1, C, H, W
+        feat_2 (torch.Tensor): 1, C, H, W
+        uv_1 (List[float]): [u, v], u and v are in [0, 1]
+        visualize (bool): whether to visualize the matching probability map
+    return:
+        prob_map (torch.Tensor): H, W, range [0, 1]
+    """
+    pass
+
+def match_points_dino_featup(
     image_path_1, 
     image_path_2, 
     left_point, 
@@ -127,6 +88,7 @@ def match_points(
     - sampled_points (list): 在右图中找到的与左图指定点匹配的点坐标
     - matching_probabilities (Tensor): top_k个匹配点的相似度概率
     """
+    # 分为匹配特征 + nms 两部分
     upsampler = load_featup_dino_model(device)
     
     # 预处理图像并提取特征
@@ -178,8 +140,7 @@ if __name__ == "__main__":
     path2 = "tom.jpg"
     left_point = (0.6, 0.2)  # 左图中归一化到[0, 1]的坐标
     # 执行匹配
-    tensor_1, tensor_2, hr_feats_1, hr_feats_2, similarity_map = match_points(path1, path2, left_point)
+    tensor_1, tensor_2, hr_feats_1, hr_feats_2, similarity_map = match_points_dino_featup(path1, path2, left_point)
 
     plot_matching(unnorm(tensor_1)[0], unnorm(tensor_2)[0], hr_feats_1[0], hr_feats_2[0], similarity_map)
-    
     

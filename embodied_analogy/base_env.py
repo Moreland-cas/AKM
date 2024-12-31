@@ -6,6 +6,7 @@ from sapien.utils.viewer import Viewer
 from embodied_analogy.utils import *
 from PIL import Image, ImageColor
 import open3d as o3d
+import transforms3d as t3d
 
 class BaseEnv():
     def __init__(
@@ -213,6 +214,8 @@ class BaseEnv():
             
 
     def open_gripper(self):
+        for i in range(50):
+            self.step()
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(0.4)
         for i in range(100): 
@@ -223,6 +226,8 @@ class BaseEnv():
             self.step()
 
     def close_gripper(self):
+        for i in range(50):
+            self.step()
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(-0.1)
         for i in range(100):  
@@ -234,13 +239,12 @@ class BaseEnv():
         self.after_try_to_close = 1
 
     def reset_franka_arm(self):
-        # Set initial joint positions
-        init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
-        self.robot.set_qpos(init_qpos)
-        # self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
-        for i in range(200):
-            self.step()
-    
+        # reset实现为让 panda hand移动到最开始的位置，并关闭夹爪
+        self.open_gripper()
+        init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz"))
+        self.move_to_pose(pose=init_panda_hand, wrt_world=True)
+        self.close_gripper()
+        
     def move_to_pose_with_RRTConnect(self, pose: mplib.pymp.Pose, wrt_world: bool):
         result = self.planner.plan_pose(
             goal_pose=pose, 
@@ -298,8 +302,7 @@ class BaseEnv():
         cfgs = argparse.Namespace()
         cfgs.checkpoint_path = 'assets/ckpts/checkpoint_detection.tar'
         cfgs.max_gripper_width = 0.1
-        # cfgs.gripper_height = 0.03
-        cfgs.gripper_height = 0.01
+        cfgs.gripper_height = 0.03
         cfgs.top_down_grasp = False
         cfgs.debug = visualize
         model = AnyGrasp(cfgs)
