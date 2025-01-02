@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 from typing import List, Union
 import torch.nn.functional as F
+import matplotlib.cm as cm
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -132,34 +133,22 @@ def world_to_normalized_uv(world_point, K, Tw2c, image_width, image_height):
     
     return u_normalized, v_normalized
 
-def draw_red_dot(image: Image, u: float, v: float, radius: int = 1):
-    """
-    在给定的 PIL 图像上，在归一化坐标 (u, v) 处画一个红色的点。
-    
-    参数：
-    - image: 输入的 PIL Image 对象
-    - u: x 坐标，归一化到 [0, 1]
-    - v: y 坐标，归一化到 [0, 1]
-    
-    返回：
-    - 修改后的 PIL Image 对象
-    """
+def dot_on_image(image: Image, uv_list: List, radius: int = 1):
     # 获取图像的宽度和高度
     width, height = image.size
-    
-    # 将归一化坐标转换为像素坐标
-    x = int(u * width)
-    y = int(v * height)
-    
-    # 创建 ImageDraw 对象
     image_draw = image.copy()
     draw = ImageDraw.Draw(image_draw)
     
-    # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
-    if radius == 1:
-        draw.point((x, y), fill=(255, 0, 0))  # (255, 0, 0) 表示红色
-    else:
-        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 0, 0))
+    for u, v in uv_list:
+        # 将归一化坐标转换为像素坐标
+        x = int(u * width)
+        y = int(v * height)
+        
+        # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
+        if radius == 1:
+            draw.point((x, y), fill=(255, 0, 0))  # (255, 0, 0) 表示红色
+        else:
+            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 0, 0))
     return image_draw
 
 def pil_images_to_mp4(pil_images, output_filename, fps=30):
@@ -320,7 +309,7 @@ def plot_matching_2(feat1, feat2, similarity_map, uv_1):
 
     ax0_img = feat1_pca[0].permute(1, 2, 0).detach().cpu().numpy() # H, W, C
     ax0_img = Image.fromarray((ax0_img * 255).astype(np.uint8))
-    ax0_img = draw_red_dot(image=ax0_img, u=uv_1[0], v=uv_1[1], radius=3)
+    ax0_img = dot_on_image(image=ax0_img, uv_list=[uv_1], radius=3)
     ax[0].imshow(ax0_img) 
     ax[0].set_title("Features 1")
     ax[1].imshow(feat2_pca[0].permute(1, 2, 0).detach().cpu())
@@ -405,3 +394,48 @@ def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
         candidates = [i for i, dist in zip(candidates, distances[0]) if dist >= threshold]
     
     return np.array(selected_points), np.array(selected_probs)
+
+class SimilarityMap:
+    def __init__(self, similarity_map: torch.Tensor, alpha: float=20):
+        """
+            alpha: torch.exp(alpha * x) / sum(torch.exp(alpha * x))
+                alpha越大, 概率分布越sharp
+        """
+        self.similarity_map = similarity_map # H, W, in range [0, 1]
+        self.H, self.W = similarity_map.shape
+        
+        # pil image for visualization
+        # cmap = cm.get_cmap("jet")
+        cmap = cm.get_cmap("viridis")
+        colored_image = cmap(self.similarity_map.cpu().numpy())  # Returns (H, W, 4) RGBA array
+        # Convert to 8-bit RGB (ignore the alpha channel)
+        colored_image = (colored_image[:, :, :3] * 255).astype(np.uint8)
+        # Convert to PIL Image
+        self.pil_image = Image.fromarray(colored_image, mode="RGB")
+        
+        # Flatten the tensor and normalize it to create a probability distribution
+        flat_tensor = self.similarity_map.flatten()
+        exp_tensor = torch.exp(flat_tensor * alpha)
+        probabilities = exp_tensor / torch.sum(exp_tensor) # H * W
+        # Convert probabilities to numpy for sampling
+        probabilities_np = probabilities.cpu().numpy()
+        self.prob_np = probabilities_np
+
+    def sample(self, num_samples=50, visualize=True):
+        # Sample indices based on the probability distribution
+        sampled_indices = np.random.choice(len(self.prob_np), size=num_samples, p=self.prob_np, replace=False)
+        # Convert flat indices to 2D coordinates (y, x)
+        y_coords, x_coords = np.unravel_index(sampled_indices, (self.H, self.W))
+
+        # Normalize coordinates to range [0, 1]
+        u_coords = x_coords / self.W
+        v_coords = y_coords / self.H
+
+        # Combine u and v into a single array of shape (num_samples, 2)
+        sampled_coordinates = np.stack((u_coords, v_coords), axis=-1)
+        
+        if visualize:
+            img = dot_on_image(self.pil_image, sampled_coordinates, radius=3)
+            img.show()
+            
+        return sampled_coordinates
