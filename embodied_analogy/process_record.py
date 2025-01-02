@@ -1,5 +1,5 @@
 import numpy as np
-from embodied_analogy.utils import draw_red_dot, pil_images_to_mp4
+from embodied_analogy.utils import dot_on_image, pil_images_to_mp4
 from PIL import Image
 
 class RecordDataReader():
@@ -52,7 +52,7 @@ class RecordDataReader():
             cp_2d = data_dict["contact_points_2d"] # N, 2
             if len(cp_2d) > 0:
                 cp_2d_mean = cp_2d.mean(0) # 2
-                rgb_pil = draw_red_dot(rgb_pil, cp_2d_mean[0], cp_2d_mean[1], radius=3)
+                rgb_pil = dot_on_image(rgb_pil, [cp_2d_mean], radius=3)
             rgb_pil_with_contact.append(rgb_pil)
             
         save_name = self.filename.split(".")[0]

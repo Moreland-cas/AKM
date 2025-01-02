@@ -328,13 +328,11 @@ def match_points_dift_sd(
     device="cuda", 
     # nms_threshold=0.05,
     visualize=False, 
-    ):
+):
     # 提取特征
     hr_feats_1 = extract_features(image_path_1, img_size=[resize, resize], upsample_feat=True)  # shape: (1, feature_dim, h, w)
     hr_feats_2 = extract_features(image_path_2, img_size=[resize, resize], upsample_feat=True)  # shape: (1, feature_dim, h, w)
-    
     similarity_map = match_point_on_featmap(hr_feats_1, hr_feats_2, uv_1, visualize) # H, W
-
     return similarity_map
 
 if __name__ == '__main__':

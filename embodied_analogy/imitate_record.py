@@ -1,12 +1,13 @@
 import sapien
 import mplib
-from embodied_analogy.base_env import BaseEnv
-from embodied_analogy.process_record import RecordDataReader
-from embodied_analogy.utils import draw_red_dot, uv_to_camera, camera_to_world, visualize_pc
-from embodied_analogy.dino_featup import match_points_dino_featup
 from PIL import Image
 import numpy as np
 import transforms3d as t3d
+from embodied_analogy.base_env import BaseEnv
+from embodied_analogy.process_record import RecordDataReader
+from embodied_analogy.utils import uv_to_camera, camera_to_world, visualize_pc, SimilarityMap
+from embodied_analogy.dino_featup import match_points_dino_featup
+from embodied_analogy.dift_sd import match_points_dift_sd
 
 class ImitateEnv(BaseEnv):
     def __init__(
@@ -101,14 +102,9 @@ class ImitateEnv(BaseEnv):
         # load franka after capture first image so that franka pc are not in the captured data
         self.load_franka_arm()
         
-        # while not self.viewer.closed:
-        #     self.step()  
+        while not self.viewer.closed:
+            self.step()      
             
-        
-        # 让机械手臂复原
-        for i in range(100):
-            self.step()
-        
         self.setup_planner()
         
         # update pointcloud to avoid collision
@@ -118,23 +114,18 @@ class ImitateEnv(BaseEnv):
         source_img_pil = self.DataReader.source_img
         source_u, source_v = self.DataReader.first_cp_2d
         
-        target_uvs, target_probs, similarity_map = match_points_dino_featup(
+        # similarity_map = match_points_dino_featup(
+        similarity_map = match_points_dift_sd(
             source_img_pil, 
             target_img_pil, 
             (source_u, source_v), 
-            top_k=500, 
-            max_return=500,
-            resize=798, 
+            resize=224 * 3, 
             device="cuda",
-            is_pil=True,
-            nms_threshold=0.002,
             visualize=False
         )
         
-        # for i in range(len(target_uvs)):
-        #     target_uv = target_uvs[i]
-        #     img = draw_red_dot(target_img_pil, target_uv[0], target_uv[1], radius=1)
-        #     img.save(self.asset_prefix + f"/tmp/{i}.png")
+        self.similarity_map = SimilarityMap(similarity_map, alpha=20)
+        target_uvs = self.similarity_map.sample(num_samples=50, visualize=False)
         
         # 使用 segmentation map 进行过滤
         # similarity_map = None # H, W, 0-1之间
@@ -145,11 +136,8 @@ class ImitateEnv(BaseEnv):
          
             
         for i in range(len(target_uvs)):
-            # print(i)
             # 根据深度图找到三维空间点
             target_u, target_v = target_uvs[i]
-            # target_u, target_v = target_uvs[34]
-            # target_u, target_v = 0.4868421052631579, 0.5153508771929824
             depth_h, depth_w = target_depth_np.shape
             
             row = int(target_v * depth_h)
@@ -173,14 +161,14 @@ class ImitateEnv(BaseEnv):
             
             # 找到与 contact_point 最近的 grasp, 即得到了 Tgrasp2w, 但这里的 grasp 和 panda_hand 坐标系还不同
             grasp = self.find_nearest_grasp(self.grasp_group, contact_point)
-            # visualize_pc(target_pc, target_pc_color, grasp)
+            visualize_pc(target_pc, target_pc_color, grasp)
             Tgrasp2w_R = grasp.rotation_matrix # 3, 3
             Tgrasp2w_t = grasp.translation # 3
             Tgrasp2w = np.hstack((Tgrasp2w_R, Tgrasp2w_t[..., None])) # 3, 4
             Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
             
             # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
-            offset = 0.03
+            offset = 0.03 # [0.01, 0.02, 0.03, 0.04, 0.05]
             Tph2grasp = np.array([
                 [0, 0, 1, -(0.045 + 0.069 - offset)], 
                 [0, 1, 0, 0], 
@@ -204,12 +192,10 @@ class ImitateEnv(BaseEnv):
             
             # traj imitation
             cur_pos, cur_quat = self.get_ee_pose()
-            for i in range(int(len(ph_pos) * 0.1)):
+            for i in range(int(len(ph_pos) * 0.25)):
                 self.move_to_pose(mplib.Pose(p=cur_pos + ph_pos[i], q=t3d.quaternions.mat2quat(Tph2w[:3, :3])), wrt_world=True)
                 
             self.reset_franka_arm()
-            # for i in range(100):
-            #     self.step()
         
         while not self.viewer.closed:
             self.step()        

@@ -50,7 +50,7 @@ def match_points_dino_featup(
     device="cuda", 
     # nms_threshold=0.05,
     visualize=False, 
-    ):
+):
     # 分为匹配特征 + nms 两部分
     upsampler = load_featup_dino_model(device)
     

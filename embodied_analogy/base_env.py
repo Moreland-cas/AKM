@@ -58,6 +58,10 @@ class BaseEnv():
         # for link in self.robot.get_links():
         #     link.disable_gravity = True
         
+        # 让机械手臂复原
+        for i in range(100):
+            self.step()
+        
     def setup_camera(self):
         # camera config
         near, far = 0.1, 100
@@ -214,8 +218,8 @@ class BaseEnv():
             
 
     def open_gripper(self):
-        for i in range(50):
-            self.step()
+        # for i in range(100):
+        #     self.step()
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(0.4)
         for i in range(100): 
@@ -226,7 +230,7 @@ class BaseEnv():
             self.step()
 
     def close_gripper(self):
-        for i in range(50):
+        for i in range(100):
             self.step()
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(-0.1)
