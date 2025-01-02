@@ -292,11 +292,16 @@ class SDFeaturizer4Eval(SDFeaturizer):
         unet_ft = unet_ft.mean(0, keepdim=True) # 1,c,h,w
         return unet_ft
     
-# 底下是新加的
+################################ 底下是新加的 ################################
+from embodied_analogy.utils import match_point_on_featmap
+
 def extract_features(image_path, img_size=[768, 768], upsample_feat=True):
     # semantic matching: downsample 1 / 16
     dift = SDFeaturizer("stabilityai/stable-diffusion-2-1")
-    img = Image.open(image_path).convert('RGB')
+    if isinstance(image_path, str):
+        img = Image.open(image_path).convert('RGB')
+    elif isinstance(image_path, Image.Image):
+        img = image_path.convert('RGB')
     
     if img_size[0] > 0:
         img = img.resize(img_size)
@@ -316,72 +321,24 @@ def extract_features(image_path, img_size=[768, 768], upsample_feat=True):
 def match_points_dift_sd(
     image_path_1, 
     image_path_2, 
-    left_point=[5, 5], 
-    top_k=100, 
-    max_return=5,
-    resize=224, 
+    uv_1, # [0.3, 0.7]
+    # top_k=100, 
+    # max_return=5,
+    resize=800, # 不能太小 
     device="cuda", 
-    is_pil=False, 
-    nms_threshold=0.05,
+    # nms_threshold=0.05,
     visualize=False, 
     ):
-    """
-    在右图上找到与左图指定点匹配的点。根据相似度分布采样若干个点。
-    
-    Args:
-    - image_path_1 (str): 左图像路径
-    - image_path_2 (str): 右图像路径
-    - left_point (tuple): 左图上的目标点坐标 (u, v)，范围 [0, 1]
-    - model (nn.Module): 特征提取模型
-    - top_k (int): 需要返回的最匹配的点数
-    - resize (int): 输入图像的缩放尺寸
-    - device (str): 计算设备，默认使用 "cuda"
-    
-    Returns:
-    - sampled_points (list): 在右图中找到的与左图指定点匹配的点坐标
-    - matching_probabilities (Tensor): top_k个匹配点的相似度概率
-    """
     # 提取特征
-    hr_feats_1 = extract_features(image_path_1)  # shape: (1, feature_dim, h, w)
-    hr_feats_2 = extract_features(image_path_2)  # shape: (1, feature_dim, h, w)
+    hr_feats_1 = extract_features(image_path_1, img_size=[resize, resize], upsample_feat=True)  # shape: (1, feature_dim, h, w)
+    hr_feats_2 = extract_features(image_path_2, img_size=[resize, resize], upsample_feat=True)  # shape: (1, feature_dim, h, w)
+    
+    similarity_map = match_point_on_featmap(hr_feats_1, hr_feats_2, uv_1, visualize) # H, W
 
-    # 获取左图指定点的坐标 (u, v)，并转换为像素坐标
-    u, v = left_point
-    h1, w1 = hr_feats_1.shape[2], hr_feats_1.shape[3]  # 获取高和宽
-    left_pixel_x = int(u * w1)  # 对应的像素坐标
-    left_pixel_y = int(v * h1)  # 对应的像素坐标
-    
-    # 获取左图指定点的特征
-    left_point_feature = hr_feats_1[0, :, left_pixel_y, left_pixel_x]  # (feature_dim, )
-
-    # 计算左图指定点与右图所有点的余弦相似度
-    # 将左图指定点的特征扩展到右图的每个位置进行比较
-    right_features = hr_feats_2.view(hr_feats_2.size(1), -1).T  # shape: (seq_length, feature_dim)
-
-    # 计算余弦相似度
-    similarity = F.cosine_similarity(left_point_feature.unsqueeze(0), right_features, dim=1) # 65536
-    # 根据相似度概率分布，进行softmax归一化
-    normalized_probs = F.softmax(similarity, dim=0) # 65536
-
-    # 提取匹配点的坐标
-    h2, w2 = hr_feats_2.shape[2], hr_feats_2.shape[3]  # 获取高和宽
-    similarity_map = similarity.reshape(h2, w2)
-    
-    # 采用概率最大的k 个点
-    topk_values, topk_indices = torch.topk(normalized_probs, top_k, largest=True, sorted=False)
-    
-    target_points_uv = np.array([[i % w2, i // w2] for i in topk_indices.cpu().numpy()])
-    target_points_uv = target_points_uv / np.array([w2, h2])
-    target_points_probs = similarity[topk_indices].cpu().numpy()
-    
-    # 应用NMS选择最终的匹配点
-    final_points_uv, final_probs = nms_selection(target_points_uv, target_points_probs, threshold=nms_threshold, max_points=max_return)
-    
-    if visualize:
-        plot_matching(unnorm(tensor_1)[0], unnorm(tensor_2)[0], hr_feats_1[0], hr_feats_2[0], similarity_map)
-    
-    return final_points_uv, final_probs, similarity_map
+    return similarity_map
 
 if __name__ == '__main__':
-    ft = extract_features(Image.open("./cat.png"))
-    import pdb;pdb.set_trace()
+    path1 = "cat.png"
+    path2 = "tom.jpg"
+    left_point = (0.72, 0.30)  # 左图中归一化到[0, 1]的坐标
+    similarity_map = match_points_dift_sd(path1, path2, left_point, visualize=True, resize=640)

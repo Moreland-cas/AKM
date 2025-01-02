@@ -57,7 +57,7 @@ pip install -e .
 # 4) 安装 DIFT
 # 安装pre-built的xformers, 0.0.29
 pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu121
-pip install jupyterlab ipympl triton transformers matplotlib diffusers==0.15.0
+pip install jupyterlab ipympl triton transformers matplotlib diffusers==0.15.0 accelerate
 # 为解决 cannot import name 'cached_download' from 'huggingface_hub'
 pip install huggingface_hub==0.25.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
 

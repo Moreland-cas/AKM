@@ -10,6 +10,8 @@ from pytorch_lightning import seed_everything
 from featup.util import pca, remove_axes
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
+from typing import List, Union
+import torch.nn.functional as F
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -286,12 +288,12 @@ def visualize_pc(points, colors, grasp):
     else:
         o3d.visualization.draw_geometries([pcd])
         
-
 @torch.no_grad()
 def plot_matching(image1, image2, hr1, hr2, span):
     seed_everything(0)
     [hr_feats_pca_1, hr_feats_pca_2], _ = pca([hr1.unsqueeze(0), hr2.unsqueeze(0)])
     fig, ax = plt.subplots(1, 5, figsize=(25, 5))
+    
     ax[0].imshow(image1.permute(1, 2, 0).detach().cpu())
     ax[0].set_title("Image 1")
     ax[1].imshow(image2.permute(1, 2, 0).detach().cpu())
@@ -304,6 +306,69 @@ def plot_matching(image1, image2, hr1, hr2, span):
     ax[4].set_title("Span")
     remove_axes(ax)
     plt.show()
+    
+@torch.no_grad()
+def plot_matching_2(feat1, feat2, similarity_map, uv_1):
+    """
+        feat1: 1, C, H, W
+        similarity_map: H, W
+        uv_1: [0.5, 0.5]
+    """
+    seed_everything(0)
+    [feat1_pca, feat2_pca], _ = pca([feat1, feat2])
+    fig, ax = plt.subplots(1, 3, figsize=(5 * 3, 5))
+
+    ax0_img = feat1_pca[0].permute(1, 2, 0).detach().cpu().numpy() # H, W, C
+    ax0_img = Image.fromarray((ax0_img * 255).astype(np.uint8))
+    ax0_img = draw_red_dot(image=ax0_img, u=uv_1[0], v=uv_1[1], radius=3)
+    ax[0].imshow(ax0_img) 
+    ax[0].set_title("Features 1")
+    ax[1].imshow(feat2_pca[0].permute(1, 2, 0).detach().cpu())
+    ax[1].set_title("Features 2")
+    ax[2].imshow(similarity_map.detach().cpu(), cmap='jet') # "viridis"
+    ax[2].set_title("Similarity Map")
+    remove_axes(ax)
+    plt.show()
+
+def match_point_on_featmap(
+    feat_1: torch.Tensor, 
+    feat_2: torch.Tensor,
+    uv_1: List[float],
+    visualize: bool=False, 
+):
+    """_summary_
+
+    Args:
+        feat_1 (torch.Tensor): 1, C, H1, W1
+        feat_2 (torch.Tensor): 1, C, H2, W2
+        uv_1 (List[float]): [u, v], u and v are in [0, 1]
+        visualize (bool): whether to visualize the matching probability map
+    return:
+        similarity_map (torch.Tensor): H2, W2, range [0, 1]
+    """
+    # 获取左图指定点的坐标 (u, v)，并转换为像素坐标
+    u, v = uv_1
+    h1, w1 = feat_1.shape[2], feat_1.shape[3]  # 获取高和宽
+    left_pixel_x = int(u * w1)  # 对应的像素坐标
+    left_pixel_y = int(v * h1)  # 对应的像素坐标
+    
+    # 获取左图指定点的特征
+    left_point_feature = feat_1[0, :, left_pixel_y, left_pixel_x]  # (feature_dim, )
+
+    # 计算左图指定点与右图所有点的余弦相似度
+    # 将左图指定点的特征扩展到右图的每个位置进行比较
+    right_features = feat_2.view(feat_2.size(1), -1).T  # shape: (seq_length, feature_dim)
+
+    # 计算余弦相似度
+    similarity = F.cosine_similarity(left_point_feature.unsqueeze(0), right_features, dim=1) # 65536
+
+    # 提取匹配点的坐标
+    h2, w2 = feat_2.shape[2], feat_2.shape[3]  # 获取高和宽
+    similarity_map = similarity.reshape(h2, w2)
+    
+    if visualize:
+        plot_matching_2(feat_1, feat_2, similarity_map, uv_1)
+    return similarity_map
 
 def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
     """
