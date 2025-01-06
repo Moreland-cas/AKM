@@ -97,13 +97,13 @@ class ImitateEnv(BaseEnv):
         target_pc_color = target_pc_color[ground_mask]
         
         self.grasp_group = self.detect_grasp_anygrasp(target_pc, target_pc_color, visualize=False)
-        # visualize_pc(target_pc, target_pc_color, self.grasp_group)
+        visualize_pc(target_pc, target_pc_color, self.grasp_group)
         
         # load franka after capture first image so that franka pc are not in the captured data
         self.load_franka_arm()
         
-        while not self.viewer.closed:
-            self.step()      
+        # while not self.viewer.closed:
+        #     self.step()      
             
         self.setup_planner()
         
@@ -121,11 +121,11 @@ class ImitateEnv(BaseEnv):
             (source_u, source_v), 
             resize=224 * 3, 
             device="cuda",
-            visualize=False
+            visualize=True
         )
         
         self.similarity_map = SimilarityMap(similarity_map, alpha=20)
-        target_uvs = self.similarity_map.sample(num_samples=50, visualize=False)
+        target_uvs = self.similarity_map.sample(num_samples=50, visualize=True)
         
         # 使用 segmentation map 进行过滤
         # similarity_map = None # H, W, 0-1之间
