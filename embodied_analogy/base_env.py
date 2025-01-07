@@ -67,6 +67,15 @@ class BaseEnv():
         near, far = 0.1, 100
         width, height = 800, 600
         
+        """ 
+            intrinsic matrix should be:
+            W, 0, W//2
+            0, W, H//2
+            0, 0, 1
+            fx = fy = W
+            fovy = 2 * np.arctan(H / (2*W))
+        """
+        
         camera = self.scene.add_camera(
             name="camera",
             width=width,
@@ -119,7 +128,7 @@ class BaseEnv():
         rgba = camera.get_picture("Color")  # 获取RGBA图像，格式为[H, W, 4]
         rgb = rgba[..., :3]
         rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
-        rgb_pil = Image.fromarray(rgb_numpy)
+        # rgb_pil = Image.fromarray(rgb_numpy)
     
         # get pointcloud
         position = camera.get_picture("Position")  # [H, W, 4], 格式为(x, y, z, render_depth), 其中 render_depth < 1 的点是有效的
@@ -135,7 +144,7 @@ class BaseEnv():
             visualize_pc(points_world, points_color, None)
             
         # get depth image
-        depth = -position[..., 2]
+        depth = -position[..., 2] # H, W, in meters
         depth_numpy = np.array(depth)
         # depth_numpy = (depth * 1000.0).astype(np.uint16)
         # depth_pil = Image.fromarray(depth_numpy)

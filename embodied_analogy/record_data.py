@@ -19,16 +19,19 @@ class RecordEnv(BaseEnv):
         self.phy_timestep = phy_timestep
         self.record_fps = record_fps
         
+        # setup camera before franka arm
+        self.setup_camera()
+        self.setup_record()
+        
+        # setup pygame after camera
+        self.setup_pygame() 
+        
         # load articulated object
-        # self.load_articulated_object(index=100015)
         self.load_articulated_object(index=100051, scale=0.2)
         self.load_franka_arm()
         self.after_try_to_close = 0
         self.setup_planner()
         
-        self.setup_camera()
-        self.setup_record()
-        self.setup_pygame() # setup pygame after camera
     def setup_pygame(self):
         # initialize pygame for keyboard control
         pygame.init()
@@ -63,10 +66,9 @@ class RecordEnv(BaseEnv):
         self.cur_steps += 1
         self.cur_steps = self.cur_steps % self.record_interval
         
-        if self.cur_steps == 0:
-            # has the gripper closed?
-            after_close = self.after_try_to_close
-            
+        # 如果机械手臂没有尝试关闭，则不录制
+        # 关闭后按照 fps 的帧率录制
+        if self.cur_steps == 0 and self.after_try_to_close:
             # pose of panda_hand link
             ee_pos, ee_quat = self.get_ee_pose() # np array of size 3 and 4
             
@@ -92,21 +94,25 @@ class RecordEnv(BaseEnv):
                 cp_2d.append(np.array([u, v]))
                 
             # record rgb image and display to pygame screen
+            rgb_np, depth_np, _, _ = self.capture_rgbd(return_point_cloud=False, visualize=False)
             rgb_np = self.capture_rgb()
             rgb_pil = Image.fromarray(rgb_np)
             update_image(self.pygame_screen, rgb_pil)
             
             cur_dict = {
-                "after_close": after_close,
+                "fps": self.record_fps,
+                "after_close": self.after_try_to_close,
                 "panda_hand_pos": ee_pos,
                 "panda_hand_quat": ee_quat,
                 "rgb_np": rgb_np, 
+                "depth_np": depth_np,
                 "contact_points_3d": np.array(cp_3d), # N x 3
                 "contact_points_2d": np.array(cp_2d), # N x 2
             }
             if "traj" not in self.recorded_data.keys():
                 self.recorded_data["traj"] = []
             self.recorded_data["traj"].append(cur_dict)
+            self.recorded_data["object_image"] = None # TODO: add object image (without franka arm)
 
     def manipulate_and_record(self):
         pos_scale_factor = 0.1
