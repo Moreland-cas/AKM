@@ -21,13 +21,16 @@ class RecordEnv(BaseEnv):
         
         # setup camera before franka arm
         self.setup_camera()
-        self.setup_record()
         
         # setup pygame after camera
         self.setup_pygame() 
         
         # load articulated object
         self.load_articulated_object(index=100051, scale=0.2)
+        
+        # setup record after object spawned, cause need segmentation image
+        self.setup_record()
+        
         self.load_franka_arm()
         self.after_try_to_close = 0
         self.setup_planner()
@@ -50,6 +53,13 @@ class RecordEnv(BaseEnv):
         extrinsic = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
         extrinsic = np.vstack([extrinsic, np.array([0, 0, 0, 1])])
         self.recorded_data["extrinsic"] =  extrinsic
+        
+        # 在这里保存 object 的 seg_mask
+        self.scene.step()
+        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        self.viewer.render()
+        seg_np = self.capture_segmentation()
+        self.recorded_data['object_seg'] = seg_np # H, W
     
     def save_recoreded_data(self):
         assert isinstance(self.recorded_data, dict)

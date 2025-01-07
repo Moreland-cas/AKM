@@ -49,6 +49,7 @@ class RecordDataReader():
             
         self.rgb = np.stack(rgb) # numpy array in shape [T, H, W, 3], in uint8
         self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
+        self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
         
     def get_first_view_img(self, idx=0):
         # return pil image of the first view
@@ -79,6 +80,7 @@ class RecordDataReader():
         
 if __name__ == "__main__":
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-    file_name = "/2025-01-07_16-02-01.npz"
+    file_name = "/2025-01-07_18-06-10.npz"
     dr = RecordDataReader(record_path_prefix, file_name)
+    dr.process_data()
     dr.visualize_contact_as_video()

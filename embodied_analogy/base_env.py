@@ -161,20 +161,20 @@ class BaseEnv():
         camera.take_picture()
         # visual_id is the unique id of each visual shape
         seg_labels = camera.get_picture("Segmentation")  # [H, W, 4]
+        mesh_np = seg_labels[..., 0].astype(np.uint8)  # mesh-level [H, W]
+        actor_np = seg_labels[..., 1].astype(np.uint8)  # actor-level [H, W]
+        
+        # Or you can use aliases below
+        # label0_image = camera.get_visual_segmentation()
+        # label1_image = camera.get_actor_segmentation()
+        
         colormap = sorted(set(ImageColor.colormap.values()))
         color_palette = np.array(
             [ImageColor.getrgb(color) for color in colormap], dtype=np.uint8
         )
-        label0_image = seg_labels[..., 0].astype(np.uint8)  # mesh-level
-        label1_image = seg_labels[..., 1].astype(np.uint8)  # actor-level
-        # Or you can use aliases below
-        # label0_image = camera.get_visual_segmentation()
-        # label1_image = camera.get_actor_segmentation()
-        label0_pil = Image.fromarray(color_palette[label0_image])
-        label1_pil = Image.fromarray(color_palette[label1_image])
-        # label1_pil.show()
-        # label0_pil.save("label0.png")
-        return label1_image
+        mesh_pil = Image.fromarray(color_palette[mesh_np])
+        actor_pil = Image.fromarray(color_palette[actor_np])
+        return actor_np # [H, W]
         
     def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
@@ -185,6 +185,7 @@ class BaseEnv():
         
         lift_joint = self.asset.get_joints()[-1]
         lift_joint.set_limit(np.array([0, 0.3]))
+        
         
     def load_panda_hand(self, scale=1., pos=[0, 0, 0], quat=[1, 0, 0, 0]):
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
