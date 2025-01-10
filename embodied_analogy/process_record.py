@@ -51,14 +51,15 @@ class RecordDataReader():
         self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
         self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
         
-    def get_first_view_img(self, idx=0):
+    def get_img(self, idx=0):
         # return pil image of the first view
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])
         return pil_img
     
     def get_object_image(self):
-        # return object image in pil format, without franka arm
-        return self.data["object_image"]
+        # TODO: return object image in pil format, without franka arm
+        # return self.data["object_image"]
+        return self.get_img()
     
     def visualize_contact_as_video(self):
         rgb_pil_with_contact = []

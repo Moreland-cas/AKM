@@ -262,7 +262,7 @@ def camera_to_world(point_camera, extrinsic_matrix):
     
     return point_world
 
-def visualize_pc(points, colors, grasp):
+def visualize_pc(points, colors, grasp=None):
     # visualize pointcloud
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)

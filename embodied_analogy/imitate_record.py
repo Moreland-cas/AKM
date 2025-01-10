@@ -14,7 +14,7 @@ class ImitateEnv(BaseEnv):
             self,
             phy_timestep=1/250.,
             record_path_prefix="/home/zby/Programs/Embodied_Analogy/assets/recorded_data",
-            record_file_name="/2024-12-12_11-23-38.npz"
+            record_file_name="/2025-01-07_18-06-10.npz"
         ):
         super().__init__(phy_timestep)
         
@@ -97,7 +97,7 @@ class ImitateEnv(BaseEnv):
         target_pc_color = target_pc_color[ground_mask]
         
         self.grasp_group = self.detect_grasp_anygrasp(target_pc, target_pc_color, visualize=False)
-        visualize_pc(target_pc, target_pc_color, self.grasp_group)
+        # visualize_pc(target_pc, target_pc_color, self.grasp_group)
         
         # load franka after capture first image so that franka pc are not in the captured data
         self.load_franka_arm()
@@ -111,11 +111,11 @@ class ImitateEnv(BaseEnv):
         self.update_pointcloud_for_avoidance(target_pc)
         
         target_img_pil = Image.fromarray(target_img_np)
-        source_img_pil = self.DataReader.source_img
+        source_img_pil = self.DataReader.get_img(idx=0)
         source_u, source_v = self.DataReader.first_cp_2d
         
-        # similarity_map = match_points_dino_featup(
-        similarity_map = match_points_dift_sd(
+        similarity_map = match_points_dino_featup(
+        # similarity_map = match_points_dift_sd(
             source_img_pil, 
             target_img_pil, 
             (source_u, source_v), 
