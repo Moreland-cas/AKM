@@ -190,7 +190,7 @@ def add_text_to_image(image, text, position=(10, 10), font_size=30):
         image (PIL.Image): 输入的PIL图像。
         text (str): 要添加的文本。
         position (tuple): 文本的左上角位置（默认在左上角，坐标为(10, 10)）。
-        font_size (int): 字体大小（默认30）。
+        font_size (int): 字体大小, default 30。
     
     Returns:
         PIL.Image: 添加了文本的图像。
@@ -242,6 +242,50 @@ def uv_to_camera(u, v, depth, K, image_width, image_height):
     
     return np.array([X, Y, Z])
 
+
+def depth_image_to_pointcloud(depth_image, mask, K):
+    """
+    将深度图像转换为相机坐标系中的点云。
+
+    Args:
+    - depth_image (np.array): 深度图像，大小为 (H, W)，单位：米
+    - K (np.array): 相机内参矩阵 (3x3)，包括焦距和主点坐标
+    - mask (np.array, optional): 掩码，大小为 (H, W)，布尔类型。如果提供，只保留 mask 为 True 的点
+
+    Returns:
+    - pointcloud (np.array): 点云，大小为 (N, 3)，表示每个像素点在相机坐标系下的三维坐标
+    """
+    # 获取相机内参
+    f_x = K[0, 0]  # 水平焦距 (单位: 像素)
+    f_y = K[1, 1]  # 垂直焦距 (单位: 像素)
+    c_x = K[0, 2]  # 主点 x 坐标 (单位: 像素)
+    c_y = K[1, 2]  # 主点 y 坐标 (单位: 像素)
+
+    # 生成像素网格
+    image_height, image_width = depth_image.shape
+    u, v = np.meshgrid(np.arange(image_width), np.arange(image_height))
+
+    # 计算归一化坐标
+    x_normalized = (u - c_x) / f_x
+    y_normalized = (v - c_y) / f_y
+
+    # 获取深度值
+    Z = depth_image  # 深度图像直接作为 Z 值
+
+    # 计算相机坐标系中的三维坐标
+    X = x_normalized * Z
+    Y = y_normalized * Z
+
+    # 合并为点云 (H, W, 3)
+    pointcloud = np.stack((X, Y, Z), axis=-1)
+
+    # 如果提供了掩码，仅保留掩码为 True 的点
+    if mask is not None:
+        pointcloud = pointcloud[mask]
+
+    pointcloud = pointcloud.reshape(-1, 3)
+    return pointcloud
+
 def camera_to_world(point_camera, extrinsic_matrix):
     """
     将相机坐标系中的点转换到世界坐标系。
@@ -263,7 +307,12 @@ def camera_to_world(point_camera, extrinsic_matrix):
     return point_world
 
 def visualize_pc(points, colors, grasp=None):
-    # visualize pointcloud
+    """
+        visualize pointcloud
+        points: Nx3
+        colors: Nx3 (0-1)
+        grasp: None
+    """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     if colors is not None:
@@ -439,3 +488,10 @@ class SimilarityMap:
             img.show()
             
         return sampled_coordinates
+    
+
+if __name__ == "__main__":
+    H, W = 300, 400
+    data = np.random.random((H, W, 3))
+    mask = np.random.choice([True, False], size=(H, W), p=[0.1, 0.9])
+    print(data[mask].shape)

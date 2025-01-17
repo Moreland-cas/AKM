@@ -88,7 +88,7 @@ def track_any_points(rgb_frames, queries=None, grid_size = 30, always_visible=Tr
         if i % model.step == 0 and i != 0:
             pred_tracks, pred_visibility = _process_step(
                 model=model,
-                queries=None,
+                queries=queries,
                 window_frames=window_frames,
                 is_first_step=is_first_step,
                 grid_size=grid_size,
@@ -99,7 +99,7 @@ def track_any_points(rgb_frames, queries=None, grid_size = 30, always_visible=Tr
     # Processing the final video frames in case video length is not a multiple of model.step
     pred_tracks, pred_visibility = _process_step(
         model=model,
-        queries=None,
+        queries=queries,
         window_frames=window_frames[-(i % model.step) - model.step - 1 :],
         is_first_step=is_first_step,
         grid_size=grid_size,
@@ -120,5 +120,13 @@ def track_any_points(rgb_frames, queries=None, grid_size = 30, always_visible=Tr
     return pred_tracks, pred_visibility
 
 if __name__ == "__main__":
-    rgb_frames = mp4_to_numpy_array_list("/home/zby/Datasets/custom_video/0.mp4")
-    track_any_points(rgb_frames, queries=None, always_visible=True, visiualize=True)
+    rgb_frames = mp4_to_numpy_array_list("./third_party/sam2/notebooks/videos/bedroom.mp4")
+    mask = np.load("./embodied_analogy/mask.npy")
+    queries = np.column_stack(np.where(mask))
+    # import pdb;pdb.set_trace()
+    queries = np.flip(queries, axis=-1)
+    indices = np.random.choice(len(queries), size=20, replace=False)
+    queries = queries[indices] # M, 2
+    queries = np.column_stack([np.zeros(len(queries)), queries])[None]
+    queries = torch.from_numpy(queries).float()
+    track_any_points(rgb_frames, queries=queries.cuda(), always_visible=False, visiualize=True)

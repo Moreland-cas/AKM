@@ -51,6 +51,8 @@ class RecordDataReader():
         self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
         self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
         
+        self.intrinsic = self.data["intrinsic"]
+        
     def get_img(self, idx=0):
         # return pil image of the first view
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])
