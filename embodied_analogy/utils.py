@@ -221,37 +221,47 @@ def add_text_to_image(image, text, position=(10, 10), font_size=30):
     
     return image
 
-def uv_to_camera(u, v, depth, K, image_width, image_height):
+def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalized_uv=False):
     """
     将归一化的像素坐标和深度值转换为三维空间中的点（相机坐标系）。
     
-    Args:
-    - u (float): 归一化的水平像素坐标，范围 [0, 1]
-    - v (float): 归一化的垂直像素坐标，范围 [0, 1]
-    - depth (float): 深度值，表示该像素点到相机的距离（单位：米）
-    - K (np.array): 相机内参矩阵(3x3), 包括焦距和主点坐标
-    - image_width (int): 图像的宽度（单位：像素）
-    - image_height (int): 图像的高度（单位：像素）
+    参数:
+    - uv (np.array): 形状为 (B, 2)，每个点的 [u, v] 坐标，值域为 [0, 1]。
+    - depth (np.array): 形状为 (B,)，每个点的深度值，单位：米。
+    - K (np.array): 相机内参矩阵 (3x3)，包括焦距和主点坐标。
+    - image_width (int): 图像的宽度（单位：像素）。
+    - image_height (int): 图像的高度（单位：像素）。
     
-    Returns:
-    - (X, Y, Z) (tuple): 在相机坐标系下的三维坐标（单位：米）
+    返回:
+    - (np.array): 形状为 (B, 3) 的点云数组，每个点的三维坐标 (X, Y, Z)。
     """
-    # 1. 计算实际的像素坐标
-    x_pixel = u * image_width
-    y_pixel = v * image_height
+    # 1. 提取 uv 坐标
+    u = uv[:, 0]  # 水平像素坐标
+    v = uv[:, 1]  # 垂直像素坐标
 
-    # 2. 获取相机内参
+    # 2. 计算实际的像素坐标
+    if normalized_uv:
+        x_pixel = u * image_width
+        y_pixel = v * image_height
+    else:
+        x_pixel = u
+        y_pixel = v
+
+    # 3. 获取相机内参
     f_x = K[0, 0]  # 水平焦距 (单位: 像素)
     f_y = K[1, 1]  # 垂直焦距 (单位: 像素)
     c_x = K[0, 2]  # 主点 x 坐标 (单位: 像素)
     c_y = K[1, 2]  # 主点 y 坐标 (单位: 像素)
     
-    # 3. 计算三维坐标 (X, Y, Z)
+    # 4. 计算三维坐标 (X, Y, Z)
     Z = depth  # 深度值，单位：米
     X = (x_pixel - c_x) * Z / f_x
     Y = (y_pixel - c_y) * Z / f_y
     
-    return np.array([X, Y, Z])
+    # 5. 返回点云 (B, 3)
+    point_cloud = torch.stack((X, Y, Z), dim=1)  # 将 X, Y, Z 合并成 (B, 3)
+    
+    return point_cloud
 
 
 def depth_image_to_pointcloud(depth_image, mask, K):

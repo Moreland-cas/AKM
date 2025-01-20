@@ -5,7 +5,7 @@ import numpy as np
 import transforms3d as t3d
 from embodied_analogy.base_env import BaseEnv
 from embodied_analogy.process_record import RecordDataReader
-from embodied_analogy.utils import uv_to_camera, camera_to_world, visualize_pc, SimilarityMap
+from embodied_analogy.utils import image_to_camera, camera_to_world, visualize_pc, SimilarityMap
 from embodied_analogy.dino_featup import match_points_dino_featup
 from embodied_analogy.dift_sd import match_points_dift_sd
 
@@ -146,7 +146,7 @@ class ImitateEnv(BaseEnv):
             depth = target_depth_np[row, col]
             K = self.camera.get_intrinsic_matrix()
             
-            point_camera = uv_to_camera(target_u, target_v, depth, K, depth_w, depth_h)
+            point_camera = image_to_camera(target_u, target_v, depth, K, depth_w, depth_h)
             extrinsic_matric = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
             contact_point = camera_to_world(point_camera, extrinsic_matric)
             
