@@ -62,78 +62,85 @@ def update_image(screen, rgb_pil):
     # 更新屏幕显示
     pygame.display.update()
     
-def world_to_camera(world_point, K, Tw2c):
+def world_to_camera(world_points, Tw2c):
     """
-    将世界坐标系中的点转换到相机坐标系
+    将世界坐标点转换到相机坐标系。
 
     Args:
-        world_point (np.ndarray): 3D世界坐标点，形状 (3,)
-        K (np.ndarray): 相机的内参矩阵，3x3
-        Tw2c (np.ndarray): 相机的外参矩阵 (4x4)，从世界坐标系到相机坐标系的变换矩阵
+        world_points (np.ndarray): 3D世界坐标点, 形状 (B, 3)
+        Tw2c (np.ndarray): 相机外参矩阵 (4x4)，从世界坐标系到相机坐标系的变换矩阵
 
     Returns:
-        np.ndarray: 相机坐标系中的点 (3,) 
+        np.ndarray: 相机坐标系中的点，形状 (B, 3)
     """
     # 将世界坐标点扩展为齐次坐标
-    world_point_homogeneous = np.append(world_point, 1)  # 变为 (4,)
-    
-    # 使用外参矩阵将世界坐标转换为相机坐标
-    camera_point_homogeneous = np.dot(Tw2c, world_point_homogeneous)  # 得到相机坐标系中的点 (4,)
-    
-    # 将相机坐标转换为非齐次坐标
-    camera_point = camera_point_homogeneous[:3]  # 去掉齐次坐标的最后一维，返回 (3,)
-    
-    return camera_point
+    world_points_homogeneous = np.hstack((world_points, np.ones((world_points.shape[0], 1))))  # (B, 4)
 
-def camera_to_image(camera_point, K, image_width, image_height):
+    # 使用外参矩阵进行批量转换
+    camera_points_homogeneous = np.dot(world_points_homogeneous, Tw2c.T)  # (B, 4)
+
+    # 转换为非齐次坐标
+    camera_points = camera_points_homogeneous[:, :3]  # (B, 3)
+
+    return camera_points
+
+def camera_to_image(camera_points, K, image_width=None, image_height=None, normalized_uv=False):
     """
-    将相机坐标系中的点投影到图像平面，并将像素坐标归一化到 [0, 1] 范围内
+    将相机坐标点投影到图像平面，并归一化到 [0, 1] 范围。
 
     Args:
-        camera_point (np.ndarray): 相机坐标系中的点，形状 (3,)
-        K (np.ndarray): 相机内参矩阵，3x3
-        image_width (int): 图像的宽度
-        image_height (int): 图像的高度
-
-    Returns:
-        (float, float): 像素坐标 (u, v)，归一化到 [0, 1]
-    """
-    # 使用内参矩阵进行投影，得到像素坐标
-    u, v, depth = np.dot(K, camera_point)  # (u, v, depth)，注意这里是齐次坐标 (3,)
-    
-    # 将齐次坐标除以深度得到非齐次像素坐标
-    u /= depth
-    v /= depth
-    
-    # 将像素坐标归一化到 [0, 1] 范围内
-    u_normalized = u / image_width
-    v_normalized = v / image_height
-    
-    return u_normalized, v_normalized
-
-def world_to_normalized_uv(world_point, K, Tw2c, image_width, image_height):
-    """
-    将世界坐标系中的点转换为归一化的像素坐标 (u, v) [0, 1]
-
-    Args:
-        world_point (np.ndarray): 世界坐标系中的点，形状 (3,)
-        K (np.ndarray): 相机的内参矩阵，3x3
-        Tw2c (np.ndarray): 相机的外参矩阵 (4x4)，从世界坐标系到相机坐标系的变换矩阵
+        camera_points (np.ndarray): 相机坐标点，形状 (B, 3)
+        K (np.ndarray): 相机内参矩阵，形状 (3, 3)
         image_width (int): 图像宽度
         image_height (int): 图像高度
 
     Returns:
-        (float, float): 归一化的像素坐标 (u, v)，范围在 [0, 1]
+        np.ndarray: 归一化像素坐标，形状 (B, 2)
     """
-    # 将世界坐标转换为相机坐标
-    camera_point = world_to_camera(world_point, K, Tw2c)
-    
-    # 将相机坐标投影到图像平面，并归一化到 [0, 1]
-    u_normalized, v_normalized = camera_to_image(camera_point, K, image_width, image_height)
-    
-    return u_normalized, v_normalized
+    # 使用内参矩阵进行投影
+    projected_points = np.dot(camera_points, K.T)  # (B, 3)
 
-def dot_on_image(image: Image, uv_list: List, radius: int = 1):
+    # 转换为非齐次像素坐标
+    u = projected_points[:, 0] / projected_points[:, 2]  # (B,)
+    v = projected_points[:, 1] / projected_points[:, 2]  # (B,)
+
+    # 归一化到 [0, 1]
+    if normalized_uv:
+        assert image_width is not None and image_height is not None, \
+            "image_width and image_height must be provided when normalized_uv is True"
+        u = u / image_width
+        v = v / image_height
+
+    return np.vstack((u, v)).T  # (B, 2)
+
+def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, normalized_uv=False):
+    """
+    将世界坐标点转换为归一化像素坐标 (u, v) [0, 1]。
+
+    Args:
+        world_points (np.ndarray): 世界坐标点，形状 (B, 3)
+        K (np.ndarray): 相机内参矩阵，形状 (3, 3)
+        Tw2c (np.ndarray): 相机外参矩阵 (4x4)，从世界坐标系到相机坐标系的变换矩阵
+        image_width (int): 图像宽度
+        image_height (int): 图像高度
+
+    Returns:
+        np.ndarray: 归一化像素坐标，形状 (B, 2)
+    """
+    # 转换到相机坐标系
+    camera_points = world_to_camera(world_points, Tw2c)
+
+    # 投影到图像平面并归一化
+    uv = camera_to_image(camera_points, K, image_width, image_height, normalized_uv)
+
+    return uv
+
+def draw_points_on_image(image, uv_list, radius=1, normalized_uv=False):
+    """
+    Args:
+        image: PIL.Image 对象，表示要绘制点的图像。
+        uv_list: 一个包含 (u, v) 坐标的列表，表示要绘制的点。
+    """
     # 获取图像的宽度和高度
     width, height = image.size
     image_draw = image.copy()
@@ -141,8 +148,12 @@ def dot_on_image(image: Image, uv_list: List, radius: int = 1):
     
     for u, v in uv_list:
         # 将归一化坐标转换为像素坐标
-        x = int(u * width)
-        y = int(v * height)
+        if normalized_uv:
+            x = int(u * width)
+            y = int(v * height)
+        else:
+            x = int(u)
+            y = int(v)
         
         # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
         if radius == 1:
@@ -358,7 +369,7 @@ def plot_matching_2(feat1, feat2, similarity_map, uv_1):
 
     ax0_img = feat1_pca[0].permute(1, 2, 0).detach().cpu().numpy() # H, W, C
     ax0_img = Image.fromarray((ax0_img * 255).astype(np.uint8))
-    ax0_img = dot_on_image(image=ax0_img, uv_list=[uv_1], radius=3)
+    ax0_img = draw_points_on_image(image=ax0_img, uv_list=[uv_1], radius=3)
     ax[0].imshow(ax0_img) 
     ax[0].set_title("Features 1")
     ax[1].imshow(feat2_pca[0].permute(1, 2, 0).detach().cpu())
@@ -484,7 +495,7 @@ class SimilarityMap:
         sampled_coordinates = np.stack((u_coords, v_coords), axis=-1)
         
         if visualize:
-            img = dot_on_image(self.pil_image, sampled_coordinates, radius=3)
+            img = draw_points_on_image(self.pil_image, sampled_coordinates, radius=3)
             img.show()
             
         return sampled_coordinates

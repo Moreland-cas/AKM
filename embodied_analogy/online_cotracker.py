@@ -54,16 +54,17 @@ def mp4_to_numpy_array_list(mp4_path):
 
     return frames
 
-def track_any_points(rgb_frames, queries=None, grid_size = 30, always_visible=True, visiualize=False):
+def track_any_points(rgb_frames, queries=None, grid_size=30, visiualize=False):
     """
         rgb_frames: list of RGB frames, in list of numpy arrays of shape [H, W, C], np.uint8
-        queries: 大小为 [B, N, 3]
-            3的第一位是timestamp, 一般是0, 后两位是像素坐标 [u, v], 大小与 window_frames 中的frame分辨率一致
-            如果 queries 不为 None, 则追踪 queries + supportive_grids, 但不返回后者
-            否则追踪图像上 uniformly sample 出的 grid_points, 数量由 grid_size 指定
-        always_visible: if True, only return the points that are always visible
+        queries: 大小为 [N, 2] 的 torch.tenspr, 存储初始帧的追踪点坐标 uv, 分辨率与rgb_frame 保持一致
+            if queries is not None:
+                追踪 queries + supportive_grids, 但不返回后者
+            else:
+                追踪图像上 uniformly sample 出的 grid_points, 数量由 grid_size 指定
         visiualize: if True, visualize the tracking results as a saved mp4 video
     """
+    assert (queries is not None) or (queries is None and grid_size is not None)
     def _process_step(model, queries, window_frames, is_first_step, grid_size, grid_query_frame):
         frames = torch.tensor(np.stack(window_frames[-model.step * 2 :]), device="cuda").float() # T, H, W, 3
         video_chunk = (frames.permute(0, 3, 1, 2)[None])  # (1, T, 3, H, W)
@@ -76,6 +77,13 @@ def track_any_points(rgb_frames, queries=None, grid_size = 30, always_visible=Tr
             add_support_grid=True
         )
         return result
+    
+    # 调整 queries 的格式为 B, N, 3
+    if queries is not None:
+        if isinstance(queries, np.ndarray):
+            queries = torch.from_numpy(queries).float()
+        queries = torch.cat([torch.zeros(queries.shape[0], 1), queries], dim=-1)
+        queries = queries[None].cuda()
     
     grid_query_frame = 0
     model = torch.hub.load("facebookresearch/co-tracker", "cotracker3_online")
@@ -105,18 +113,15 @@ def track_any_points(rgb_frames, queries=None, grid_size = 30, always_visible=Tr
         grid_size=grid_size,
         grid_query_frame=grid_query_frame,
     )
-
-    if always_visible:
-        always_visible_mask = pred_visibility.all(dim=1)[0] # N
-        pred_tracks = pred_tracks[:, :, always_visible_mask, :] # B T N 2 -> B T M 2
-        pred_visibility = pred_visibility[:, :, always_visible_mask] # B T N -> B T M
         
     if visiualize:
         # save a video with predicted tracks
         video = torch.tensor(np.stack(window_frames), device="cuda").permute(0, 3, 1, 2)[None]
-        vis = Visualizer(save_dir="./", pad_value=120, linewidth=2)
-        vis.visualize(video, pred_tracks, pred_visibility, query_frame=grid_query_frame, filename="tracking_results")
+        vis = Visualizer(save_dir="./", pad_value=120, linewidth=1)
+        vis.visualize(video, pred_tracks, pred_visibility, query_frame=grid_query_frame, filename="initial_tracks")
 
+    # 去除 batch 维度
+    pred_tracks, pred_visibility = pred_tracks[0], pred_visibility[0]
     return pred_tracks, pred_visibility
 
 if __name__ == "__main__":
