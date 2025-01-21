@@ -125,6 +125,7 @@ dr.process_data()
 rgb_seq = dr.rgb # T H W C
 depth_seq = dr.depth # T H W 1
 K = dr.intrinsic # 3, 3
+Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
 visualize = False
 
@@ -180,16 +181,40 @@ if visualize:
 # 得到追踪点的三维轨迹
 T, M, _ = pred_tracks.shape
 pred_tracks_3d = image_to_camera(pred_tracks.reshape(T*M, -1), depth_tracks.reshape(-1), K) # T * M, 3
-motion_for_kmeans = pred_tracks_3d.reshape(T, M, 3).permute(1, 0, 2).reshape(M, -1) # M T*3
+pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
+motion_for_kmeans = pred_tracks_3d.permute(1, 0, 2).reshape(M, -1) # M T*3
 
 _, moving_labels, _ = cluster.k_means(motion_for_kmeans.cpu().numpy(), init="k-means++", n_clusters=2)
 red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
 rigid_part_colors = red_and_green[moving_labels]
 
-if visualize or True:
+if visualize:
     visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
 
 # 5) 初步估计出 joint parameters
+from embodied_analogy.joint_estimate_w_corr import estimate_t_w_corr_1, estimate_t_w_corr_2
+
+# for i in range(T - 1):
+#     translation1_c = estimate_t_w_corr_1(pred_tracks_3d[:i+2])
+#     Rc2w = Tw2c[:3, :3].T # 3, 3
+#     translation1_w = Rc2w @ translation1_c
+#     print(translation1_w)
+    
+translation2_c, translation2_c_f, scales, scales_f = estimate_t_w_corr_2(pred_tracks_3d)
+Rc2w = Tw2c[:3, :3].T # 3, 3
+translation2_w = Rc2w @ translation2_c
+translation2_w_f = Rc2w @ translation2_c_f
+print(translation2_w)
+print(translation2_w_f)
+print(scales)
+print(scales_f)
+import matplotlib.pyplot as plt
+plt.plot(scales, marker='o')
+# plt.savefig("plot.png") 
+plt.show()
+plt.plot(scales_f, marker='o')
+# plt.savefig("plot.png") 
+plt.show()
 
 # 6) 对于第一帧剩下的 k-m 个点簇进行分类验证, 分为 static, moving 和 unknown 三类
 
