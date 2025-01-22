@@ -217,6 +217,8 @@ plt.plot(scales_f, marker='o')
 plt.show()
 
 # 6) 对于第一帧剩下的 k-m 个点簇进行分类验证, 分为 static, moving 和 unknown 三类
+# static 和 moving 里又分为一直能看到的, 和随着运动新发现的 
+#
 
 # 首先得到运动的三维点云 
 # TODO：用 sam2 仅仅分割出物体的部分
