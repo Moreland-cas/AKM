@@ -1,5 +1,5 @@
 import numpy as np
-from embodied_analogy.utils import draw_points_on_image, pil_images_to_mp4
+from embodied_analogy.utility.utils import draw_points_on_image, pil_images_to_mp4
 from PIL import Image
 
 class RecordDataReader():

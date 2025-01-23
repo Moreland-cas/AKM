@@ -12,13 +12,15 @@ Output:
         (6,) for revolute joint
 """
 import torch
+import random
 import numpy as np
 from PIL import Image
 import sklearn.cluster as cluster
 from cotracker.utils.visualizer import Visualizer
-from embodied_analogy.process_record import RecordDataReader
-from embodied_analogy.online_cotracker import track_any_points
-from embodied_analogy.utils import (
+from embodied_analogy.pipeline.process_record import RecordDataReader
+from embodied_analogy.perception.online_cotracker import track_any_points
+from embodied_analogy.visualization.vis_tracks_3d import vis_tracks_3d_napari
+from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud, 
     visualize_pc, 
     camera_to_image,
@@ -65,7 +67,6 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     # 使用高级索引提取深度值
     depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
     return depth_tracks
-
 
 def filter_by_depthSeq(pred_tracks, depth_tracks, thr=1.5):
     """
@@ -127,8 +128,22 @@ depth_seq = dr.depth # T H W 1
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
-visualize = False
+visualize = True
+napari = False
 
+if napari:
+    # 展示初始的 pointcloud sequence
+    T = depth_seq.shape[0]
+    raw_pc_list = []
+    for i in range(T):
+        pc_i = depth_image_to_pointcloud(depth_seq[i].squeeze(), None, K) # N, 3
+        indices = np.random.choice(pc_i.shape[0], size=10000, replace=False)
+        # 使用这些索引获取对应的 100 x 3 数组
+        pc_i = pc_i[indices]
+        raw_pc_list.append(pc_i)
+    raw_pc_list = np.stack(raw_pc_list)
+    vis_tracks_3d_napari(raw_pc_list)
+    
 pc_0 = depth_image_to_pointcloud(depth_seq[0].squeeze(), object_mask_0, K) # N, 3
 rgb_0 = rgb_seq[0][object_mask_0] / 255. # N,3
 if visualize:
@@ -173,7 +188,7 @@ if visualize:
 # TODO: 改为线性模型的回归
 depth_tracks = extract_tracked_depths(depth_seq, pred_tracks) # T, M
 pred_tracks, depth_tracks = filter_by_depthSeq(pred_tracks, depth_tracks) # [T, M, 2], [T, M]
-
+    
 if visualize:
     visualize_tracks_on_video(rgb_seq, pred_tracks, "after_depth_filter")
 
@@ -182,23 +197,24 @@ if visualize:
 T, M, _ = pred_tracks.shape
 pred_tracks_3d = image_to_camera(pred_tracks.reshape(T*M, -1), depth_tracks.reshape(-1), K) # T * M, 3
 pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
+
+if napari:
+    vis_tracks_3d_napari(pred_tracks_3d)
+    
 motion_for_kmeans = pred_tracks_3d.permute(1, 0, 2).reshape(M, -1) # M T*3
 
 _, moving_labels, _ = cluster.k_means(motion_for_kmeans.cpu().numpy(), init="k-means++", n_clusters=2)
 red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
-rigid_part_colors = red_and_green[moving_labels]
+rigid_part_colors = red_and_green[moving_labels] # M, 3
 
+if napari or True:
+    vis_tracks_3d_napari(pred_tracks_3d, rigid_part_colors)
+    
 if visualize:
     visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
 
 # 5) 初步估计出 joint parameters
-from embodied_analogy.joint_estimate_w_corr import estimate_t_w_corr_1, estimate_t_w_corr_2
-
-# for i in range(T - 1):
-#     translation1_c = estimate_t_w_corr_1(pred_tracks_3d[:i+2])
-#     Rc2w = Tw2c[:3, :3].T # 3, 3
-#     translation1_w = Rc2w @ translation1_c
-#     print(translation1_w)
+from embodied_analogy.estimation.joint_estimate_w_corr import estimate_t_w_corr_1, estimate_t_w_corr_2
     
 translation2_c, translation2_c_f, scales, scales_f = estimate_t_w_corr_2(pred_tracks_3d)
 Rc2w = Tw2c[:3, :3].T # 3, 3
