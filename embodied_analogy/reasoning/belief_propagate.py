@@ -11,6 +11,7 @@ Output:
         (3,) for prismatic joint
         (6,) for revolute joint
 """
+import os
 import torch
 import random
 import numpy as np
@@ -129,8 +130,24 @@ K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
 visualize = True
-napari = False
+napari = True
+save_intermidiate = False
 
+# 保存数据到 tmp_folder
+tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/"
+rgb_folder = os.path.join(tmp_folder, "rgbs")
+depth_folder = os.path.join(tmp_folder, "depths")
+mask_folder = os.path.join(tmp_folder, "masks")
+os.makedirs(rgb_folder, exist_ok=True)
+os.makedirs(depth_folder, exist_ok=True)
+os.makedirs(mask_folder, exist_ok=True)
+
+if save_intermidiate:
+    for i, rgb in enumerate(rgb_seq):
+        Image.fromarray(rgb).save(os.path.join(rgb_folder, f"{i}.jpg"))
+    for i, depth in enumerate(depth_seq):
+        np.save(os.path.join(depth_folder, f"{i}.npy"), depth) # H, W, 1
+        
 if napari:
     # 展示初始的 pointcloud sequence
     T = depth_seq.shape[0]
@@ -142,7 +159,7 @@ if napari:
         pc_i = pc_i[indices]
         raw_pc_list.append(pc_i)
     raw_pc_list = np.stack(raw_pc_list)
-    vis_tracks_3d_napari(raw_pc_list)
+    # vis_tracks_3d_napari(raw_pc_list)
     
 pc_0 = depth_image_to_pointcloud(depth_seq[0].squeeze(), object_mask_0, K) # N, 3
 rgb_0 = rgb_seq[0][object_mask_0] / 255. # N,3
@@ -169,37 +186,37 @@ if visualize:
     draw_points_on_image(Image.fromarray(rgb_seq[0]), centroids_image).show()
 
 # [T, M, 2], [T, M]
-pred_tracks, pred_visibility = track_any_points(rgb_seq, centroids_image, visiualize=visualize)
+pred_tracks_2d, pred_visibility = track_any_points(rgb_seq, centroids_image, visiualize=visualize)
 
 # 3) 对跟踪的点进行筛选
 # 3.1）要是一直能跟踪到的点
-pred_tracks = filter_by_visibility(pred_tracks, pred_visibility)
+pred_tracks_2d = filter_by_visibility(pred_tracks_2d, pred_visibility)
 
 if visualize:
-    visualize_tracks_on_video(rgb_seq, pred_tracks, "after_vis_filter")
+    visualize_tracks_on_video(rgb_seq, pred_tracks_2d, "after_vis_filter")
     
 # 3.2）要是一直在物体区域内的点(物体区域由sam2得到)
-pred_tracks = filter_by_sam2(pred_tracks, sam2_mask=None)
+pred_tracks_2d = filter_by_sam2(pred_tracks_2d, sam2_mask=None)
 
 if visualize:
-    visualize_tracks_on_video(rgb_seq, pred_tracks, "after_sam2_filter")
+    visualize_tracks_on_video(rgb_seq, pred_tracks_2d, "after_sam2_filter")
     
 # 3.3）这些点的深度不应该有突然的变化
 # TODO: 改为线性模型的回归
-depth_tracks = extract_tracked_depths(depth_seq, pred_tracks) # T, M
-pred_tracks, depth_tracks = filter_by_depthSeq(pred_tracks, depth_tracks) # [T, M, 2], [T, M]
+depth_tracks = extract_tracked_depths(depth_seq, pred_tracks_2d) # T, M
+pred_tracks_2d, depth_tracks = filter_by_depthSeq(pred_tracks_2d, depth_tracks) # [T, M, 2], [T, M]
     
 if visualize:
-    visualize_tracks_on_video(rgb_seq, pred_tracks, "after_depth_filter")
+    visualize_tracks_on_video(rgb_seq, pred_tracks_2d, "after_depth_filter")
 
 # 4) 根据这 m 个点的轨迹将其聚类为 static 和 moving 两类
 # 得到追踪点的三维轨迹
-T, M, _ = pred_tracks.shape
-pred_tracks_3d = image_to_camera(pred_tracks.reshape(T*M, -1), depth_tracks.reshape(-1), K) # T * M, 3
+T, M, _ = pred_tracks_2d.shape
+pred_tracks_3d = image_to_camera(pred_tracks_2d.reshape(T*M, -1), depth_tracks.reshape(-1), K) # T * M, 3
 pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
 
-if napari:
-    vis_tracks_3d_napari(pred_tracks_3d)
+# if napari:
+#     vis_tracks_3d_napari(pred_tracks_3d)
     
 motion_for_kmeans = pred_tracks_3d.permute(1, 0, 2).reshape(M, -1) # M T*3
 
@@ -207,37 +224,46 @@ _, moving_labels, _ = cluster.k_means(motion_for_kmeans.cpu().numpy(), init="k-m
 red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
 rigid_part_colors = red_and_green[moving_labels] # M, 3
 
-if napari or True:
+if napari:
     vis_tracks_3d_napari(pred_tracks_3d, rigid_part_colors)
     
 if visualize:
     visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
+    
+# 在这里跑 sam2, 得到 moving_part 和 static_part 的分割
+from embodied_analogy.perception.sam2_masking import run_sam2_whole
+from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask
+moving_tracks_2d = pred_tracks_2d[:, moving_labels == 1, :] # T, N, 2
+static_tracks_2d = pred_tracks_2d[:, moving_labels == 0, :] # T, N, 2
+point_prompt = torch.stack([moving_tracks_2d[0][0], static_tracks_2d[0][0]]).cpu() #2, 2
+video_masks = run_sam2_whole(rgb_folder, initial_point_prompt=point_prompt)
+if visualize:
+    visualize_sam2_mask(rgb_seq, video_masks)
+
+if save_intermidiate:
+    for i, mask in enumerate(video_masks):
+        mask_255 = (mask * 255).astype(np.uint8)
+        Image.fromarray(mask_255).save(os.path.join(mask_folder, f"{i}.jpg"))
+        # np.save(os.path.join(mask_folder, f"{i}.npy"), mask)
 
 # 5) 初步估计出 joint parameters
-from embodied_analogy.estimation.joint_estimate_w_corr import estimate_t_w_corr_1, estimate_t_w_corr_2
+from embodied_analogy.estimation.joint_estimate_w_corr import estimate_translation_from_tracks
     
-translation2_c, translation2_c_f, scales, scales_f = estimate_t_w_corr_2(pred_tracks_3d)
+translation_c, scales = estimate_translation_from_tracks(pred_tracks_3d)
 Rc2w = Tw2c[:3, :3].T # 3, 3
-translation2_w = Rc2w @ translation2_c
-translation2_w_f = Rc2w @ translation2_c_f
-print(translation2_w)
-print(translation2_w_f)
-print(scales)
-print(scales_f)
-import matplotlib.pyplot as plt
-plt.plot(scales, marker='o')
-# plt.savefig("plot.png") 
-plt.show()
-plt.plot(scales_f, marker='o')
-# plt.savefig("plot.png") 
-plt.show()
+translation_w = Rc2w @ translation_c
+
+# 将 joint states 保存到 tmp_folder
+if save_intermidiate:
+    np.savez(
+        os.path.join(tmp_folder, "joint_state.npz"), 
+        translation_c=translation_c, 
+        translation_w=translation_w, 
+        scales=scales
+    )
 
 # 6) 对于第一帧剩下的 k-m 个点簇进行分类验证, 分为 static, moving 和 unknown 三类
 # static 和 moving 里又分为一直能看到的, 和随着运动新发现的 
-#
 
-# 首先得到运动的三维点云 
-# TODO：用 sam2 仅仅分割出物体的部分
-pc_seq = [depth_image_to_pointcloud(depth_seq[i].squeeze(), mask=None, K=K) for i in range(len(depth_seq))] # T, N, 3
 
 # 7) 用所有 known 的点簇重新估计 joint parameters

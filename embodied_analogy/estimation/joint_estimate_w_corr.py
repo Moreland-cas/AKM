@@ -11,26 +11,8 @@ import torch
 import numpy as np
 from scipy.linalg import svd
 
-def estimate_t_w_corr_1(tracks_3d):
-    """
-    通过轨迹估计平移方向，并返回单位向量形式
-    :param tracks_3d: 形状为(T, M, 3)的numpy数组, T是时间步数, M是点的数量
-    :return: 平移方向的单位向量 (3,)
-    """
-    if isinstance(tracks_3d, torch.Tensor):
-        tracks_3d = tracks_3d.cpu().numpy()
-        
-    # 计算每个点在不同时间点的平均平移
-    translation_vectors = tracks_3d[-1] - tracks_3d[0]  # 初始位置和最终位置之间的差异
-    avg_translation = np.mean(translation_vectors, axis=0)  # 计算所有点的平均平移
 
-    # 将平均平移向量归一化为单位向量
-    norm = np.linalg.norm(avg_translation)  # 计算模长
-    unit_translation = avg_translation / norm  # 归一化为单位向量
-
-    return unit_translation
-
-def estimate_t_w_corr_2(tracks_3d):
+def estimate_translation_from_tracks(tracks_3d):
     """
     通过所有时间帧的位移变化估计平移方向，并计算每帧沿该方向的位移标量
     :param tracks_3d: 形状为(T, M, 3)的numpy数组, T是时间步数, M是点的数量
@@ -61,34 +43,34 @@ def estimate_t_w_corr_2(tracks_3d):
         scale_t = np.dot(displacement, avg_unit_vector)  # 投影到单位向量上的标量
         scales.append(scale_t)
         
-    # 按照 scale 的绝对值排序并保留中间部分
-    keep_ratio = 0.6
-    sorted_indices = np.argsort(np.abs(scales))
-    num_keep = int(T * keep_ratio)  # 保留的帧数
-    start_idx = (T - num_keep) // 2  # 起始索引
-    valid_indices = sorted_indices[start_idx : start_idx + num_keep]  # 中间部分的索引
-    
-    # 使用过滤后的帧重新估计平移方向
-    filtered_tracks = tracks_3d[valid_indices]  # 过滤掉两端数据的帧
-    filtered_unit_vectors = []
-    for t in range(1, len(filtered_tracks)):
-        displacement_vectors = filtered_tracks[t] - tracks_3d[0]  # 当前帧和初始帧的位移
-        norms = np.linalg.norm(displacement_vectors, axis=1, keepdims=True)  # 计算位移的模长
-        normalized_vectors = displacement_vectors / norms  # 归一化为单位向量
-        filtered_unit_vectors.append(normalized_vectors)  # 保存单位向量
+    # 进一步的进行一轮筛选
+    if False:
+        keep_ratio = 0.6
+        sorted_indices = np.argsort(np.abs(scales))
+        num_keep = int(T * keep_ratio)  # 保留的帧数
+        start_idx = (T - num_keep) // 2  # 起始索引
+        valid_indices = sorted_indices[start_idx : start_idx + num_keep]  # 中间部分的索引
+        
+        filtered_tracks = tracks_3d[valid_indices]  # 过滤掉两端数据的帧
+        filtered_unit_vectors = []
+        for t in range(1, len(filtered_tracks)):
+            displacement_vectors = filtered_tracks[t] - tracks_3d[0]  # 当前帧和初始帧的位移
+            norms = np.linalg.norm(displacement_vectors, axis=1, keepdims=True)  # 计算位移的模长
+            normalized_vectors = displacement_vectors / norms  # 归一化为单位向量
+            filtered_unit_vectors.append(normalized_vectors)  # 保存单位向量
 
-    filtered_unit_vectors = np.concatenate(filtered_unit_vectors, axis=0)  # 合并为一个大数组
-    filtered_avg_unit_vector = np.mean(filtered_unit_vectors, axis=0)  # 重新计算单位向量
-    filtered_avg_unit_vector /= np.linalg.norm(filtered_avg_unit_vector)  # 再次归一化
+        filtered_unit_vectors = np.concatenate(filtered_unit_vectors, axis=0)  # 合并为一个大数组
+        filtered_avg_unit_vector = np.mean(filtered_unit_vectors, axis=0)  # 重新计算单位向量
+        filtered_avg_unit_vector /= np.linalg.norm(filtered_avg_unit_vector)  # 再次归一化
 
-    # 重新计算过滤后的位移标量
-    filtered_scales = []
-    for t in range(T):
-        displacement = np.mean(tracks_3d[t] - tracks_3d[0], axis=0)  # 当前帧和初始帧的平均位移
-        scale_t = np.dot(displacement, filtered_avg_unit_vector)  # 投影到单位向量上的标量
-        filtered_scales.append(scale_t)
+        filtered_scales = []
+        for t in range(T):
+            displacement = np.mean(tracks_3d[t] - tracks_3d[0], axis=0)  # 当前帧和初始帧的平均位移
+            scale_t = np.dot(displacement, filtered_avg_unit_vector)  # 投影到单位向量上的标量
+            filtered_scales.append(scale_t)
 
-    return avg_unit_vector, filtered_avg_unit_vector, np.array(scales), np.array(filtered_scales)
+        return avg_unit_vector, filtered_avg_unit_vector, np.array(scales), np.array(filtered_scales)
+    return avg_unit_vector, np.array(scales)
 
 def estimate_R_w_corr(trajectory):
     """

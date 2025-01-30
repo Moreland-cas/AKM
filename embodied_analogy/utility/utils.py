@@ -103,7 +103,11 @@ def camera_to_image(camera_points, K, image_width=None, image_height=None, norma
     # 转换为非齐次像素坐标
     u = projected_points[:, 0] / projected_points[:, 2]  # (B,)
     v = projected_points[:, 1] / projected_points[:, 2]  # (B,)
-
+    uv = np.vstack((u, v)).T  # (B, 2)
+    
+    # 提取深度值
+    depth = projected_points[:, 2]  # (B,)
+    
     # 归一化到 [0, 1]
     if normalized_uv:
         assert image_width is not None and image_height is not None, \
@@ -111,7 +115,7 @@ def camera_to_image(camera_points, K, image_width=None, image_height=None, norma
         u = u / image_width
         v = v / image_height
 
-    return np.vstack((u, v)).T  # (B, 2)
+    return uv, depth  # (B, 2), (B, )
 
 def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, normalized_uv=False):
     """
@@ -276,6 +280,8 @@ def depth_image_to_pointcloud(depth_image, mask, K):
     Returns:
     - pointcloud (np.array): 点云，大小为 (N, 3)，表示每个像素点在相机坐标系下的三维坐标
     """
+    assert depth_image.ndim == 2, "depth_image must be a 2D array"
+    assert mask.dtype == np.bool_, "mask must be a boolean array"
     # 获取相机内参
     f_x = K[0, 0]  # 水平焦距 (单位: 像素)
     f_y = K[1, 1]  # 垂直焦距 (单位: 像素)

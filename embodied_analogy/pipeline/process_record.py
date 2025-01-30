@@ -87,3 +87,5 @@ if __name__ == "__main__":
     dr = RecordDataReader(record_path_prefix, file_name)
     dr.process_data()
     dr.visualize_contact_as_video()
+    
+    
