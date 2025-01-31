@@ -517,6 +517,36 @@ class SimilarityMap:
         return sampled_coordinates
     
 
+import numpy as np
+
+def reconstruct_mask(mask1: np.ndarray, mask2: np.ndarray) -> np.ndarray:
+    """
+    根据初始布尔掩码 (mask1) 和筛选掩码 (mask2)，返回最终筛选后的布尔掩码。
+
+    参数:
+    - mask1: np.ndarray (H, W)  -> 初始布尔掩码
+    - mask2: np.ndarray (N,)     -> 选中的N个点的筛选掩码
+
+    返回:
+    - new_mask: np.ndarray (H, W) -> 仅包含 mask2 选中像素点的布尔掩码
+    """
+    assert mask1.dtype == np.bool_, "mask1 必须是 bool 类型"
+    assert mask2.dtype == np.bool_, "mask2 必须是 bool 类型"
+    
+    # 获取 mask1 中为 True 的索引
+    indices = np.argwhere(mask1)  # (N, 2) 形状数组，每行是 (y, x)
+    
+    # 选出最终保留的 M 个像素点
+    selected_indices = indices[mask2]  # (M, 2) 形状
+
+    # 构造新的 (H, W) 掩码
+    new_mask = np.zeros_like(mask1, dtype=bool)
+    
+    # 设置 M 个有效位置为 True
+    new_mask[selected_indices[:, 0], selected_indices[:, 1]] = True
+    
+    return new_mask
+
 if __name__ == "__main__":
     H, W = 300, 400
     data = np.random.random((H, W, 3))

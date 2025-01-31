@@ -33,7 +33,7 @@
 import os
 from PIL import Image
 import numpy as np
-from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image
+from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask
 
 def classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref2tgt, alpha=1.):
     """
@@ -65,22 +65,29 @@ def classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref2tgt
     uv_static_pred_int = np.floor(uv_static_pred).astype(int)
     mask_static_obs = obj_mask_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
     depth_static_obs = depth_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
+    # static_score = alpha * (mask_static_obs - 1)
     static_score = alpha * (mask_static_obs - 1) + np.minimum(0, depth_static_pred - depth_static_obs) # N
     
     uv_moving_pred_int = np.floor(uv_moving_pred).astype(int)
     mask_moving_obs = obj_mask_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
     depth_moving_obs = depth_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
+    # moving_score = alpha * (mask_moving_obs - 1)
     moving_score = alpha * (mask_moving_obs - 1) + np.minimum(0, depth_moving_pred - depth_moving_obs) # N
     
     # 1.5）根据 static_score 和 moving_score 将所有点分类为 static, moving 和 unknown 中的一类
     # 得分最大是 0, 如果一方接近 0，另一方很小，则选取接近为 0 的那一类， 否则为 unkonwn
     class_mask = np.zeros(len(static_score))
     for i in range(len(static_score)):
-        if static_score[i] > moving_score[i]:
+        if depth_static_obs[i] == 1e6 or depth_moving_obs[i] == 1e6:
+            # class_mask[i] = 2 # 2 for unknown
+            class_mask[i] = 0
+            continue
+        if abs(static_score[i]) <= abs(moving_score[i]) :
             class_mask[i] = 0 # 0 for static
         else:
+            print(static_score[i], moving_score[i])
             class_mask[i] = 1 # 1 for moving
-    return class_mask
+    return class_mask.astype(np.bool_)
 def refine_joint_est(depth1, depth2, obj_mask1, obj_mask2, joint_param, delta_joint_state):
     """
         根据当前的 joint 信息和 obj_mask 信息迭代的进行精度提升
@@ -99,9 +106,16 @@ if __name__ == "__main__":
     depth_ref = np.load(os.path.join(tmp_folder, "depths", "0.npy")).squeeze() # H, w
     depth_tgt = np.load(os.path.join(tmp_folder, "depths", "47.npy")).squeeze()
     
+    # 修改深度图观测为 0 的地方
+    depth_ref[depth_ref == 0] = 1e6
+    depth_tgt[depth_tgt == 0] = 1e6
+    
     # 读取 0 和 47 帧的 obj_mask
-    obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "masks", "0.jpg")), dtype=np.bool_) # H, W 0, 255
-    obj_mask_tgt = np.array(Image.open(os.path.join(tmp_folder, "masks", "47.jpg")), dtype=np.bool_)
+    obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "masks", "0.png"))) # H, W 0, 255
+    obj_mask_tgt = np.array(Image.open(os.path.join(tmp_folder, "masks", "47.png")))
+    
+    obj_mask_ref = (obj_mask_ref == 255)
+    obj_mask_tgt = (obj_mask_tgt == 255)
     
     delta_scale = scales[47] - scales[0]
     T_ref_to_tgt = np.eye(4)
@@ -114,5 +128,10 @@ if __name__ == "__main__":
         [  0.,   0.,   1.]]
     )
     
-    class_mask = classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt, alpha=0.5)
-    print(class_mask)
+    class_mask_ref = classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt, alpha=1.)
+    recon_mask_ref = reconstruct_mask(obj_mask_ref, class_mask_ref)
+    Image.fromarray((recon_mask_ref.astype(np.int32) * 255).astype(np.uint8)).save("mask_ref.png")
+    
+    class_mask_tgt = classify_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt), alpha=1.)
+    recon_mask_tgt = reconstruct_mask(obj_mask_tgt, class_mask_tgt)
+    Image.fromarray((recon_mask_tgt.astype(np.int32) * 255).astype(np.uint8)).save("mask_tgt.png")

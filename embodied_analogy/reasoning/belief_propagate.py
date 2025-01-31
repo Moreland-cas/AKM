@@ -129,9 +129,9 @@ depth_seq = dr.depth # T H W 1
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
-visualize = True
-napari = True
-save_intermidiate = False
+visualize = False
+napari = False
+save_intermidiate = True
 
 # 保存数据到 tmp_folder
 tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/"
@@ -180,7 +180,7 @@ if visualize:
 
 # 2) 然后对这 k 个点进行 rgb tracking
 centroids_camera = centroids[:, :3] # num_clusters, 3
-centroids_image = camera_to_image(centroids_camera, K) # num_clusters, 2
+centroids_image, _ = camera_to_image(centroids_camera, K) # num_clusters, 2
 
 if visualize:
     draw_points_on_image(Image.fromarray(rgb_seq[0]), centroids_image).show()
@@ -243,7 +243,7 @@ if visualize:
 if save_intermidiate:
     for i, mask in enumerate(video_masks):
         mask_255 = (mask * 255).astype(np.uint8)
-        Image.fromarray(mask_255).save(os.path.join(mask_folder, f"{i}.jpg"))
+        Image.fromarray(mask_255).save(os.path.join(mask_folder, f"{i}.png"))
         # np.save(os.path.join(mask_folder, f"{i}.npy"), mask)
 
 # 5) 初步估计出 joint parameters
