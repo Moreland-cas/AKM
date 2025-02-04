@@ -20,7 +20,7 @@ import sklearn.cluster as cluster
 from cotracker.utils.visualizer import Visualizer
 from embodied_analogy.pipeline.process_record import RecordDataReader
 from embodied_analogy.perception.online_cotracker import track_any_points
-from embodied_analogy.visualization.vis_tracks_3d import vis_tracks_3d_napari
+from embodied_analogy.visualization.vis_tracks_3d import vis_tracks_3d_napari, vis_pointcloud_series_napari
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud, 
     visualize_pc, 
@@ -168,7 +168,7 @@ if visualize:
 
 # 1) 对初始帧中的物体点云聚类得到 num_clusters 个点簇, 并计算 num_clusters 个簇中心在图像上的投影
 # TODO: 可以在一开始聚类的时候也考虑视觉特征
-num_clusters = 300
+num_clusters = 600
 feat_for_kmeans = np.concatenate([pc_0, rgb_0], axis=-1)
 centroids, labels, _ = cluster.k_means(feat_for_kmeans, init="k-means++", n_clusters=num_clusters)
 
@@ -219,22 +219,34 @@ pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
 #     vis_tracks_3d_napari(pred_tracks_3d)
     
 motion_for_kmeans = pred_tracks_3d.permute(1, 0, 2).reshape(M, -1) # M T*3
-
 _, moving_labels, _ = cluster.k_means(motion_for_kmeans.cpu().numpy(), init="k-means++", n_clusters=2)
-red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
-rigid_part_colors = red_and_green[moving_labels] # M, 3
+
+# 在这里将分类后的两类点进行判断, 判断哪一类是静止的, 哪一类是运动的 (M = M1 + M2)
+part1 = pred_tracks_3d[:, moving_labels == 0, :] # T, M1, 3
+part2 = pred_tracks_3d[:, moving_labels == 1, :] # T, M2, 3
+
+# 计算点的轨迹的 variance, 将 variance 小的点认为是静止的, variance 大的点认为是运动的
+from embodied_analogy.utility.utils import tracks3d_variance
+if tracks3d_variance(part1) > tracks3d_variance(part2):
+    moving_mask = (moving_labels == 0)
+    static_mask = (moving_labels == 1)
+else:
+    moving_mask = (moving_labels == 1)
+    static_mask = (moving_labels == 0)
 
 if napari:
+    red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
+    rigid_part_colors = red_and_green[moving_labels] # M, 3
     vis_tracks_3d_napari(pred_tracks_3d, rigid_part_colors)
     
-if visualize:
-    visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
+# if visualize:
+#     visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
     
 # 在这里跑 sam2, 得到 moving_part 和 static_part 的分割
 from embodied_analogy.perception.sam2_masking import run_sam2_whole
 from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask
-moving_tracks_2d = pred_tracks_2d[:, moving_labels == 1, :] # T, N, 2
-static_tracks_2d = pred_tracks_2d[:, moving_labels == 0, :] # T, N, 2
+moving_tracks_2d = pred_tracks_2d[:, moving_mask, :] # T, N, 2
+static_tracks_2d = pred_tracks_2d[:, static_mask, :] # T, N, 2
 point_prompt = torch.stack([moving_tracks_2d[0][0], static_tracks_2d[0][0]]).cpu() #2, 2
 video_masks = run_sam2_whole(rgb_folder, initial_point_prompt=point_prompt)
 if visualize:
@@ -249,10 +261,28 @@ if save_intermidiate:
 # 5) 初步估计出 joint parameters
 from embodied_analogy.estimation.joint_estimate_w_corr import estimate_translation_from_tracks
     
-translation_c, scales = estimate_translation_from_tracks(pred_tracks_3d)
+translation_c, scales = estimate_translation_from_tracks(pred_tracks_3d[:, moving_mask, :])
 Rc2w = Tw2c[:3, :3].T # 3, 3
 translation_w = Rc2w @ translation_c
 
+# for debug, visualize 原始的跟踪点，和第一frame的moving points 按照我们的估计的joint param 计算出的轨迹
+if visualize:
+    tracks_3d = pred_tracks_3d.cpu().numpy() # T, M, 3
+    moving_points = tracks_3d[0, moving_mask, :] # M, 3
+    # static_points = tracks_3d[0, moving_labels == 0, :]
+    points = []
+    colors = []
+    for i in range(len(tracks_3d)):
+        points_tmp = []
+        colors_tmp = []
+        points_tmp.extend(tracks_3d[i])
+        colors_tmp.extend([[0, 0, 1]] * len(tracks_3d[i]))
+        points_tmp.extend(moving_points + scales[i] * translation_c)
+        colors_tmp.extend([[1, 0, 0]] * len(moving_points))
+        points.append(np.array(points_tmp))
+        colors.append(np.array(colors_tmp))
+        
+    vis_pointcloud_series_napari(points, colors)
 # 将 joint states 保存到 tmp_folder
 if save_intermidiate:
     np.savez(

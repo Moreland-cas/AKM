@@ -65,28 +65,37 @@ def classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref2tgt
     uv_static_pred_int = np.floor(uv_static_pred).astype(int)
     mask_static_obs = obj_mask_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
     depth_static_obs = depth_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
-    # static_score = alpha * (mask_static_obs - 1)
+    
+    alpha = 0.
     static_score = alpha * (mask_static_obs - 1) + np.minimum(0, depth_static_pred - depth_static_obs) # N
+    # static_score = alpha * (mask_static_obs - 1) + (depth_static_pred - depth_static_obs) # N
     
     uv_moving_pred_int = np.floor(uv_moving_pred).astype(int)
     mask_moving_obs = obj_mask_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
     depth_moving_obs = depth_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
-    # moving_score = alpha * (mask_moving_obs - 1)
     moving_score = alpha * (mask_moving_obs - 1) + np.minimum(0, depth_moving_pred - depth_moving_obs) # N
+    # moving_score = alpha * (mask_moving_obs - 1) + (depth_moving_pred - depth_moving_obs) # N
     
     # 1.5）根据 static_score 和 moving_score 将所有点分类为 static, moving 和 unknown 中的一类
     # 得分最大是 0, 如果一方接近 0，另一方很小，则选取接近为 0 的那一类， 否则为 unkonwn
     class_mask = np.zeros(len(static_score))
     for i in range(len(static_score)):
         if depth_static_obs[i] == 1e6 or depth_moving_obs[i] == 1e6:
-            # class_mask[i] = 2 # 2 for unknown
-            class_mask[i] = 0
+            class_mask[i] = 0 # 2 for unknown
             continue
-        if abs(static_score[i]) <= abs(moving_score[i]) :
-            class_mask[i] = 0 # 0 for static
+        
+        if abs(static_score[i]) > 1 and abs(moving_score[i]) > 1:
+            class_mask[i] = 0 
+            continue
+        
+        if abs(static_score[i]) < 0.1 and abs(moving_score[i]) < 0.1:
+            class_mask[i] = 0 
+            continue
+        
+        if static_score[i] + 0.001 < moving_score[i]:
+            class_mask[i] = 1 # 0 for static
         else:
-            print(static_score[i], moving_score[i])
-            class_mask[i] = 1 # 1 for moving
+            class_mask[i] = 0 
     return class_mask.astype(np.bool_)
 def refine_joint_est(depth1, depth2, obj_mask1, obj_mask2, joint_param, delta_joint_state):
     """
@@ -101,23 +110,31 @@ if __name__ == "__main__":
     
     translation_w = joint_state_npz["translation_w"]
     translation_c = joint_state_npz["translation_c"]
+    translation_w_gt = np.array([0, 0, 1.])
+    
+    Rc2w = np.array([[-4.83808517e-01, -1.60986036e-01,  8.60239983e-01],
+       [-8.75173867e-01,  8.89947787e-02, -4.75552976e-01],
+       [ 5.21540642e-07, -9.82936144e-01, -1.83947206e-01]])
+    translation_c_gt = Rc2w.T @ translation_w_gt
+    
+    ref_idx, tgt_idx = 0, 38
     
     # 读取 0 和 47 帧的深度图
-    depth_ref = np.load(os.path.join(tmp_folder, "depths", "0.npy")).squeeze() # H, w
-    depth_tgt = np.load(os.path.join(tmp_folder, "depths", "47.npy")).squeeze()
+    depth_ref = np.load(os.path.join(tmp_folder, "depths", f"{ref_idx}.npy")).squeeze() # H, w
+    depth_tgt = np.load(os.path.join(tmp_folder, "depths", f"{tgt_idx}.npy")).squeeze()
     
     # 修改深度图观测为 0 的地方
     depth_ref[depth_ref == 0] = 1e6
     depth_tgt[depth_tgt == 0] = 1e6
     
     # 读取 0 和 47 帧的 obj_mask
-    obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "masks", "0.png"))) # H, W 0, 255
-    obj_mask_tgt = np.array(Image.open(os.path.join(tmp_folder, "masks", "47.png")))
+    obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "masks", f"{ref_idx}.png"))) # H, W 0, 255
+    obj_mask_tgt = np.array(Image.open(os.path.join(tmp_folder, "masks", f"{tgt_idx}.png")))
     
     obj_mask_ref = (obj_mask_ref == 255)
     obj_mask_tgt = (obj_mask_tgt == 255)
     
-    delta_scale = scales[47] - scales[0]
+    delta_scale = scales[tgt_idx] - scales[ref_idx]
     T_ref_to_tgt = np.eye(4)
     # from 0 to 47, which means coor_47 = coor_0 + translation_c * delta_scale
     T_ref_to_tgt[:3, 3] = translation_c * delta_scale
@@ -127,11 +144,27 @@ if __name__ == "__main__":
         [  0., 300., 300.],
         [  0.,   0.,   1.]]
     )
+    # 可视化 tgt frame 的点云, 和 ref frame 的点云经过 transform 后与之的对比，看看估计的到底有多离谱，你妈的
+    from embodied_analogy.utility.utils import visualize_pc
+    points_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
+    points_ref_transformed = points_ref + translation_c * delta_scale 
+    colors_ref = np.zeros((len(points_ref), 3))
+    colors_ref[:, 0] = 1
+    # visualize_pc(points=points_ref, colors=None)
     
-    class_mask_ref = classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt, alpha=1.)
-    recon_mask_ref = reconstruct_mask(obj_mask_ref, class_mask_ref)
-    Image.fromarray((recon_mask_ref.astype(np.int32) * 255).astype(np.uint8)).save("mask_ref.png")
+    points_tgt = depth_image_to_pointcloud(depth_tgt, obj_mask_tgt, K)
+    colors_tgt = np.zeros((len(points_tgt), 3))
+    colors_tgt[:, 1] = 1
     
-    class_mask_tgt = classify_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt), alpha=1.)
-    recon_mask_tgt = reconstruct_mask(obj_mask_tgt, class_mask_tgt)
-    Image.fromarray((recon_mask_tgt.astype(np.int32) * 255).astype(np.uint8)).save("mask_tgt.png")
+    points_concat_for_vis = np.concatenate([points_ref_transformed, points_tgt], axis=0)
+    colors_concat_for_vis = np.concatenate([colors_ref, colors_tgt], axis=0)
+    visualize_pc(points=points_concat_for_vis, colors=colors_concat_for_vis)
+    # visualize_pc(points=points_tgt, colors=colors_tgt)
+    if True:
+        class_mask_ref = classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt, alpha=1.)
+        recon_mask_ref = reconstruct_mask(obj_mask_ref, class_mask_ref)
+        Image.fromarray((recon_mask_ref.astype(np.int32) * 255).astype(np.uint8)).save("mask_ref.png")
+        
+        class_mask_tgt = classify_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt), alpha=1.)
+        recon_mask_tgt = reconstruct_mask(obj_mask_tgt, class_mask_tgt)
+        Image.fromarray((recon_mask_tgt.astype(np.int32) * 255).astype(np.uint8)).save("mask_tgt.png")
