@@ -22,7 +22,7 @@ from embodied_analogy.visualization.vis_tracks_3d import (
     vis_tracks3d_napari,
     vis_pointcloud_series_napari
 )
-from embodied_analogy.reasoning.utils import (
+from embodied_analogy.estimation.utils import (
     filter_2d_tracks_by_visibility, 
     filter_2d_tracks_by_depthSeq_mask, 
     extract_tracked_depths, 
@@ -131,13 +131,13 @@ centroids_camera = centroids[:, :3] # num_clusters, 3
 centroids_image, _ = camera_to_image(centroids_camera, K) # num_clusters, 2
 pred_tracks_2d, pred_visibility = track_any_points(rgb_seq, centroids_image) # [T, M, 2], [T, M]
 
-if visualize:
+if save_intermidiate:
     visualize_2d_tracks_on_video(rgb_seq, pred_tracks_2d, "track2d_initial_results", vis_folder)
 
 # 筛选出一直能跟踪到的点 
 pred_tracks_2d = filter_2d_tracks_by_visibility(pred_tracks_2d, pred_visibility)
 
-if visualize:
+if save_intermidiate:
     visualize_2d_tracks_on_video(rgb_seq, pred_tracks_2d, "tracks2d_filtered_by_visibility", vis_folder)
 
 # 筛选出不曾重投影到地面上的点
@@ -146,7 +146,7 @@ if visualize:
 pred_tracks_2d = filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depth_seq_mask)
 depth_tracks = extract_tracked_depths(depth_seq, pred_tracks_2d) # T, M
     
-if visualize:
+if save_intermidiate:
     visualize_2d_tracks_on_video(rgb_seq, pred_tracks_2d, "tracks2d_filtered_by_depth_mask", vis_folder)
         
 """
@@ -175,14 +175,13 @@ else:
 if visualize:
     red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
     rigid_part_colors = red_and_green[moving_labels] # M, 3
-    # vis_tracks3d_napari(pred_tracks_3d, rigid_part_colors)
-    visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
+    vis_tracks3d_napari(pred_tracks_3d, rigid_part_colors)
         
 """
     根据 tracks2d 初步估计出 joint params
 """
-t_axis_camera, t_scales, t_est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :])
-R_axis_camera, R_scales, R_est_loss = coarse_R_from_tracks_3d(pred_tracks_3d[:, moving_mask, :])
+t_axis_camera, t_scales, t_est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize)
+R_axis_camera, R_scales, R_est_loss = coarse_R_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize)
 
 print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
 if t_est_loss < R_est_loss:
@@ -196,7 +195,7 @@ Rc2w = Tw2c[:3, :3].T # 3, 3
 axis_world = Rc2w @ axis_camera
 
 # for debug, visualize 原始的跟踪点，和第一frame的moving points 按照我们的估计的joint param 计算出的轨迹
-if visualize:
+if False:
     tracks_3d = pred_tracks_3d.cpu().numpy() # T, M, 3
     moving_points = tracks_3d[0, moving_mask, :] # M, 3
     # static_points = tracks_3d[0, moving_labels == 0, :]
@@ -211,8 +210,8 @@ if visualize:
         colors_tmp.extend([[1, 0, 0]] * len(moving_points))
         points.append(np.array(points_tmp))
         colors.append(np.array(colors_tmp))
-        
     vis_pointcloud_series_napari(points, colors)
+    
 # 将 joint states 保存到 tmp_folder
 if save_intermidiate:
     np.savez(

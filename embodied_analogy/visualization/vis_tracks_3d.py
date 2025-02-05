@@ -26,7 +26,7 @@ def vis_tracks3d_napari(tracks_3d, colors=None):
     if colors is None:
         colors = np.random.rand(M, 3)
         # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
-        colors = np.tile(colors, (T, 1))
+    colors = np.tile(colors, (T, 1))
         
     viewer.add_points(napari_data, size=0.02, name='tracks_3d', opacity=0.8, face_color=colors)
     napari.run()

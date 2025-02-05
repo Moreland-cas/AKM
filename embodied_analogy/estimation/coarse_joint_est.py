@@ -11,8 +11,12 @@ import torch
 import numpy as np
 from scipy.linalg import svd
 from scipy.spatial.transform import Rotation as R
+from embodied_analogy.visualization.vis_tracks_3d import (
+    vis_tracks3d_napari,
+    vis_pointcloud_series_napari
+)
 
-def coarse_t_from_tracks_3d(tracks_3d):
+def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     """
     通过所有时间帧的位移变化估计平移方向，并计算每帧沿该方向的位移标量
     :param tracks_3d: 形状为(T, M, 3)的numpy数组, T是时间步数, M是点的数量
@@ -47,9 +51,13 @@ def coarse_t_from_tracks_3d(tracks_3d):
     reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
     est_loss = np.mean(np.linalg.norm(reconstructed_tracks - tracks_3d, axis=2))  # 计算点对点 L2 误差的平均值
     
+    if visualize:
+        # 绿色代表 moving part, 红色代表 renconstructed moving part
+        colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1)))) # 2M, 3
+        vis_tracks3d_napari(np.concatenate([tracks_3d, reconstructed_tracks], axis=1), colors)
     return avg_unit_vector, np.array(scales), est_loss
 
-def coarse_R_from_tracks_3d(tracks_3d):
+def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     """
     通过所有时间帧的点轨迹估计旋转轴，并计算每帧的旋转角度
     :param tracks_3d: 形状为 (T, M, 3) 的 numpy 数组, T 是时间步数, M 是点的数量
@@ -63,7 +71,7 @@ def coarse_R_from_tracks_3d(tracks_3d):
     
     # 计算每一帧相对于初始帧的旋转矩阵
     for t in range(1, T):
-        # 计算所有点的归一化向量（单位方向）
+        # 由于这是纯旋转变换, 所以不需要减去中心值
         U, _, Vt = np.linalg.svd(tracks_3d[t].T @ tracks_3d[0])
         R_t = U @ Vt  # 计算旋转矩阵
         if np.linalg.det(R_t) < 0:  # 保证旋转矩阵的正定性
@@ -85,15 +93,28 @@ def coarse_R_from_tracks_3d(tracks_3d):
     unit_vector_axis = np.mean(rotation_axes, axis=0)  # 计算所有旋转轴的平均
     unit_vector_axis /= np.linalg.norm(unit_vector_axis)  # 归一化旋转轴
     
-    # 计算每帧旋转角度
-    angles = np.array([0.0] + angles)  # 添加初始帧的角度 0
+    # 重新计算每帧旋转角度
+    angles = [0.0]  # 初始帧角度为0
+    for R_t in relative_rotations:
+        projected_rotation_vector = R.from_matrix(R_t).as_rotvec()
+        angle = np.dot(projected_rotation_vector, unit_vector_axis)  # 计算在估计旋转轴上的旋转量
+        angles.append(angle)
+    
+    angles = np.array(angles)  # 转换为数组
     
     # 计算重投影误差 est_loss
     est_loss = 0
+    reconstructed_tracks = []
     for t in range(T):
         R_reconstructed = R.from_rotvec(angles[t] * unit_vector_axis).as_matrix()
-        reconstructed_tracks = (R_reconstructed @ tracks_3d[0].T).T
-        est_loss += np.mean(np.linalg.norm(reconstructed_tracks - tracks_3d[t], axis=1))
+        reconstructed_track = (R_reconstructed @ tracks_3d[0].T).T # T, M, 3
+        est_loss += np.mean(np.linalg.norm(reconstructed_track - tracks_3d[t], axis=1))
+        reconstructed_tracks.append(reconstructed_track)
     est_loss /= T  # 计算所有帧的平均误差
     
+    if visualize:
+        # 绿色代表 moving part, 红色代表 renconstructed moving part
+        # 绿色代表 moving part, 红色代表 renconstructed moving part
+        colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1)))) # 2M, 3
+        vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors)
     return unit_vector_axis, angles, est_loss
