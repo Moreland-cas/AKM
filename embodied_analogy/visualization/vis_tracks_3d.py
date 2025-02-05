@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import napari
 
-def vis_tracks3d_napari(tracks_3d, colors):
+def vis_tracks3d_napari(tracks_3d, colors=None):
     """
     Args:
         tracks_3d: np.array of shape (T, M, 3)
@@ -22,13 +22,16 @@ def vis_tracks3d_napari(tracks_3d, colors):
         napari_data[i * M: (i + 1) * M, 1:] = tracks_3d[i]
     
     viewer = napari.Viewer(ndisplay=3)
-    # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
-    colors = np.tile(colors, (T, 1))
+    
+    if colors is None:
+        colors = np.random.rand(M, 3)
+        # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
+        colors = np.tile(colors, (T, 1))
+        
     viewer.add_points(napari_data, size=0.02, name='tracks_3d', opacity=0.8, face_color=colors)
-    # viewer.add_labels(np.random.randint(0, 10, size=(M, 1)), name='labels')
     napari.run()
     
-def vis_pointcloud_series_napari(pc_series, colors):
+def vis_pointcloud_series_napari(pc_series, colors=None):
     """
     Args:
         pc_series: list of np.arrays of shape (M, 3)
@@ -50,10 +53,12 @@ def vis_pointcloud_series_napari(pc_series, colors):
     # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
     if colors is not None:
         colors = np.concatenate(colors, axis=0)
-    viewer.add_points(napari_data, size=0.02, name='pc_series', opacity=0.8, face_color=colors)
+        viewer.add_points(napari_data, size=0.02, name='pc_series', opacity=0.8, face_color=colors)
+    else:
+        viewer.add_points(napari_data, size=0.02, name='pc_series', opacity=0.8)
     # viewer.add_labels(np.random.randint(0, 10, size=(M, 1)), name='labels')
     napari.run()
 
 if __name__ == '__main__':
     pc_series = np.random.random((100, 10, 3)) * 10
-    vis_tracks_3d_napari(pc_series)
+    vis_pointcloud_series_napari(pc_series)

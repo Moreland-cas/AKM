@@ -16,7 +16,7 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     """
     Args:
         depth_seq (np.ndarray): 
-            深度图视频，形状为 (T, H, W, 1)
+            深度图视频，形状为 (T, H, W)
         pred_tracks (torch.Tensor): 
             (T, M, 2)
             每个点的坐标形式为 [u, v]，值域为 [0, W) 和 [0, H)。
@@ -24,7 +24,6 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     返回:
         torch.Tensor: 点的深度值，形状为 (T, M)，每个点的深度值。
     """
-    depth_seq = depth_seq.squeeze(-1)
     T, H, W = depth_seq.shape
     # _, M, _ = pred_tracks.shape
 
@@ -37,10 +36,24 @@ def extract_tracked_depths(depth_seq, pred_tracks):
 
     # 使用高级索引提取深度值
     depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
-    return depth_tracks
+    return depth_tracks.cpu()
 
-def filter_2d_tracks_by_depthSeq_mask(pred_tracks, depth_tracks):
-    pass
+def filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depthSeq_mask):
+    """
+    筛选出那些不曾落到 invalid depth_mask 中的 tracks
+    Args:
+        pred_tracks_2d: torch.tensor([T, M, 2])
+        depthSeq_mask: np.array([T, H, W], dtype=np.bool_)
+    """
+    T = pred_tracks_2d.shape[0]
+    # 首先读取出 pred_tracks_2d 在对应位置的 mask 的值
+    pred_tracks_2d_floor = torch.floor(pred_tracks_2d).long() # T M 2 (u, v)
+    t_index = torch.arange(T, device=pred_tracks_2d.device).view(T, 1)  # (T, M)
+    pred_tracks_2d_mask = depthSeq_mask[t_index, pred_tracks_2d_floor[:, :, 1], pred_tracks_2d_floor[:, :, 0]] # T M
+    
+    # 然后在时间维度上取交, 得到一个大小为 M 的 mask, 把其中一直为 True 的保留下来并返回
+    mask_and = np.all(pred_tracks_2d_mask, axis=0) # M
+    return pred_tracks_2d[:, mask_and, :]
 
 def filter_2d_tracks_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
     """

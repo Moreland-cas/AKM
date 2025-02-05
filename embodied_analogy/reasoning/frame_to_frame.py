@@ -65,34 +65,26 @@ def classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref2tgt
     uv_static_pred_int = np.floor(uv_static_pred).astype(int)
     mask_static_obs = obj_mask_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
     depth_static_obs = depth_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
-    
-    alpha = 0.
     static_score = alpha * (mask_static_obs - 1) + np.minimum(0, depth_static_pred - depth_static_obs) # N
-    # static_score = alpha * (mask_static_obs - 1) + (depth_static_pred - depth_static_obs) # N
     
     uv_moving_pred_int = np.floor(uv_moving_pred).astype(int)
     mask_moving_obs = obj_mask_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
     depth_moving_obs = depth_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
     moving_score = alpha * (mask_moving_obs - 1) + np.minimum(0, depth_moving_pred - depth_moving_obs) # N
-    # moving_score = alpha * (mask_moving_obs - 1) + (depth_moving_pred - depth_moving_obs) # N
     
     # 1.5）根据 static_score 和 moving_score 将所有点分类为 static, moving 和 unknown 中的一类
     # 得分最大是 0, 如果一方接近 0，另一方很小，则选取接近为 0 的那一类， 否则为 unkonwn
     class_mask = np.zeros(len(static_score))
     for i in range(len(static_score)):
-        if depth_static_obs[i] == 1e6 or depth_moving_obs[i] == 1e6:
-            class_mask[i] = 0 # 2 for unknown
-            continue
-        
-        if abs(static_score[i]) > 1 and abs(moving_score[i]) > 1:
+        if min(abs(static_score[i]), abs(moving_score[i])) > 0.1:
             class_mask[i] = 0 
             continue
         
-        if abs(static_score[i]) < 0.1 and abs(moving_score[i]) < 0.1:
+        if max(abs(static_score[i]), abs(moving_score[i])) < 0.001:
             class_mask[i] = 0 
             continue
         
-        if static_score[i] + 0.001 < moving_score[i]:
+        if static_score[i] < moving_score[i]:
             class_mask[i] = 1 # 0 for static
         else:
             class_mask[i] = 0 
@@ -117,7 +109,7 @@ if __name__ == "__main__":
        [ 5.21540642e-07, -9.82936144e-01, -1.83947206e-01]])
     translation_c_gt = Rc2w.T @ translation_w_gt
     
-    ref_idx, tgt_idx = 0, 47
+    ref_idx, tgt_idx = 0, 46
     
     # 读取 0 和 47 帧的深度图
     depth_ref = np.load(os.path.join(tmp_folder, "depths", f"{ref_idx}.npy")).squeeze() # H, w
@@ -128,8 +120,8 @@ if __name__ == "__main__":
     depth_tgt_valid_mask = (depth_tgt != 0)
     
     # 读取 0 和 47 帧的 obj_mask
-    obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "masks", f"{ref_idx}.png"))) # H, W 0, 255
-    obj_mask_tgt = np.array(Image.open(os.path.join(tmp_folder, "masks", f"{tgt_idx}.png")))
+    obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "sam2_masks", f"{ref_idx}.png"))) # H, W 0, 255
+    obj_mask_tgt = np.array(Image.open(os.path.join(tmp_folder, "sam2_masks", f"{tgt_idx}.png")))
     
     obj_mask_ref = (obj_mask_ref == 255)
     obj_mask_tgt = (obj_mask_tgt == 255)
@@ -144,7 +136,7 @@ if __name__ == "__main__":
         [  0., 300., 300.],
         [  0.,   0.,   1.]]
     )
-    # 可视化 tgt frame 的点云, 和 ref frame 的点云经过 transform 后与之的对比，看看估计的到底有多离谱，你妈的
+    # 可视化 tgt frame 的点云, 和 ref frame 的点云经过 transform 后与之的对比，看看估计的怎样
     from embodied_analogy.utility.utils import visualize_pc
     points_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
     points_ref_transformed = points_ref + translation_c * delta_scale 

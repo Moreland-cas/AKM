@@ -319,18 +319,21 @@ def camera_to_world(point_camera, extrinsic_matrix):
     将相机坐标系中的点转换到世界坐标系。
     
     Args:
-    - point_camera (np.array): 相机坐标系中的点
-    - extrinsic_matrix (np.array): Tw2c, 外参矩阵(3, 4), 形式为 [R | t]
+        point_camera:
+            np.array([N, 3]), 相机坐标系中的点
+        extrinsic_matrix (np.array): 
+            Tw2c, 外参矩阵(3, 4)或者(4, 4), 形式为 [R | t]
     
     Returns:
-    - point_world (np.array): 世界坐标系中的点 (3x1)
+        point_world np.array([N, 3])
     """
     # 从外参矩阵中提取旋转矩阵 R 和平移向量 t
-    R = extrinsic_matrix[:, :3]  # 旋转矩阵
-    t = extrinsic_matrix[:, 3]   # 平移向量
-    
+    Rw2c = extrinsic_matrix[:3, :3]  # (3, 3)
+    tw2c = extrinsic_matrix[:3, 3]   # (3)
+    tc2w = -Rw2c.T @ tw2c
+
     # 计算从相机坐标系到世界坐标系的转换
-    point_world = np.dot(R.T, (point_camera - t))  # R^T * (P_camera - t)
+    point_world = point_camera @ Rw2c + tc2w
     
     return point_world
 

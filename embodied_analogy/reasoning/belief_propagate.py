@@ -25,13 +25,14 @@ from embodied_analogy.visualization.vis_tracks_3d import (
 from embodied_analogy.reasoning.utils import (
     filter_2d_tracks_by_visibility, 
     filter_2d_tracks_by_depthSeq_mask, 
-    # extract_tracked_depths, 
+    extract_tracked_depths, 
     visualize_2d_tracks_on_video,
 )
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud, 
     visualize_pc, 
     camera_to_image,
+    camera_to_world,
     image_to_camera,
     tracks3d_variance
 )
@@ -39,30 +40,42 @@ from embodied_analogy.utility.utils import (
 """
     读取 exploration 阶段获取的视频数据, 进而对物体进行感知和推理理解
 """
+# 读取数据
 record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
 file_name = "/2025-01-07_18-06-10.npz"
 dr = RecordDataReader(record_path_prefix, file_name)
 dr.process_data()
 
 rgb_seq = dr.rgb # T H W C
-depth_seq = dr.depth # T H W 1
+depth_seq = np.squeeze(dr.depth) # T H W
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
 visualize = True
-save_intermidiate = False
+save_intermidiate = True
 
 # 对于 depth_seq 进行处理, 得到 depth_seq_mask, 用于标记其中depth为 0, 或者重投影在地面上的位置
+depth_seq_mask = np.ones_like(depth_seq, dtype=np.bool_) # T, H, W
+depth_seq_mask = depth_seq_mask & (depth_seq > 0)
+
+for i in range(depth_seq.shape[0]):
+    _, H, W = depth_seq.shape
+    pc_camera = depth_image_to_pointcloud(depth_seq[i], None, K) # H*W, 3
+    pc_world = camera_to_world(pc_camera, Tw2c)
+    pc_height_mask = (pc_world[:, 2] > 0.03).reshape(H, W) # H*W
+    depth_seq_mask[i] = depth_seq_mask[i] & pc_height_mask
 
 # 初始化中间过程的存储位置 tmp_folder
 tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/"
 rgb_folder = os.path.join(tmp_folder, "rgbs")
 depth_folder = os.path.join(tmp_folder, "depths")
-mask_folder = os.path.join(tmp_folder, "masks")
+depth_mask_folder = os.path.join(tmp_folder, "depth_masks")
+sam2_mask_folder = os.path.join(tmp_folder, "sam2_masks")
 vis_folder = os.path.join(tmp_folder, "vis")
 os.makedirs(rgb_folder, exist_ok=True)
 os.makedirs(depth_folder, exist_ok=True)
-os.makedirs(mask_folder, exist_ok=True)
+os.makedirs(depth_mask_folder, exist_ok=True)
+os.makedirs(sam2_mask_folder, exist_ok=True)
 os.makedirs(vis_folder, exist_ok=True)
 
 if save_intermidiate:
@@ -70,19 +83,23 @@ if save_intermidiate:
         Image.fromarray(rgb).save(os.path.join(rgb_folder, f"{i}.jpg"))
     for i, depth in enumerate(depth_seq):
         np.save(os.path.join(depth_folder, f"{i}.npy"), depth) # H, W, 1
+    for i, depth_mask in enumerate(depth_seq_mask):
+        depth_mask_255 = (depth_mask * 255).astype(np.uint8)
+        Image.fromarray(depth_mask_255).save(os.path.join(depth_mask_folder, f"{i}.png"))
         
-if visualize:
+if visualize and False:
     # 展示初始的 pointcloud sequence
     T = depth_seq.shape[0]
     raw_pc_list = []
     for i in range(T):
-        pc_i = depth_image_to_pointcloud(depth_seq[i].squeeze(), None, K) # N, 3
+        pc_i = depth_image_to_pointcloud(depth_seq[i], depth_seq_mask[i], K) # N, 3
         indices = np.random.choice(pc_i.shape[0], size=5000, replace=False)
         # 使用这些索引获取对应的 100 x 3 数组
         pc_i = pc_i[indices]
-        raw_pc_list.append(pc_i)
-    raw_pc_list = np.stack(raw_pc_list)
-    # vis_tracks_3d_napari(raw_pc_list)
+        pc_i_world = camera_to_world(pc_i, Tw2c)
+        raw_pc_list.append(pc_i_world)
+    # raw_pc_list = np.stack(raw_pc_list)
+    vis_pointcloud_series_napari(raw_pc_list)
 
 """
     根据物体初始状态的图像, 得到一些初始跟踪点
@@ -95,7 +112,7 @@ num_clusters = 600
 feat_for_kmeans = np.concatenate([pc_0, rgb_0], axis=-1)
 centroids, labels, _ = cluster.k_means(feat_for_kmeans, init="k-means++", n_clusters=num_clusters)
 
-if visualize:
+if visualize and False:
     # 可视化初始点云
     visualize_pc(pc_0, rgb_0)
     color_map = np.random.rand(num_clusters, 3)
@@ -122,11 +139,12 @@ if visualize:
 # 筛选出不曾重投影到地面上的点
 # depth_tracks = extract_tracked_depths(depth_seq, pred_tracks_2d) # T, M
 # pred_tracks_2d, depth_tracks = filter_by_depthSeq(pred_tracks_2d, depth_tracks) # [T, M, 2], [T, M]
-pred_tracks_2d, depth_tracks = filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depth_seq_mask)
+pred_tracks_2d = filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depth_seq_mask)
+depth_tracks = extract_tracked_depths(depth_seq, pred_tracks_2d) # T, M
     
 if visualize:
     visualize_2d_tracks_on_video(rgb_seq, pred_tracks_2d, "tracks2d_filtered_by_depth_mask", vis_folder)
-
+        
 """
     将 tracks2d 聚类为 static 和 moving 两类
 """
@@ -135,17 +153,14 @@ T, M, _ = pred_tracks_2d.shape
 pred_tracks_3d = image_to_camera(pred_tracks_2d.reshape(T*M, -1), depth_tracks.reshape(-1), K) # T * M, 3
 pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
 
-if visualize:
-    vis_tracks3d_napari(pred_tracks_3d)
-    
+# 根据 tracks3d 将所有点分类为两类 
 motion_for_kmeans = pred_tracks_3d.permute(1, 0, 2).reshape(M, -1) # M T*3
 _, moving_labels, _ = cluster.k_means(motion_for_kmeans.cpu().numpy(), init="k-means++", n_clusters=2)
 
-# 在这里将分类后的两类点进行判断, 判断哪一类是静止的, 哪一类是运动的 (M = M1 + M2)
+# 确定哪一类是 moving, 那一类是 static, 依据是轨迹的 variance
 part1 = pred_tracks_3d[:, moving_labels == 0, :] # T, M1, 3
 part2 = pred_tracks_3d[:, moving_labels == 1, :] # T, M2, 3
 
-# 计算点的轨迹的 variance, 将 variance 小的点认为是静止的, variance 大的点认为是运动的
 if tracks3d_variance(part1) > tracks3d_variance(part2):
     moving_mask = (moving_labels == 0)
     static_mask = (moving_labels == 1)
@@ -157,33 +172,14 @@ if visualize:
     red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
     rigid_part_colors = red_and_green[moving_labels] # M, 3
     vis_tracks3d_napari(pred_tracks_3d, rigid_part_colors)
+    # visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
+        
+"""
+    根据 tracks2d 初步估计出 joint params
+"""
+from embodied_analogy.estimation.coarse_joint_est import coarse_t_from_tracks_3d
     
-# if visualize:
-#     visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
-    
-# 在这里跑 sam2, 得到 moving_part 和 static_part 的分割
-from embodied_analogy.perception.sam2_masking import run_sam2_whole
-from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask
-moving_tracks_2d = pred_tracks_2d[:, moving_mask, :] # T, N, 2
-static_tracks_2d = pred_tracks_2d[:, static_mask, :] # T, N, 2
-point_prompt = torch.stack([moving_tracks_2d[0][0], static_tracks_2d[0][0]]).cpu() #2, 2
-video_masks = run_sam2_whole(rgb_folder, initial_point_prompt=point_prompt)
-if visualize:
-    visualize_sam2_mask(rgb_seq, video_masks)
-
-# sam2 mask filtering: 根据 depth_seq 对 sam2 得到的 mask 进行过滤, 使得过滤后的 mask 不包含深度为 0, 或者重投影后会落在地面上的点
-# TODO：
-
-if save_intermidiate:
-    for i, mask in enumerate(video_masks):
-        mask_255 = (mask * 255).astype(np.uint8)
-        Image.fromarray(mask_255).save(os.path.join(mask_folder, f"{i}.png"))
-        # np.save(os.path.join(mask_folder, f"{i}.npy"), mask)
-
-# 5) 初步估计出 joint parameters
-from embodied_analogy.estimation.joint_estimate_w_corr import estimate_translation_from_tracks
-    
-translation_c, scales = estimate_translation_from_tracks(pred_tracks_3d[:, moving_mask, :])
+translation_c, scales, est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :])
 Rc2w = Tw2c[:3, :3].T # 3, 3
 translation_w = Rc2w @ translation_c
 
@@ -214,8 +210,32 @@ if save_intermidiate:
         scales=scales
     )
 
-# 6) 对于第一帧剩下的 k-m 个点簇进行分类验证, 分为 static, moving 和 unknown 三类
-# static 和 moving 里又分为一直能看到的, 和随着运动新发现的 
+"""
+    运行 sam2 得到 articulated objects 整体随着时间变化的 sam2_video_mask
+"""
+from embodied_analogy.perception.sam2_masking import run_sam2_whole
+from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask
+# TODO: 把这里的 point_prompt 改为 bbox
+point_prompt = pred_tracks_2d[0, :2, :].cpu() #2, 2
+sam2_video_masks = run_sam2_whole(rgb_folder, initial_point_prompt=point_prompt) # T, H, W
+
+# TODO: 在这里添加一个迭代逻辑，就是如果发现 tracks_2d 上的点在某个时刻没有在 sam2_video_masks 中, 那就在该位置添加 positive point prompt, 
+# 如果发现 机械臂上的点 或者 !depthSeq_mask 的点在 mask 里, 那就添加 negative point prompt, 然后运行一次 sam2 propagate
+
+# sam2 mask filtering: 根据 depth_seq 对 sam2 得到的 mask 进行过滤, 使得过滤后的 mask 不包含深度为 0, 或者重投影后会落在地面上的点
+sam2_video_masks = sam2_video_masks & depth_seq_mask
+
+if visualize:
+    visualize_sam2_mask(rgb_seq, sam2_video_masks)
+
+if save_intermidiate:
+    for i, sam2_mask in enumerate(sam2_video_masks):
+        sam2_mask_255 = (sam2_mask * 255).astype(np.uint8)
+        Image.fromarray(sam2_mask_255).save(os.path.join(sam2_mask_folder, f"{i}.png"))
+        # np.save(os.path.join(mask_folder, f"{i}.npy"), mask)
+        
+"""
+    根据 sam2_video_mask 初步估计出 joint params, 利用 ICP 估计出精确的 joint params 和 object model
+"""
 
 
-# 7) 用所有 known 的点簇重新估计 joint parameters
