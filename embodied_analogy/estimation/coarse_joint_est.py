@@ -11,6 +11,7 @@ import torch
 import numpy as np
 from scipy.linalg import svd
 from scipy.spatial.transform import Rotation as R
+from scipy.optimize import minimize
 from embodied_analogy.visualization.vis_tracks_3d import (
     vis_tracks3d_napari,
     vis_pointcloud_series_napari
@@ -59,7 +60,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
 
 def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     """
-    通过所有时间帧的点轨迹估计旋转轴，并计算每帧的旋转角度
+    通过所有时间帧的点轨迹估计旋转轴，并通过优化方法求解每帧的旋转角度
     :param tracks_3d: 形状为 (T, M, 3) 的 numpy 数组, T 是时间步数, M 是点的数量
     :return: 旋转轴的单位向量 (3,), 每帧的旋转角度数组 (T,), 以及估计误差 est_loss
     """
@@ -71,7 +72,6 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     
     # 计算每一帧相对于初始帧的旋转矩阵
     for t in range(1, T):
-        # 由于这是纯旋转变换, 所以不需要减去中心值
         U, _, Vt = np.linalg.svd(tracks_3d[t].T @ tracks_3d[0])
         R_t = U @ Vt  # 计算旋转矩阵
         if np.linalg.det(R_t) < 0:  # 保证旋转矩阵的正定性
@@ -81,40 +81,55 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     
     # 计算所有旋转矩阵的平均旋转轴
     rotation_axes = []
-    angles = []
     for R_t in relative_rotations:
         r = R.from_matrix(R_t)
         axis_angle = r.as_rotvec()  # 旋转向量
         axis = axis_angle / np.linalg.norm(axis_angle)  # 归一化旋转轴
-        angle = np.linalg.norm(axis_angle)  # 旋转角度
         rotation_axes.append(axis)
-        angles.append(angle)
     
     unit_vector_axis = np.mean(rotation_axes, axis=0)  # 计算所有旋转轴的平均
     unit_vector_axis /= np.linalg.norm(unit_vector_axis)  # 归一化旋转轴
     
-    # 重新计算每帧旋转角度
-    angles = [0.0]  # 初始帧角度为0
+    # 得到 angles 的初始值, 然后通过优化的方法更新
+    angles_init = [0.0]  # 初始帧角度为0
     for R_t in relative_rotations:
         projected_rotation_vector = R.from_matrix(R_t).as_rotvec()
         angle = np.dot(projected_rotation_vector, unit_vector_axis)  # 计算在估计旋转轴上的旋转量
-        angles.append(angle)
+        angles_init.append(angle)
+    angles_init = np.array(angles_init)
     
-    angles = np.array(angles)  # 转换为数组
+    def loss_function_torch(angles):
+        est_loss = 0
+        for t in range(T):
+            theta = angles[t]
+            skew_v = torch.tensor([[0, -unit_vector_axis[2], unit_vector_axis[1]],
+                                    [unit_vector_axis[2], 0, -unit_vector_axis[0]],
+                                    [-unit_vector_axis[1], unit_vector_axis[0], 0]], device="cuda")
+            R_reconstructed = torch.eye(3, device="cuda") + torch.sin(theta) * skew_v + (1 - torch.cos(theta)) * (skew_v @ skew_v)
+            reconstructed_track = (R_reconstructed @ torch.from_numpy(tracks_3d[0].T).double().cuda()).T
+            est_loss += torch.mean(torch.norm(reconstructed_track - torch.from_numpy(tracks_3d[t]).cuda(), dim=1))
+        return est_loss / T
     
-    # 计算重投影误差 est_loss
-    est_loss = 0
-    reconstructed_tracks = []
-    for t in range(T):
-        R_reconstructed = R.from_rotvec(angles[t] * unit_vector_axis).as_matrix()
-        reconstructed_track = (R_reconstructed @ tracks_3d[0].T).T # T, M, 3
-        est_loss += np.mean(np.linalg.norm(reconstructed_track - tracks_3d[t], axis=1))
-        reconstructed_tracks.append(reconstructed_track)
-    est_loss /= T  # 计算所有帧的平均误差
+    # 初始化 angles 并设置优化器
+    angles = torch.from_numpy(angles_init).float().to('cuda').requires_grad_()
+    optimizer = torch.optim.Adam([angles], lr=3e-4)
+    
+    # 运行优化
+    num_iterations = 200
+    for _ in range(num_iterations):
+        optimizer.zero_grad()
+        loss = loss_function_torch(angles)
+        loss.backward()
+        optimizer.step()
+    with torch.no_grad():
+        est_loss = loss_function_torch(angles)
+    
+    angles = angles.detach().cpu().numpy()
     
     if visualize:
-        # 绿色代表 moving part, 红色代表 renconstructed moving part
-        # 绿色代表 moving part, 红色代表 renconstructed moving part
-        colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1)))) # 2M, 3
+        # 绿色代表 moving part, 红色代表 reconstructed moving part
+        colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1))))  # 2M, 3
+        reconstructed_tracks = [(R.from_rotvec(angles[t] * unit_vector_axis).as_matrix() @ tracks_3d[0].T).T for t in range(T)]
         vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors)
+    
     return unit_vector_axis, angles, est_loss

@@ -55,8 +55,8 @@ depth_seq = np.squeeze(dr.depth) # T H W
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
-visualize = True
-save_intermidiate = True
+visualize = False
+save_intermidiate = False
 
 # 对于 depth_seq 进行处理, 得到 depth_seq_mask, 用于标记其中depth为 0, 或者重投影在地面上的位置
 depth_seq_mask = np.ones_like(depth_seq, dtype=np.bool_) # T, H, W
@@ -181,7 +181,7 @@ if visualize:
     根据 tracks2d 初步估计出 joint params
 """
 t_axis_camera, t_scales, t_est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize)
-R_axis_camera, R_scales, R_est_loss = coarse_R_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize)
+R_axis_camera, R_scales, R_est_loss = coarse_R_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize=True)
 
 print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
 if t_est_loss < R_est_loss:
@@ -193,26 +193,8 @@ else:
 
 Rc2w = Tw2c[:3, :3].T # 3, 3
 axis_world = Rc2w @ axis_camera
-
-# for debug, visualize 原始的跟踪点，和第一frame的moving points 按照我们的估计的joint param 计算出的轨迹
-if False:
-    tracks_3d = pred_tracks_3d.cpu().numpy() # T, M, 3
-    moving_points = tracks_3d[0, moving_mask, :] # M, 3
-    # static_points = tracks_3d[0, moving_labels == 0, :]
-    points = []
-    colors = []
-    for i in range(len(tracks_3d)):
-        points_tmp = []
-        colors_tmp = []
-        points_tmp.extend(tracks_3d[i])
-        colors_tmp.extend([[0, 0, 1]] * len(tracks_3d[i]))
-        points_tmp.extend(moving_points + scales[i] * axis_camera)
-        colors_tmp.extend([[1, 0, 0]] * len(moving_points))
-        points.append(np.array(points_tmp))
-        colors.append(np.array(colors_tmp))
-    vis_pointcloud_series_napari(points, colors)
     
-# 将 joint states 保存到 tmp_folder
+# 保存 joint states 到 tmp_folder
 if save_intermidiate:
     np.savez(
         os.path.join(tmp_folder, "joint_state.npz"), 
