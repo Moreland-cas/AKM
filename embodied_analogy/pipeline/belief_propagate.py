@@ -36,6 +36,10 @@ from embodied_analogy.utility.utils import (
     image_to_camera,
     tracks3d_variance
 )
+from embodied_analogy.estimation.coarse_joint_est import (
+    coarse_t_from_tracks_3d,
+    coarse_R_from_tracks_3d
+)
 
 """
     读取 exploration 阶段获取的视频数据, 进而对物体进行感知和推理理解
@@ -171,17 +175,25 @@ else:
 if visualize:
     red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
     rigid_part_colors = red_and_green[moving_labels] # M, 3
-    vis_tracks3d_napari(pred_tracks_3d, rigid_part_colors)
-    # visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
+    # vis_tracks3d_napari(pred_tracks_3d, rigid_part_colors)
+    visualize_pc(pred_tracks_3d[:M, :].cpu().numpy(), rigid_part_colors)
         
 """
     根据 tracks2d 初步估计出 joint params
 """
-from embodied_analogy.estimation.coarse_joint_est import coarse_t_from_tracks_3d
-    
-translation_c, scales, est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :])
+t_axis_camera, t_scales, t_est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :])
+R_axis_camera, R_scales, R_est_loss = coarse_R_from_tracks_3d(pred_tracks_3d[:, moving_mask, :])
+
+print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
+if t_est_loss < R_est_loss:
+    axis_camera = t_axis_camera
+    scales = t_scales
+else:
+    axis_camera = R_axis_camera
+    scales = R_scales
+
 Rc2w = Tw2c[:3, :3].T # 3, 3
-translation_w = Rc2w @ translation_c
+axis_world = Rc2w @ axis_camera
 
 # for debug, visualize 原始的跟踪点，和第一frame的moving points 按照我们的估计的joint param 计算出的轨迹
 if visualize:
@@ -195,7 +207,7 @@ if visualize:
         colors_tmp = []
         points_tmp.extend(tracks_3d[i])
         colors_tmp.extend([[0, 0, 1]] * len(tracks_3d[i]))
-        points_tmp.extend(moving_points + scales[i] * translation_c)
+        points_tmp.extend(moving_points + scales[i] * axis_camera)
         colors_tmp.extend([[1, 0, 0]] * len(moving_points))
         points.append(np.array(points_tmp))
         colors.append(np.array(colors_tmp))
@@ -205,8 +217,8 @@ if visualize:
 if save_intermidiate:
     np.savez(
         os.path.join(tmp_folder, "joint_state.npz"), 
-        translation_c=translation_c, 
-        translation_w=translation_w, 
+        translation_c=axis_camera, 
+        translation_w=axis_world, 
         scales=scales
     )
 

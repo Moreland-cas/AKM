@@ -86,14 +86,14 @@ def coarse_R_from_tracks_3d(tracks_3d):
     unit_vector_axis /= np.linalg.norm(unit_vector_axis)  # 归一化旋转轴
     
     # 计算每帧旋转角度
-    angles = np.array(angles)
+    angles = np.array([0.0] + angles)  # 添加初始帧的角度 0
     
     # 计算重投影误差 est_loss
     est_loss = 0
-    for t in range(1, T):
-        R_reconstructed = R.from_rotvec(angles[t-1] * unit_vector_axis).as_matrix()
+    for t in range(T):
+        R_reconstructed = R.from_rotvec(angles[t] * unit_vector_axis).as_matrix()
         reconstructed_tracks = (R_reconstructed @ tracks_3d[0].T).T
         est_loss += np.mean(np.linalg.norm(reconstructed_tracks - tracks_3d[t], axis=1))
-    est_loss /= (T - 1)
+    est_loss /= T  # 计算所有帧的平均误差
     
     return unit_vector_axis, angles, est_loss
