@@ -334,7 +334,7 @@ def camera_to_world(point_camera, extrinsic_matrix):
     
     return point_world
 
-def visualize_pc(points, colors, grasp=None):
+def visualize_pc(points, colors=None, grasp=None):
     """
         visualize pointcloud
         points: Nx3

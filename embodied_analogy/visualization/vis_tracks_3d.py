@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import napari
 
-def vis_tracks_3d_napari(tracks_3d, colors):
+def vis_tracks3d_napari(tracks_3d, colors):
     """
     Args:
         tracks_3d: np.array of shape (T, M, 3)

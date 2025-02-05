@@ -117,15 +117,15 @@ if __name__ == "__main__":
        [ 5.21540642e-07, -9.82936144e-01, -1.83947206e-01]])
     translation_c_gt = Rc2w.T @ translation_w_gt
     
-    ref_idx, tgt_idx = 0, 38
+    ref_idx, tgt_idx = 0, 47
     
     # 读取 0 和 47 帧的深度图
     depth_ref = np.load(os.path.join(tmp_folder, "depths", f"{ref_idx}.npy")).squeeze() # H, w
     depth_tgt = np.load(os.path.join(tmp_folder, "depths", f"{tgt_idx}.npy")).squeeze()
     
-    # 修改深度图观测为 0 的地方
-    depth_ref[depth_ref == 0] = 1e6
-    depth_tgt[depth_tgt == 0] = 1e6
+    # 标记深度图观测为 0 的地方
+    depth_ref_valid_mask = (depth_ref != 0)
+    depth_tgt_valid_mask = (depth_tgt != 0)
     
     # 读取 0 和 47 帧的 obj_mask
     obj_mask_ref = np.array(Image.open(os.path.join(tmp_folder, "masks", f"{ref_idx}.png"))) # H, W 0, 255
@@ -158,8 +158,10 @@ if __name__ == "__main__":
     
     points_concat_for_vis = np.concatenate([points_ref_transformed, points_tgt], axis=0)
     colors_concat_for_vis = np.concatenate([colors_ref, colors_tgt], axis=0)
-    visualize_pc(points=points_concat_for_vis, colors=colors_concat_for_vis)
+    if False:
+        visualize_pc(points=points_concat_for_vis, colors=colors_concat_for_vis)
     # visualize_pc(points=points_tgt, colors=colors_tgt)
+    
     if True:
         class_mask_ref = classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt, alpha=1.)
         recon_mask_ref = reconstruct_mask(obj_mask_ref, class_mask_ref)

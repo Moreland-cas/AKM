@@ -54,15 +54,22 @@ def mp4_to_numpy_array_list(mp4_path):
 
     return frames
 
-def track_any_points(rgb_frames, queries=None, grid_size=30, visiualize=False):
+def track_any_points(rgb_frames, queries=None, grid_size=30):
     """
-        rgb_frames: list of RGB frames, in list of numpy arrays of shape [H, W, C], np.uint8
-        queries: 大小为 [N, 2] 的 torch.tenspr, 存储初始帧的追踪点坐标 uv, 分辨率与rgb_frame 保持一致
+    Input:
+        rgb_frames: 
+            list of np.array([H, W, C], dtype=uint8)
+        queries: 
+            torch.tensor([N, 2]), 存储初始帧的追踪点坐标 uv, 分辨率与rgb_frame 保持一致
             if queries is not None:
                 追踪 queries + supportive_grids, 但不返回后者
             else:
                 追踪图像上 uniformly sample 出的 grid_points, 数量由 grid_size 指定
-        visiualize: if True, visualize the tracking results as a saved mp4 video
+    return:
+        pred_tracks: 
+            torch.tensor([T, M, 2]) on cpu
+        pred_visibility: 
+            torch.tensor([T, M]) on cpu
     """
     assert (queries is not None) or (queries is None and grid_size is not None)
     def _process_step(model, queries, window_frames, is_first_step, grid_size, grid_query_frame):
@@ -113,16 +120,10 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visiualize=False):
         grid_size=grid_size,
         grid_query_frame=grid_query_frame,
     )
-        
-    if visiualize:
-        # save a video with predicted tracks
-        video = torch.tensor(np.stack(window_frames), device="cuda").permute(0, 3, 1, 2)[None]
-        vis = Visualizer(save_dir="./", pad_value=120, linewidth=1)
-        vis.visualize(video, pred_tracks, pred_visibility, query_frame=grid_query_frame, filename="initial_tracks")
 
     # 去除 batch 维度
     pred_tracks, pred_visibility = pred_tracks[0], pred_visibility[0]
-    return pred_tracks, pred_visibility
+    return pred_tracks.cpu(), pred_visibility.cpu()
 
 if __name__ == "__main__":
     rgb_frames = mp4_to_numpy_array_list("./third_party/sam2/notebooks/videos/bedroom.mp4")

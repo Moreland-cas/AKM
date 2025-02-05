@@ -1,0 +1,94 @@
+import os
+import torch
+import numpy as np
+from cotracker.utils.visualizer import Visualizer
+
+def filter_2d_tracks_by_visibility(pred_tracks_2d, pred_visibility):
+    """
+        pred_tracks_2d: torch.tensor([T, M, 2])
+        pred_visibility: torch.tensor([T, M])
+    """
+    always_visible_mask = pred_visibility.all(dim=0) # num_clusters
+    pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
+    return pred_tracks_2d
+
+def extract_tracked_depths(depth_seq, pred_tracks):
+    """
+    Args:
+        depth_seq (np.ndarray): 
+            深度图视频，形状为 (T, H, W, 1)
+        pred_tracks (torch.Tensor): 
+            (T, M, 2)
+            每个点的坐标形式为 [u, v]，值域为 [0, W) 和 [0, H)。
+        
+    返回:
+        torch.Tensor: 点的深度值，形状为 (T, M)，每个点的深度值。
+    """
+    depth_seq = depth_seq.squeeze(-1)
+    T, H, W = depth_seq.shape
+    # _, M, _ = pred_tracks.shape
+
+    # 确保 pred_tracks 是整数坐标
+    u_coords = pred_tracks[..., 0].clamp(0, W - 1).long()  # 水平坐标 u
+    v_coords = pred_tracks[..., 1].clamp(0, H - 1).long()  # 垂直坐标 v
+
+    # 将 depth_seq 转为 torch.Tensor
+    depth_tensor = torch.from_numpy(depth_seq).cuda()  # Shape: (T, H, W)
+
+    # 使用高级索引提取深度值
+    depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
+    return depth_tracks
+
+def filter_2d_tracks_by_depthSeq_mask(pred_tracks, depth_tracks):
+    pass
+
+def filter_2d_tracks_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
+    """
+    过滤深度序列中的无效序列，基于相邻元素的相对变化率。
+    
+    参数:
+        pred_tracks (torch.Tensor): 
+            形状为 (T, N, 2)，每个点的坐标形式为 [u, v]，值域为 [0, W) 和 [0, H)。
+        depth_tracks (torch.Tensor): 
+            形状为 (T, N)，表示 T 个时间步上的 N 个深度序列。
+        thr (float): 
+            相对变化率的阈值，超过此比率的序列会被判定为无效。
+    
+    返回:
+        torch.Tensor: 
+            筛选后的 pred_tracks, 形状为 (T, M, 2)，其中 M 是筛选后的有效点数量。
+    """
+    depth_tracks += 1e-6  # 防止除零
+
+    # 转置 depth_tracks，使其形状为 (N, T)
+    depth_tracks_T = depth_tracks.T  # (N, T)
+
+    # 计算相邻元素的变化比率 (N, T-1)
+    ratios = torch.max(depth_tracks_T[:, :-1] / depth_tracks_T[:, 1:], depth_tracks_T[:, 1:] / depth_tracks_T[:, :-1])
+
+    # 检测每个序列是否存在无效的变化 (N,)
+    invalid_sequences = torch.any(ratios > thr, dim=1)  # 检查每一行是否有任何值大于阈值
+
+    # 合法序列的掩码 (N,)
+    valid_mask = ~invalid_sequences  # 合法序列为 False，其他为 True
+    
+    # 筛选 pred_tracks 和 depth_tracks 的合法序列
+    pred_tracks = pred_tracks[:, valid_mask, :]  # 筛选有效的 M 点，(T, M, 2)
+    depth_tracks = depth_tracks[:, valid_mask]   # 筛选有效的 M 深度，(T, M)
+    
+    return pred_tracks, depth_tracks
+
+def visualize_2d_tracks_on_video(rgb_frames, pred_tracks, file_name="video_output", vis_folder="./"):
+    """
+        Args:
+            rgb_frames: np.array([T, H, W, 3])
+            pred_tracks: torch.Tensor([T, M, 2])
+    """
+    os.makedirs(vis_folder, exist_ok=True)
+    video = torch.tensor(np.stack(rgb_frames), device="cuda").permute(0, 3, 1, 2)[None]
+    vis = Visualizer(save_dir=vis_folder, pad_value=120, linewidth=1)
+    
+    pred_tracks = pred_tracks[None] # [1, T, M, 2]
+    # pred_visibility = torch.ones((pred_tracks.shape[:3], 1), dtype=torch.bool, device="cuda")
+    vis.visualize(video, pred_tracks, filename=file_name)
+    
