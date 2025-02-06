@@ -1,11 +1,12 @@
 """
-    给定两帧铰链物体点云，和初始的 joint estimation, 输出更准的 joint estimation
+    利用 depth map 和 sam2 得到的分割结果, 对于 coarse_joint_estimation 得到的结果进行修正
     
     输入:
-        depth1, depth2
-        obj_mask1, obj_mask2
-        joint_param, delta_joint_state        
+        depth1, depth2, obj_mask1, obj_mask2, joint_type, joint_axis, joint_state1, joint_state2
     
+    输出:
+        part_mask1, part_mask2, joint_axis, (joint_state2 - joint_state1)
+        
     迭代过程：
         对于 obj_mask1 中的像素进行分类
             假设 static part 和 moving part 对应的变换分别是 T_static 和 T_moving
@@ -20,48 +21,70 @@
             将 moving_mask1 中的像素进行 T_moving 变换, 并得到投影 moving_mask1_project_on2
             求 moving_mask1_project_on2 和 moving_mask2 的交集
             
-        用交集的点进行 ICP 估计出 joint_param 和 delta_joint_state
-    
-    输出:
-        static_mask1, static_mask2
-        moving_mask1, moving_mask2
-        unknown_mask1, unknown_mask2
-        joint_param, delta_joint_state
+        用交集的点进行 point-to-plane-ICP 估计出更精确的 joint_axis 和 (joint_state2 - joint_state1)
         
-    # TODO: 其实可以加一步, 当我有了全局的模型和每一帧的参数后，可以推测出每一帧的 mask, 进而再次给 sam2, 分割出更准的 mask, 进而估计出更准的 joint
+    # TODO: 当有了全局的模型和每一帧的参数后，可以推测出每一帧的 mask, 进而再次给 sam2, 分割出更准的 mask, 进而估计出更准的 joint
 """
 import os
 from PIL import Image
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask
 
-def classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref2tgt, alpha=1.):
+def joint_data_to_transform(
+    joint_type, # "prismatic" or "revolute"
+    joint_axis, # unit vector np.array([3, ])
+    joint_state_ref, joint_state_tgt, # constant
+):
+    # 根据 joint_type 和 joint_axis 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
+    delta_joint_state = joint_state_tgt - joint_state_ref
+    T_ref2tgt = np.eye(4)
+    if joint_type == "prismatic":
+        # coor_tgt = coor_ref + joint_axis * (joint_state_tgt - joint_state_ref)
+        T_ref2tgt[:3, 3] = translation_c * delta_scale
+    elif joint_type == "revolute":
+        # coor_tgt = coor_ref @ Rref2tgt.T
+        angle = delta_joint_state
+        Rref2tgt = R.from_rotvec(joint_axis * angle).as_matrix()
+        T_ref2tgt[:3, :3] = Rref2tgt
+    else:
+        assert False, "joint_type must be either prismatic or revolute"
+    return T_ref2tgt
+
+def segment_ref_obj_mask(
+    K, # 相机内参
+    depth_ref, depth_tgt, 
+    obj_mask_ref, obj_mask_tgt,
+    T_ref2tgt, # (4, 4)
+    alpha=1.,
+    visualize=False
+):
     """
     对 obj_mask_ref 中的像素进行分类, 分为 static, moving 和 unknown 三类
     Args:
-        K: 相机内参
-        depth: H, W
-        obj_mask: H, W (有物体的位置不为 0)
-        T_ref2tgt: np.array([4, 4]), 对于 moving part 的运动估计
-        alpha: 在计算新的点落入mask和新的点的深度预测大于等于观测值时候的权重
+        obj_mask: 
+            要保证这个 mask 里的点的 depth 不为0, 且重投影最好不要落到地面上
+        alpha: 
+            score_T = alpha * (mask_T_obs - 1) + min(0, depth_T_pred - depth_T_obs)
+            score_T 是小于等于 0 的, 且越接近于 0 越好
     """
-    # 1) 对 obj_mask1 中的像素进行分类
+    # 1) 对 obj_mask_ref 中的像素进行分类
     # 1.1) 首先得到 obj_mask_ref 中为 True 的那些像素点转换到相机坐标系下
     pc_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
     pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
     
     # 1.2) 分别让这些点按照 T_static (Identity matrix) 或者 T_ref2tgt 运动, 得到变换后的点
-    pc_tgt_static = pc_ref
-    pc_tgt_moving = (pc_ref_aug @ T_ref2tgt.T)[:, :3] # N, 3
+    pc_ref_static = pc_ref
+    pc_ref_moving = (pc_ref_aug @ T_ref2tgt.T)[:, :3] # N, 3
     
     # 1.3) 将这些点投影，得到新的对应点的像素坐标和深度观测
-    uv_static_pred, depth_static_pred = camera_to_image(pc_tgt_static, K) # [N, 2], [N, ]
-    uv_moving_pred, depth_moving_pred = camera_to_image(pc_tgt_moving, K)
+    uv_static_pred, depth_static_pred = camera_to_image(pc_ref_static, K) # [N, 2], [N, ]
+    uv_moving_pred, depth_moving_pred = camera_to_image(pc_ref_moving, K)
     
     # 1.4) 根据像素坐标和深度观测进行打分 TODO：可以把mask的值改为该点离 mask 区域的距离
-    # 找到 uv_static_pred 位置的 mask_static_obs 值和 depth_static_obs 值
-    # 应该满足 depth_static_pred >= depth_static_obs 和 mask_static_obs == True
-    # 计算一个得分，用来反映满足以上条件的程度：alpha * mask_static_obs + min(0, depth_static_pred - depth_static_obs)
+    # 找到 uv_pred 位置的 mask_obs 和 depth_obs 值, 并且计算得分:
+    # score = alpha * (mask_obs - 1) + min(0, depth_pred - depth_obs)
+    # 上述得分代表了正确的 Transform 应该满足 depth_pred >= depth_obs 和 mask_obs == True
     uv_static_pred_int = np.floor(uv_static_pred).astype(int)
     mask_static_obs = obj_mask_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
     depth_static_obs = depth_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
@@ -74,24 +97,55 @@ def classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref2tgt
     
     # 1.5）根据 static_score 和 moving_score 将所有点分类为 static, moving 和 unknown 中的一类
     # 得分最大是 0, 如果一方接近 0，另一方很小，则选取接近为 0 的那一类， 否则为 unkonwn
-    class_mask = np.zeros(len(static_score))
+    ref_mask_seg = np.zeros(len(static_score))
     for i in range(len(static_score)):
-        if min(abs(static_score[i]), abs(moving_score[i])) > 0.1:
-            class_mask[i] = 0 
-            continue
-        
-        if max(abs(static_score[i]), abs(moving_score[i])) < 0.001:
-            class_mask[i] = 0 
-            continue
-        
-        if static_score[i] < moving_score[i]:
-            class_mask[i] = 1 # 0 for static
+        if min(abs(static_score[i]), abs(moving_score[i])) > 0.1: # 大于 1dm
+            ref_mask_seg[i] = 2 # 2 for unkown
+        elif max(abs(static_score[i]), abs(moving_score[i])) < 0.001: # 都小于 1mm
+            ref_mask_seg[i] = 2 # 2 for unkown
+        elif static_score[i] < moving_score[i]:
+            ref_mask_seg[i] = 1 # 1 for moving
         else:
-            class_mask[i] = 0 
-    return class_mask.astype(np.bool_)
+            ref_mask_seg[i] = 0 # 0 for static
+    if visualize:
+        pass
+    return ref_mask_seg # (N, ), composed of 0, 1, 2
+
+def find_moving_part_intersection(
+    K, # 相机内参
+    depth_ref, depth_tgt, 
+    moving_mask_ref, moving_mask_tgt,
+    T_ref2tgt, # (4, 4)
+    visualize=False
+):
+    """
+    给定 moving_mask1 和 moving_mask2, 找到投影的交集, 并返回两个 point-cloud, 用于 point-to-plane-ICP
+    """
+    pc_ref = depth_image_to_pointcloud(depth_ref, moving_mask_ref, K) # N, 3
+    # pc_tgt = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt, K) # N, 3
+    
+    # 首先把 mask_ref 中的点投影到 tgt_frame 中得到一个 projected_mask_ref
+    pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
+    pc_ref_projected, _ = camera_to_image((pc_ref_aug @ T_ref2tgt.T)[:, :3], K) # N, 2
+    
+    # 求 pc_ref 变换到 tgt frame 后的投影与 moving_mask_tgt 的交集, 这个交集里的点满足能同时被 ref 和 tgt frame 观测到
+    pc_ref_projected_int = np.floor(pc_ref_projected).astype(int) # N, 2
+    mask_intersection = moving_mask_tgt[pc_ref_projected_int[:, 1], pc_ref_projected_int[:, 0]] # M
+    pc_ref_filtered = pc_ref[mask_intersection] # M, 3
+    
+    # 将 tgt frame 中 mask_intersection 为 True 的点重投影回 3d 得到 pc_tgt_filtered
+    pc_ref_projected_mask = np.zeros_like(moving_mask_tgt, dtype=np.bool_) # H, W
+    pc_ref_projected_mask[pc_ref_projected_int[:, 1], pc_ref_projected_int[:, 0]] = True # H, W
+    pc_tgt_filtered = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt & pc_ref_projected_mask, K) # M', 3
+    
+    if visualize:
+        pass
+    return pc_ref_filtered, pc_tgt_filtered
+    
+    
 def refine_joint_est(depth1, depth2, obj_mask1, obj_mask2, joint_param, delta_joint_state):
     """
-        根据当前的 joint 信息和 obj_mask 信息迭代的进行精度提升
+    根据当前的 joint 信息和 obj_mask 信息迭代的进行精度提升
     """
 
 if __name__ == "__main__":
