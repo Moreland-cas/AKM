@@ -27,13 +27,13 @@ def find_correspondences(ref_pc, target_pc):
     distances, indices = tree.query(ref_pc)
     return indices
 
-def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="rotation", max_iterations=20, tolerance=1e-6):
+def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="prismatic", max_iterations=20, tolerance=1e-6):
     """
     点到平面 ICP 算法，计算刚性变换
     :param ref_pc: numpy 数组，形状 (M, 3)，参考点云
     :param target_pc: numpy 数组，形状 (N, 3)，目标点云
     :param init_transform: 初始变换矩阵，形状 (4, 4)
-    :param mode: "rotation" 仅估计旋转, "translation" 仅估计平移
+    :param mode: "revolute" 仅估计旋转, "prismatic" 仅估计平移
     :param max_iterations: 最大迭代次数
     :param tolerance: 终止条件
     :return: 计算出的刚性变换矩阵 (4, 4)
@@ -65,10 +65,10 @@ def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="rotation", max_i
             n = matched_normals[j]
             p = ref_pc[j]
             
-            if mode == "rotation":
+            if mode == "revolute":
                 # 旋转模式：约束方程 n_i^T * (R * p_i - q_i) = 0
                 A.append(np.cross(p, n))  # 叉乘用于旋转约束
-            elif mode == "translation":
+            elif mode == "prismatic":
                 # 平移模式：约束方程 n_i^T * (p_i + t - q_i) = 0
                 A.append(n)
             
@@ -80,7 +80,7 @@ def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="rotation", max_i
         # 求解最小二乘 Ax = b
         x, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
         
-        if mode == "rotation":
+        if mode == "revolute":
             # 计算旋转矩阵
             theta = np.linalg.norm(x)
             if theta > 0:
@@ -96,7 +96,7 @@ def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="rotation", max_i
             
             update_transform = np.eye(4)
             update_transform[:3, :3] = R_update
-        elif mode == "translation":
+        elif mode == "prismatic":
             # 计算平移向量
             t_update = x
             update_transform = np.eye(4)

@@ -29,23 +29,26 @@ import os
 from PIL import Image
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from embodied_analogy.estimation.icp_custom import point_to_plane_icp
 from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask, visualize_pc
+
+STATIC_LABEL = 0
+MOVING_LABEL = 1
+UNKNOWN_LABEL = 2
 
 def joint_data_to_transform(
     joint_type, # "prismatic" or "revolute"
     joint_axis, # unit vector np.array([3, ])
-    joint_state_ref, joint_state_tgt, # constant
+    joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
 ):
     # 根据 joint_type 和 joint_axis 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
-    delta_joint_state = joint_state_tgt - joint_state_ref
     T_ref2tgt = np.eye(4)
     if joint_type == "prismatic":
         # coor_tgt = coor_ref + joint_axis * (joint_state_tgt - joint_state_ref)
-        T_ref2tgt[:3, 3] = translation_c * delta_joint_state
+        T_ref2tgt[:3, 3] = joint_axis * joint_state_ref2tgt
     elif joint_type == "revolute":
         # coor_tgt = coor_ref @ Rref2tgt.T
-        angle = delta_joint_state
-        Rref2tgt = R.from_rotvec(joint_axis * angle).as_matrix()
+        Rref2tgt = R.from_rotvec(joint_axis * joint_state_ref2tgt).as_matrix()
         T_ref2tgt[:3, :3] = Rref2tgt
     else:
         assert False, "joint_type must be either prismatic or revolute"
@@ -100,16 +103,16 @@ def segment_ref_obj_mask(
     ref_mask_seg = np.zeros(len(static_score))
     for i in range(len(static_score)):
         if min(abs(static_score[i]), abs(moving_score[i])) > 0.1: # 大于 1dm
-            ref_mask_seg[i] = 2 # 2 for unkown
+            ref_mask_seg[i] = UNKNOWN_LABEL 
         elif max(abs(static_score[i]), abs(moving_score[i])) < 0.001: # 都小于 1mm
             # print(static_score[i], moving_score[i])
-            ref_mask_seg[i] = 2 # 2 for unkown
+            ref_mask_seg[i] = UNKNOWN_LABEL
         elif static_score[i] < moving_score[i]:
             # print(static_score[i], moving_score[i])
-            ref_mask_seg[i] = 1 # 1 for moving
+            ref_mask_seg[i] = MOVING_LABEL
         else:
             # print(static_score[i], moving_score[i])
-            ref_mask_seg[i] = 0 # 0 for static
+            ref_mask_seg[i] = STATIC_LABEL
     if visualize:
         # 使用 napari 进行分类结果的可视化
         pass
@@ -151,11 +154,48 @@ def find_moving_part_intersection(
         
     return pc_ref_filtered, pc_tgt_filtered
     
+
+def fine_joint_estimation(
+    K,
+    depth_ref, depth_tgt,
+    obj_mask_ref, obj_mask_tgt,
+    joint_type, joint_axis, joint_state_ref2tgt,
+    visualize=False
+):
+    """
     
-def refine_joint_est(depth1, depth2, obj_mask1, obj_mask2, joint_param, delta_joint_state):
     """
-    根据当前的 joint 信息和 obj_mask 信息迭代的进行精度提升
-    """
+    T_ref_to_tgt = joint_data_to_transform(
+        joint_type,
+        joint_axis,
+        joint_state_ref2tgt,
+    )
+    
+    seg_mask_ref = segment_ref_obj_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt)
+    moving_mask_ref = reconstruct_mask(obj_mask_ref, seg_mask_ref == MOVING_LABEL) # H, W
+    
+    seg_mask_tgt = segment_ref_obj_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt))
+    moving_mask_tgt = reconstruct_mask(obj_mask_tgt, seg_mask_tgt == MOVING_LABEL)
+    
+    pc_ref, pc_tgt = find_moving_part_intersection(K, depth_ref, depth_tgt, moving_mask_ref, moving_mask_tgt, T_ref_to_tgt, visualize)
+    
+    # 如果用于 ICP 的点云数目过少，则直接返回
+    if min(len(pc_ref), len(pc_tgt)) < 500:
+        return joint_axis, joint_state_ref2tgt
+    
+    # 然后利用 pc_ref 和 pc_tgt 执行 point-to-plane ICP
+    estimated_transform = point_to_plane_icp(pc_ref, pc_tgt, init_transform=T_ref_to_tgt, mode=joint_type, max_iterations=20, tolerance=1e-6)
+    
+    # 提取数据并返回
+    if joint_type == "prismatic":
+        fine_joint_state_ref2tgt = np.linalg.norm(estimated_transform[:3, 3])
+        fine_joint_axis = estimated_transform[:3, 3] / fine_joint_state_ref2tgt
+    elif joint_type == "revolute":
+        rotation_matrix = estimated_transform[:3, :3]
+        rotation_axis_angle = R.from_matrix(rotation_matrix).as_rotvec()
+        fine_joint_state_ref2tgt = np.linalg.norm(rotation_axis_angle)
+        fine_joint_axis = rotation_axis_angle / fine_joint_state_ref2tgt
+    return fine_joint_axis, fine_joint_state_ref2tgt
 
 if __name__ == "__main__":
     # 首先读取数据

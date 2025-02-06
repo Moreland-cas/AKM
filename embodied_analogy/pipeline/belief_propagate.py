@@ -36,10 +36,8 @@ from embodied_analogy.utility.utils import (
     image_to_camera,
     tracks3d_variance
 )
-from embodied_analogy.estimation.coarse_joint_est import (
-    coarse_t_from_tracks_3d,
-    coarse_R_from_tracks_3d
-)
+from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
+from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation 
 
 """
     读取 exploration 阶段获取的视频数据, 进而对物体进行感知和推理理解
@@ -56,7 +54,7 @@ K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
 visualize = False
-save_intermidiate = False
+save_intermidiate = True
 
 # 对于 depth_seq 进行处理, 得到 depth_seq_mask, 用于标记其中depth为 0, 或者重投影在地面上的位置
 depth_seq_mask = np.ones_like(depth_seq, dtype=np.bool_) # T, H, W
@@ -180,27 +178,19 @@ if visualize:
 """
     根据 tracks2d 初步估计出 joint params
 """
-t_axis_camera, t_scales, t_est_loss = coarse_t_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize)
-R_axis_camera, R_scales, R_est_loss = coarse_R_from_tracks_3d(pred_tracks_3d[:, moving_mask, :], visualize=True)
-
-print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
-if t_est_loss < R_est_loss:
-    axis_camera = t_axis_camera
-    scales = t_scales
-else:
-    axis_camera = R_axis_camera
-    scales = R_scales
+joint_type, joint_axis_camera, joint_states = coarse_joint_estimation(pred_tracks_3d[:, moving_mask, :], visualize)
 
 Rc2w = Tw2c[:3, :3].T # 3, 3
-axis_world = Rc2w @ axis_camera
+axis_world = Rc2w @ joint_axis_camera
     
 # 保存 joint states 到 tmp_folder
 if save_intermidiate:
     np.savez(
         os.path.join(tmp_folder, "joint_state.npz"), 
-        translation_c=axis_camera, 
+        joint_type=joint_type,
+        translation_c=joint_axis_camera, 
         translation_w=axis_world, 
-        scales=scales
+        scales=joint_states
     )
 
 """
@@ -230,5 +220,24 @@ if save_intermidiate:
 """
     根据 sam2_video_mask 初步估计出 joint params, 利用 ICP 估计出精确的 joint params 和 object model
 """
+# 根据 coarse joint estimation 挑选出有信息量的两帧, 进行 fine joint estimation
+coarse_joint_axis = joint_axis_camera
+translation_w_gt = np.array([0, 0, 1])
+translation_c_gt = Rc2w.T @ translation_w_gt
 
+for i in range(T):
+    depth_ref = depth_seq[0]
+    depth_tgt = depth_seq[i]
+    obj_mask_ref = sam2_video_masks[0]
+    obj_mask_tgt = sam2_video_masks[i]
+    coarse_joint_state_ref2tgt = joint_states[i] - joint_states[0]
+    fine_joint_axis, fine_joint_state_ref2tgt = fine_joint_estimation(
+        K,
+        depth_ref, depth_tgt,
+        obj_mask_ref, obj_mask_tgt,
+        joint_type, coarse_joint_axis, coarse_joint_state_ref2tgt,
+    )
+    print(f"{i}th frame:")
+    print(f"\t before: {np.dot(translation_c_gt, coarse_joint_axis)}")
+    print(f"\t after : {np.dot(translation_c_gt, fine_joint_axis)}")
 

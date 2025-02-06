@@ -133,3 +133,22 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors)
     
     return unit_vector_axis, angles, est_loss
+
+
+def coarse_joint_estimation(tracks_3d, visualize=False):
+    """
+    tracks_3d: (T, M, 3)
+    """
+    t_axis, t_states, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
+    R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
+
+    print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
+    if t_est_loss < R_est_loss:
+        joint_type = "prismatic"
+        joint_axis = t_axis
+        joint_states = t_states
+    else:
+        joint_type = "revolute"
+        joint_axis = R_axis
+        joint_states = R_states
+    return joint_type, joint_axis, joint_states
