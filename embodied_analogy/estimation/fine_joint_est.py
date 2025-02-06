@@ -29,7 +29,7 @@ import os
 from PIL import Image
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask
+from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask, visualize_pc
 
 def joint_data_to_transform(
     joint_type, # "prismatic" or "revolute"
@@ -41,7 +41,7 @@ def joint_data_to_transform(
     T_ref2tgt = np.eye(4)
     if joint_type == "prismatic":
         # coor_tgt = coor_ref + joint_axis * (joint_state_tgt - joint_state_ref)
-        T_ref2tgt[:3, 3] = translation_c * delta_scale
+        T_ref2tgt[:3, 3] = translation_c * delta_joint_state
     elif joint_type == "revolute":
         # coor_tgt = coor_ref @ Rref2tgt.T
         angle = delta_joint_state
@@ -56,7 +56,7 @@ def segment_ref_obj_mask(
     depth_ref, depth_tgt, 
     obj_mask_ref, obj_mask_tgt,
     T_ref2tgt, # (4, 4)
-    alpha=1.,
+    alpha=0.1,
     visualize=False
 ):
     """
@@ -102,12 +102,16 @@ def segment_ref_obj_mask(
         if min(abs(static_score[i]), abs(moving_score[i])) > 0.1: # 大于 1dm
             ref_mask_seg[i] = 2 # 2 for unkown
         elif max(abs(static_score[i]), abs(moving_score[i])) < 0.001: # 都小于 1mm
+            # print(static_score[i], moving_score[i])
             ref_mask_seg[i] = 2 # 2 for unkown
         elif static_score[i] < moving_score[i]:
+            # print(static_score[i], moving_score[i])
             ref_mask_seg[i] = 1 # 1 for moving
         else:
+            # print(static_score[i], moving_score[i])
             ref_mask_seg[i] = 0 # 0 for static
     if visualize:
+        # 使用 napari 进行分类结果的可视化
         pass
     return ref_mask_seg # (N, ), composed of 0, 1, 2
 
@@ -139,7 +143,12 @@ def find_moving_part_intersection(
     pc_tgt_filtered = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt & pc_ref_projected_mask, K) # M', 3
     
     if visualize:
-        pass
+        # 以一个时序的方式展示 filter 前和 filter 后的点
+        moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, mask_intersection)
+        moving_mask_tgt_filtered = pc_ref_projected_mask
+        Image.fromarray((moving_mask_ref_filtered.astype(np.int32) * 255).astype(np.uint8)).save("moving_mask_ref_filtered.png")
+        Image.fromarray((moving_mask_tgt_filtered.astype(np.int32) * 255).astype(np.uint8)).save("moving_mask_tgt_filtered.png")
+        
     return pc_ref_filtered, pc_tgt_filtered
     
     
@@ -163,7 +172,7 @@ if __name__ == "__main__":
        [ 5.21540642e-07, -9.82936144e-01, -1.83947206e-01]])
     translation_c_gt = Rc2w.T @ translation_w_gt
     
-    ref_idx, tgt_idx = 0, 46
+    ref_idx, tgt_idx = 0, 23
     
     # 读取 0 和 47 帧的深度图
     depth_ref = np.load(os.path.join(tmp_folder, "depths", f"{ref_idx}.npy")).squeeze() # H, w
@@ -180,39 +189,77 @@ if __name__ == "__main__":
     obj_mask_ref = (obj_mask_ref == 255)
     obj_mask_tgt = (obj_mask_tgt == 255)
     
-    delta_scale = scales[tgt_idx] - scales[ref_idx]
-    T_ref_to_tgt = np.eye(4)
-    # from 0 to 47, which means coor_47 = coor_0 + translation_c * delta_scale
-    T_ref_to_tgt[:3, 3] = translation_c * delta_scale
-    
     K = np.array([
         [300.,   0., 400.],
         [  0., 300., 300.],
         [  0.,   0.,   1.]]
     )
+    
+    T_ref_to_tgt = joint_data_to_transform(
+        joint_type="prismatic",
+        joint_axis=translation_c,
+        joint_state_ref=scales[ref_idx],
+        joint_state_tgt=scales[tgt_idx]
+    )
     # 可视化 tgt frame 的点云, 和 ref frame 的点云经过 transform 后与之的对比，看看估计的怎样
-    from embodied_analogy.utility.utils import visualize_pc
-    points_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
-    points_ref_transformed = points_ref + translation_c * delta_scale 
-    colors_ref = np.zeros((len(points_ref), 3))
-    colors_ref[:, 0] = 1
+    # from embodied_analogy.utility.utils import visualize_pc
+    # points_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
+    # points_ref_transformed = points_ref + translation_c * (joint_state_tgt - joint_state_ref) 
+    # colors_ref = np.zeros((len(points_ref), 3))
+    # colors_ref[:, 0] = 1
     # visualize_pc(points=points_ref, colors=None)
     
-    points_tgt = depth_image_to_pointcloud(depth_tgt, obj_mask_tgt, K)
-    colors_tgt = np.zeros((len(points_tgt), 3))
-    colors_tgt[:, 1] = 1
+    # points_tgt = depth_image_to_pointcloud(depth_tgt, obj_mask_tgt, K)
+    # colors_tgt = np.zeros((len(points_tgt), 3))
+    # colors_tgt[:, 1] = 1
     
-    points_concat_for_vis = np.concatenate([points_ref_transformed, points_tgt], axis=0)
-    colors_concat_for_vis = np.concatenate([colors_ref, colors_tgt], axis=0)
-    if False:
-        visualize_pc(points=points_concat_for_vis, colors=colors_concat_for_vis)
+    # points_concat_for_vis = np.concatenate([points_ref_transformed, points_tgt], axis=0)
+    # colors_concat_for_vis = np.concatenate([colors_ref, colors_tgt], axis=0)
+    # visualize_pc(points=points_concat_for_vis, colors=colors_concat_for_vis)
     # visualize_pc(points=points_tgt, colors=colors_tgt)
     
-    if True:
-        class_mask_ref = classify_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt, alpha=1.)
-        recon_mask_ref = reconstruct_mask(obj_mask_ref, class_mask_ref)
-        Image.fromarray((recon_mask_ref.astype(np.int32) * 255).astype(np.uint8)).save("mask_ref.png")
-        
-        class_mask_tgt = classify_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt), alpha=1.)
-        recon_mask_tgt = reconstruct_mask(obj_mask_tgt, class_mask_tgt)
-        Image.fromarray((recon_mask_tgt.astype(np.int32) * 255).astype(np.uint8)).save("mask_tgt.png")
+    class_mask_ref = segment_ref_obj_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt)
+    moving_mask_ref = reconstruct_mask(obj_mask_ref, class_mask_ref == 1) # H, W
+    Image.fromarray((moving_mask_ref.astype(np.int32) * 255).astype(np.uint8)).save("mask_ref.png")
+    
+    class_mask_tgt = segment_ref_obj_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt))
+    moving_mask_tgt = reconstruct_mask(obj_mask_tgt, class_mask_tgt == 1)
+    Image.fromarray((moving_mask_tgt.astype(np.int32) * 255).astype(np.uint8)).save("mask_tgt.png")
+    
+    use_intersection = True
+    if use_intersection:
+        pc_ref, pc_tgt = find_moving_part_intersection(K, depth_ref, depth_tgt, moving_mask_ref, moving_mask_tgt, T_ref_to_tgt, visualize=True)
+    else:
+        pc_ref = depth_image_to_pointcloud(depth_ref, moving_mask_ref, K)
+        pc_tgt = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt, K)
+    
+    points_concat = np.concatenate([pc_ref, pc_tgt], axis=0)
+    colors_ref = np.zeros((len(pc_ref), 3))
+    colors_ref[:, 0] = 1 # red
+    colors_tgt = np.zeros((len(pc_tgt), 3))
+    colors_tgt[:, 1] = 1 # green
+    colors_concat = np.concatenate([colors_ref, colors_tgt], axis=0)
+    # print(len(pc_ref), len(pc_tgt))
+    # visualize_pc(points=points_concat, colors=colors_concat)
+    
+    # 然后利用 pc_ref 和 pc_tgt 执行 point-to-plane ICP
+    from embodied_analogy.estimation.icp_custom import point_to_plane_icp
+    import time
+    print(np.dot(translation_c_gt, translation_c))
+    start = time.time()
+    init_transform = np.eye(4)
+    estimated_transform = point_to_plane_icp(pc_ref, pc_tgt, init_transform, mode="translation", max_iterations=20, tolerance=1e-6)
+    fine_joint_axis = estimated_transform[:3, 3] / np.linalg.norm(estimated_transform[:3, 3])
+    end = time.time()
+    print(f"without init transform: {end - start}")
+    # print(translation_c)
+    # print(fine_joint_axis)
+    # print(translation_c_gt)
+    print(np.dot(translation_c_gt, fine_joint_axis))
+    start = time.time()
+    init_transform = T_ref_to_tgt
+    estimated_transform = point_to_plane_icp(pc_ref, pc_tgt, init_transform, mode="translation", max_iterations=20, tolerance=1e-6)
+    fine_joint_axis = estimated_transform[:3, 3] / np.linalg.norm(estimated_transform[:3, 3])
+    end = time.time()
+    print(f"with init transform: {end - start}")
+    print(np.dot(translation_c_gt, fine_joint_axis))
