@@ -39,6 +39,7 @@ from embodied_analogy.utility.utils import (
 )
 from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation 
+from embodied_analogy.utility.constants import *
 
 """
     读取 exploration 阶段获取的视频数据, 进而对物体进行感知和推理理解
@@ -219,23 +220,24 @@ if save_intermidiate:
 """
     利用 moving_mask_2d 对于 sam2_video_masks 分割出哪些部分的 mask 属于 moving_part, 哪些属于 static_part
 """
-from embodied_analogy.estimation.utils import classify_mask_by_nearest
+from embodied_analogy.estimation.utils import classify_dynamics_by_nearest
 from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask_as_part
-moving_mask_seq, static_mask_seq = [], []
+moving_mask_seq, static_mask_seq, dynamic_mask_seq = [], [], []
 
 for i in range(T):
-    moving_mask, static_mask = classify_mask_by_nearest(
+    dynamic_mask = classify_dynamics_by_nearest(
         sam2_video_masks[i], 
         pred_tracks_2d[i, moving_mask_2d, :],
         pred_tracks_2d[i, static_mask_2d, :]
     )
-    moving_mask_seq.append(moving_mask)
-    static_mask_seq.append(static_mask)
+    dynamic_mask_seq.append(dynamic_mask)
+    moving_mask_seq.append(dynamic_mask == MOVING_LABEL)
+    static_mask_seq.append(dynamic_mask == STATIC_LABEL)
 
 moving_mask_seq = np.stack(moving_mask_seq, axis=0)
 static_mask_seq = np.stack(static_mask_seq, axis=0)
 
-if True:
+if visualize:
     visualize_sam2_mask_as_part(rgb_seq, sam2_video_masks, moving_mask_seq, static_mask_seq)
     
 """
@@ -249,13 +251,15 @@ translation_c_gt = Rc2w.T @ translation_w_gt
 for i in range(T):
     depth_ref = depth_seq[0]
     depth_tgt = depth_seq[i]
-    obj_mask_ref = sam2_video_masks[0]
-    obj_mask_tgt = sam2_video_masks[i]
+    # obj_mask_ref = sam2_video_masks[0]
+    # obj_mask_tgt = sam2_video_masks[i]
+    dynamic_mask_ref = dynamic_mask_seq[0]
+    dynamic_mask_tgt = dynamic_mask_seq[i]
     coarse_joint_state_ref2tgt = joint_states[i] - joint_states[0]
     fine_joint_axis, fine_joint_state_ref2tgt = fine_joint_estimation(
         K,
         depth_ref, depth_tgt,
-        obj_mask_ref, obj_mask_tgt,
+        dynamic_mask_ref, dynamic_mask_tgt,
         joint_type, coarse_joint_axis, coarse_joint_state_ref2tgt,
     )
     print(f"{i}th frame:")

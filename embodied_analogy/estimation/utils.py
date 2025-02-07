@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from scipy.spatial import cKDTree
 from cotracker.utils.visualizer import Visualizer
+from embodied_analogy.utility.constants import *
 
 def filter_2d_tracks_by_visibility(pred_tracks_2d, pred_visibility):
     """
@@ -107,7 +108,7 @@ def visualize_2d_tracks_on_video(rgb_frames, pred_tracks, file_name="video_outpu
     vis.visualize(video, pred_tracks, filename=file_name)
 
 
-def classify_mask_by_nearest(mask, points_A, points_B):
+def classify_dynamics_by_nearest(mask, moving_points, static_points):
     """
     根据A和B点集的最近邻分类让mask中为True的点分类。
 
@@ -117,13 +118,13 @@ def classify_mask_by_nearest(mask, points_A, points_B):
         points_B (np.ndarray): 大小为(N, 2)的B类点集,具有(u, v)坐标
 
     返回:
-        classified_mask (np.ndarray): 大小为(H, W)的分类结果,A类标记1,B类标记2,False区域标记0
+        dynamic_mask (np.ndarray): 大小为(H, W)的分类结果,A类标记1,B类标记2
     """
     H, W = mask.shape
 
     # 构建KD树以加快最近邻搜索，确保用(v, u)坐标格式
-    tree_A = cKDTree(points_A[:, [1, 0]])
-    tree_B = cKDTree(points_B[:, [1, 0]])
+    tree_A = cKDTree(moving_points[:, [1, 0]])
+    tree_B = cKDTree(static_points[:, [1, 0]])
 
     # 找到mask中为True的点坐标
     mask_indices = np.argwhere(mask) # N, 2 (v, u)
@@ -133,19 +134,17 @@ def classify_mask_by_nearest(mask, points_A, points_B):
     distances_B, _ = tree_B.query(mask_indices)
 
     # 初始化结果网络
-    classified_mask = np.zeros((H, W), dtype=np.uint8)
+    dynamic_mask = np.zeros((H, W), dtype=np.uint8)
 
     # 根据最近邻距离分类
     A_closer = distances_A < distances_B # N
     B_closer = ~A_closer
 
     # 将分类结果填入到对应位置
-    classified_mask[mask_indices[A_closer, 0], mask_indices[A_closer, 1]] = 1
-    classified_mask[mask_indices[B_closer, 0], mask_indices[B_closer, 1]] = 2
+    dynamic_mask[mask_indices[A_closer, 0], mask_indices[A_closer, 1]] = MOVING_LABEL
+    dynamic_mask[mask_indices[B_closer, 0], mask_indices[B_closer, 1]] = STATIC_LABEL
 
-    A_mask = (classified_mask == 1)
-    B_mask = (classified_mask == 2)
-    return A_mask, B_mask
+    return dynamic_mask
 
 
 if __name__ == "__main__":

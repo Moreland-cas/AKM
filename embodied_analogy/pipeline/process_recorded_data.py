@@ -59,7 +59,6 @@ class RecordDataReader():
         return pil_img
     
     def get_object_image(self):
-        # TODO: return object image in pil format, without franka arm
         # return self.data["object_image"]
         return self.get_img()
     

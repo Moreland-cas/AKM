@@ -31,10 +31,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from embodied_analogy.estimation.icp_custom import point_to_plane_icp
 from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask, visualize_pc
-
-STATIC_LABEL = 0
-MOVING_LABEL = 1
-UNKNOWN_LABEL = 2
+from embodied_analogy.utility.constants import *
 
 def joint_data_to_transform(
     joint_type, # "prismatic" or "revolute"
@@ -62,6 +59,7 @@ def segment_ref_obj_mask(
     alpha=0.1,
     visualize=False
 ):
+    # TODO: 摆清你的位置, 你就是个 refine mask 的小函数, 改为 refine mask
     """
     对 obj_mask_ref 中的像素进行分类, 分为 static, moving 和 unknown 三类
     Args:
@@ -84,7 +82,8 @@ def segment_ref_obj_mask(
     uv_static_pred, depth_static_pred = camera_to_image(pc_ref_static, K) # [N, 2], [N, ]
     uv_moving_pred, depth_moving_pred = camera_to_image(pc_ref_moving, K)
     
-    # 1.4) 根据像素坐标和深度观测进行打分 TODO：可以把mask的值改为该点离 mask 区域的距离
+    # 1.4) 根据像素坐标和深度观测进行打分 
+    # TODO：可以把mask的值改为该点离 mask 区域的距离
     # 找到 uv_pred 位置的 mask_obs 和 depth_obs 值, 并且计算得分:
     # score = alpha * (mask_obs - 1) + min(0, depth_pred - depth_obs)
     # 上述得分代表了正确的 Transform 应该满足 depth_pred >= depth_obs 和 mask_obs == True
@@ -116,7 +115,7 @@ def segment_ref_obj_mask(
     if visualize:
         # 使用 napari 进行分类结果的可视化
         pass
-    return ref_mask_seg # (N, ), composed of 0, 1, 2
+    return ref_mask_seg # (N, ), composed of 1, 2， 3
 
 def find_moving_part_intersection(
     K, # 相机内参
@@ -158,8 +157,9 @@ def find_moving_part_intersection(
 def fine_joint_estimation(
     K,
     depth_ref, depth_tgt,
-    obj_mask_ref, obj_mask_tgt,
-    joint_type, joint_axis, joint_state_ref2tgt,
+    dynamic_mask_ref, dynamic_mask_tgt,
+    joint_type, joint_axis, 
+    joint_state_ref2tgt,
     visualize=False
 ):
     """
@@ -169,8 +169,8 @@ def fine_joint_estimation(
         K (np.ndarray): 相机内参矩阵，形状为 (3, 3)。
         depth_ref (np.ndarray): 参考帧的深度图，形状为 (H, W)。
         depth_tgt (np.ndarray): 目标帧的深度图，形状为 (H, W)。
-        obj_mask_ref (np.ndarray): 参考帧的物体掩码，形状为 (H, W)。
-        obj_mask_tgt (np.ndarray): 目标帧的物体掩码，形状为 (H, W)。
+        dynamic_mask_ref (np.ndarray): 参考帧的动力学掩码，形状为 (H, W), 由0, 1组成。
+        dynamic_mask_tgt (np.ndarray): 目标帧的动力学掩码，形状为 (H, W)。
         joint_type (str): 关节类型，支持 "prismatic"（平移关节）或 "revolute"（旋转关节）。
         joint_axis (np.ndarray): 初始估计的关节轴，形状为 (3,)。
         joint_state_ref2tgt (float): 初始估计的参考帧到目标帧的关节状态（平移距离或旋转角度）。
@@ -181,24 +181,24 @@ def fine_joint_estimation(
         fine_joint_state_ref2tgt (float): 优化后的关节状态，平移距离或旋转角度。
 
     功能描述:
-        1. 根据初始关节参数计算参考帧到目标帧的变换矩阵。
-        2. 基于物体掩码和深度图进行物体分割，提取移动部分的掩码。
-        3. 找到参考帧和目标帧中移动部分点云的交集。
-        4. 如果点云数量足够，使用点到平面的 ICP 算法对点云进行配准，优化变换矩阵。
-        5. 根据优化后的变换矩阵提取精细的关节轴和关节状态。
+        基础版本是根据已有的 kinematic_mask 做一个 ICP 估计
+        进阶版本是先修正 kinematic_mask, 再做 ICP 估计
     """
     T_ref_to_tgt = joint_data_to_transform(
         joint_type,
         joint_axis,
         joint_state_ref2tgt,
     )
-    
-    seg_mask_ref = segment_ref_obj_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt)
-    moving_mask_ref = reconstruct_mask(obj_mask_ref, seg_mask_ref == MOVING_LABEL) # H, W
-    
-    seg_mask_tgt = segment_ref_obj_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt))
-    moving_mask_tgt = reconstruct_mask(obj_mask_tgt, seg_mask_tgt == MOVING_LABEL)
-    
+    # TODO: 把这个函数重新写一下，输入的 mask 要求包含初始的 moving 和 static 的估计, 不光输出更准的 joint, 还输出更准的 dynamic_mask
+    if False:
+        seg_mask_ref = segment_ref_obj_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt)
+        seg_mask_tgt = segment_ref_obj_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt))
+        
+        moving_mask_ref = reconstruct_mask(obj_mask_ref, dynamic_mask_ref == MOVING_LABEL) # H, W
+        moving_mask_tgt = reconstruct_mask(obj_mask_tgt, dynamic_mask_tgt == MOVING_LABEL)
+        
+    moving_mask_ref = (dynamic_mask_ref == MOVING_LABEL)
+    moving_mask_tgt = (dynamic_mask_tgt == MOVING_LABEL)
     pc_ref, pc_tgt = find_moving_part_intersection(K, depth_ref, depth_tgt, moving_mask_ref, moving_mask_tgt, T_ref_to_tgt, visualize)
     
     # 如果用于 ICP 的点云数目过少，则直接返回

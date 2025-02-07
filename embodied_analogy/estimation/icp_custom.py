@@ -24,7 +24,7 @@ def find_correspondences(ref_pc, target_pc):
     :return: 匹配的索引数组
     """
     tree = KDTree(target_pc)
-    distances, indices = tree.query(ref_pc)
+    _, indices = tree.query(ref_pc)
     return indices
 
 def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="prismatic", max_iterations=20, tolerance=1e-6):
