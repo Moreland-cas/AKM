@@ -152,7 +152,7 @@ def run_sam2_whole(
 
 
 if __name__ == "__main__":
-    from embodied_analogy.pipeline.process_record import RecordDataReader
+    from embodied_analogy.pipeline.process_recorded_data import RecordDataReader
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
     file_name = "/2025-01-07_18-06-10.npz"
     dr = RecordDataReader(record_path_prefix, file_name)

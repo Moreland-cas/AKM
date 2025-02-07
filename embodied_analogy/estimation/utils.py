@@ -1,6 +1,7 @@
 import os
 import torch
 import numpy as np
+from scipy.spatial import cKDTree
 from cotracker.utils.visualizer import Visualizer
 
 def filter_2d_tracks_by_visibility(pred_tracks_2d, pred_visibility):
@@ -16,13 +17,13 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     """
     Args:
         depth_seq (np.ndarray): 
-            深度图视频，形状为 (T, H, W)
+            深度图视频,形状为 (T, H, W)
         pred_tracks (torch.Tensor): 
             (T, M, 2)
-            每个点的坐标形式为 [u, v]，值域为 [0, W) 和 [0, H)。
+            每个点的坐标形式为 [u, v],值域为 [0, W) 和 [0, H)。
         
     返回:
-        torch.Tensor: 点的深度值，形状为 (T, M)，每个点的深度值。
+        torch.Tensor: 点的深度值,形状为 (T, M),每个点的深度值。
     """
     T, H, W = depth_seq.shape
     # _, M, _ = pred_tracks.shape
@@ -57,23 +58,23 @@ def filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depthSeq_mask):
 
 def filter_2d_tracks_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
     """
-    过滤深度序列中的无效序列，基于相邻元素的相对变化率。
+    过滤深度序列中的无效序列,基于相邻元素的相对变化率。
     
     参数:
         pred_tracks (torch.Tensor): 
-            形状为 (T, N, 2)，每个点的坐标形式为 [u, v]，值域为 [0, W) 和 [0, H)。
+            形状为 (T, N, 2),每个点的坐标形式为 [u, v],值域为 [0, W) 和 [0, H)。
         depth_tracks (torch.Tensor): 
-            形状为 (T, N)，表示 T 个时间步上的 N 个深度序列。
+            形状为 (T, N),表示 T 个时间步上的 N 个深度序列。
         thr (float): 
-            相对变化率的阈值，超过此比率的序列会被判定为无效。
+            相对变化率的阈值,超过此比率的序列会被判定为无效。
     
     返回:
         torch.Tensor: 
-            筛选后的 pred_tracks, 形状为 (T, M, 2)，其中 M 是筛选后的有效点数量。
+            筛选后的 pred_tracks, 形状为 (T, M, 2),其中 M 是筛选后的有效点数量。
     """
     depth_tracks += 1e-6  # 防止除零
 
-    # 转置 depth_tracks，使其形状为 (N, T)
+    # 转置 depth_tracks,使其形状为 (N, T)
     depth_tracks_T = depth_tracks.T  # (N, T)
 
     # 计算相邻元素的变化比率 (N, T-1)
@@ -83,11 +84,11 @@ def filter_2d_tracks_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
     invalid_sequences = torch.any(ratios > thr, dim=1)  # 检查每一行是否有任何值大于阈值
 
     # 合法序列的掩码 (N,)
-    valid_mask = ~invalid_sequences  # 合法序列为 False，其他为 True
+    valid_mask = ~invalid_sequences  # 合法序列为 False,其他为 True
     
     # 筛选 pred_tracks 和 depth_tracks 的合法序列
-    pred_tracks = pred_tracks[:, valid_mask, :]  # 筛选有效的 M 点，(T, M, 2)
-    depth_tracks = depth_tracks[:, valid_mask]   # 筛选有效的 M 深度，(T, M)
+    pred_tracks = pred_tracks[:, valid_mask, :]  # 筛选有效的 M 点,(T, M, 2)
+    depth_tracks = depth_tracks[:, valid_mask]   # 筛选有效的 M 深度,(T, M)
     
     return pred_tracks, depth_tracks
 
@@ -104,4 +105,48 @@ def visualize_2d_tracks_on_video(rgb_frames, pred_tracks, file_name="video_outpu
     pred_tracks = pred_tracks[None] # [1, T, M, 2]
     # pred_visibility = torch.ones((pred_tracks.shape[:3], 1), dtype=torch.bool, device="cuda")
     vis.visualize(video, pred_tracks, filename=file_name)
-    
+
+
+def classify_mask_by_nearest(mask, points_A, points_B):
+    """
+    根据A和B点集的最近邻分类让mask中为True的点分类。
+
+    参数:
+        mask (np.ndarray): 大小为(H, W)的应用匹配网络,mask=True的点需要分类
+        points_A (np.ndarray): 大小为(M, 2)的A类点集,具有(u, v)坐标
+        points_B (np.ndarray): 大小为(N, 2)的B类点集,具有(u, v)坐标
+
+    返回:
+        classified_mask (np.ndarray): 大小为(H, W)的分类结果,A类标记1,B类标记2,False区域标记0
+    """
+    H, W = mask.shape
+
+    # 构建KD树以加快最近邻搜索，确保用(v, u)坐标格式
+    tree_A = cKDTree(points_A[:, [1, 0]])
+    tree_B = cKDTree(points_B[:, [1, 0]])
+
+    # 找到mask中为True的点坐标
+    mask_indices = np.argwhere(mask) # N, 2 (v, u)
+
+    # 对每个True点计算自A和B集合的最近距离
+    distances_A, _ = tree_A.query(mask_indices)
+    distances_B, _ = tree_B.query(mask_indices)
+
+    # 初始化结果网络
+    classified_mask = np.zeros((H, W), dtype=np.uint8)
+
+    # 根据最近邻距离分类
+    A_closer = distances_A < distances_B # N
+    B_closer = ~A_closer
+
+    # 将分类结果填入到对应位置
+    classified_mask[mask_indices[A_closer, 0], mask_indices[A_closer, 1]] = 1
+    classified_mask[mask_indices[B_closer, 0], mask_indices[B_closer, 1]] = 2
+
+    A_mask = (classified_mask == 1)
+    B_mask = (classified_mask == 2)
+    return A_mask, B_mask
+
+
+if __name__ == "__main__":
+    pass

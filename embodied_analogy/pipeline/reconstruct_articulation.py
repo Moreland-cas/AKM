@@ -16,7 +16,7 @@ import torch
 import numpy as np
 from PIL import Image
 import sklearn.cluster as cluster
-from embodied_analogy.pipeline.process_record import RecordDataReader
+from embodied_analogy.pipeline.process_recorded_data import RecordDataReader
 from embodied_analogy.perception.online_cotracker import track_any_points
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 from embodied_analogy.visualization.vis_tracks_3d import (
@@ -134,7 +134,7 @@ pred_tracks_2d, pred_visibility = track_any_points(rgb_seq, centroids_image) # [
 # 在这里将 pred_tracks_2d 根据图像坐标的变换聚类为两类, 并可视化 (这一部分信息可用于估计 sam2_mask 的 moving_part)
 moving_mask_2d, static_mask_2d = cluster_tracks_Nd(pred_tracks_2d)
 
-if visualize or True:
+if visualize:
     rigid_part_colors = np.zeros((pred_tracks_2d.shape[1], 3)) # M, 3
     rigid_part_colors[moving_mask_2d] = np.array([1, 0, 0])
     rigid_part_colors[static_mask_2d] = np.array([0, 0, 1])
@@ -217,10 +217,27 @@ if save_intermidiate:
         # np.save(os.path.join(mask_folder, f"{i}.npy"), mask)
 
 """
-    在这里对于 sam2_mask 进行分割, 方式是用最近的 tracks_2d
+    利用 moving_mask_2d 对于 sam2_video_masks 分割出哪些部分的 mask 属于 moving_part, 哪些属于 static_part
 """
+from embodied_analogy.estimation.utils import classify_mask_by_nearest
+from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask_as_part
+moving_mask_seq, static_mask_seq = [], []
 
+for i in range(T):
+    moving_mask, static_mask = classify_mask_by_nearest(
+        sam2_video_masks[i], 
+        pred_tracks_2d[i, moving_mask_2d, :],
+        pred_tracks_2d[i, static_mask_2d, :]
+    )
+    moving_mask_seq.append(moving_mask)
+    static_mask_seq.append(static_mask)
 
+moving_mask_seq = np.stack(moving_mask_seq, axis=0)
+static_mask_seq = np.stack(static_mask_seq, axis=0)
+
+if True:
+    visualize_sam2_mask_as_part(rgb_seq, sam2_video_masks, moving_mask_seq, static_mask_seq)
+    
 """
     根据 sam2_video_mask 初步估计出 joint params, 利用 ICP 估计出精确的 joint params 和 object model
 """
