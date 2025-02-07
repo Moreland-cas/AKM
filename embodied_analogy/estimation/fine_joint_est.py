@@ -163,7 +163,29 @@ def fine_joint_estimation(
     visualize=False
 ):
     """
-    
+    对关节参数进行精细估计，基于参考帧和目标帧的深度图及物体掩码，通过点云配准优化关节轴和关节状态。
+
+    参数:
+        K (np.ndarray): 相机内参矩阵，形状为 (3, 3)。
+        depth_ref (np.ndarray): 参考帧的深度图，形状为 (H, W)。
+        depth_tgt (np.ndarray): 目标帧的深度图，形状为 (H, W)。
+        obj_mask_ref (np.ndarray): 参考帧的物体掩码，形状为 (H, W)。
+        obj_mask_tgt (np.ndarray): 目标帧的物体掩码，形状为 (H, W)。
+        joint_type (str): 关节类型，支持 "prismatic"（平移关节）或 "revolute"（旋转关节）。
+        joint_axis (np.ndarray): 初始估计的关节轴，形状为 (3,)。
+        joint_state_ref2tgt (float): 初始估计的参考帧到目标帧的关节状态（平移距离或旋转角度）。
+        visualize (bool, 可选): 是否可视化中间步骤，默认值为 False。
+
+    返回:
+        fine_joint_axis (np.ndarray): 优化后的关节轴，形状为 (3,)。
+        fine_joint_state_ref2tgt (float): 优化后的关节状态，平移距离或旋转角度。
+
+    功能描述:
+        1. 根据初始关节参数计算参考帧到目标帧的变换矩阵。
+        2. 基于物体掩码和深度图进行物体分割，提取移动部分的掩码。
+        3. 找到参考帧和目标帧中移动部分点云的交集。
+        4. 如果点云数量足够，使用点到平面的 ICP 算法对点云进行配准，优化变换矩阵。
+        5. 根据优化后的变换矩阵提取精细的关节轴和关节状态。
     """
     T_ref_to_tgt = joint_data_to_transform(
         joint_type,
@@ -201,7 +223,7 @@ if __name__ == "__main__":
     # 首先读取数据
     tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/"
     joint_state_npz = np.load(os.path.join(tmp_folder, "joint_state.npz"))
-    scales = joint_state_npz["scales"]
+    joint_states = joint_state_npz["joint_states"]
     
     translation_w = joint_state_npz["translation_w"]
     translation_c = joint_state_npz["translation_c"]

@@ -56,7 +56,6 @@ def vis_pointcloud_series_napari(pc_series, colors=None):
         viewer.add_points(napari_data, size=0.02, name='pc_series', opacity=0.8, face_color=colors)
     else:
         viewer.add_points(napari_data, size=0.02, name='pc_series', opacity=0.8)
-    # viewer.add_labels(np.random.randint(0, 10, size=(M, 1)), name='labels')
     napari.run()
 
 if __name__ == '__main__':

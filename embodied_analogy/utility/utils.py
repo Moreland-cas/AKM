@@ -551,12 +551,12 @@ def reconstruct_mask(mask1: np.ndarray, mask2: np.ndarray) -> np.ndarray:
     
     return new_mask
 
-def tracks3d_variance(tracks: torch.Tensor) -> torch.Tensor:
+def tracksNd_variance(tracks: torch.Tensor) -> torch.Tensor:
     """
     计算 T, M, 3 形状的 3D 轨迹数据的平均方差 (PyTorch 版本)。
 
     参数:
-        tracks (torch.Tensor): 形状为 (T, M, 3) 的张量，表示 T 个时刻 M 个点的 3D 轨迹。
+        tracks (torch.Tensor): 形状为 (T, M, Nd) 的张量，表示 T 个时刻 M 个点的 2D/3D 轨迹。
 
     返回:
         torch.Tensor: M 个点的方差均值（标量）。
