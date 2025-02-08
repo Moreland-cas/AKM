@@ -47,12 +47,14 @@ from embodied_analogy.utility.constants import *
 """
 # 读取数据
 record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-file_name = "/2025-01-07_18-06-10.npz"
+# file_name = "/2025-01-07_18-06-10.npz"
+file_name = "/2025-02-08_14-57-26.npz"
 dr = RecordDataReader(record_path_prefix, file_name)
 dr.process_data()
 
 rgb_seq = dr.rgb # T H W C
 depth_seq = np.squeeze(dr.depth) # T H W
+franka_tracks_seq = dr.franka_tracks_2d
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
@@ -195,6 +197,21 @@ if save_intermidiate:
     )
 
 """
+    在这里先运行 sam 看看结果
+"""
+# 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
+informative_frame_idx = farthest_scale_sampling(joint_states, M=5)
+
+from embodied_analogy.perception.sam_masking import run_sam_whole
+for idx in informative_frame_idx:
+    mask = run_sam_whole(
+        rgb_seq[idx], 
+        positive_points=pred_tracks_2d_filtered[idx], # np.array([N, 2])
+        negative_points=franka_tracks_seq[idx], # np.array([M, 2])
+        visualize=True
+    )
+
+"""
     运行 sam2 得到 articulated objects 整体随着时间变化的 sam2_video_mask
 """
 from embodied_analogy.perception.sam2_masking import run_sam2_whole
@@ -266,7 +283,7 @@ for i, idx in enumerate(informative_frame_idx):
         depth_ref, depth_tgt,
         dynamic_mask_ref, dynamic_mask_tgt,
         joint_type, coarse_joint_axis, coarse_joint_state_ref2tgt,
-        visualize=True
+        visualize
     )
     print(f"{i}th frame: scales {coarse_joint_state_ref2tgt} -> {fine_joint_state_ref2tgt}")
     print(f"\t before: {np.dot(translation_c_gt, coarse_joint_axis)}")

@@ -201,12 +201,21 @@ class BaseEnv():
         return self.asset
     
     def get_points_on_arm(self):
-        # 获取 franka arm 上的 link pose
-        link_poses = []
+        # 获取 franka arm 上的一些点的 2d 和 3d 的坐标（目前是 link_pose）
+        link_poses_3d = []
         for link in self.robot.get_links():
             link_pos = link.get_entity_pose().p # np.array(3)
-            link_poses.append(link_pos)
-        return np.array(link_poses)
+            link_poses_3d.append(link_pos)
+        link_poses_3d = np.array(link_poses_3d) # N, 3
+        
+        # 投影到 2d 相机平面
+        link_poses_2d = world_to_image(
+            link_poses_3d,
+            self.camera_intrinsic,
+            self.camera_extrinsic
+        ) # N, 2
+        return link_poses_2d, link_poses_3d
+    
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
         joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
@@ -351,6 +360,7 @@ class BaseEnv():
         gg.transform(Tgrasp2w)
         # 此时的 gg 中的 rotation 和 translation 对应 Tgripper2world
         return gg
+
 
 if __name__ == "__main__":
     env = BaseEnv()

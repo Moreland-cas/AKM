@@ -1,5 +1,9 @@
 import numpy as np
-from embodied_analogy.utility.utils import draw_points_on_image, pil_images_to_mp4
+from embodied_analogy.utility.utils import (
+    draw_points_on_image,
+    pil_images_to_mp4,
+    napari_time_series_transform
+)
 from PIL import Image
 
 class RecordDataReader():
@@ -40,12 +44,14 @@ class RecordDataReader():
         # 提取 rgbd 数据
         rgb = []
         depth = []
+        franka_tracks_2d = []
         for data_dict in self.data["traj"]:
             after_close = data_dict["after_close"]
             if not after_close:
                 continue
             rgb.append(data_dict["rgb_np"])
             depth.append(data_dict["depth_np"])
+            franka_tracks_2d.append(data_dict["franka_tracks2d"])
             
         self.rgb = np.stack(rgb) # numpy array in shape [T, H, W, 3], in uint8
         self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
@@ -53,6 +59,8 @@ class RecordDataReader():
         
         self.intrinsic = self.data["intrinsic"]
         
+        # 提取 franka_tracks_2d
+        self.franka_tracks_2d = np.stack(franka_tracks_2d) # T, N, 2
     def get_img(self, idx=0):
         # return pil image of the first view
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])
@@ -62,7 +70,10 @@ class RecordDataReader():
         # return self.data["object_image"]
         return self.get_img()
     
-    def visualize_contact_as_video(self):
+    def visualize_deprecated(self):
+        """
+            visualize contact point using video
+        """
         rgb_pil_with_contact = []
         for data_dict in self.data["traj"]:
             after_close = data_dict["after_close"]
@@ -79,12 +90,24 @@ class RecordDataReader():
         save_name = self.filename.split(".")[0]
         pil_images_to_mp4(rgb_pil_with_contact, self.record_path_prefix + f"/{save_name}.mp4")
         
+    def visualize(self):
+        """
+            visualize contact point using video using napari
+        """
+        import napari
+        viewer = napari.view_image(self.rgb, rgb=True)
+        # viewer.add_points(napari_time_series_transform(self.contact_point_2d), face_color="green")
+        franka_visuailze = napari_time_series_transform(self.franka_tracks_2d) # T*M, (1+2)
+        franka_visuailze = franka_visuailze[:, [0, 2, 1]]
+        viewer.add_points(franka_visuailze, face_color="red")
+        napari.run()
+        
         
 if __name__ == "__main__":
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-    file_name = "/2025-01-07_18-06-10.npz"
+    # file_name = "/2025-01-07_18-06-10.npz"
+    file_name = "/2025-02-08_14-57-26.npz"
     dr = RecordDataReader(record_path_prefix, file_name)
     dr.process_data()
-    dr.visualize_contact_as_video()
-    
+    dr.visualize()
     

@@ -1,6 +1,3 @@
-"""
-    给定一个 rgb 视频, 和一个 prompt, 对于视频中的物体和机械臂进行区域跟踪, 输出每一帧的 mask
-"""
 import os
 import shutil
 import numpy as np

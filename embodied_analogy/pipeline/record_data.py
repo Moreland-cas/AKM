@@ -98,7 +98,8 @@ class RecordEnv(BaseEnv):
                 Tw2c = self.recorded_data["extrinsic"]
                 w = self.camera.get_width()
                 h = self.camera.get_height()
-                u, v = world_to_image(cp, K, Tw2c, w, h, normalized_uv=True)
+                uv = world_to_image(cp[None], K, Tw2c, w, h, normalized_uv=True) # B, 2
+                u, v = uv[0]
                 cp_2d.append(np.array([u, v]))
                 
             # record rgb image and display to pygame screen
@@ -106,6 +107,9 @@ class RecordEnv(BaseEnv):
             rgb_np = self.capture_rgb()
             rgb_pil = Image.fromarray(rgb_np)
             update_image(self.pygame_screen, rgb_pil)
+            
+            # 在这里添加当前帧的 franka_arm 上的点的 franka_tracks3d 和 franka_tracks2d
+            franka_tracks2d, franka_tracks3d = self.get_points_on_arm()
             
             cur_dict = {
                 "fps": self.record_fps,
@@ -116,6 +120,8 @@ class RecordEnv(BaseEnv):
                 "depth_np": depth_np,
                 "contact_points_3d": np.array(cp_3d), # N x 3
                 "contact_points_2d": np.array(cp_2d), # N x 2
+                "franka_tracks2d": franka_tracks2d, # N x 2
+                "franka_tracks3d": franka_tracks3d
             }
             if "traj" not in self.recorded_data.keys():
                 self.recorded_data["traj"] = []

@@ -137,7 +137,7 @@ def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, n
     # 投影到图像平面并归一化
     uv, depth = camera_to_image(camera_points, K, image_width, image_height, normalized_uv)
 
-    return uv
+    return uv # B, 2
 
 def draw_points_on_image(image, uv_list, radius=1, normalized_uv=False):
     """
@@ -179,7 +179,7 @@ def pil_images_to_mp4(pil_images, output_filename, fps=30):
     width, height = pil_images[0].size
 
     # 定义视频编写器
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 使用 mp4 编码
+    fourcc = cv2.VideoWriter_fourcc(*'X264')  # 使用 mp4 编码
     video_writer = cv2.VideoWriter(output_filename, fourcc, fps, (width, height))
 
     # 将 PIL 图像逐一转换为 NumPy 数组并写入视频
@@ -609,6 +609,22 @@ def farthest_scale_sampling(arr, M):
     # 返回排序后的抽样点，方便阅读
     # return arr[np.sort(selected_indices)]
     return np.sort(selected_indices)
+
+
+def napari_time_series_transform(original_data):
+    """
+        将原始的时序数据转换为 napari 可视化所需的格式。
+        original_data: np.ndarray, (T, N, d)
+        returned_data: np.ndarray, (T*N, 1+d), 1代表时间维度
+    """
+    T = original_data.shape[0]
+    napari_data = []
+    for i in range(T):
+        tmp_data = original_data[i] # M, d
+        tmp_data_with_t = np.concatenate([np.ones((tmp_data.shape[0], 1)) * i, tmp_data], axis=1) # M, (1+d)
+        napari_data.append(tmp_data_with_t)
+    napari_data = np.concatenate(napari_data, axis=0)
+    return napari_data
 
 
 if __name__ == "__main__":
