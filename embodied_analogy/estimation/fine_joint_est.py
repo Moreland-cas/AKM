@@ -1,36 +1,15 @@
-"""
-    利用 depth map 和 sam2 得到的分割结果, 对于 coarse_joint_estimation 得到的结果进行修正
-    
-    输入:
-        depth1, depth2, obj_mask1, obj_mask2, joint_type, joint_axis, joint_state1, joint_state2
-    
-    输出:
-        part_mask1, part_mask2, joint_axis, (joint_state2 - joint_state1)
-        
-    迭代过程：
-        对于 obj_mask1 中的像素进行分类
-            假设 static part 和 moving part 对应的变换分别是 T_static 和 T_moving
-            对于每个像素，计算其在变换后的三维位置 p_3d 和像素投影 p_2d
-            
-            正确的变换 => (distance(p_3d, camera_o) >= depth2[p_2d]) and (p_2d in obj_mask2)
-            
-        对于 obj_mask2 中的像素进行分类
-            xxx
-            
-        找到 moving_mask1 和 moving_mask2 的交集 
-            将 moving_mask1 中的像素进行 T_moving 变换, 并得到投影 moving_mask1_project_on2
-            求 moving_mask1_project_on2 和 moving_mask2 的交集
-            
-        用交集的点进行 point-to-plane-ICP 估计出更精确的 joint_axis 和 (joint_state2 - joint_state1)
-        
-    # TODO: 当有了全局的模型和每一帧的参数后，可以推测出每一帧的 mask, 进而再次给 sam2, 分割出更准的 mask, 进而估计出更准的 joint
-"""
 import os
 from PIL import Image
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from embodied_analogy.estimation.icp_custom import point_to_plane_icp
-from embodied_analogy.utility.utils import depth_image_to_pointcloud, camera_to_image, reconstruct_mask, visualize_pc
+from embodied_analogy.utility.utils import (
+    depth_image_to_pointcloud, 
+    camera_to_image, 
+    reconstruct_mask, 
+    visualize_pc,
+    farthest_scale_sampling
+)
 from embodied_analogy.utility.constants import *
 
 def joint_data_to_transform(
@@ -148,8 +127,8 @@ def find_moving_part_intersection(
         # 以一个时序的方式展示 filter 前和 filter 后的点
         moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, mask_intersection)
         moving_mask_tgt_filtered = pc_ref_projected_mask
-        Image.fromarray((moving_mask_ref_filtered.astype(np.int32) * 255).astype(np.uint8)).save("moving_mask_ref_filtered.png")
-        Image.fromarray((moving_mask_tgt_filtered.astype(np.int32) * 255).astype(np.uint8)).save("moving_mask_tgt_filtered.png")
+        Image.fromarray((moving_mask_ref_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
+        Image.fromarray((moving_mask_tgt_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
         
     return pc_ref_filtered, pc_tgt_filtered
     
@@ -208,6 +187,19 @@ def fine_joint_estimation(
     # 然后利用 pc_ref 和 pc_tgt 执行 point-to-plane ICP
     estimated_transform = point_to_plane_icp(pc_ref, pc_tgt, init_transform=T_ref_to_tgt, mode=joint_type, max_iterations=20, tolerance=1e-6)
     
+    if visualize:
+        # 可视化 before icp 的 pc_ref_transformed, pc_tgt 和 after icp 的 pc_ref_transformed, pc_tgt
+        import napari
+        viewer = napari.Viewer(ndisplay=3)
+        pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
+        pc_ref_transformed = (pc_ref_aug @ T_ref_to_tgt.T)[:, :3] # N, 3
+        pc_ref_transformed_after_icp = (pc_ref_aug @ estimated_transform.T)[:, :3] # N, 3
+        viewer.add_points(pc_ref_transformed, size=0.005, name='ref', opacity=0.8, face_color="red")
+        viewer.add_points(pc_ref_transformed_after_icp, size=0.005, name='ref_after_icp', opacity=0.8, face_color="green")
+        viewer.add_points(pc_tgt, size=0.005, name='tgt', opacity=0.8, face_color="blue")
+        napari.run()
+        
+        
     # 提取数据并返回
     if joint_type == "prismatic":
         fine_joint_state_ref2tgt = np.linalg.norm(estimated_transform[:3, 3])

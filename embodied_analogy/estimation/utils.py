@@ -147,5 +147,25 @@ def classify_dynamics_by_nearest(mask, moving_points, static_points):
     return dynamic_mask
 
 
-if __name__ == "__main__":
-    pass
+def quantile_sampling(arr, M):
+    """
+    从数组中按分位数抽样，返回代表性数据点。
+    
+    参数:
+    arr (np.ndarray): 输入的一维数据数组。
+    M (int): 要抽取的数据点数量。
+
+    返回:
+    np.ndarray: 抽取的代表性数据点。
+    """
+    # 确保输入为NumPy数组并排序
+    arr_sorted = np.sort(arr)
+    
+    # 计算分位数对应的索引
+    quantiles = np.linspace(0, 1, M)
+    indices = (quantiles * (len(arr_sorted) - 1)).astype(int)
+    
+    # 根据索引抽取数据
+    sampled_data = arr_sorted[indices]
+    return sampled_data
+

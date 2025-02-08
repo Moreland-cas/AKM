@@ -36,6 +36,7 @@ from embodied_analogy.utility.utils import (
     camera_to_image,
     camera_to_world,
     image_to_camera,
+    farthest_scale_sampling
 )
 from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation 
@@ -243,26 +244,31 @@ if visualize:
 """
     根据 sam2_video_mask 初步估计出 joint params, 利用 ICP 估计出精确的 joint params 和 object model
 """
-# 根据 coarse joint estimation 挑选出有信息量的两帧, 进行 fine joint estimation
+# 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
+informative_frame_idx = farthest_scale_sampling(joint_states, M=5)
+
 coarse_joint_axis = joint_axis_camera
 translation_w_gt = np.array([0, 0, 1])
 translation_c_gt = Rc2w.T @ translation_w_gt
 
-for i in range(T):
-    depth_ref = depth_seq[0]
-    depth_tgt = depth_seq[i]
+for i, idx in enumerate(informative_frame_idx):
+    if i == 0:
+        continue
+    depth_ref = depth_seq[informative_frame_idx[0]]
+    depth_tgt = depth_seq[idx]
     # obj_mask_ref = sam2_video_masks[0]
     # obj_mask_tgt = sam2_video_masks[i]
-    dynamic_mask_ref = dynamic_mask_seq[0]
-    dynamic_mask_tgt = dynamic_mask_seq[i]
-    coarse_joint_state_ref2tgt = joint_states[i] - joint_states[0]
+    dynamic_mask_ref = dynamic_mask_seq[informative_frame_idx[0]]
+    dynamic_mask_tgt = dynamic_mask_seq[idx]
+    coarse_joint_state_ref2tgt = joint_states[idx] - joint_states[informative_frame_idx[0]]
     fine_joint_axis, fine_joint_state_ref2tgt = fine_joint_estimation(
         K,
         depth_ref, depth_tgt,
         dynamic_mask_ref, dynamic_mask_tgt,
         joint_type, coarse_joint_axis, coarse_joint_state_ref2tgt,
+        visualize=True
     )
-    print(f"{i}th frame:")
+    print(f"{i}th frame: scales {coarse_joint_state_ref2tgt} -> {fine_joint_state_ref2tgt}")
     print(f"\t before: {np.dot(translation_c_gt, coarse_joint_axis)}")
     print(f"\t after : {np.dot(translation_c_gt, fine_joint_axis)}")
 

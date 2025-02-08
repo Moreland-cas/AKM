@@ -573,8 +573,58 @@ def tracksNd_variance(tracks: torch.Tensor) -> torch.Tensor:
     return average_variance
 
 
+def farthest_scale_sampling(arr, M):
+    """
+    从一维数组中选择 M 个点，确保它们之间的距离尽可能大（最大最小距离采样）。
+    
+    参数:
+    arr (np.ndarray): 输入的一维数据数组。
+    M (int): 需要选择的数据点数量。
+
+    返回:
+    np.ndarray: 选择出的代表性数据点。
+    """
+    arr = np.array(arr)
+    N = len(arr)
+    
+    if M >= N:
+        return arr  # 如果需要的点数大于等于数组长度，直接返回原数组
+
+    # 随机选择第一个点（也可以选择固定的起点，如最小值或最大值）
+    selected_indices = [np.random.randint(0, N)]
+    
+    # 迭代选择剩余的点
+    for _ in range(1, M):
+        # 计算未选点到已选点的最小距离
+        remaining_indices = list(set(range(N)) - set(selected_indices))
+        min_distances = np.array([
+            min(abs(arr[i] - arr[j]) for j in selected_indices)
+            for i in remaining_indices
+        ])
+        
+        # 选择最小距离最大的点
+        next_index = remaining_indices[np.argmax(min_distances)]
+        selected_indices.append(next_index)
+    
+    # 返回排序后的抽样点，方便阅读
+    # return arr[np.sort(selected_indices)]
+    return np.sort(selected_indices)
+
+
 if __name__ == "__main__":
-    H, W = 300, 400
-    data = np.random.random((H, W, 3))
-    mask = np.random.choice([True, False], size=(H, W), p=[0.1, 0.9])
-    print(data[mask].shape)
+    # 示例数据
+    data = np.random.randn(100)  # 生成标准正态分布数据
+    # sampled_points = quantile_sampling(data, 10)
+    sampled_points = farthest_scale_sampling(data, 5)
+
+    print("抽取的分位数点：", sampled_points)
+    import matplotlib.pyplot as plt
+
+    # 可视化原始数据和抽取的数据点
+    plt.hist(data, bins=50, alpha=0.5, label='Original Data')
+    plt.scatter(sampled_points, np.zeros_like(sampled_points), color='red', label='Quantile Samples', zorder=5)
+    plt.legend()
+    plt.title('Quantile Sampling Visualization')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.show()
