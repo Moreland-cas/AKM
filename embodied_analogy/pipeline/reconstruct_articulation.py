@@ -36,7 +36,8 @@ from embodied_analogy.utility.utils import (
     camera_to_image,
     camera_to_world,
     image_to_camera,
-    farthest_scale_sampling
+    farthest_scale_sampling,
+    sample_array
 )
 from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation 

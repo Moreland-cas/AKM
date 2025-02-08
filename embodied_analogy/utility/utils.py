@@ -627,6 +627,26 @@ def napari_time_series_transform(original_data):
     return napari_data
 
 
+def sample_array(arr, k):
+    """
+    从大小为 N x d 的数组中随机采样 k 个样本，并返回 k x d 的数组。
+    :param arr: 输入的 N x d 的 numpy 数组
+    :param k: 需要采样的样本数量
+    :return: 返回大小为 k x d 的数组
+    """
+    # 确保 k 不大于数组的行数
+    assert k <= arr.shape[0], "k 不能大于数组的行数"
+    
+    # 随机选择 k 个索引
+    indices = np.random.choice(arr.shape[0], size=k, replace=False)
+    
+    # 根据索引提取行，并取前两列
+    sampled_array = arr[indices]
+    
+    return sampled_array
+
+
+
 if __name__ == "__main__":
     # 示例数据
     data = np.random.randn(100)  # 生成标准正态分布数据
