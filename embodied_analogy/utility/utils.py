@@ -135,7 +135,7 @@ def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, n
     camera_points = world_to_camera(world_points, Tw2c)
 
     # 投影到图像平面并归一化
-    uv = camera_to_image(camera_points, K, image_width, image_height, normalized_uv)
+    uv, depth = camera_to_image(camera_points, K, image_width, image_height, normalized_uv)
 
     return uv
 

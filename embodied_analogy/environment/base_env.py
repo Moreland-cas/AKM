@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
-from embodied_analogy.utils import *
+from embodied_analogy.utility.utils import *
 from PIL import Image, ImageColor
 import open3d as o3d
 import transforms3d as t3d
@@ -107,6 +107,11 @@ class BaseEnv():
         """
         camera.set_local_pose(sapien.Pose([-0.474219, 0.783512, 0.544986], [0.964151, 0.0230758, 0.0894396, -0.248758]))
         self.camera = camera
+        
+        # 记录相机的内参和外参
+        self.camera_intrinsic = self.camera.get_intrinsic_matrix() # [3, 3], K
+        Tw2c = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
+        self.camera_extrinsic = np.vstack([Tw2c, np.array([0, 0, 0, 1])]) # 4, 4
     
     def capture_rgb(self):
         camera = self.camera
@@ -194,7 +199,14 @@ class BaseEnv():
         self.asset = loader.load(self.asset_prefix + f"/panda/panda_v2_gripper.urdf")
         self.asset.set_root_pose(sapien.Pose(pos, quat))
         return self.asset
-        
+    
+    def get_points_on_arm(self):
+        # 获取 franka arm 上的 link pose
+        link_poses = []
+        for link in self.robot.get_links():
+            link_pos = link.get_entity_pose().p # np.array(3)
+            link_poses.append(link_pos)
+        return np.array(link_poses)
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
         joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
@@ -226,7 +238,6 @@ class BaseEnv():
                 self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
             self.step()
             
-
     def open_gripper(self):
         # for i in range(100):
         #     self.step()
@@ -283,8 +294,8 @@ class BaseEnv():
         # 获取ee_pos和ee_quat
         ee_link = self.robot.get_links()[9] # panda_hand
         # print(ee_link.name)
-        ee_pos = ee_link.get_pose().p
-        ee_quat = ee_link.get_pose().q
+        ee_pos = ee_link.get_entity_pose().p
+        ee_quat = ee_link.get_entity_pose().q
         return ee_pos, ee_quat # numpy array
     
     def detect_grasp_anygrasp(self, points, colors, visualize=True):
@@ -340,4 +351,23 @@ class BaseEnv():
         gg.transform(Tgrasp2w)
         # 此时的 gg 中的 rotation 和 translation 对应 Tgripper2world
         return gg
+
+if __name__ == "__main__":
+    env = BaseEnv()
+    env.load_franka_arm()
+    env.load_articulated_object()
+    env.setup_camera()
+    
+    for i in range(100):
+        env.step()
+        
+    pts_on_arm_3d = env.get_points_on_arm() # N, 3
+    from embodied_analogy.utility.utils import world_to_image
+    pts_on_arm_2d = world_to_image(pts_on_arm_3d, env.camera_intrinsic, env.camera_extrinsic)
+    from embodied_analogy.utility.utils import draw_points_on_image
+    draw_points_on_image(Image.fromarray(env.capture_rgb()), pts_on_arm_2d, radius=3).show()
+    
+    
+    while True:
+        env.step()
     

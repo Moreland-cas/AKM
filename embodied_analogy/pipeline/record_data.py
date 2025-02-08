@@ -6,8 +6,8 @@ import transforms3d as t3d
 import trimesh
 # from trimesh_utils import *
 from datetime import datetime
-from embodied_analogy.utils import *
-from embodied_analogy.base_env import BaseEnv
+from embodied_analogy.utility.utils import *
+from embodied_analogy.environment.base_env import BaseEnv
     
 class RecordEnv(BaseEnv):
     def __init__(
@@ -49,10 +49,8 @@ class RecordEnv(BaseEnv):
         self.recorded_data = {}
         
         # 将相机的内参和外参保存到 self.recorded_data 中
-        self.recorded_data["intrinsic"] = self.camera.get_intrinsic_matrix() # [3, 3]
-        extrinsic = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
-        extrinsic = np.vstack([extrinsic, np.array([0, 0, 0, 1])])
-        self.recorded_data["extrinsic"] =  extrinsic
+        self.recorded_data["intrinsic"] = self.camera_intrinsic # [3, 3]
+        self.recorded_data["extrinsic"] =  self.camera_extrinsic # [4, 4]
         
         # 在这里保存 object 的 seg_mask
         self.scene.step()
@@ -100,7 +98,7 @@ class RecordEnv(BaseEnv):
                 Tw2c = self.recorded_data["extrinsic"]
                 w = self.camera.get_width()
                 h = self.camera.get_height()
-                u, v = world_to_normalized_uv(cp, K, Tw2c, w, h)
+                u, v = world_to_image(cp, K, Tw2c, w, h, normalized_uv=True)
                 cp_2d.append(np.array([u, v]))
                 
             # record rgb image and display to pygame screen
