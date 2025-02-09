@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from PIL import Image
+from sklearn.cluster import KMeans
 
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -54,12 +55,29 @@ def select_dense_point(unsatisfied_points):
     dense_idx = np.argmin(mean_dists)
     return unsatisfied_points[dense_idx]
 
+
+def select_cluster_center_point(points, return_k_points=1):
+    if len(points) <= return_k_points:
+        return points
+
+    kmeans = KMeans(n_clusters=return_k_points, init='k-means++', random_state=0).fit(points)
+    centers = kmeans.cluster_centers_
+
+    # 找到最接近每个中心点的样本
+    closest_indices = []
+    for center in centers:
+        closest_idx = np.argmin(np.linalg.norm(points - center, axis=1))
+        closest_indices.append(closest_idx)
+
+    return np.array(closest_indices)
+
+
 # 函数功能：培训并运行 SAM2 模型，并逐步优化输入点，以提高分割效果
 def run_sam_whole(
     rgb_img,
     positive_points,  # np.array([N, 2])
     negative_points,
-    num_iterations=3,
+    num_iterations=5,
     visualize=False
 ):
     assert num_iterations >= 1
@@ -78,18 +96,19 @@ def run_sam_whole(
     predictor = SAM2ImagePredictor(sam2_model)
     predictor.set_image(rgb_img)
 
-    # 随机抽取一个正样本点和一个负样本点作为初始输入
-    initial_pos_idx = np.random.choice(len(positive_points))
-    initial_neg_idx = np.random.choice(len(negative_points))
+    # 选择正样本点的聚类中心和一个随机负样本点作为初始输入
+    initial_pos_idx = select_cluster_center_point(positive_points, return_k_points=2)
+    initial_neg_idx = -5 # panda_hand
     
     input_point = np.vstack([positive_points[initial_pos_idx], negative_points[initial_neg_idx]])
-    input_label = np.array([1, 0])
+    input_label = np.append(np.ones(len(initial_pos_idx)), 0)
 
     # 记录已使用的点
-    used_positive_points = set([tuple(positive_points[initial_pos_idx])])
+    used_positive_points = set(map(tuple, positive_points[initial_pos_idx]))
     used_negative_points = set([tuple(negative_points[initial_neg_idx])])
     
     cur_best_score = -1e6
+    acceptable_score = 0.9 * len(positive_points)
     cur_best_mask = None
     tmp_best_mask = None
     last_logits = None
@@ -102,11 +121,13 @@ def run_sam_whole(
         # viewer.add_points(negative_points[:, [1, 0]], face_color="red", name="input negative points")
             
     for i in range(num_iterations):
+        if cur_best_score > acceptable_score:
+            break
         # 进行预测
         masks, scores, logits = predictor.predict(
             point_coords=input_point,
             point_labels=input_label,
-            # mask_input=tmp_best_mask[None, :, :] if tmp_best_mask is not None else None, # TODO 这里需要 ablate 一下到底是 cur_best 好还是 tmp_best 好, 还是不用好
+            # mask_input=tmp_best_mask[None, :, :] if tmp_best_mask is not None else None
             mask_input=last_logits[None, :, :] if last_logits is not None else None,
             multimask_output=True,
         )
@@ -146,7 +167,9 @@ def run_sam_whole(
         # 优先选择从不满足的点中选择新点进行扩充
         if unsatisfied_negative:
             # new_negative_point = np.array(select_farthest_point(unsatisfied_negative, used_negative_points, used_positive_points))
-            new_negative_point = np.array(select_dense_point(unsatisfied_negative))
+            # new_negative_point = np.array(select_dense_point(unsatisfied_negative))
+            new_negative_idx = select_cluster_center_point(unsatisfied_negative, return_k_points=1)[0]
+            new_negative_point = unsatisfied_negative[new_negative_idx]
             input_point = np.vstack([input_point, new_negative_point])
             input_label = np.append(input_label, 0)
             used_negative_points.add(tuple(new_negative_point))
@@ -154,7 +177,9 @@ def run_sam_whole(
         # 从不满足的正样本点中选择最远的点
         if unsatisfied_positive:
             # new_positive_point = np.array(select_farthest_point(unsatisfied_positive, used_positive_points, used_negative_points))
-            new_positive_point = np.array(select_dense_point(unsatisfied_positive))
+            # new_positive_point = np.array(select_dense_point(unsatisfied_positive))
+            new_positive_idx = select_cluster_center_point(unsatisfied_positive, return_k_points=1)[0]
+            new_positive_point = unsatisfied_positive[new_positive_idx]
             input_point = np.vstack([input_point, new_positive_point])
             input_label = np.append(input_label, 1)
             used_positive_points.add(tuple(new_positive_point))
