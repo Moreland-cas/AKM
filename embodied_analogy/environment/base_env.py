@@ -371,7 +371,7 @@ if __name__ == "__main__":
     for i in range(100):
         env.step()
         
-    pts_on_arm_3d = env.get_points_on_arm() # N, 3
+    pts_on_arm_2d, pts_on_arm_3d = env.get_points_on_arm() # N, 3
     from embodied_analogy.utility.utils import world_to_image
     pts_on_arm_2d = world_to_image(pts_on_arm_3d, env.camera_intrinsic, env.camera_extrinsic)
     from embodied_analogy.utility.utils import draw_points_on_image

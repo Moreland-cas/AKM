@@ -55,7 +55,7 @@ dr.process_data()
 
 rgb_seq = dr.rgb # T H W C
 depth_seq = np.squeeze(dr.depth) # T H W
-franka_tracks_seq = dr.franka_tracks_2d
+franka_tracks_seq = dr.franka_tracks_2d # T, M, 2, 把 gripper 刚体对应的点去掉
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg

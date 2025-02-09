@@ -59,8 +59,22 @@ class RecordDataReader():
         
         self.intrinsic = self.data["intrinsic"]
         
-        # 提取 franka_tracks_2d
-        self.franka_tracks_2d = np.stack(franka_tracks_2d) # T, N, 2
+        # 提取 franka_tracks_2d, 需要把 panda_hand 上的点过滤掉
+        """
+        把第 10 个, 也就是 panda_hand_tcp 的数据去掉
+        ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 
+        'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7', 
+        'panda_link8', 'panda_hand', 'panda_hand_tcp', 
+        'panda_leftfinger', 'panda_rightfinger', 'camera_base_link', 'camera_link']
+        """
+        self.link_name = [
+            'panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 
+            'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7', 
+            'panda_link8', 'panda_hand', 'panda_leftfinger', 'panda_rightfinger', 
+            'camera_base_link', 'camera_link'
+        ]
+        franka_tracks_2d = np.stack(franka_tracks_2d) # T, N, 2
+        self.franka_tracks_2d = np.delete(franka_tracks_2d, 10, axis=1)
     def get_img(self, idx=0):
         # return pil image of the first view
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])
@@ -99,7 +113,11 @@ class RecordDataReader():
         # viewer.add_points(napari_time_series_transform(self.contact_point_2d), face_color="green")
         franka_visuailze = napari_time_series_transform(self.franka_tracks_2d) # T*M, (1+2)
         franka_visuailze = franka_visuailze[:, [0, 2, 1]]
-        viewer.add_points(franka_visuailze, face_color="red")
+        for i in range(len(self.link_name)):
+            T = len(self.rgb)
+            M = len(self.link_name)
+            viewer.add_points(franka_visuailze[i::M, :], face_color="red", name=self.link_name[i])
+        # viewer.add_points(franka_visuailze, face_color="red")
         napari.run()
         
         
