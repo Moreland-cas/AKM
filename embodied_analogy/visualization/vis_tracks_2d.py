@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import napari
 
-def vis_tracks2d_napari(image_frames, tracks_2d, colors=None):
+def vis_tracks2d_napari(image_frames, tracks_2d, colors=None, viewer_title="napari"):
     """
     Args:
         image_frames: np.array([T, H, W, C])
@@ -17,6 +17,7 @@ def vis_tracks2d_napari(image_frames, tracks_2d, colors=None):
         
     T, M, _ = tracks_2d.shape
     viewer = napari.view_image(image_frames, rgb=True)
+    viewer.title = viewer_title
     
     # 把 tracks_2d 转换成 napari 支持的格式
     napari_data = []

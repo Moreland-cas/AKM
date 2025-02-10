@@ -55,7 +55,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     if visualize:
         # 绿色代表 moving part, 红色代表 renconstructed moving part
         colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1)))) # 2M, 3
-        vis_tracks3d_napari(np.concatenate([tracks_3d, reconstructed_tracks], axis=1), colors)
+        vis_tracks3d_napari(np.concatenate([tracks_3d, reconstructed_tracks], axis=1), colors, viewer_title="coarse translation estimation")
     return avg_unit_vector, np.array(scales), est_loss
 
 def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
@@ -130,7 +130,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         # 绿色代表 moving part, 红色代表 reconstructed moving part
         colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1))))  # 2M, 3
         reconstructed_tracks = [(R.from_rotvec(angles[t] * unit_vector_axis).as_matrix() @ tracks_3d[0].T).T for t in range(T)]
-        vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors)
+        vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors, viewer_title="coarse Rotation estimation")
     
     return unit_vector_axis, angles, est_loss
 

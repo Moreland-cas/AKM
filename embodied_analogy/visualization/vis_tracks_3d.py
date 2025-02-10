@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import napari
 
-def vis_tracks3d_napari(tracks_3d, colors=None):
+def vis_tracks3d_napari(tracks_3d, colors=None, viewer_title="napari"):
     """
     Args:
         tracks_3d: np.array of shape (T, M, 3)
@@ -22,6 +22,7 @@ def vis_tracks3d_napari(tracks_3d, colors=None):
         napari_data[i * M: (i + 1) * M, 1:] = tracks_3d[i]
     
     viewer = napari.Viewer(ndisplay=3)
+    viewer.title = viewer_title
     
     if colors is None:
         colors = np.random.rand(M, 3)

@@ -38,7 +38,6 @@ from embodied_analogy.estimation.utils import get_dynamic_seg_seq
 
 ################################# PARAMS #################################
 visualize = True
-save_intermidiate = True
 whole_obj_masking_with_sam = True
 ##########################################################################
 
@@ -83,14 +82,13 @@ os.makedirs(depth_folder, exist_ok=True)
 os.makedirs(depth_mask_folder, exist_ok=True)
 os.makedirs(vis_folder, exist_ok=True)
 
-if save_intermidiate:
-    for i, rgb in enumerate(rgb_seq):
-        Image.fromarray(rgb).save(os.path.join(rgb_folder, f"{i}.jpg"))
-    for i, depth in enumerate(depth_seq):
-        np.save(os.path.join(depth_folder, f"{i}.npy"), depth) # H, W, 1
-    for i, depth_mask in enumerate(depth_seq_mask):
-        depth_mask_255 = (depth_mask * 255).astype(np.uint8)
-        Image.fromarray(depth_mask_255).save(os.path.join(depth_mask_folder, f"{i}.png"))
+for i, rgb in enumerate(rgb_seq):
+    Image.fromarray(rgb).save(os.path.join(rgb_folder, f"{i}.jpg"))
+for i, depth in enumerate(depth_seq):
+    np.save(os.path.join(depth_folder, f"{i}.npy"), depth) # H, W, 1
+for i, depth_mask in enumerate(depth_seq_mask):
+    depth_mask_255 = (depth_mask * 255).astype(np.uint8)
+    Image.fromarray(depth_mask_255).save(os.path.join(depth_mask_folder, f"{i}.png"))
         
 # if visualize:
 #     # 展示初始的 pointcloud sequence
@@ -135,7 +133,7 @@ centroids_image, _ = camera_to_image(centroids_camera, K) # num_clusters, 2
 tracks_2d, pred_visibility = track_any_points(rgb_seq, centroids_image, visiualize=visualize) # [T, M, 2], [T, M]
 
 # 在这里将 tracks_2d 根据图像坐标的变换聚类为两类
-moving_mask_2d, static_mask_2d = cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=visualize)
+moving_mask_2d, static_mask_2d = cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=visualize, viewer_title="dynamic clustering tracks2d")
 
 # filter tracks2d by visibility
 tracks2d_filtered = filter_tracks2d_by_visibility(rgb_seq, tracks_2d, pred_visibility, visualize)
@@ -150,27 +148,17 @@ tracks2d_filtered = filter_tracks2d_by_depthSeq_mask(rgb_seq, tracks2d_filtered,
 # 根据 tracks2d 得到 tracks3d
 T, M, _ = tracks2d_filtered.shape
 tracks2d_filtered_depth = extract_tracked_depths(depth_seq, tracks2d_filtered) # T, M
-pred_tracks_3d = image_to_camera(tracks2d_filtered.reshape(T*M, -1), tracks2d_filtered_depth.reshape(-1), K) # T*M, 3
-pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
-moving_mask_3d, static_mask_3d = cluster_tracks_3d(pred_tracks_3d, use_diff=True, visualize=visualize)
+tracks3d_filtered = image_to_camera(tracks2d_filtered.reshape(T*M, -1), tracks2d_filtered_depth.reshape(-1), K) # T*M, 3
+tracks3d_filtered = tracks3d_filtered.reshape(T, M, 3) # T, M, 3
+moving_mask_3d, static_mask_3d = cluster_tracks_3d(tracks3d_filtered, use_diff=True, visualize=visualize, viewer_title="dynamic clustering tracks3d_filtered")
 
         
 """
-    根据 tracks3d 进行 coarse joint estimation
+    coarse joint estimation with tracks3d_filtered
 """
-joint_type, joint_axis_camera, joint_states = coarse_joint_estimation(pred_tracks_3d[:, moving_mask_3d, :], visualize)
+joint_type, joint_axis_camera, joint_states = coarse_joint_estimation(tracks3d_filtered[:, moving_mask_3d, :], visualize)
 Rc2w = Tw2c[:3, :3].T # 3, 3
 joint_axis_world = Rc2w @ joint_axis_camera
-    
-# 保存 joint states 到 tmp_folder
-if save_intermidiate:
-    np.savez(
-        os.path.join(tmp_folder, "joint_state.npz"), 
-        joint_type=joint_type,
-        joint_axis=joint_axis_camera, 
-        # translation_w=axis_world, 
-        joint_states=joint_states
-    )
     
     
 """

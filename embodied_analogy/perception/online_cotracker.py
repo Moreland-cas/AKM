@@ -126,7 +126,7 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visiualize=False):
     pred_tracks, pred_visibility = pred_tracks[0].cpu(), pred_visibility[0].cpu()
     
     if visiualize:
-        vis_tracks2d_napari(rgb_frames, pred_tracks)
+        vis_tracks2d_napari(rgb_frames, pred_tracks, viewer_title="Cotracker returned tracks2d")
         
     return pred_tracks, pred_visibility
 

@@ -42,7 +42,7 @@ def filter_tracks2d_by_visibility(rgb_seq, pred_tracks_2d, pred_visibility, visu
     pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
     
     if visualize:
-        vis_tracks2d_napari(rgb_seq, pred_tracks_2d)
+        vis_tracks2d_napari(rgb_seq, pred_tracks_2d, viewer_title="filter_tracks2d_by_visibility")
     return pred_tracks_2d
 
 def filter_tracks2d_by_depthSeq_mask(rgb_seq, pred_tracks_2d, depthSeq_mask, visualize=False):
@@ -63,7 +63,7 @@ def filter_tracks2d_by_depthSeq_mask(rgb_seq, pred_tracks_2d, depthSeq_mask, vis
     
     pred_tracks_2d = pred_tracks_2d[:, mask_and, :]
     if visualize:
-        vis_tracks2d_napari(rgb_seq, pred_tracks_2d)
+        vis_tracks2d_napari(rgb_seq, pred_tracks_2d, viewer_title="filter_tracks2d_by_depthSeq_mask")
     return pred_tracks_2d
 
 def filter_tracks2d_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
@@ -175,6 +175,7 @@ def get_dynamic_seg_seq(mask_seq, moving_points_seq, static_points_seq, visualiz
     if visualize:
         import napari 
         viewer = napari.view_image(mask_seq, rgb=False)
+        viewer.title = "dynamic segment video mask by tracks2d"
         # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
         viewer.add_labels((dynamic_seg_seq == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
         viewer.add_labels((dynamic_seg_seq == STATIC_LABEL).astype(np.int32) * 3, name='static parts')

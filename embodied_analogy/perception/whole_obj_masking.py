@@ -11,6 +11,7 @@ def whole_obj_masking_sam(rgb_seq, positive_tracks2d, negative_tracks2d, visuali
     if visualize:
         import napari
         viewer = napari.view_image(rgb_seq, rgb=True)
+        viewer.title = "whole_obj_masking by sam"
     
     for i in range(len(rgb_seq)):
         rgb_img = rgb_seq[i]
@@ -69,6 +70,7 @@ def whole_obj_masking_sam2(rgb_folder, selected_idx, positive_tracks2d, negative
         rgb_seq = np.array(rgb_seq)  # T, H, W, C
         
         viewer = napari.view_image(rgb_seq, rgb=True)
+        viewer.title = "whole_obj_masking by sam2"
         viewer.add_labels(video_masks.astype(np.int32), name='whole obj mask (sam2)')
         
         # pos_pts = initial_point_prompt[:, [1, 0]]
