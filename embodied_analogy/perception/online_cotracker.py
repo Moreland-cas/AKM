@@ -12,6 +12,7 @@ import numpy as np
 
 from cotracker.utils.visualizer import Visualizer
 from cotracker.predictor import CoTrackerOnlinePredictor
+from embodied_analogy.visualization import vis_tracks2d_napari
 
 
 import cv2
@@ -54,7 +55,7 @@ def mp4_to_numpy_array_list(mp4_path):
 
     return frames
 
-def track_any_points(rgb_frames, queries=None, grid_size=30):
+def track_any_points(rgb_frames, queries=None, grid_size=30, visiualize=False):
     """
     Input:
         rgb_frames: 
@@ -121,9 +122,13 @@ def track_any_points(rgb_frames, queries=None, grid_size=30):
         grid_query_frame=grid_query_frame,
     )
 
-    # 去除 batch 维度
-    pred_tracks, pred_visibility = pred_tracks[0], pred_visibility[0]
-    return pred_tracks.cpu(), pred_visibility.cpu()
+    # 去除 batch 维度, 并转移到 cpu 上去
+    pred_tracks, pred_visibility = pred_tracks[0].cpu(), pred_visibility[0].cpu()
+    
+    if visiualize:
+        vis_tracks2d_napari(rgb_frames, pred_tracks)
+        
+    return pred_tracks, pred_visibility
 
 if __name__ == "__main__":
     rgb_frames = mp4_to_numpy_array_list("./third_party/sam2/notebooks/videos/bedroom.mp4")

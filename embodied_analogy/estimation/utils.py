@@ -4,16 +4,8 @@ import numpy as np
 from scipy.spatial import cKDTree
 from cotracker.utils.visualizer import Visualizer
 from embodied_analogy.utility.constants import *
-from embodied_analogy.visualization import visualize_dynamic_mask_seq
+from embodied_analogy.visualization import *
 
-def filter_2d_tracks_by_visibility(pred_tracks_2d, pred_visibility):
-    """
-        pred_tracks_2d: torch.tensor([T, M, 2])
-        pred_visibility: torch.tensor([T, M])
-    """
-    always_visible_mask = pred_visibility.all(dim=0) # num_clusters
-    pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
-    return pred_tracks_2d
 
 def extract_tracked_depths(depth_seq, pred_tracks):
     """
@@ -41,7 +33,19 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
     return depth_tracks.cpu()
 
-def filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depthSeq_mask):
+def filter_tracks2d_by_visibility(rgb_seq, pred_tracks_2d, pred_visibility, visualize=False):
+    """
+        pred_tracks_2d: torch.tensor([T, M, 2])
+        pred_visibility: torch.tensor([T, M])
+    """
+    always_visible_mask = pred_visibility.all(dim=0) # num_clusters
+    pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
+    
+    if visualize:
+        vis_tracks2d_napari(rgb_seq, pred_tracks_2d)
+    return pred_tracks_2d
+
+def filter_tracks2d_by_depthSeq_mask(rgb_seq, pred_tracks_2d, depthSeq_mask, visualize=False):
     """
     筛选出那些不曾落到 invalid depth_mask 中的 tracks
     Args:
@@ -56,9 +60,13 @@ def filter_2d_tracks_by_depthSeq_mask(pred_tracks_2d, depthSeq_mask):
     
     # 然后在时间维度上取交, 得到一个大小为 M 的 mask, 把其中一直为 True 的保留下来并返回
     mask_and = np.all(pred_tracks_2d_mask, axis=0) # M
-    return pred_tracks_2d[:, mask_and, :]
+    
+    pred_tracks_2d = pred_tracks_2d[:, mask_and, :]
+    if visualize:
+        vis_tracks2d_napari(rgb_seq, pred_tracks_2d)
+    return pred_tracks_2d
 
-def filter_2d_tracks_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
+def filter_tracks2d_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
     """
     过滤深度序列中的无效序列,基于相邻元素的相对变化率。
     
@@ -94,7 +102,7 @@ def filter_2d_tracks_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
     
     return pred_tracks, depth_tracks
 
-def visualize_2d_tracks_on_video(rgb_frames, pred_tracks, file_name="video_output", vis_folder="./"):
+def visualize_tracks2d_on_video(rgb_frames, pred_tracks, file_name="video_output", vis_folder="./"):
     """
         Args:
             rgb_frames: np.array([T, H, W, 3])
