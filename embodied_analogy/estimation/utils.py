@@ -4,6 +4,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 from cotracker.utils.visualizer import Visualizer
 from embodied_analogy.utility.constants import *
+from embodied_analogy.visualization import visualize_dynamic_mask_seq
 
 def filter_2d_tracks_by_visibility(pred_tracks_2d, pred_visibility):
     """
@@ -108,7 +109,7 @@ def visualize_2d_tracks_on_video(rgb_frames, pred_tracks, file_name="video_outpu
     vis.visualize(video, pred_tracks, filename=file_name)
 
 
-def classify_dynamics_by_nearest(mask, moving_points, static_points):
+def get_dynamic_seg(mask, moving_points, static_points, visualize=False):
     """
     根据A和B点集的最近邻分类让mask中为True的点分类。
 
@@ -144,7 +145,33 @@ def classify_dynamics_by_nearest(mask, moving_points, static_points):
     dynamic_mask[mask_indices[A_closer, 0], mask_indices[A_closer, 1]] = MOVING_LABEL
     dynamic_mask[mask_indices[B_closer, 0], mask_indices[B_closer, 1]] = STATIC_LABEL
 
+    if visualize:
+        import napari 
+        viewer = napari.view_image(mask, rgb=True)
+        viewer.add_labels(mask.astype(np.int32), name='articulated objects')
+        viewer.add_labels((dynamic_mask == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
+        viewer.add_labels((dynamic_mask == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
+        napari.run()
     return dynamic_mask
+
+def get_dynamic_seg_seq(mask_seq, moving_points_seq, static_points_seq, visualize=False):
+    T = mask_seq.shape[0]
+    dynamic_seg_seq = []
+    
+    for i in range(T):
+        dynamic_seg = get_dynamic_seg(mask_seq[i], moving_points_seq[i], static_points_seq[i])
+        dynamic_seg_seq.append(dynamic_seg)
+    
+    dynamic_seg_seq = np.array(dynamic_seg_seq)
+    
+    if visualize:
+        import napari 
+        viewer = napari.view_image(mask_seq, rgb=False)
+        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+        viewer.add_labels((dynamic_seg_seq == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
+        viewer.add_labels((dynamic_seg_seq == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
+        napari.run()
+    return dynamic_seg_seq # T, H, W
 
 
 def quantile_sampling(arr, M):

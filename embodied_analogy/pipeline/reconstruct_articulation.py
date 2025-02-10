@@ -35,6 +35,8 @@ from embodied_analogy.utility.utils import (
     sample_array
 )
 from embodied_analogy.utility.constants import *
+from embodied_analogy.estimation.utils import get_dynamic_seg_seq
+
 
 """
     读取 exploration 阶段获取的视频数据, 进而对物体进行感知和推理理解
@@ -225,25 +227,13 @@ video_masks = video_masks & depth_seq_mask[informative_frame_idx]
 """
     根据 tracks2d 和 whole obj video_masks 得到 dynamic_mask
 """
-from embodied_analogy.estimation.utils import classify_dynamics_by_nearest
-from embodied_analogy.visualization.vis_sam2_mask import visualize_dynamic_mask_seq
-moving_mask_seq, static_mask_seq, dynamic_mask_seq = [], [], []
 
-for i in range(len(informative_frame_idx)):
-    dynamic_mask = classify_dynamics_by_nearest(
-        video_masks[i], 
-        pred_tracks_2d[i, moving_mask_2d, :],
-        pred_tracks_2d[i, static_mask_2d, :]
-    )
-    dynamic_mask_seq.append(dynamic_mask)
-    moving_mask_seq.append(dynamic_mask == MOVING_LABEL)
-    static_mask_seq.append(dynamic_mask == STATIC_LABEL)
-
-moving_mask_seq = np.stack(moving_mask_seq, axis=0)
-static_mask_seq = np.stack(static_mask_seq, axis=0)
-
-if visualize:
-    visualize_dynamic_mask_seq(rgb_seq[informative_frame_idx], video_masks, moving_mask_seq, static_mask_seq)
+dynamic_seg_seq = get_dynamic_seg_seq(
+    video_masks, 
+    pred_tracks_2d[informative_frame_idx][:, moving_mask_2d, :],
+    pred_tracks_2d[informative_frame_idx][:, static_mask_2d, :], 
+    visualize=True
+)
 
 """
     根据 dynamic_mask 中的 moving_part, 利用 ICP 估计出精确的 joint params
