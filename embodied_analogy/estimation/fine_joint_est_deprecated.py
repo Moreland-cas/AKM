@@ -120,7 +120,6 @@ def find_moving_part_intersection(
     pc_tgt_filtered = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt & pc_ref_projected_mask, K) # M', 3
     
     if visualize:
-        # TODO: 改为 napari 的可视化方式
         # 以一个时序的方式展示 filter 前和 filter 后的点
         moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, mask_intersection)
         moving_mask_tgt_filtered = pc_ref_projected_mask
@@ -130,27 +129,72 @@ def find_moving_part_intersection(
     return pc_ref_filtered, pc_tgt_filtered
     
 
-def fine_joint_estimation_seq(
+def fine_joint_estimation(
     K,
-    depth_seq, 
-    dynamic_seq,
-    joint_type, 
-    joint_axis, 
-    joint_states,
+    depth_ref, depth_tgt,
+    dynamic_mask_ref, dynamic_mask_tgt,
+    joint_type, joint_axis, 
+    joint_state_ref2tgt,
     visualize=False
 ):
     """
-    主要是计算损失函数的逻辑, 优化没啥难的
-    计算损失函数：
-        损失函数为所有 (frame_i, frame_j) 的 point-to-plane ICP loss + point-to-point ICP loss
-        frame_i 和 frame_j 间的 pc_i 和 pc_j 需要使用验证对齐
-        
+    对关节参数进行精细估计，基于参考帧和目标帧的深度图及物体掩码，通过点云配准优化关节轴和关节状态。
+
+    参数:
+        K (np.ndarray): 相机内参矩阵，形状为 (3, 3)。
+        depth_ref (np.ndarray): 参考帧的深度图，形状为 (H, W)。
+        depth_tgt (np.ndarray): 目标帧的深度图，形状为 (H, W)。
+        dynamic_mask_ref (np.ndarray): 参考帧的动力学掩码，形状为 (H, W), 由0, 1组成。
+        dynamic_mask_tgt (np.ndarray): 目标帧的动力学掩码，形状为 (H, W)。
+        joint_type (str): 关节类型，支持 "prismatic"（平移关节）或 "revolute"（旋转关节）。
+        joint_axis (np.ndarray): 初始估计的关节轴，形状为 (3,)。
+        joint_state_ref2tgt (float): 初始估计的参考帧到目标帧的关节状态（平移距离或旋转角度）。
+        visualize (bool, 可选): 是否可视化中间步骤，默认值为 False。
+
+    返回:
+        fine_joint_axis (np.ndarray): 优化后的关节轴，形状为 (3,)。
+        fine_joint_state_ref2tgt (float): 优化后的关节状态，平移距离或旋转角度。
+
+    功能描述:
+        基础版本是根据已有的 kinematic_mask 做一个 ICP 估计
+        进阶版本是先修正 kinematic_mask, 再做 ICP 估计
     """
-    # 首先对于 moving_part 进行 K 帧的验证（利用 joint states）, 去除那些可能有问题的 part, 至此 moving mask 不动了
+    T_ref_to_tgt = joint_data_to_transform(
+        joint_type,
+        joint_axis,
+        joint_state_ref2tgt,
+    )
+    # TODO: 把这个函数重新写一下，输入的 mask 要求包含初始的 moving 和 static 的估计, 不光输出更准的 joint, 还输出更准的 dynamic_mask
+    if False:
+        seg_mask_ref = segment_ref_obj_mask(K, depth_ref, depth_tgt, obj_mask_ref, obj_mask_tgt, T_ref_to_tgt)
+        seg_mask_tgt = segment_ref_obj_mask(K, depth_tgt, depth_ref, obj_mask_tgt, obj_mask_ref, np.linalg.inv(T_ref_to_tgt))
+        
+        moving_mask_ref = reconstruct_mask(obj_mask_ref, dynamic_mask_ref == MOVING_LABEL) # H, W
+        moving_mask_tgt = reconstruct_mask(obj_mask_tgt, dynamic_mask_tgt == MOVING_LABEL)
+        
+    moving_mask_ref = (dynamic_mask_ref == MOVING_LABEL)
+    moving_mask_tgt = (dynamic_mask_tgt == MOVING_LABEL)
+    pc_ref, pc_tgt = find_moving_part_intersection(K, depth_ref, depth_tgt, moving_mask_ref, moving_mask_tgt, T_ref_to_tgt, visualize)
     
-    # 更新 joint states, 优化 N 次
-    #   sum of all (i, j): 对于 moving_i 和 moving_j, 先求交集, 再计算两种 ICP loss (需要 joint states 离散的计算分配关系)
-    #   然后调用 torch_minimize 更新 joint states
+    # 如果用于 ICP 的点云数目过少，则直接返回
+    if min(len(pc_ref), len(pc_tgt)) < 500:
+        return joint_axis, joint_state_ref2tgt
+    
+    # 然后利用 pc_ref 和 pc_tgt 执行 point-to-plane ICP
+    estimated_transform = point_to_plane_icp(pc_ref, pc_tgt, init_transform=T_ref_to_tgt, mode=joint_type, max_iterations=20, tolerance=1e-6)
+    
+    if visualize:
+        # 可视化 before icp 的 pc_ref_transformed, pc_tgt 和 after icp 的 pc_ref_transformed, pc_tgt
+        import napari
+        viewer = napari.Viewer(ndisplay=3)
+        pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
+        pc_ref_transformed = (pc_ref_aug @ T_ref_to_tgt.T)[:, :3] # N, 3
+        pc_ref_transformed_after_icp = (pc_ref_aug @ estimated_transform.T)[:, :3] # N, 3
+        viewer.add_points(pc_ref_transformed, size=0.005, name='ref', opacity=0.8, face_color="red")
+        viewer.add_points(pc_ref_transformed_after_icp, size=0.005, name='ref_after_icp', opacity=0.8, face_color="green")
+        viewer.add_points(pc_tgt, size=0.005, name='tgt', opacity=0.8, face_color="blue")
+        napari.run()
+        
         
     # 提取数据并返回
     if joint_type == "prismatic":
