@@ -1,35 +1,30 @@
-"""
-Input:
-    rgb_seq: [t, h, w]
-    depth_seq: [t, h, w]
-    object_mask: [t, h, w]
-    franka_mask: [t, h, w]
-Output:
-    moving_mask: [t, h, w]
-    joint_states: [t, 1]
-    joint_params:
-        (3,) for prismatic joint
-        (6,) for revolute joint
-"""
 import os
 import torch
 import numpy as np
 from PIL import Image
 import sklearn.cluster as cluster
+
 from embodied_analogy.pipeline.process_recorded_data import RecordDataReader
+
 from embodied_analogy.perception.online_cotracker import track_any_points
+from embodied_analogy.perception.whole_obj_masking import whole_obj_masking_sam, whole_obj_masking_sam2
+
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 from embodied_analogy.visualization.vis_tracks_3d import (
     vis_tracks3d_napari,
     vis_pointcloud_series_napari
 )
+
 from embodied_analogy.estimation.clustering import cluster_tracks_Nd
+from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
+from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation 
 from embodied_analogy.estimation.utils import (
     filter_2d_tracks_by_visibility, 
     filter_2d_tracks_by_depthSeq_mask, 
     extract_tracked_depths, 
     visualize_2d_tracks_on_video,
 )
+
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud, 
     visualize_pc, 
@@ -39,8 +34,6 @@ from embodied_analogy.utility.utils import (
     farthest_scale_sampling,
     sample_array
 )
-from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
-from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation 
 from embodied_analogy.utility.constants import *
 
 """
@@ -59,10 +52,8 @@ franka_tracks_seq = dr.franka_tracks_2d # T, M, 2, 把 gripper 刚体对应的�
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 object_mask_0 = dr.seg
-visualize = False
-save_intermidiate = False
-filter_tracks2d_before_coarse_joint_estimation = True
 
+# process depth
 # 对于 depth_seq 进行处理, 得到 depth_seq_mask, 用于标记其中depth为 0, 或者重投影在地面上的位置
 depth_seq_mask = np.ones_like(depth_seq, dtype=np.bool_) # T, H, W
 depth_seq_mask = depth_seq_mask & (depth_seq > 0)
@@ -73,6 +64,15 @@ for i in range(depth_seq.shape[0]):
     pc_world = camera_to_world(pc_camera, Tw2c)
     pc_height_mask = (pc_world[:, 2] > 0.03).reshape(H, W) # H*W
     depth_seq_mask[i] = depth_seq_mask[i] & pc_height_mask
+    
+    
+################################# PARAMS #################################
+visualize = False
+save_intermidiate = True
+filter_tracks2d_before_coarse_joint_estimation = True
+whole_obj_masking_with_sam = True
+##########################################################################
+
 
 # 初始化中间过程的存储位置 tmp_folder
 tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/"
@@ -137,7 +137,7 @@ centroids_image, _ = camera_to_image(centroids_camera, K) # num_clusters, 2
 pred_tracks_2d, pred_visibility = track_any_points(rgb_seq, centroids_image) # [T, M, 2], [T, M]
 
 # 在这里将 pred_tracks_2d 根据图像坐标的变换聚类为两类, 并可视化 (这一部分信息可用于估计 sam2_mask 的 moving_part)
-moving_mask_2d, static_mask_2d = cluster_tracks_Nd(pred_tracks_2d)
+moving_mask_2d, static_mask_2d = cluster_tracks_Nd(pred_tracks_2d, use_diff=True)
 
 if visualize:
     rigid_part_colors = np.zeros((pred_tracks_2d.shape[1], 3)) # M, 3
@@ -173,11 +173,11 @@ else:
 T, M, _ = pred_tracks_2d_filtered.shape
 pred_tracks_3d = image_to_camera(pred_tracks_2d_filtered.reshape(T*M, -1), depth_tracks.reshape(-1), K) # T * M, 3
 pred_tracks_3d = pred_tracks_3d.reshape(T, M, 3) # T, M, 3
-moving_mask_3d, static_mask_3d = cluster_tracks_Nd(pred_tracks_3d)
+moving_mask_3d, static_mask_3d = cluster_tracks_Nd(pred_tracks_3d, use_diff=True)
 
 if visualize:
     red_and_green = np.array([[1, 0, 0], [0, 1, 0]])
-    rigid_part_colors = red_and_green[moving_mask_3d] # M, 3
+    rigid_part_colors = red_and_green[moving_mask_3d.astype(np.int32)] # M, 3
     vis_tracks3d_napari(pred_tracks_3d, rigid_part_colors)
         
 """
@@ -198,54 +198,40 @@ if save_intermidiate:
     )
 
 """
-    在这里先运行 sam 看看结果
+    根据 rgb_seq 和 tracks2d 得到 video_masks (可以用 sam 或者 sam2)
 """
 # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
 informative_frame_idx = farthest_scale_sampling(joint_states, M=5)
 
-from embodied_analogy.perception.sam_masking import run_sam_whole
-for idx in informative_frame_idx:
-    mask = run_sam_whole(
-        rgb_seq[idx], 
-        positive_points=pred_tracks_2d_filtered[idx], # np.array([N, 2])
-        negative_points=franka_tracks_seq[idx], # np.array([M, 2])
-        visualize=True
+if whole_obj_masking_with_sam:
+    video_masks = whole_obj_masking_sam(
+        rgb_seq[informative_frame_idx], 
+        pred_tracks_2d_filtered[informative_frame_idx], 
+        franka_tracks_seq[informative_frame_idx], 
+        visualize
+    ) # T, H, W
+else:
+    video_masks = whole_obj_masking_sam2(
+        rgb_folder,
+        informative_frame_idx,
+        pred_tracks_2d_filtered[informative_frame_idx], 
+        franka_tracks_seq[informative_frame_idx], 
+        visualize
     )
 
+# 对 video_masks 进行 depth 过滤
+video_masks = video_masks & depth_seq_mask[informative_frame_idx]
+    
 """
-    运行 sam2 得到 articulated objects 整体随着时间变化的 sam2_video_mask
-"""
-from embodied_analogy.perception.sam2_masking import run_sam2_whole
-from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask
-# TODO: 把这里的 point_prompt 改为 bbox
-point_prompt = pred_tracks_2d[0, :2, :].cpu() #2, 2
-sam2_video_masks = run_sam2_whole(rgb_folder, initial_point_prompt=point_prompt) # T, H, W
-
-# TODO: 在这里添加一个迭代逻辑，就是如果发现 tracks_2d 上的点在某个时刻没有在 sam2_video_masks 中, 那就在该位置添加 positive point prompt, 
-# 如果发现 机械臂上的点 或者 !depthSeq_mask 的点在 mask 里, 那就添加 negative point prompt, 然后运行一次 sam2 propagate
-
-# sam2 mask filtering: 根据 depth_seq 对 sam2 得到的 mask 进行过滤, 使得过滤后的 mask 不包含深度为 0, 或者重投影后会落在地面上的点
-sam2_video_masks = sam2_video_masks & depth_seq_mask
-
-if visualize:
-    visualize_sam2_mask(rgb_seq, sam2_video_masks)
-
-if save_intermidiate:
-    for i, sam2_mask in enumerate(sam2_video_masks):
-        sam2_mask_255 = (sam2_mask * 255).astype(np.uint8)
-        Image.fromarray(sam2_mask_255).save(os.path.join(sam2_mask_folder, f"{i}.png"))
-        # np.save(os.path.join(mask_folder, f"{i}.npy"), mask)
-
-"""
-    利用 moving_mask_2d 对于 sam2_video_masks 分割出哪些部分的 mask 属于 moving_part, 哪些属于 static_part
+    根据 tracks2d 和 whole obj video_masks 得到 dynamic_mask
 """
 from embodied_analogy.estimation.utils import classify_dynamics_by_nearest
-from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask_as_part
+from embodied_analogy.visualization.vis_sam2_mask import visualize_dynamic_mask_seq
 moving_mask_seq, static_mask_seq, dynamic_mask_seq = [], [], []
 
-for i in range(T):
+for i in range(len(informative_frame_idx)):
     dynamic_mask = classify_dynamics_by_nearest(
-        sam2_video_masks[i], 
+        video_masks[i], 
         pred_tracks_2d[i, moving_mask_2d, :],
         pred_tracks_2d[i, static_mask_2d, :]
     )
@@ -257,10 +243,10 @@ moving_mask_seq = np.stack(moving_mask_seq, axis=0)
 static_mask_seq = np.stack(static_mask_seq, axis=0)
 
 if visualize:
-    visualize_sam2_mask_as_part(rgb_seq, sam2_video_masks, moving_mask_seq, static_mask_seq)
-    
+    visualize_dynamic_mask_seq(rgb_seq[informative_frame_idx], video_masks, moving_mask_seq, static_mask_seq)
+
 """
-    根据 sam2_video_mask 初步估计出 joint params, 利用 ICP 估计出精确的 joint params 和 object model
+    根据 dynamic_mask 中的 moving_part, 利用 ICP 估计出精确的 joint params
 """
 # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
 informative_frame_idx = farthest_scale_sampling(joint_states, M=5)

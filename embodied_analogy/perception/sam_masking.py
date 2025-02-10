@@ -78,6 +78,7 @@ def run_sam_whole(
     positive_points,  # np.array([N, 2])
     negative_points,
     num_iterations=5,
+    acceptable_thr=0.9,
     visualize=False
 ):
     assert num_iterations >= 1
@@ -108,7 +109,7 @@ def run_sam_whole(
     used_negative_points = set([tuple(negative_points[initial_neg_idx])])
     
     cur_best_score = -1e6
-    acceptable_score = 0.9 * len(positive_points)
+    acceptable_score = acceptable_thr * len(positive_points)
     cur_best_mask = None
     tmp_best_mask = None
     last_logits = None
@@ -194,15 +195,15 @@ def run_sam_whole(
             # viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
             # viewer.add_points(used_negative_vis[:, [1, 0]], face_color="red", name=f"used negative points {i}")
 
+    used_positive_vis = np.array(list(used_positive_points))
+    used_negative_vis = np.array(list(used_negative_points))
+        
     if visualize:
-        used_positive_vis = np.array(list(used_positive_points))
-        used_negative_vis = np.array(list(used_negative_points))
-
         viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
         viewer.add_points(used_negative_vis[:, [1, 0]], face_color="red", name=f"used negative points {i}")
         napari.run()
 
-    return cur_best_mask
+    return cur_best_mask, used_positive_vis, used_negative_vis
 
 
 

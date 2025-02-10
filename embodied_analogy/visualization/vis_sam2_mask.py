@@ -12,7 +12,7 @@ def visualize_sam2_mask(rgb_seq, mask_seq):
     viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
     napari.run()
 
-def visualize_sam2_mask_as_part(rgb_seq, whole_mask_seq, moving_mask_seq, static_mask_seq):
+def visualize_dynamic_mask_seq(rgb_seq, whole_mask_seq, moving_mask_seq, static_mask_seq):
     """
     rgb_seq: T, H, W, C (np.uint8)
     mask_seq: T, H, W (np.int32) 0 for background, 1 for foreground 

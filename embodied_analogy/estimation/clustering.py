@@ -2,13 +2,18 @@ import numpy as np
 import sklearn.cluster as cluster
 from embodied_analogy.utility.utils import tracksNd_variance
 
-def cluster_tracks_Nd(pred_tracks_Nd):
+def cluster_tracks_Nd(pred_tracks_Nd, use_diff=False):
     """
         pred_tracks_Nd: torch.tensor([T, M, Nd])
         将 pred_tracks_Nd 进行聚类，得到两个部分，分别代表移动和静止的轨迹, 返回两个 mask
     """
     pred_tracks_Nd = pred_tracks_Nd.cpu()
     T, M, _ = pred_tracks_Nd.shape
+    
+    if use_diff:
+        # 减去初始帧, 也就是用 difference 作为 clustering 的输入
+        pred_tracks_Nd = pred_tracks_Nd - pred_tracks_Nd[0:1, ...]
+        
     motion_for_kmeans = pred_tracks_Nd.permute(1, 0, 2).reshape(M, -1) # M T*Nd
     _, moving_labels, _ = cluster.k_means(motion_for_kmeans.numpy(), init="k-means++", n_clusters=2)
 
