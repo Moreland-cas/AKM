@@ -292,7 +292,7 @@ class SDFeaturizer4Eval(SDFeaturizer):
         return unet_ft
     
 ################################ 底下是新加的 ################################
-from embodied_analogy.utils import match_point_on_featmap, SimilarityMap
+from embodied_analogy.utility.utils import match_point_on_featmap, SimilarityMap
 
 def extract_features(image_path, img_size=[768, 768], upsample_feat=True):
     # semantic matching: downsample 1 / 16

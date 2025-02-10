@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from featup.util import norm, unnorm
 import torchvision.transforms as T
 from featup.plotting import plot_feats, plot_lang_heatmaps
-from embodied_analogy.utils import plot_matching, plot_matching_2, nms_selection, match_point_on_featmap
+from embodied_analogy.utility.utils import plot_matching, plot_matching_2, nms_selection, match_point_on_featmap
     
 def load_featup_dino_model(device="cuda"):
     """
