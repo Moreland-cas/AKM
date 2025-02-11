@@ -1,7 +1,9 @@
 import os
 import torch
 import numpy as np
+import open3d as o3d
 from scipy.spatial import cKDTree
+
 from cotracker.utils.visualizer import Visualizer
 from embodied_analogy.utility.constants import *
 from embodied_analogy.visualization import *
@@ -205,3 +207,28 @@ def quantile_sampling(arr, M):
     sampled_data = arr_sorted[indices]
     return sampled_data
 
+def compute_normals(target_pc, k_neighbors=10):
+    """
+    计算目标点云的法向量
+    :param target_pc: numpy 数组，形状为 (N, 3)，目标点云
+    :param k_neighbors: 计算法向量时的近邻数
+    :return: 法向量数组，形状为 (N, 3)
+    """
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(target_pc)
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=k_neighbors))
+    normals = np.asarray(pcd.normals)
+    return normals
+
+def find_correspondences(ref_pc, target_pc, max_distance=0.01):
+    """
+    使用 KD-Tree 进行最近邻搜索，找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
+    :param ref_pc: numpy 数组，形状 (M, 3)，参考点云
+    :param target_pc: numpy 数组，形状 (N, 3)，目标点云
+    :param max_distance: 最大距离，超过这个距离的点会被忽略
+    :return: 匹配的索引数组
+    """
+    tree = cKDTree(target_pc)
+    distances, indices = tree.query(ref_pc)
+    valid_mask = distances < max_distance
+    return indices, valid_mask

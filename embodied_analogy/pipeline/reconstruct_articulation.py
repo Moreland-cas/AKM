@@ -168,64 +168,32 @@ dynamic_mask_seq = get_dynamic_mask_seq(
     tracks_2d[informative_frame_idx][:, moving_mask_2d, :],
     tracks_2d[informative_frame_idx][:, static_mask_2d, :], 
     visualize
-)
+) # T, H, W
 
 
 """
     根据 dynamic_mask 中的 moving_part, 利用 ICP 估计出精确的 joint params
 """
 # filter dynamic mask seq
-from embodied_analogy.estimation.fine_joint_est import filter_dynamic_mask_seq, joint_data_to_transform, intersect_moving_part_in_2d
-
-transform_seq = [
-    joint_data_to_transform(
-        joint_type,
-        joint_axis_camera,
-        scale - joint_states[informative_frame_idx][0],
-    ) for scale in joint_states[informative_frame_idx]]
-dynamic_mask_seq = filter_dynamic_mask_seq(
-    K, 
-    depth_seq[informative_frame_idx], 
-    dynamic_mask_seq, 
-    transform_seq, 
-    visualize
-)
-
-ref_idx, tgt_idx = informative_frame_idx[0], informative_frame_idx[-1]
-intersect_moving_part_in_2d(
+from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
+joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     K,
-    depth_seq[ref_idx], 
-    depth_seq[tgt_idx], 
-    dynamic_mask_seq[0] == MOVING_LABEL, 
-    dynamic_mask_seq[-1] == MOVING_LABEL,
-    transform_seq[-1] @ np.linalg.inv(transform_seq[0]),
+    depth_seq[informative_frame_idx], 
+    dynamic_mask_seq,
+    joint_type, 
+    joint_axis_unit=joint_axis_camera, 
+    joint_states=joint_states[informative_frame_idx],
+    max_icp_iters=100, # ICP 最多迭代多少轮
+    # lr=5e-4, # 0.1 mm
+    lr=1e-3, # 0.1 mm
+    tol=1e-8,
     visualize=True
 )
-# Tref2tgt = Tw2tgt @ Tw2ref.inv()
 
-# 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
-coarse_joint_axis = joint_axis_camera
+
 translation_w_gt = np.array([0, 0, 1])
 translation_c_gt = Rc2w.T @ translation_w_gt
 
-for i, idx in enumerate(informative_frame_idx):
-    if i == 0:
-        continue
-    depth_ref = depth_seq[informative_frame_idx[0]]
-    depth_tgt = depth_seq[idx]
-    # obj_mask_ref = sam2_video_masks[0]
-    # obj_mask_tgt = sam2_video_masks[i]
-    dynamic_mask_ref = dynamic_mask_seq[informative_frame_idx[0]]
-    dynamic_mask_tgt = dynamic_mask_seq[idx]
-    coarse_joint_state_ref2tgt = joint_states[idx] - joint_states[informative_frame_idx[0]]
-    fine_joint_axis, fine_joint_state_ref2tgt = fine_joint_estimation(
-        K,
-        depth_ref, depth_tgt,
-        dynamic_mask_ref, dynamic_mask_tgt,
-        joint_type, coarse_joint_axis, coarse_joint_state_ref2tgt,
-        visualize
-    )
-    print(f"{i}th frame: scales {coarse_joint_state_ref2tgt} -> {fine_joint_state_ref2tgt}")
-    print(f"\t before: {np.dot(translation_c_gt, coarse_joint_axis)}")
-    print(f"\t after : {np.dot(translation_c_gt, fine_joint_axis)}")
-
+print(f"\t before: {np.dot(translation_c_gt, joint_axis_camera)}")
+print(f"\t after : {np.dot(translation_c_gt, joint_axis_updated)}")
+pass

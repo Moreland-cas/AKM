@@ -2,8 +2,9 @@ import os
 import numpy as np
 from PIL import Image
 from scipy.spatial.transform import Rotation as R
-from embodied_analogy.estimation.icp_custom import point_to_plane_icp
+from embodied_analogy.estimation.icp_loss import icp_loss_torch
 from embodied_analogy.utility import *
+from embodied_analogy.estimation.utils import *
 
 
 def joint_data_to_transform(
@@ -24,6 +25,74 @@ def joint_data_to_transform(
         assert False, "joint_type must be either prismatic or revolute"
     return T_ref2tgt
 
+
+def segment_ref_obj_mask(
+    K, # 相机内参
+    depth_ref, depth_tgt, 
+    obj_mask_ref, obj_mask_tgt,
+    T_ref2tgt, # (4, 4)
+    alpha=0.1,
+    visualize=False
+):
+    # TODO: 摆清你的位置, 你就是个 refine mask 的小函数, 改为 refine mask
+    """
+    对 obj_mask_ref 中的像素进行分类, 分为 static, moving 和 unknown 三类
+    Args:
+        obj_mask: 
+            要保证这个 mask 里的点的 depth 不为0, 且重投影最好不要落到地面上
+        alpha: 
+            score_T = alpha * (mask_T_obs - 1) + min(0, depth_T_pred - depth_T_obs)
+            score_T 是小于等于 0 的, 且越接近于 0 越好
+    """
+    # 1) 对 obj_mask_ref 中的像素进行分类
+    # 1.1) 首先得到 obj_mask_ref 中为 True 的那些像素点转换到相机坐标系下
+    pc_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
+    pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
+    
+    # 1.2) 分别让这些点按照 T_static (Identity matrix) 或者 T_ref2tgt 运动, 得到变换后的点
+    pc_ref_static = pc_ref
+    pc_ref_moving = (pc_ref_aug @ T_ref2tgt.T)[:, :3] # N, 3
+    
+    # 1.3) 将这些点投影，得到新的对应点的像素坐标和深度观测
+    uv_static_pred, depth_static_pred = camera_to_image(pc_ref_static, K) # [N, 2], [N, ]
+    uv_moving_pred, depth_moving_pred = camera_to_image(pc_ref_moving, K)
+    
+    # 1.4) 根据像素坐标和深度观测进行打分 
+    # TODO：可以把mask的值改为该点离 mask 区域的距离
+    # 找到 uv_pred 位置的 mask_obs 和 depth_obs 值, 并且计算得分:
+    # score = alpha * (mask_obs - 1) + min(0, depth_pred - depth_obs)
+    # 上述得分代表了正确的 Transform 应该满足 depth_pred >= depth_obs 和 mask_obs == True
+    uv_static_pred_int = np.floor(uv_static_pred).astype(int)
+    mask_static_obs = obj_mask_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
+    depth_static_obs = depth_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
+    static_score = alpha * (mask_static_obs - 1) + np.minimum(0, depth_static_pred - depth_static_obs) # N
+    
+    uv_moving_pred_int = np.floor(uv_moving_pred).astype(int)
+    mask_moving_obs = obj_mask_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
+    depth_moving_obs = depth_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
+    moving_score = alpha * (mask_moving_obs - 1) + np.minimum(0, depth_moving_pred - depth_moving_obs) # N
+    
+    # 1.5）根据 static_score 和 moving_score 将所有点分类为 static, moving 和 unknown 中的一类
+    # 得分最大是 0, 如果一方接近 0，另一方很小，则选取接近为 0 的那一类， 否则为 unkonwn
+    ref_mask_seg = np.zeros(len(static_score))
+    for i in range(len(static_score)):
+        if min(abs(static_score[i]), abs(moving_score[i])) > 0.1: # 大于 1dm
+            ref_mask_seg[i] = UNKNOWN_LABEL 
+        elif max(abs(static_score[i]), abs(moving_score[i])) < 0.001: # 都小于 1mm
+            # print(static_score[i], moving_score[i])
+            ref_mask_seg[i] = UNKNOWN_LABEL
+        elif static_score[i] < moving_score[i]:
+            # print(static_score[i], moving_score[i])
+            ref_mask_seg[i] = MOVING_LABEL
+        else:
+            # print(static_score[i], moving_score[i])
+            ref_mask_seg[i] = STATIC_LABEL
+    if visualize:
+        # 使用 napari 进行分类结果的可视化
+        pass
+    return ref_mask_seg # (N, ), composed of 1, 2， 3
+
+
 def classify_unknown():
     # 如果按照深度验证这个必要条件, Tmoving满足但是Tstatic不满足, 那就可以 classify 到 moving, 反之也是
     pass
@@ -39,6 +108,9 @@ def filter_dynamic_mask_seq(
         根据当前的 joint state
         验证所有的 moving points, 把不确定的 points 标记为 unknown
     """
+    if isinstance(transform_seq, List):
+        transform_seq = np.array(transform_seq)
+        
     T, H, W = depth_seq.shape
     dynamic_mask_seq_updated = dynamic_mask_seq.copy()
     
@@ -47,19 +119,20 @@ def filter_dynamic_mask_seq(
         moving_mask = dynamic_mask_seq[i] == MOVING_LABEL
         if not np.any(moving_mask):
             continue
+        other_frame = np.arange(T) != i
         
         y, x = np.where(moving_mask) # N
         pc_moving = depth_image_to_pointcloud(depth_seq[i], moving_mask, K)  # (N, 3)
         pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
         
         # 批量计算所有其他帧的转换
-        T_i_to_all = transform_seq @ np.linalg.inv(transform_seq[i])  # (T, 4, 4)
+        T_i_to_all = transform_seq[other_frame] @ np.linalg.inv(transform_seq[i])  # (T, 4, 4)
         pc_pred = np.einsum('tij,jk->tik', T_i_to_all, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
         
         # 投影到所有帧
         uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K)  
-        uv_pred = uv_pred.reshape(T, len(pc_moving), 2) # T, N, 2
-        depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
+        uv_pred = uv_pred.reshape(T - 1, len(pc_moving), 2) # T, N, 2
+        depth_pred = depth_pred.reshape(T - 1, len(pc_moving)) # T, N
         
         uv_pred_int = np.floor(uv_pred).astype(int) # T, N, 2
         # TODO:考虑超出图像边界的情况
@@ -71,8 +144,8 @@ def filter_dynamic_mask_seq(
         # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
         
         # 获取目标帧的真实深度
-        T_idx = np.arange(T)[:, None]
-        depth_obs = depth_seq[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
+        T_idx = np.arange(T - 1)[:, None]
+        depth_obs = depth_seq[other_frame][T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
         
         # 计算误差并更新 dynamic_mask
         depth_tolerance = 0.01
@@ -91,11 +164,11 @@ def filter_dynamic_mask_seq(
     return dynamic_mask_seq_updated  # (T, H, W), composed of 1, 2, 3
 
 
-def intersect_moving_part_in_2d(
+def find_moving_part_intersection(
     K, # 相机内参
     depth_ref, depth_tgt, 
     moving_mask_ref, moving_mask_tgt,
-    Tref2tgt, # (4, 4)
+    T_ref2tgt, # (4, 4)
     visualize=False
 ):
     """
@@ -106,7 +179,7 @@ def intersect_moving_part_in_2d(
     
     # 首先把 mask_ref 中的点投影到 tgt_frame 中得到一个 projected_mask_ref
     pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
-    pc_ref_projected, _ = camera_to_image((pc_ref_aug @ Tref2tgt.T)[:, :3], K) # N, 2
+    pc_ref_projected, _ = camera_to_image((pc_ref_aug @ T_ref2tgt.T)[:, :3], K) # N, 2
     
     # 求 pc_ref 变换到 tgt frame 后的投影与 moving_mask_tgt 的交集, 这个交集里的点满足能同时被 ref 和 tgt frame 观测到
     pc_ref_projected_int = np.floor(pc_ref_projected).astype(int) # N, 2
@@ -122,23 +195,63 @@ def intersect_moving_part_in_2d(
         # 以一个时序的方式展示 filter 前和 filter 后的点
         moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, mask_intersection)
         moving_mask_tgt_filtered = pc_ref_projected_mask
-        import napari
-        viewer = napari.view_labels(moving_mask_ref, name="ref before filter")
-        viewer.title = "find moving mask ij intersection in 2d projection"
-        viewer.add_labels(moving_mask_ref_filtered, name='ref after filter')
-        viewer.add_labels(moving_mask_tgt, name='tgt before filter')
-        viewer.add_labels(moving_mask_tgt_filtered, name='tgt after filter')
+        Image.fromarray((moving_mask_ref_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
+        Image.fromarray((moving_mask_tgt_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
         
     return pc_ref_filtered, pc_tgt_filtered
+
+
+def moving_ij_intersection(
+    K, # 相机内参
+    pc_ref,  # N
+    pc_tgt,  # M
+    moving_mask_ref, moving_mask_tgt,
+    Tref2tgt, # (4, 4)
+    visualize=False
+):
+    """
+    给定 moving_mask1 和 moving_mask2, 找到投影的交集, 并返回两个 point-cloud, 用于 point-to-plane-ICP
+    """    
+    Ttgt2ref = np.linalg.inv(Tref2tgt)
     
+    # 首先把 mask_ref 中的点投影到 tgt_frame 中得到一个 projected_mask_ref
+    pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
+    pc_ref_projected, _ = camera_to_image((pc_ref_aug @ Tref2tgt.T)[:, :3], K) # N, 2
+    # 求 pc_ref 变换到 tgt frame 后的投影与 moving_mask_tgt 的交集, 这个交集里的点满足能同时被 ref 和 tgt frame 观测到
+    pc_ref_projected_int = np.floor(pc_ref_projected).astype(int) # N, 2
+    pc_ref_mask = moving_mask_tgt[pc_ref_projected_int[:, 1], pc_ref_projected_int[:, 0]] # N
+    
+    pc_tgt_aug = np.concatenate([pc_tgt, np.ones((len(pc_tgt), 1))], axis=1) # N, 4
+    pc_tgt_projected, _ = camera_to_image((pc_tgt_aug @ Ttgt2ref.T)[:, :3], K) # N, 2
+    pc_tgt_projected_int = np.floor(pc_tgt_projected).astype(int) # N, 2
+    pc_tgt_mask = moving_mask_ref[pc_tgt_projected_int[:, 1], pc_tgt_projected_int[:, 0]] # N
+
+    if visualize:
+        import napari
+        viewer = napari.view_labels(moving_mask_ref, name="ref before filter")
+        viewer.add_labels(moving_mask_tgt, name='tgt before filter')
+        
+        moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, pc_ref_mask)
+        viewer.add_labels(moving_mask_ref_filtered, name='ref after filter')
+        
+        moving_mask_tgt_filtered = reconstruct_mask(moving_mask_tgt, pc_tgt_mask)
+        viewer.add_labels(moving_mask_tgt_filtered, name='tgt after filter')
+        
+        viewer.title = "find moving mask ij intersection in 2d projection"
+        
+    return pc_ref_mask, pc_tgt_mask
+
 
 def fine_joint_estimation_seq(
     K,
     depth_seq, 
     dynamic_mask_seq,
     joint_type, 
-    joint_axis, 
+    joint_axis_unit, # unit vector here
     joint_states,
+    max_icp_iters=100, # ICP 最多迭代多少轮
+    lr=1e-4,
+    tol=1e-6,
     visualize=False
 ):
     """
@@ -148,22 +261,128 @@ def fine_joint_estimation_seq(
         frame_i 和 frame_j 间的 pc_i 和 pc_j 需要使用验证对齐
         
     """
-    # 首先对于 moving_part 进行 K 帧的验证（利用 joint states）, 去除那些可能有问题的 part, 至此 moving mask 不动了
+    T = depth_seq.shape[0]
+    assert T >= 2
     
-    # 更新 joint states, 优化 N 次
-    #   sum of all (i, j): 对于 moving_i 和 moving_j, 先求交集, 再计算两种 ICP loss (需要 joint states 离散的计算分配关系)
-    #   然后调用 torch_minimize 更新 joint states
+    # 获取 transform_seq
+    transform_seq = [
+        joint_data_to_transform(
+            joint_type,
+            joint_axis_unit,
+            cur_state - joint_states[0],
+    ) for cur_state in joint_states] # T, 4, 4 (Tfirst2cur)
+    
+    # 首先对于 moving_part 进行 K 帧的验证（利用 joint states）, 去除那些可能有问题的 part, 至此 moving mask 不动了
+    dynamic_mask_seq_updated = filter_dynamic_mask_seq(
+        K,
+        depth_seq,
+        dynamic_mask_seq,
+        transform_seq,
+        visualize=False
+    ) # T, H, W
+    
+    # 准备 moving mask 数据, 点云数据 和 normal 数据
+    moving_masks = [dynamic_mask_seq_updated[i] == MOVING_LABEL for i in range(T)]
+    moving_pcs = [depth_image_to_pointcloud(depth_seq[i], moving_masks[i], K) for i in range(T)] #  [(N, 3), ...], len=T
+    normals = [compute_normals(moving_pcs[i]) for i in range(T)]
+    
+    # 进入 ICP 迭代
+    prev_icp_loss = float('inf')
+    # 设置待优化参数
+    # joint_axis_unit_updated = joint_axis_unit
+    # joint_states_updated = joint_states
+    axis_params = torch.from_numpy(joint_axis_unit).float().cuda().requires_grad_()
+    states_params = torch.from_numpy(joint_states).float().cuda().requires_grad_()
+    for k in range(max_icp_iters):
+        optimizer = torch.optim.Adam([
+            {'params': axis_params, 'lr': lr}, 
+            {'params': states_params, 'lr': lr}
+        ])
         
-    # 提取数据并返回
-    if joint_type == "prismatic":
-        fine_joint_state_ref2tgt = np.linalg.norm(estimated_transform[:3, 3])
-        fine_joint_axis = estimated_transform[:3, 3] / fine_joint_state_ref2tgt
-    elif joint_type == "revolute":
-        rotation_matrix = estimated_transform[:3, :3]
-        rotation_axis_angle = R.from_matrix(rotation_matrix).as_rotvec()
-        fine_joint_state_ref2tgt = np.linalg.norm(rotation_axis_angle)
-        fine_joint_axis = rotation_axis_angle / fine_joint_state_ref2tgt
-    return fine_joint_axis, fine_joint_state_ref2tgt
+        # 在这里计算 cur_icp_loss
+        cur_icp_loss = 0
+        # 0, 1, 2, ..., T-2, T-1
+        for i in range(0, T-1):
+            for j in range(i+1, T):
+                # 提取需要的数据
+                ref_pc = moving_pcs[i]
+                tgt_pc = moving_pcs[j]
+                target_normals = normals[j]
+                
+                # 无梯度的计算 Tref2tgt
+                Tref2tgt = joint_data_to_transform(
+                    joint_type, 
+                    (axis_params / torch.norm(axis_params)).detach().cpu().numpy(), 
+                    (states_params[j] - states_params[i]).detach().cpu().numpy()
+                )
+                # 计算 pc_i 和 pc_j 的 intersection_mask
+                pc_ref_mask, pc_tgt_mask = moving_ij_intersection(
+                    K,
+                    ref_pc, tgt_pc,
+                    moving_masks[i], moving_masks[j],
+                    Tref2tgt,
+                    visualize=False
+                )
+                # 有梯度的计算 ICP loss
+                joint_axis_scaled = axis_params / torch.norm(axis_params) * (states_params[j] - states_params[i])
+                cur_icp_loss += icp_loss_torch(
+                    joint_axis_scaled,
+                    ref_pc[pc_ref_mask],
+                    tgt_pc[pc_tgt_mask],
+                    target_normals[pc_tgt_mask],
+                    loss_type="point_to_plane",
+                    # loss_type="point_to_point",
+                    joint_type=joint_type,
+                    coor_valid_distance=0.03
+                )
+        
+        # 计算损失变化
+        loss_change = abs(cur_icp_loss.item() - prev_icp_loss)
+        prev_icp_loss = cur_icp_loss.item()
+        print(f"ICP iter_{k}: ", prev_icp_loss)
+        if loss_change < tol:
+            break
+        
+        # otherwise 继续优化
+        optimizer.zero_grad()
+        cur_icp_loss.backward()
+        optimizer.step()
+
+    joint_axis_unit_updated = (axis_params / torch.norm(axis_params)).detach().cpu().numpy()
+    joint_states_updated = (states_params - states_params[0]).detach().cpu().numpy() 
+    
+    if visualize:
+        pc_series = moving_pcs
+        # 给每个 time_stamp 加上 transformed_first
+        pc_ref = moving_pcs[0] # N, 3
+        pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1)  # (N, 4)
+        
+        transform_seq = np.array(transform_seq)
+        transform_seq = transform_seq @ np.linalg.inv(transform_seq[0])
+        pc_ref_transformed = np.einsum('tij,jk->tik', transform_seq, pc_ref_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+        pc_ref_transformed = napari_time_series_transform(pc_ref_transformed) # T*N, d
+        
+        transform_seq_updated = np.array([
+            joint_data_to_transform(
+                joint_type,
+                joint_axis_unit_updated,
+                cur_state - joint_states_updated[0],
+        ) for cur_state in joint_states_updated])
+        transform_seq_updated = transform_seq_updated @ np.linalg.inv(transform_seq_updated[0])
+        pc_ref_transformed_updated = np.einsum('tij,jk->tik', transform_seq_updated, pc_ref_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+        pc_ref_transformed_updated = napari_time_series_transform(pc_ref_transformed_updated) # T*N, d
+        
+        moving_pcs = napari_time_series_transform(moving_pcs) # T*N, d
+        
+        viewer = napari.Viewer(ndisplay=3)
+        size = 0.002
+        viewer.add_points(moving_pcs, size=size, name='moving_pc', opacity=0.8, face_color="blue")
+        viewer.add_points(pc_ref_transformed, size=size, name='before icp', opacity=0.8, face_color="red")
+        viewer.add_points(pc_ref_transformed_updated, size=size, name='after icp', opacity=0.8, face_color="green")
+        viewer.title = "fine joint estimation using ICP"
+        napari.run()
+        
+    return joint_axis_unit_updated, joint_states_updated 
 
 
 if __name__ == "__main__":

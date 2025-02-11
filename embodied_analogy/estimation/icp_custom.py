@@ -1,33 +1,7 @@
 import numpy as np
-import open3d as o3d
-from scipy.spatial import KDTree
-from scipy.linalg import svd
+from embodied_analogy.estimation.utils import *
 
-def compute_normals(target_pc, k_neighbors=10):
-    """
-    计算目标点云的法向量
-    :param target_pc: numpy 数组，形状为 (N, 3)，目标点云
-    :param k_neighbors: 计算法向量时的近邻数
-    :return: 法向量数组，形状为 (N, 3)
-    """
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(target_pc)
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=k_neighbors))
-    normals = np.asarray(pcd.normals)
-    return normals
-
-def find_correspondences(ref_pc, target_pc):
-    """
-    使用 KD-Tree 进行最近邻搜索，找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
-    :param ref_pc: numpy 数组，形状 (M, 3)，参考点云
-    :param target_pc: numpy 数组，形状 (N, 3)，目标点云
-    :return: 匹配的索引数组
-    """
-    tree = KDTree(target_pc)
-    _, indices = tree.query(ref_pc)
-    return indices
-
-def point_to_plane_icp(ref_pc, target_pc, init_transform, mode="prismatic", max_iterations=20, tolerance=1e-6):
+def point_to_plane_icp_cpu(ref_pc, target_pc, init_transform, mode="prismatic", max_iterations=20, tolerance=1e-6):
     """
     点到平面 ICP 算法，计算刚性变换
     :param ref_pc: numpy 数组，形状 (M, 3)，参考点云

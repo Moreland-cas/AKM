@@ -611,22 +611,6 @@ def farthest_scale_sampling(arr, M):
     return np.sort(selected_indices)
 
 
-def napari_time_series_transform(original_data):
-    """
-        将原始的时序数据转换为 napari 可视化所需的格式。
-        original_data: np.ndarray, (T, N, d)
-        returned_data: np.ndarray, (T*N, 1+d), 1代表时间维度
-    """
-    T = original_data.shape[0]
-    napari_data = []
-    for i in range(T):
-        tmp_data = original_data[i] # M, d
-        tmp_data_with_t = np.concatenate([np.ones((tmp_data.shape[0], 1)) * i, tmp_data], axis=1) # M, (1+d)
-        napari_data.append(tmp_data_with_t)
-    napari_data = np.concatenate(napari_data, axis=0)
-    return napari_data
-
-
 def sample_array(arr, k):
     """
     从大小为 N x d 的数组中随机采样 k 个样本，并返回 k x d 的数组。
