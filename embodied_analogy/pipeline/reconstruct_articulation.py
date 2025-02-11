@@ -156,7 +156,7 @@ else:
         visualize
     )
 
-# 对 video_masks 进行 depth 过滤
+# 对 video_masks 进行 depth 过滤, 可选可不选
 video_masks = video_masks & depth_seq_mask[informative_frame_idx]
     
     
@@ -183,11 +183,10 @@ joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     joint_type, 
     joint_axis_unit=joint_axis_camera, 
     joint_states=joint_states[informative_frame_idx],
-    max_icp_iters=100, # ICP 最多迭代多少轮
-    # lr=5e-4, # 0.1 mm
-    lr=1e-3, # 0.1 mm
+    max_icp_iters=200, # ICP 最多迭代多少轮
+    lr=3e-4, # 0.1 mm
     tol=1e-8,
-    visualize=True
+    visualize=visualize
 )
 
 
