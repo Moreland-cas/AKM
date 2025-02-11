@@ -24,79 +24,78 @@ def joint_data_to_transform(
         assert False, "joint_type must be either prismatic or revolute"
     return T_ref2tgt
 
+def classify_unknown():
+    # 如果按照深度验证这个必要条件, Tmoving满足但是Tstatic不满足, 那就可以 classify 到 moving, 反之也是
+    pass
 
-def segment_ref_obj_mask(
+def filter_dynamic_mask_seq(
     K, # 相机内参
-    depth_ref, depth_tgt, 
-    obj_mask_ref, obj_mask_tgt,
-    T_ref2tgt, # (4, 4)
-    alpha=0.1,
+    depth_seq,  # T, H, W
+    dynamic_mask_seq, # T, H, W
+    transform_seq, # (T, 4, 4) 把 frame_0 作为 world_frame, Tw2i
     visualize=False
 ):
-    # TODO: 摆清你的位置, 你就是个 refine mask 的小函数, 改为 refine mask
     """
-    对 obj_mask_ref 中的像素进行分类, 分为 static, moving 和 unknown 三类
-    Args:
-        obj_mask: 
-            要保证这个 mask 里的点的 depth 不为0, 且重投影最好不要落到地面上
-        alpha: 
-            score_T = alpha * (mask_T_obs - 1) + min(0, depth_T_pred - depth_T_obs)
-            score_T 是小于等于 0 的, 且越接近于 0 越好
+        根据当前的 joint state
+        验证所有的 moving points, 把不确定的 points 标记为 unknown
     """
-    # 1) 对 obj_mask_ref 中的像素进行分类
-    # 1.1) 首先得到 obj_mask_ref 中为 True 的那些像素点转换到相机坐标系下
-    pc_ref = depth_image_to_pointcloud(depth_ref, obj_mask_ref, K) # N, 3
-    pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
+    T, H, W = depth_seq.shape
+    dynamic_mask_seq_updated = dynamic_mask_seq.copy()
     
-    # 1.2) 分别让这些点按照 T_static (Identity matrix) 或者 T_ref2tgt 运动, 得到变换后的点
-    pc_ref_static = pc_ref
-    pc_ref_moving = (pc_ref_aug @ T_ref2tgt.T)[:, :3] # N, 3
+    for i in range(T):
+        # 获取当前帧 MOVING_LABEL 的像素坐标
+        moving_mask = dynamic_mask_seq[i] == MOVING_LABEL
+        if not np.any(moving_mask):
+            continue
+        
+        y, x = np.where(moving_mask) # N
+        pc_moving = depth_image_to_pointcloud(depth_seq[i], moving_mask, K)  # (N, 3)
+        pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
+        
+        # 批量计算所有其他帧的转换
+        T_i_to_all = transform_seq @ np.linalg.inv(transform_seq[i])  # (T, 4, 4)
+        pc_pred = np.einsum('tij,jk->tik', T_i_to_all, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+        
+        # 投影到所有帧
+        uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K)  
+        uv_pred = uv_pred.reshape(T, len(pc_moving), 2) # T, N, 2
+        depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
+        
+        uv_pred_int = np.floor(uv_pred).astype(int) # T, N, 2
+        # TODO:考虑超出图像边界的情况
+        # valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
+        #             (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H)
+        
+        # valid_uv = uv_pred_int[valid_idx] # M, 2
+        # depth_pred_valid = depth_pred[valid_idx] # M
+        # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
+        
+        # 获取目标帧的真实深度
+        T_idx = np.arange(T)[:, None]
+        depth_obs = depth_seq[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
+        
+        # 计算误差并更新 dynamic_mask
+        depth_tolerance = 0.01
+        update_to_unknown = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  # M, 只要有一帧拒绝，则置为 UNKNOWN
+        dynamic_mask_seq_updated[i, y[update_to_unknown], x[update_to_unknown]] = UNKNOWN_LABEL
     
-    # 1.3) 将这些点投影，得到新的对应点的像素坐标和深度观测
-    uv_static_pred, depth_static_pred = camera_to_image(pc_ref_static, K) # [N, 2], [N, ]
-    uv_moving_pred, depth_moving_pred = camera_to_image(pc_ref_moving, K)
-    
-    # 1.4) 根据像素坐标和深度观测进行打分 
-    # TODO：可以把mask的值改为该点离 mask 区域的距离
-    # 找到 uv_pred 位置的 mask_obs 和 depth_obs 值, 并且计算得分:
-    # score = alpha * (mask_obs - 1) + min(0, depth_pred - depth_obs)
-    # 上述得分代表了正确的 Transform 应该满足 depth_pred >= depth_obs 和 mask_obs == True
-    uv_static_pred_int = np.floor(uv_static_pred).astype(int)
-    mask_static_obs = obj_mask_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
-    depth_static_obs = depth_tgt[uv_static_pred_int[:, 1], uv_static_pred_int[:, 0]] # N
-    static_score = alpha * (mask_static_obs - 1) + np.minimum(0, depth_static_pred - depth_static_obs) # N
-    
-    uv_moving_pred_int = np.floor(uv_moving_pred).astype(int)
-    mask_moving_obs = obj_mask_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
-    depth_moving_obs = depth_tgt[uv_moving_pred_int[:, 1], uv_moving_pred_int[:, 0]]
-    moving_score = alpha * (mask_moving_obs - 1) + np.minimum(0, depth_moving_pred - depth_moving_obs) # N
-    
-    # 1.5）根据 static_score 和 moving_score 将所有点分类为 static, moving 和 unknown 中的一类
-    # 得分最大是 0, 如果一方接近 0，另一方很小，则选取接近为 0 的那一类， 否则为 unkonwn
-    ref_mask_seg = np.zeros(len(static_score))
-    for i in range(len(static_score)):
-        if min(abs(static_score[i]), abs(moving_score[i])) > 0.1: # 大于 1dm
-            ref_mask_seg[i] = UNKNOWN_LABEL 
-        elif max(abs(static_score[i]), abs(moving_score[i])) < 0.001: # 都小于 1mm
-            # print(static_score[i], moving_score[i])
-            ref_mask_seg[i] = UNKNOWN_LABEL
-        elif static_score[i] < moving_score[i]:
-            # print(static_score[i], moving_score[i])
-            ref_mask_seg[i] = MOVING_LABEL
-        else:
-            # print(static_score[i], moving_score[i])
-            ref_mask_seg[i] = STATIC_LABEL
     if visualize:
-        # 使用 napari 进行分类结果的可视化
-        pass
-    return ref_mask_seg # (N, ), composed of 1, 2， 3
+        import napari 
+        viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+        viewer.title = "filter dynamic mask seq (moving part)"
+        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+        viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='before filtering')
+        viewer.add_labels(dynamic_mask_seq_updated.astype(np.int32), name='after filtering')
+        napari.run()
+    
+    return dynamic_mask_seq_updated  # (T, H, W), composed of 1, 2, 3
 
 
-def find_moving_part_intersection(
+def intersect_moving_part_in_2d(
     K, # 相机内参
     depth_ref, depth_tgt, 
     moving_mask_ref, moving_mask_tgt,
-    T_ref2tgt, # (4, 4)
+    Tref2tgt, # (4, 4)
     visualize=False
 ):
     """
@@ -107,7 +106,7 @@ def find_moving_part_intersection(
     
     # 首先把 mask_ref 中的点投影到 tgt_frame 中得到一个 projected_mask_ref
     pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1) # N, 4
-    pc_ref_projected, _ = camera_to_image((pc_ref_aug @ T_ref2tgt.T)[:, :3], K) # N, 2
+    pc_ref_projected, _ = camera_to_image((pc_ref_aug @ Tref2tgt.T)[:, :3], K) # N, 2
     
     # 求 pc_ref 变换到 tgt frame 后的投影与 moving_mask_tgt 的交集, 这个交集里的点满足能同时被 ref 和 tgt frame 观测到
     pc_ref_projected_int = np.floor(pc_ref_projected).astype(int) # N, 2
@@ -120,12 +119,15 @@ def find_moving_part_intersection(
     pc_tgt_filtered = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt & pc_ref_projected_mask, K) # M', 3
     
     if visualize:
-        # TODO: 改为 napari 的可视化方式
         # 以一个时序的方式展示 filter 前和 filter 后的点
         moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, mask_intersection)
         moving_mask_tgt_filtered = pc_ref_projected_mask
-        Image.fromarray((moving_mask_ref_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
-        Image.fromarray((moving_mask_tgt_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
+        import napari
+        viewer = napari.view_labels(moving_mask_ref, name="ref before filter")
+        viewer.title = "find moving mask ij intersection in 2d projection"
+        viewer.add_labels(moving_mask_ref_filtered, name='ref after filter')
+        viewer.add_labels(moving_mask_tgt, name='tgt before filter')
+        viewer.add_labels(moving_mask_tgt_filtered, name='tgt after filter')
         
     return pc_ref_filtered, pc_tgt_filtered
     
@@ -133,7 +135,7 @@ def find_moving_part_intersection(
 def fine_joint_estimation_seq(
     K,
     depth_seq, 
-    dynamic_seq,
+    dynamic_mask_seq,
     joint_type, 
     joint_axis, 
     joint_states,

@@ -117,7 +117,7 @@ def visualize_tracks2d_on_video(rgb_frames, pred_tracks, file_name="video_output
     vis.visualize(video, pred_tracks, filename=file_name)
 
 
-def get_dynamic_seg(mask, moving_points, static_points, visualize=False):
+def get_dynamic_mask(mask, moving_points, static_points, visualize=False):
     """
     根据A和B点集的最近邻分类让mask中为True的点分类。
 
@@ -162,12 +162,12 @@ def get_dynamic_seg(mask, moving_points, static_points, visualize=False):
         napari.run()
     return dynamic_mask
 
-def get_dynamic_seg_seq(mask_seq, moving_points_seq, static_points_seq, visualize=False):
+def get_dynamic_mask_seq(mask_seq, moving_points_seq, static_points_seq, visualize=False):
     T = mask_seq.shape[0]
     dynamic_seg_seq = []
     
     for i in range(T):
-        dynamic_seg = get_dynamic_seg(mask_seq[i], moving_points_seq[i], static_points_seq[i])
+        dynamic_seg = get_dynamic_mask(mask_seq[i], moving_points_seq[i], static_points_seq[i])
         dynamic_seg_seq.append(dynamic_seg)
     
     dynamic_seg_seq = np.array(dynamic_seg_seq)

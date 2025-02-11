@@ -10,7 +10,7 @@ from embodied_analogy.utility import *
 
 
 ################################# PARAMS #################################
-visualize = True
+visualize = False
 whole_obj_masking_with_sam = True
 ##########################################################################
 
@@ -163,7 +163,7 @@ video_masks = video_masks & depth_seq_mask[informative_frame_idx]
 """
     根据 tracks2d 和 whole obj video_masks 得到 dynamic_mask
 """
-dynamic_seg_seq = get_dynamic_seg_seq(
+dynamic_mask_seq = get_dynamic_mask_seq(
     video_masks, 
     tracks_2d[informative_frame_idx][:, moving_mask_2d, :],
     tracks_2d[informative_frame_idx][:, static_mask_2d, :], 
@@ -174,6 +174,35 @@ dynamic_seg_seq = get_dynamic_seg_seq(
 """
     根据 dynamic_mask 中的 moving_part, 利用 ICP 估计出精确的 joint params
 """
+# filter dynamic mask seq
+from embodied_analogy.estimation.fine_joint_est import filter_dynamic_mask_seq, joint_data_to_transform, intersect_moving_part_in_2d
+
+transform_seq = [
+    joint_data_to_transform(
+        joint_type,
+        joint_axis_camera,
+        scale - joint_states[informative_frame_idx][0],
+    ) for scale in joint_states[informative_frame_idx]]
+dynamic_mask_seq = filter_dynamic_mask_seq(
+    K, 
+    depth_seq[informative_frame_idx], 
+    dynamic_mask_seq, 
+    transform_seq, 
+    visualize
+)
+
+ref_idx, tgt_idx = informative_frame_idx[0], informative_frame_idx[-1]
+intersect_moving_part_in_2d(
+    K,
+    depth_seq[ref_idx], 
+    depth_seq[tgt_idx], 
+    dynamic_mask_seq[0] == MOVING_LABEL, 
+    dynamic_mask_seq[-1] == MOVING_LABEL,
+    transform_seq[-1] @ np.linalg.inv(transform_seq[0]),
+    visualize=True
+)
+# Tref2tgt = Tw2tgt @ Tw2ref.inv()
+
 # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
 coarse_joint_axis = joint_axis_camera
 translation_w_gt = np.array([0, 0, 1])
