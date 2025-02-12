@@ -25,9 +25,6 @@ class RecordEnv(BaseEnv):
         # setup pygame after camera
         self.setup_pygame() 
         
-        # load articulated object
-        self.load_articulated_object(index=100051, scale=0.2)
-        
         # setup record after object spawned, cause need segmentation image
         self.setup_record()
         
@@ -56,8 +53,8 @@ class RecordEnv(BaseEnv):
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
         self.viewer.render()
-        seg_np = self.capture_segmentation()
-        self.recorded_data['object_seg'] = seg_np # H, W
+        # seg_np = self.capture_segmentation()
+        # self.recorded_data['object_seg'] = seg_np # H, W
     
     def save_recoreded_data(self):
         assert isinstance(self.recorded_data, dict)
@@ -132,10 +129,7 @@ class RecordEnv(BaseEnv):
         pos_scale_factor = 0.1
         
         while not self.viewer.closed:
-            target_pos, _ = self.get_ee_pose()
-            target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
-            delta_pos = np.array([0, 0, 0])
-            # delta_rpy = np.array([0, 0, 0])
+            target_pos, target_quat = self.get_ee_pose()
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -172,16 +166,59 @@ class RecordEnv(BaseEnv):
                         target_pos += delta_pos * pos_scale_factor
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
-                    elif event.key == pygame.K_KP0: 
+                        
+                    # 旋转变换的部分
+                    elif event.key == pygame.K_KP1:  # 绕x轴+30度
+                        delta_quat = t3d.euler.euler2quat(np.deg2rad(30), 0, 0, axes="syxz")
+                        target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                    elif event.key == pygame.K_KP4:  # 绕x轴-30度
+                        delta_quat = t3d.euler.euler2quat(np.deg2rad(-30), 0, 0, axes="syxz")
+                        target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                    elif event.key == pygame.K_KP2:  # 绕y轴+30度
+                        delta_quat = t3d.euler.euler2quat(0, np.deg2rad(30), 0, axes="syxz")
+                        target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                    elif event.key == pygame.K_KP5:  # 绕y轴-30度
+                        delta_quat = t3d.euler.euler2quat(0, np.deg2rad(-30), 0, axes="syxz")
+                        target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                    elif event.key == pygame.K_KP3:  # 绕z轴+30度
+                        delta_quat = t3d.euler.euler2quat(0, 0, np.deg2rad(30), axes="syxz")
+                        target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                    elif event.key == pygame.K_KP6:  # 绕z轴-30度
+                        delta_quat = t3d.euler.euler2quat(0, 0, np.deg2rad(-30), axes="syxz")
+                        target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                    elif event.key == pygame.K_r:  # "r"键归位
+                        target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
+                        target_pose = mplib.Pose(p=target_pos, q=target_quat)
+                        self.move_to_pose(target_pose, wrt_world=True)
+                        
+                    # 夹爪控制部分
+                    elif event.key == pygame.K_c: 
                         self.close_gripper()
-                    elif event.key == pygame.K_KP1:  
+                    elif event.key == pygame.K_o:  
                         self.open_gripper()
+                        
+                    # 数据保存部分
                     elif event.key == pygame.K_KP_ENTER:  
                         self.save_recoreded_data()
+                        
                     continue
             
             self.step()
     
 if __name__ == '__main__':
     demo = RecordEnv()
+    # demo.load_articulated_object(index=44962, scale=0.4, pose=[0.8, 0.2, 0.4])
+    demo.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
     demo.manipulate_and_record()

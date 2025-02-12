@@ -1,5 +1,6 @@
 import numpy as np
-from embodied_analogy.utility.utils import *
+from embodied_analogy.utility import *
+from embodied_analogy.visualization import *
 from PIL import Image
 
 class RecordDataReader():
@@ -51,7 +52,7 @@ class RecordDataReader():
             
         self.rgb = np.stack(rgb) # numpy array in shape [T, H, W, 3], in uint8
         self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
-        self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
+        # self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
         
         self.intrinsic = self.data["intrinsic"]
         
@@ -120,7 +121,8 @@ class RecordDataReader():
 if __name__ == "__main__":
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
     # file_name = "/2025-01-07_18-06-10.npz"
-    file_name = "/2025-02-08_14-57-26.npz"
+    # file_name = "/2025-02-08_14-57-26.npz"
+    file_name = "/2025-02-11_17-58-37.npz"
     dr = RecordDataReader(record_path_prefix, file_name)
     dr.process_data()
     dr.visualize()

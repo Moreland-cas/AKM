@@ -249,9 +249,9 @@ def fine_joint_estimation_seq(
     joint_type, 
     joint_axis_unit, # unit vector here
     joint_states,
-    max_icp_iters=100, # ICP 最多迭代多少轮
-    lr=1e-4,
-    tol=1e-6,
+    max_icp_iters=200, # ICP 最多迭代多少轮
+    lr=3e-4,
+    tol=1e-8,
     visualize=False
 ):
     """
