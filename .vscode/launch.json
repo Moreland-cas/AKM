@@ -6,7 +6,7 @@
         "type": "python",
         "request": "launch",
         "program": "${file}",
-        "console": "integratedTerminal",
+        "console":"integratedTerminal",
         "justMyCode": false  // 如果为 true，调试器将仅调试当前文件中的代码
       }
     ]

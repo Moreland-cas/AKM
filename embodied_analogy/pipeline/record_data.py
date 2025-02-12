@@ -126,7 +126,7 @@ class RecordEnv(BaseEnv):
             self.recorded_data["object_image"] = None # TODO: add object image (without franka arm)
 
     def manipulate_and_record(self):
-        pos_scale_factor = 0.1
+        pos_scale_factor = 0.05
         
         while not self.viewer.closed:
             target_pos, target_quat = self.get_ee_pose()
@@ -199,7 +199,7 @@ class RecordEnv(BaseEnv):
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
                     elif event.key == pygame.K_r:  # "r"键归位
-                        target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
+                        target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(90), np.deg2rad(90), axes="syxz")
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
                         
@@ -219,6 +219,6 @@ class RecordEnv(BaseEnv):
     
 if __name__ == '__main__':
     demo = RecordEnv()
-    # demo.load_articulated_object(index=44962, scale=0.4, pose=[0.8, 0.2, 0.4])
-    demo.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
+    demo.load_articulated_object(index=44962, scale=0.7, pose=[1.0, 0., 0.5])
+    # demo.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
     demo.manipulate_and_record()
