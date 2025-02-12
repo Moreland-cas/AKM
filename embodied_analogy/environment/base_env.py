@@ -61,6 +61,8 @@ class BaseEnv():
         # 让机械手臂复原
         for i in range(100):
             self.step()
+            
+        self.setup_planner()
         
     def setup_camera(self):
         # camera config
@@ -112,6 +114,10 @@ class BaseEnv():
         self.camera_intrinsic = self.camera.get_intrinsic_matrix() # [3, 3], K
         Tw2c = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
         self.camera_extrinsic = np.vstack([Tw2c, np.array([0, 0, 0, 1])]) # 4, 4
+        
+        # 将相机的内参和外参保存到 self.recorded_data 中
+        self.recorded_data["intrinsic"] = self.camera_intrinsic # [3, 3]
+        self.recorded_data["extrinsic"] =  self.camera_extrinsic # [4, 4]
     
     def capture_rgb(self):
         camera = self.camera
@@ -124,7 +130,7 @@ class BaseEnv():
         # rgb_pil = Image.fromarray(rgb_numpy)
         return rgb_numpy
     
-    def capture_rgbd(self, return_point_cloud=False, visualize=False):
+    def capture_rgbd(self, return_pc=False, visualize=False):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
@@ -156,7 +162,7 @@ class BaseEnv():
         depth_valid_mask = position[..., 3] < 1 # H, W
         depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
         
-        if return_point_cloud:
+        if return_pc:
             return rgb_numpy, depth_numpy, points_world, points_color
         else:    
             return rgb_numpy, depth_numpy, None, None
@@ -182,6 +188,7 @@ class BaseEnv():
         return actor_np # [H, W]
         
     def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
+        # 返回一张拍摄的照片
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale
         loader.fix_root_link = True
@@ -190,6 +197,18 @@ class BaseEnv():
         
         lift_joint = self.asset.get_joints()[-1]
         lift_joint.set_limit(np.array([0, 0.3]))
+        
+        self.scene.step()
+        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        self.viewer.render()
+        
+        initial_rgb, initial_depth, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
+        
+        if not hasattr(self, 'recorded_data'):
+            self.recorded_data = {}
+            
+        self.recorded_data["initial_rgb"] = initial_rgb
+        self.recorded_data["initial_depth"] = initial_depth
         
         
     def load_panda_hand(self, scale=1., pos=[0, 0, 0], quat=[1, 0, 0, 0]):
@@ -270,7 +289,7 @@ class BaseEnv():
                 coriolis_and_centrifugal=True)
             self.robot.set_qf(qf)
             self.step()
-        self.after_try_to_close = 1
+        # self.after_try_to_close = 1
 
     def reset_franka_arm(self):
         # reset实现为让 panda hand移动到最开始的位置，并关闭夹爪

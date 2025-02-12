@@ -1,6 +1,9 @@
 import os
+import cv2
+import torch
 import numpy as np
 from PIL import Image
+from torchvision.ops import box_convert
 import groundingdino.datasets.transforms as T
 from groundingdino.util.inference import load_model, predict, annotate, load_image
 
@@ -22,7 +25,8 @@ def run_groundingDINO(
     elif isinstance(image, Image.Image):
         image_pil = image.convert("RGB")
         image_np = np.asarray(image)
-    
+        
+    h, w, _ = image_np.shape
     # 处理 image
     transform = T.Compose(
         [
@@ -43,14 +47,27 @@ def run_groundingDINO(
         text_threshold=0.25
     )
     if visualize:
-        annotated_frame = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
-        Image.fromarray(annotated_frame).show()
+        annotated_frame_BGR = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
+        annotated_frame_RGB = cv2.cvtColor(annotated_frame_BGR, cv2.COLOR_BGR2RGB)
+        Image.fromarray(annotated_frame_RGB).show()
+        
+    boxes = boxes * torch.Tensor([w, h, w, h])
+    bbox_scaled = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy() # N, 4
+    
+    bbox_score = logits.numpy()
+    return bbox_scaled, bbox_score
+
+
+def get_cur_frame_obj_mask(image):
+    pass
+
 
 
 if __name__ == "__main__":
     # load_image("/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png")
-    run_groundingDINO(
+    bbox_scaled, bbox_score = run_groundingDINO(
         image="/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png",
-        text_prompt="drawer",
+        text_prompt="object",
         visualize=True
     )
+    pass

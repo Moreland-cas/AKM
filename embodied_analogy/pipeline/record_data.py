@@ -19,18 +19,20 @@ class RecordEnv(BaseEnv):
         self.phy_timestep = phy_timestep
         self.record_fps = record_fps
         
+        # 根据record_fps计算record_interval
+        self.record_interval = max(int(1. / self.phy_timestep / self.record_fps), 1)
+        self.recorded_data = {}
+        self.start_recording = False
+        
         # setup camera before franka arm
         self.setup_camera()
         
         # setup pygame after camera
         self.setup_pygame() 
         
-        # setup record after object spawned, cause need segmentation image
-        self.setup_record()
-        
-        self.load_franka_arm()
-        self.after_try_to_close = 0
-        self.setup_planner()
+        # setup articulated object and franka arm
+        # self.load_articulated_object()                
+        # self.load_franka_arm()
         
     def setup_pygame(self):
         # initialize pygame for keyboard control
@@ -38,23 +40,6 @@ class RecordEnv(BaseEnv):
         resolution = (self.camera.get_width(), self.camera.get_height())
         self.pygame_screen = pygame.display.set_mode(resolution)
         pygame.display.set_caption("Keyboard Control")
-    
-    def setup_record(self):
-        # 根据record_fps计算record_interval
-        self.record_interval = max(int(1. / self.phy_timestep / self.record_fps), 1)
-        self.after_try_to_close = 0
-        self.recorded_data = {}
-        
-        # 将相机的内参和外参保存到 self.recorded_data 中
-        self.recorded_data["intrinsic"] = self.camera_intrinsic # [3, 3]
-        self.recorded_data["extrinsic"] =  self.camera_extrinsic # [4, 4]
-        
-        # 在这里保存 object 的 seg_mask
-        self.scene.step()
-        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        self.viewer.render()
-        # seg_np = self.capture_segmentation()
-        # self.recorded_data['object_seg'] = seg_np # H, W
     
     def save_recoreded_data(self):
         assert isinstance(self.recorded_data, dict)
@@ -73,7 +58,7 @@ class RecordEnv(BaseEnv):
         
         # 如果机械手臂没有尝试关闭，则不录制
         # 关闭后按照 fps 的帧率录制
-        if self.cur_steps == 0 and self.after_try_to_close:
+        if self.cur_steps == 0 and self.start_recording:
             # pose of panda_hand link
             ee_pos, ee_quat = self.get_ee_pose() # np array of size 3 and 4
             
@@ -100,7 +85,7 @@ class RecordEnv(BaseEnv):
                 cp_2d.append(np.array([u, v]))
                 
             # record rgb image and display to pygame screen
-            rgb_np, depth_np, _, _ = self.capture_rgbd(return_point_cloud=False, visualize=False)
+            rgb_np, depth_np, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
             rgb_np = self.capture_rgb()
             rgb_pil = Image.fromarray(rgb_np)
             update_image(self.pygame_screen, rgb_pil)
@@ -110,7 +95,6 @@ class RecordEnv(BaseEnv):
             
             cur_dict = {
                 "fps": self.record_fps,
-                "after_close": self.after_try_to_close,
                 "panda_hand_pos": ee_pos,
                 "panda_hand_quat": ee_quat,
                 "rgb_np": rgb_np, 
@@ -123,7 +107,6 @@ class RecordEnv(BaseEnv):
             if "traj" not in self.recorded_data.keys():
                 self.recorded_data["traj"] = []
             self.recorded_data["traj"].append(cur_dict)
-            self.recorded_data["object_image"] = None # TODO: add object image (without franka arm)
 
     def manipulate_and_record(self):
         pos_scale_factor = 0.05
@@ -210,15 +193,19 @@ class RecordEnv(BaseEnv):
                         self.open_gripper()
                         
                     # 数据保存部分
-                    elif event.key == pygame.K_KP_ENTER:  
+                    elif event.key == pygame.K_e:  
                         self.save_recoreded_data()
+                        
+                    elif event.key == pygame.K_s:  
+                        self.start_recording = True
                         
                     continue
             
             self.step()
     
 if __name__ == '__main__':
-    demo = RecordEnv()
-    demo.load_articulated_object(index=44962, scale=0.7, pose=[1.0, 0., 0.5])
-    # demo.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
-    demo.manipulate_and_record()
+    record_env = RecordEnv()
+    record_env.load_articulated_object(index=44962, scale=0.7, pose=[1.0, 0., 0.5])
+    # record_env.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
+    record_env.load_franka_arm()
+    record_env.manipulate_and_record()
