@@ -14,8 +14,12 @@ class RecordEnv(BaseEnv):
             self,
             phy_timestep=1/250.,
             record_fps=30,
+            use_sapien2=True
         ):
-        super().__init__(phy_timestep)
+        super().__init__(
+            phy_timestep,
+            use_sapien2
+        )
         self.phy_timestep = phy_timestep
         self.record_fps = record_fps
         
@@ -37,7 +41,11 @@ class RecordEnv(BaseEnv):
     def setup_pygame(self):
         # initialize pygame for keyboard control
         pygame.init()
-        resolution = (self.camera.get_width(), self.camera.get_height())
+        # for sapien 3
+        # resolution = (self.camera.get_width(), self.camera.get_height())
+        
+        # for sapien 2
+        resolution = (self.camera.width, self.camera.height)
         self.pygame_screen = pygame.display.set_mode(resolution)
         pygame.display.set_caption("Keyboard Control")
     

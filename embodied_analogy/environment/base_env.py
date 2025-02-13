@@ -12,32 +12,52 @@ class BaseEnv():
     def __init__(
             self,
             phy_timestep=1/250.,
-        ):
-        self.engine = sapien.Engine()
-        self.renderer = sapien.SapienRenderer()
-        self.engine.set_renderer(self.renderer)
+            use_sapien2=True # otherwise use sapien3
+        ):        
+        self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
+        self.cur_steps = 0
+        
+        self.engine = sapien.Engine()  # Create a physical simulation engine
+        self.renderer = sapien.SapienRenderer()  # Create a Vulkan renderer
+        self.engine.set_renderer(self.renderer)  # Bind the renderer and the engine
+        if False:
+            from sapien.core import renderer as R
+            self.renderer_context: R.Context = self.renderer._internal_context
         
         scene_config = sapien.SceneConfig()
+        # follow video axis aligned (or RGBManip?)
+        scene_config.default_dynamic_friction = 1.0
+        scene_config.default_static_friction = 1.0
+        scene_config.default_restitution = 0.0
+        scene_config.contact_offset = 0.02
+        scene_config.enable_pcm = False
+        scene_config.solver_iterations = 25
+        scene_config.solver_velocity_iterations = 1
+        
         self.scene = self.engine.create_scene(scene_config)
-
         self.scene.set_timestep(phy_timestep)
         self.scene.add_ground(0)
-        # physical_material = self.scene.create_physical_material(1, 1, 0.0)
-        # self.scene.default_physical_material = physical_material
-
+        
+        # add some lights
         self.scene.set_ambient_light([0.5, 0.5, 0.5])
         self.scene.add_directional_light([0, 1, -1], [0.5, 0.5, 0.5], shadow=True)
         self.scene.add_point_light([1, 2, 2], [1, 1, 1], shadow=True)
         self.scene.add_point_light([1, -2, 2], [1, 1, 1], shadow=True)
         self.scene.add_point_light([-1, 0, 1], [1, 1, 1], shadow=True)
-
-        self.viewer = Viewer(self.renderer)
-        self.viewer.set_scene(self.scene)
-        self.viewer.set_camera_xyz(x=1.2, y=0.25, z=0.4)
-        self.viewer.set_camera_rpy(r=0, p=-0.4, y=2.7)
         
-        self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
-        self.cur_steps = 0
+        self.viewer = Viewer(self.renderer)  # Create a viewer (window)
+        self.viewer.set_scene(self.scene)  # Bind the viewer and the scene
+        self.viewer.set_camera_xyz(x=-1, y=1, z=2)
+        self.viewer.set_camera_rpy(r=0, p=-np.arctan2(1, 1), y=np.arctan2(1, 1))
+        self.viewer.window.set_camera_parameters(near=0.05, far=100, fovy=1)
+            
+        if use_sapien2:
+            self.viewer.toggle_axes(False)
+            self.capture_rgb = self.capture_rgb_sapien2
+            self.capture_rgbd = self.capture_rgbd_sapien2
+        else:
+            self.capture_rgb = self.capture_rgb_sapien3
+            self.capture_rgbd = self.capture_rgbd_sapien3
     
     def load_franka_arm(self):
         # Robot
@@ -116,10 +136,26 @@ class BaseEnv():
         self.camera_extrinsic = np.vstack([Tw2c, np.array([0, 0, 0, 1])]) # 4, 4
         
         # 将相机的内参和外参保存到 self.recorded_data 中
+        if not hasattr(self, 'recorded_data'):
+            self.recorded_data = {}
+            
         self.recorded_data["intrinsic"] = self.camera_intrinsic # [3, 3]
         self.recorded_data["extrinsic"] =  self.camera_extrinsic # [4, 4]
     
-    def capture_rgb(self):
+    def capture_rgb_sapien2(self):
+        camera = self.camera
+        camera.take_picture()  # submit rendering jobs to the GPU
+        
+        # 渲染rgb图像
+        rgba = camera.get_float_texture('Color')  # [H, W, 4]
+        # An alias
+        # rgba = camera.get_color_rgba()  
+        rgb = rgba[..., :3]
+        rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
+        # rgb_pil = Image.fromarray(rgb_numpy)
+        return rgb_numpy
+    
+    def capture_rgb_sapien3(self):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
@@ -130,7 +166,44 @@ class BaseEnv():
         # rgb_pil = Image.fromarray(rgb_numpy)
         return rgb_numpy
     
-    def capture_rgbd(self, return_pc=False, visualize=False):
+    def capture_rgbd_sapien2(self, return_pc=False, visualize=False):
+        camera = self.camera
+        camera.take_picture()  # submit rendering jobs to the GPU
+        
+        # 渲染过程
+        # get rgb image
+        rgba = camera.get_float_texture("Color")  # 获取RGBA图像，格式为[H, W, 4]
+        rgb = rgba[..., :3]
+        rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
+        # rgb_pil = Image.fromarray(rgb_numpy)
+    
+        # get pointcloud
+        position = camera.get_float_texture("Position")  # [H, W, 4], 格式为(x, y, z, render_depth), 其中 render_depth < 1 的点是有效的
+        points_opengl = position[..., :3][position[..., 3] < 1] # num_valid_points, 3
+        points_color = rgba[position[..., 3] < 1] # num_valid_points, 4
+        model_matrix = camera.get_model_matrix() # opengl camera to world, must be called after scene.update_render()
+        points_world = points_opengl @ model_matrix[:3, :3].T + model_matrix[:3, 3] # N. 3
+        points_world = points_world.astype(np.float64)
+        points_color = (np.clip(points_color, 0, 1)).astype(np.float64)
+        points_color = points_color[..., :3]
+        
+        if visualize:
+            visualize_pc(points_world, points_color, None)
+            
+        # get depth image
+        depth = -position[..., 2] # H, W, in meters
+        depth_numpy = np.array(depth)
+        # depth_numpy = (depth * 1000.0).astype(np.uint16)
+        # depth_pil = Image.fromarray(depth_numpy)
+        depth_valid_mask = position[..., 3] < 1 # H, W
+        depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
+        
+        if return_pc:
+            return rgb_numpy, depth_numpy, points_world, points_color
+        else:    
+            return rgb_numpy, depth_numpy, None, None
+        
+    def capture_rgbd_sapien3(self, return_pc=False, visualize=False):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
@@ -188,15 +261,16 @@ class BaseEnv():
         return actor_np # [H, W]
         
     def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
-        # 返回一张拍摄的照片
+        # TODO: 改变 load_articulated_object 的参数, 使得摩擦力密度等发生变换
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale
         loader.fix_root_link = True
         self.asset = loader.load(self.asset_prefix + f"/{index}/mobility.urdf")
         self.asset.set_root_pose(sapien.Pose(pose, [1, 0, 0, 0]))
         
-        lift_joint = self.asset.get_joints()[-1]
-        lift_joint.set_limit(np.array([0, 0.3]))
+        # only for pot
+        # lift_joint = self.asset.get_joints()[-1]
+        # lift_joint.set_limit(np.array([0, 0.3]))
         
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
@@ -223,7 +297,7 @@ class BaseEnv():
         # 获取 franka arm 上的一些点的 2d 和 3d 的坐标（目前是 link_pose）
         link_poses_3d = []
         for link in self.robot.get_links():
-            link_pos = link.get_entity_pose().p # np.array(3)
+            link_pos = link.get_pose().p # np.array(3)
             link_poses_3d.append(link_pos)
         link_poses_3d = np.array(link_poses_3d) # N, 3
         
@@ -322,8 +396,8 @@ class BaseEnv():
         # 获取ee_pos和ee_quat
         ee_link = self.robot.get_links()[9] # panda_hand
         # print(ee_link.name)
-        ee_pos = ee_link.get_entity_pose().p
-        ee_quat = ee_link.get_entity_pose().q
+        ee_pos = ee_link.get_pose().p
+        ee_quat = ee_link.get_pose().q
         return ee_pos, ee_quat # numpy array
     
     def detect_grasp_anygrasp(self, points, colors, visualize=True):
@@ -384,11 +458,13 @@ class BaseEnv():
 if __name__ == "__main__":
     env = BaseEnv()
     env.load_franka_arm()
-    env.load_articulated_object()
     env.setup_camera()
+    # env.load_articulated_object()
     
-    for i in range(100):
+    # for i in range(100):
+    while True:
         env.step()
+        env.capture_rgbd_sapien2(visualize=True)
         
     pts_on_arm_2d, pts_on_arm_3d = env.get_points_on_arm() # N, 3
     from embodied_analogy.utility.utils import world_to_image
