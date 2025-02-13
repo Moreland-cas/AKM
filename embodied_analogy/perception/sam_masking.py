@@ -219,6 +219,8 @@ def run_sam_whole(
                 [u_rightdown, v_rightdown],
                 [u_leftup, v_rightdown],
             ])
+            # 在这里 transpose一下, 因为 napari 的坐标是 (v, u)
+            bbox_rect = bbox_rect[:, [1, 0]]
             viewer.add_shapes(
                 bbox_rect[None], # should be of shape 1, 4, 2
                 face_color="transparent",
@@ -235,7 +237,7 @@ if __name__ == "__main__":
     image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/assets/cat.png")
     # image_pil.show() # 1100 x 1100
     image_np = np.array(image_pil.convert("RGB"))
-    input_bbox = np.array([1100/4, 1100/4, 3300/4, 3300/4])
+    input_bbox = np.array([0, 0, 1000, 400])
     
     # positive_points = np.array([[550, 550], [551, 554]])
     positive_points = None

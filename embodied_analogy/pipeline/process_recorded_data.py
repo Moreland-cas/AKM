@@ -120,6 +120,10 @@ class RecordDataReader():
         franka_tracks_2d = np.stack(franka_tracks_2d) # T, N, 2
         self.franka_tracks_2d = np.delete(franka_tracks_2d, 10, axis=1)
         
+        # 读取初始帧的物体图像数据
+        self.initial_rgb = self.data["initial_rgb"]
+        self.initial_depth = self.data["initial_depth"]
+        
     def get_img(self, idx=0):
         # return pil image of the first view
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])

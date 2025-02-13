@@ -31,9 +31,11 @@ depth_seq = np.squeeze(dr.depth) # T H W
 franka_tracks_seq = dr.franka_tracks_2d # T, M, 2, 把 gripper 刚体对应的点去掉
 K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
-object_mask_0 = dr.seg
+# object_mask_0 = dr.seg
+# TODO: initial rgb 里还可以看到 camera 的可视化框??
+initial_rgb = dr.initial_rgb
+initial_depth = dr.initial_depth
 
-# process depth
 # 对于 depth_seq 进行处理, 得到 depth_seq_mask, 用于标记其中depth为 0, 或者重投影在地面上的位置
 depth_seq_mask = np.ones_like(depth_seq, dtype=np.bool_) # T, H, W
 depth_seq_mask = depth_seq_mask & (depth_seq > 0)
@@ -80,9 +82,29 @@ for i, depth_mask in enumerate(depth_seq_mask):
 
 
 """
-    根据物体初始状态的图像, 得到一些初始跟踪点
-    TODO: 修改这个, 使得初始点是用 sam 区域内采样得到的
+    根据物体初始状态的图像, 得到一些初始跟踪点, initial_uvs
 """
+# 根据 initial rgb, 先得到 initial_bbox
+from embodied_analogy.perception.grounding_dino import run_groundingDINO
+initial_bboxs, initial_bbox_scores = run_groundingDINO(
+    image=initial_rgb,
+    text_prompt="articulated object",
+    visualize=visualize
+)
+initial_bbox = initial_bboxs[0]
+
+# 然后根据 initial_bbox 得到 initial_mask
+from embodied_analogy.perception.sam_masking import run_sam_whole
+initial_mask = run_sam_whole(
+    rgb_img=initial_rgb, # numpy
+    positive_points=None,  # np.array([N, 2])
+    positive_bbox=initial_bbox, # np.array([4]), [u_left, v_left, u_right, v_right]
+    negative_points=None,
+    visualize=visualize
+)
+# 在 initial_bbox 内均匀采样
+# 然后把在 initial_mask 内的采样点进行保留
+
 pc_0 = depth_image_to_pointcloud(depth_seq[0].squeeze(), object_mask_0, K) # N, 3
 rgb_0 = rgb_seq[0][object_mask_0] / 255. # N,3   
 
@@ -90,6 +112,7 @@ rgb_0 = rgb_seq[0][object_mask_0] / 255. # N,3
 num_clusters = 600
 feat_for_kmeans = np.concatenate([pc_0, rgb_0], axis=-1)
 centroids, labels, _ = cluster.k_means(feat_for_kmeans, init="k-means++", n_clusters=num_clusters)
+initial_uvs = None
 
 # if visualize:
 #     # 可视化初始点云
@@ -101,11 +124,10 @@ centroids, labels, _ = cluster.k_means(feat_for_kmeans, init="k-means++", n_clus
 
 
 """
-    对于 rgb_seq 操作得到 tracks_2d 和 tracks2d_filtered
+    对于 initial_uvs 进行追踪得到 tracks_2d 
+    根据 depth filter 得到 tracks2d_filtered
 """
-centroids_camera = centroids[:, :3] # num_clusters, 3
-centroids_image, _ = camera_to_image(centroids_camera, K) # num_clusters, 2
-tracks_2d, pred_visibility = track_any_points(rgb_seq, centroids_image, visiualize=visualize) # [T, M, 2], [T, M]
+tracks_2d, pred_visibility = track_any_points(rgb_seq, initial_uvs, visiualize=visualize) # [T, M, 2], [T, M]
 
 # 在这里将 tracks_2d 根据图像坐标的变换聚类为两类
 moving_mask_2d, static_mask_2d = cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=visualize, viewer_title="dynamic clustering tracks2d")

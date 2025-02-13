@@ -53,9 +53,14 @@ def run_groundingDINO(
         
     boxes = boxes * torch.Tensor([w, h, w, h])
     bbox_scaled = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy() # N, 4
-    
     bbox_score = logits.numpy()
-    return bbox_scaled, bbox_score
+    
+    # Sort bounding boxes by score in descending order
+    sorted_indices = np.argsort(bbox_score)[::-1]  # Sort indices by score (descending order)
+    bbox_scaled_sorted = bbox_scaled[sorted_indices]
+    bbox_score_sorted = bbox_score[sorted_indices]
+    
+    return bbox_scaled_sorted, bbox_score_sorted
 
 
 def get_cur_frame_obj_mask(image):
