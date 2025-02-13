@@ -8,8 +8,10 @@ class RecordDataReader():
         self.record_path_prefix = record_path_prefix
         self.filename = file_name
         self.data = np.load(record_path_prefix + file_name, allow_pickle=True)
-        
+    
     def process_data(self):
+        self.process_data_sapien2()
+    def process_data_sapien3(self):
         # 获取 first contact point、panda_hand 的轨迹、rgbd数据
         
         # 读取 after_contact 之后的first contact point
@@ -72,6 +74,52 @@ class RecordDataReader():
         ]
         franka_tracks_2d = np.stack(franka_tracks_2d) # T, N, 2
         self.franka_tracks_2d = np.delete(franka_tracks_2d, 10, axis=1)
+    
+    def process_data_sapien2(self):
+        # 提取 panda_hand 的轨迹
+        panda_hand_pos = []
+        panda_hand_quat = []
+        for data_dict in self.data["traj"]:
+            panda_hand_pos.append(data_dict["panda_hand_pos"])
+            panda_hand_quat.append(data_dict["panda_hand_quat"])
+            
+        self.panda_hand_pos = np.array(panda_hand_pos)
+        # save relative pose
+        self.panda_hand_pos -= panda_hand_pos[0]
+        self.panda_hand_quat = np.array(panda_hand_quat)
+        
+        # 提取 rgbd 数据
+        rgb = []
+        depth = []
+        franka_tracks_2d = []
+        for data_dict in self.data["traj"]:
+            rgb.append(data_dict["rgb_np"])
+            depth.append(data_dict["depth_np"])
+            franka_tracks_2d.append(data_dict["franka_tracks2d"])
+            
+        self.rgb = np.stack(rgb) # numpy array in shape [T, H, W, 3], in uint8
+        self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
+        # self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
+        
+        self.intrinsic = self.data["intrinsic"]
+        
+        # 提取 franka_tracks_2d, 需要把 panda_hand 上的点过滤掉
+        """
+        把第 10 个, 也就是 panda_hand_tcp 的数据去掉
+        ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 
+        'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7', 
+        'panda_link8', 'panda_hand', 'panda_hand_tcp', 
+        'panda_leftfinger', 'panda_rightfinger', 'camera_base_link', 'camera_link']
+        """
+        self.link_name = [
+            'panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 
+            'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7', 
+            'panda_link8', 'panda_hand', 'panda_leftfinger', 'panda_rightfinger', 
+            'camera_base_link', 'camera_link'
+        ]
+        franka_tracks_2d = np.stack(franka_tracks_2d) # T, N, 2
+        self.franka_tracks_2d = np.delete(franka_tracks_2d, 10, axis=1)
+        
     def get_img(self, idx=0):
         # return pil image of the first view
         pil_img =  Image.fromarray(self.data["traj"][idx]["rgb_np"])
@@ -123,7 +171,8 @@ if __name__ == "__main__":
     # file_name = "/2025-01-07_18-06-10.npz"
     # file_name = "/2025-02-08_14-57-26.npz"
     # file_name = "/2025-02-11_17-58-37.npz"
-    file_name = "/2025-02-12_09-20-48.npz"
+    # file_name = "/2025-02-12_09-20-48.npz"
+    file_name = "/2025-02-13_13-43-47.npz"
     dr = RecordDataReader(record_path_prefix, file_name)
     dr.process_data()
     dr.visualize()

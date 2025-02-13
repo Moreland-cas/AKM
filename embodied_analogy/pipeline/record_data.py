@@ -37,6 +37,10 @@ class RecordEnv(BaseEnv):
         # setup articulated object and franka arm
         # self.load_articulated_object()                
         # self.load_franka_arm()
+        if use_sapien2:
+            self.step = self.step_sapien2
+        else:
+            self.step = self.step_sapien3
         
     def setup_pygame(self):
         # initialize pygame for keyboard control
@@ -56,7 +60,7 @@ class RecordEnv(BaseEnv):
         timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
         np.savez(prefix + f'/{timestamp}.npz', **self.recorded_data)
         
-    def step(self):
+    def step_sapien3(self):
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
         self.viewer.render()
@@ -86,8 +90,10 @@ class RecordEnv(BaseEnv):
             for cp in cp_3d:
                 K = self.recorded_data["intrinsic"]
                 Tw2c = self.recorded_data["extrinsic"]
-                w = self.camera.get_width()
-                h = self.camera.get_height()
+                # w = self.camera.get_width()
+                # h = self.camera.get_height()
+                w = self.camera.width
+                h = self.camera.height
                 uv = world_to_image(cp[None], K, Tw2c, w, h, normalized_uv=True) # B, 2
                 u, v = uv[0]
                 cp_2d.append(np.array([u, v]))
@@ -116,6 +122,44 @@ class RecordEnv(BaseEnv):
                 self.recorded_data["traj"] = []
             self.recorded_data["traj"].append(cur_dict)
 
+    def step_sapien2(self):
+        self.scene.step()
+        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        self.viewer.render()
+        
+        self.cur_steps += 1
+        self.cur_steps = self.cur_steps % self.record_interval
+        
+        # 如果机械手臂没有尝试关闭，则不录制
+        # 关闭后按照 fps 的帧率录制
+        if self.cur_steps == 0 and self.start_recording:
+            # pose of panda_hand link
+            ee_pos, ee_quat = self.get_ee_pose() # np array of size 3 and 4
+                
+            # record rgb image and display to pygame screen
+            rgb_np, depth_np, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
+            rgb_np = self.capture_rgb()
+            rgb_pil = Image.fromarray(rgb_np)
+            update_image(self.pygame_screen, rgb_pil)
+            
+            # 在这里添加当前帧的 franka_arm 上的点的 franka_tracks3d 和 franka_tracks2d
+            franka_tracks2d, franka_tracks3d = self.get_points_on_arm()
+            
+            cur_dict = {
+                "fps": self.record_fps,
+                "panda_hand_pos": ee_pos,
+                "panda_hand_quat": ee_quat,
+                "rgb_np": rgb_np, 
+                "depth_np": depth_np,
+                # "contact_points_3d": np.array(cp_3d), # N x 3
+                # "contact_points_2d": np.array(cp_2d), # N x 2
+                "franka_tracks2d": franka_tracks2d, # N x 2
+                "franka_tracks3d": franka_tracks3d
+            }
+            if "traj" not in self.recorded_data.keys():
+                self.recorded_data["traj"] = []
+            self.recorded_data["traj"].append(cur_dict)
+            
     def manipulate_and_record(self):
         pos_scale_factor = 0.05
         
@@ -213,7 +257,13 @@ class RecordEnv(BaseEnv):
     
 if __name__ == '__main__':
     record_env = RecordEnv()
-    record_env.load_articulated_object(index=44962, scale=0.7, pose=[1.0, 0., 0.5])
+    obj_config = {
+        "index": 44962,
+        "scale": 0.8,
+        "pose": [1.0, 0., 0.5],
+        "active_link": "link_1"
+    }
+    record_env.load_articulated_object(obj_config)
     # record_env.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
     record_env.load_franka_arm()
     record_env.manipulate_and_record()

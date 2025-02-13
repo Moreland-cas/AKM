@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
-from embodied_analogy.utility.utils import *
+from embodied_analogy.utility import *
 from PIL import Image, ImageColor
 import open3d as o3d
 import transforms3d as t3d
@@ -260,18 +260,54 @@ class BaseEnv():
         actor_pil = Image.fromarray(color_palette[actor_np])
         return actor_np # [H, W]
         
-    def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
-        # TODO: 改变 load_articulated_object 的参数, 使得摩擦力密度等发生变换
+    # def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
+    def load_articulated_object(self, obj_config):
+        index = obj_config["index"]
+        scale = obj_config["scale"]
+        pose = obj_config["pose"]
+        active_link = obj_config["active_link"]
+        
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale
         loader.fix_root_link = True
-        self.asset = loader.load(self.asset_prefix + f"/{index}/mobility.urdf")
+        
+        # 在这里设置 load 时的 config
+        urdf_config = {
+            "_materials": {
+                "gripper" : {
+                    "static_friction": 2.0,
+                    "dynamic_friction": 2.0,
+                    "restitution": 0.0
+                }
+            },
+            "link": {
+                active_link: {
+                    "material": "gripper",
+                    "density": 1.0,
+                }
+            }
+        }
+        load_config = parse_urdf_config(urdf_config, self.scene)
+        check_urdf_config(load_config)
+        
+        self.asset = loader.load(
+            filename=self.asset_prefix + f"/{index}/mobility.urdf",
+            config=load_config
+        )
+        
+        # 设置物体关节的参数, 把回弹关掉
+        for joint in self.asset.get_active_joints():
+            joint.set_drive_property(stiffness=0, damping=0.01)
+            
         self.asset.set_root_pose(sapien.Pose(pose, [1, 0, 0, 0]))
+        # self.asset.set_qpos(dof_value)
+        # self.asset.set_qvel(np.zeros_like(dof_value))
         
         # only for pot
         # lift_joint = self.asset.get_joints()[-1]
         # lift_joint.set_limit(np.array([0, 0.3]))
         
+        # 在 load asset 之后拍一张物体的照片，作为初始状态
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
         self.viewer.render()
