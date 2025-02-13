@@ -10,7 +10,7 @@ from embodied_analogy.utility import *
 
 
 ################################# PARAMS #################################
-visualize = False
+visualize = True
 whole_obj_masking_with_sam = True
 ##########################################################################
 
@@ -21,7 +21,8 @@ whole_obj_masking_with_sam = True
 # 读取数据
 record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
 # file_name = "/2025-01-07_18-06-10.npz"
-file_name = "/2025-02-08_14-57-26.npz"
+# file_name = "/2025-02-08_14-57-26.npz"
+file_name = "/2025-02-13_13-43-47.npz"
 dr = RecordDataReader(record_path_prefix, file_name)
 dr.process_data()
 
@@ -80,6 +81,7 @@ for i, depth_mask in enumerate(depth_seq_mask):
 
 """
     根据物体初始状态的图像, 得到一些初始跟踪点
+    TODO: 修改这个, 使得初始点是用 sam 区域内采样得到的
 """
 pc_0 = depth_image_to_pointcloud(depth_seq[0].squeeze(), object_mask_0, K) # N, 3
 rgb_0 = rgb_seq[0][object_mask_0] / 255. # N,3   

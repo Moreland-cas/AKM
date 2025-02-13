@@ -58,7 +58,7 @@ def select_dense_point(unsatisfied_points):
 
 def select_cluster_center_point(points, return_k_points=1):
     if len(points) <= return_k_points:
-        return points
+        return np.arange(len(points))
 
     kmeans = KMeans(n_clusters=return_k_points, init='k-means++', random_state=0).fit(points)
     centers = kmeans.cluster_centers_
@@ -72,16 +72,26 @@ def select_cluster_center_point(points, return_k_points=1):
     return np.array(closest_indices)
 
 
-# 函数功能：培训并运行 SAM2 模型，并逐步优化输入点，以提高分割效果
+# 运行 SAM2 模型，并逐步优化输入点，以提高分割效果
 def run_sam_whole(
-    rgb_img,
-    positive_points,  # np.array([N, 2])
-    negative_points,
+    rgb_img, # numpy
+    positive_points=None,  # np.array([N, 2])
+    positive_bbox=None, # np.array([4]), [u_left, v_left, u_right, v_right]
+    negative_points=None,
     num_iterations=5,
     acceptable_thr=0.9,
     visualize=False
 ):
     assert num_iterations >= 1
+    # positive points 或者 positive box 至少有一个不为 None
+    assert (positive_bbox is not None) or (positive_points is not None)
+    
+    # 默认处理 None 的情况
+    if positive_points is None:
+        positive_points = np.empty((0, 2))  # 为空时设置为形状为 (0, 2) 的空数组
+    if negative_points is None:
+        negative_points = np.empty((0, 2))  # 为空时设置为形状为 (0, 2) 的空数组
+        
     if isinstance(positive_points, torch.Tensor):
         positive_points = positive_points.cpu().numpy()
     if isinstance(negative_points, torch.Tensor):
@@ -98,18 +108,27 @@ def run_sam_whole(
     predictor.set_image(rgb_img)
 
     # 选择正样本点的聚类中心和一个随机负样本点作为初始输入
-    initial_pos_idx = select_cluster_center_point(positive_points, return_k_points=2)
-    initial_neg_idx = -5 # panda_hand
+    # initial_neg_idx = -5 # panda_hand
+    if positive_points.shape[0] > 0:
+        initial_pos_idx = select_cluster_center_point(positive_points, return_k_points=1)
+    else:
+        initial_pos_idx = []
+
+    if negative_points.shape[0] > 0:
+        initial_neg_idx = select_cluster_center_point(negative_points, return_k_points=1)
+    else:
+        initial_neg_idx = []
     
     input_point = np.vstack([positive_points[initial_pos_idx], negative_points[initial_neg_idx]])
-    input_label = np.append(np.ones(len(initial_pos_idx)), 0)
+    input_label = np.append(np.ones(len(initial_pos_idx)), np.zeros(len(initial_neg_idx)))
 
     # 记录已使用的点
-    used_positive_points = set(map(tuple, positive_points[initial_pos_idx]))
-    used_negative_points = set([tuple(negative_points[initial_neg_idx])])
+    used_positive_points = set(map(tuple, positive_points[initial_pos_idx])) if len(initial_pos_idx) > 0 else set()
+    used_negative_points = set(map(tuple, negative_points[initial_neg_idx])) if len(initial_neg_idx) > 0 else set()
     
+    acceptable_score = acceptable_thr * len(positive_points) if positive_points is not None else 0
+        
     cur_best_score = -1e6
-    acceptable_score = acceptable_thr * len(positive_points)
     cur_best_mask = None
     tmp_best_mask = None
     last_logits = None
@@ -122,28 +141,25 @@ def run_sam_whole(
         # viewer.add_points(negative_points[:, [1, 0]], face_color="red", name="input negative points")
             
     for i in range(num_iterations):
-        if cur_best_score > acceptable_score:
+        if cur_best_score >= acceptable_score:
             break
         # 进行预测
         masks, scores, logits = predictor.predict(
             point_coords=input_point,
             point_labels=input_label,
-            # mask_input=tmp_best_mask[None, :, :] if tmp_best_mask is not None else None
+            box=positive_bbox,
             mask_input=last_logits[None, :, :] if last_logits is not None else None,
             multimask_output=True,
         )
 
         # 根据分数排序
-        # sorted_ind = np.argsort(scores)[::-1]
-        # masks = masks[sorted_ind]
-        # scores = scores[sorted_ind]
-        # logits = logits[sorted_ind]
-
         tmp_best_mask = masks[np.argmax(scores)]
         last_logits = logits[np.argmax(scores)]
 
         # 分数函数，并返回不满足条件的点
         def score_mask(mask):
+            if positive_points.shape[0] == 0 and negative_points.shape[0] == 0:
+                return 0, [], []
             positive_int = positive_points.astype(np.int32)
             negative_int = negative_points.astype(np.int32)
             pos_score = np.sum(mask[positive_int[:, 1], positive_int[:, 0]])
@@ -161,14 +177,8 @@ def run_sam_whole(
             cur_best_mask = tmp_best_mask
             cur_best_score = current_score
 
-        # 增加点, 筛选点的逻辑到底是什么？？
-        # 增加点：找不满足的点
-        # 应该找不满足的点中密度最高的那个（最处于中心的那个）
-        
         # 优先选择从不满足的点中选择新点进行扩充
         if unsatisfied_negative:
-            # new_negative_point = np.array(select_farthest_point(unsatisfied_negative, used_negative_points, used_positive_points))
-            # new_negative_point = np.array(select_dense_point(unsatisfied_negative))
             new_negative_idx = select_cluster_center_point(unsatisfied_negative, return_k_points=1)[0]
             new_negative_point = unsatisfied_negative[new_negative_idx]
             input_point = np.vstack([input_point, new_negative_point])
@@ -177,8 +187,6 @@ def run_sam_whole(
 
         # 从不满足的正样本点中选择最远的点
         if unsatisfied_positive:
-            # new_positive_point = np.array(select_farthest_point(unsatisfied_positive, used_positive_points, used_negative_points))
-            # new_positive_point = np.array(select_dense_point(unsatisfied_positive))
             new_positive_idx = select_cluster_center_point(unsatisfied_positive, return_k_points=1)[0]
             new_positive_point = unsatisfied_positive[new_positive_idx]
             input_point = np.vstack([input_point, new_positive_point])
@@ -199,14 +207,46 @@ def run_sam_whole(
     used_negative_vis = np.array(list(used_negative_points))
         
     if visualize:
-        viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
-        viewer.add_points(used_negative_vis[:, [1, 0]], face_color="red", name=f"used negative points {i}")
+        if len(used_positive_vis) > 0:
+            viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
+        if len(used_negative_vis) > 0:
+            viewer.add_points(used_negative_vis[:, [1, 0]], face_color="red", name=f"used negative points {i}")
+        if positive_bbox is not None:
+            u_leftup, v_leftup, u_rightdown, v_rightdown = positive_bbox
+            bbox_rect = np.array([
+                [u_leftup, v_leftup],
+                [u_rightdown, v_leftup],
+                [u_rightdown, v_rightdown],
+                [u_leftup, v_rightdown],
+            ])
+            viewer.add_shapes(
+                bbox_rect[None], # should be of shape 1, 4, 2
+                face_color="transparent",
+                edge_color="green",
+                edge_width=5,
+                name="positive bbox prompt"
+            )
         napari.run()
 
     return cur_best_mask, used_positive_vis, used_negative_vis
 
 
-
-
 if __name__ == "__main__":
-    pass
+    image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/assets/cat.png")
+    # image_pil.show() # 1100 x 1100
+    image_np = np.array(image_pil.convert("RGB"))
+    input_bbox = np.array([1100/4, 1100/4, 3300/4, 3300/4])
+    
+    # positive_points = np.array([[550, 550], [551, 554]])
+    positive_points = None
+    negative_points = np.array([[5, 5]])
+    negative_points = None
+    run_sam_whole(
+        rgb_img=image_np, 
+        positive_points=positive_points, 
+        positive_bbox=input_bbox,
+        negative_points=negative_points, 
+        num_iterations=3,
+        acceptable_thr=0.9,
+        visualize=True
+    )
