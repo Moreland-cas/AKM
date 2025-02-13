@@ -278,7 +278,7 @@ def fine_joint_estimation_seq(
         depth_seq,
         dynamic_mask_seq,
         transform_seq,
-        visualize=False
+        visualize=visualize
     ) # T, H, W
     
     # 准备 moving mask 数据, 点云数据 和 normal 数据

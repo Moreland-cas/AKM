@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from PIL import Image
+import random
 from sklearn.cluster import KMeans
 
 from sam2.build_sam import build_sam2
@@ -60,7 +61,12 @@ def select_cluster_center_point(points, return_k_points=1):
     if len(points) <= return_k_points:
         return np.arange(len(points))
 
-    kmeans = KMeans(n_clusters=return_k_points, init='k-means++', random_state=0).fit(points)
+    if return_k_points == 1:
+        k_clusters = 3
+    else:
+        k_clusters = return_k_points
+        
+    kmeans = KMeans(n_clusters=min(k_clusters, len(points)), init='k-means++', random_state=0).fit(points)
     centers = kmeans.cluster_centers_
 
     # 找到最接近每个中心点的样本
@@ -68,8 +74,11 @@ def select_cluster_center_point(points, return_k_points=1):
     for center in centers:
         closest_idx = np.argmin(np.linalg.norm(points - center, axis=1))
         closest_indices.append(closest_idx)
-
-    return np.array(closest_indices)
+    
+    if return_k_points == 1:
+        return np.array([random.choice(closest_indices)])
+    else:
+        return np.array(closest_indices)
 
 
 # 运行 SAM2 模型，并逐步优化输入点，以提高分割效果
@@ -137,8 +146,9 @@ def run_sam_whole(
     if visualize:
         import napari
         viewer = napari.view_image(rgb_img, rgb=True)
-        # viewer.add_points(positive_points[:, [1, 0]], face_color="green", name="input positive points")
-        # viewer.add_points(negative_points[:, [1, 0]], face_color="red", name="input negative points")
+        viewer.title = "sam results"
+        viewer.add_points(positive_points[:, [1, 0]], face_color="green", name="input positive points")
+        viewer.add_points(negative_points[:, [1, 0]], face_color="red", name="input negative points")
             
     for i in range(num_iterations):
         if cur_best_score >= acceptable_score:
@@ -197,12 +207,13 @@ def run_sam_whole(
             viewer.add_labels(cur_best_mask.astype(np.int32), name=f'cur best mask {i}')
             # viewer.add_labels(tmp_best_mask.astype(np.int32), name=f'tmp best mask {i}')
             
-            # used_positive_vis = np.array(list(used_positive_points))
-            # used_negative_vis = np.array(list(used_negative_points))
+            used_positive_vis = np.array(list(used_positive_points))
+            used_negative_vis = np.array(list(used_negative_points))
     
             # viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
             # viewer.add_points(used_negative_vis[:, [1, 0]], face_color="red", name=f"used negative points {i}")
-
+            pass
+        
     used_positive_vis = np.array(list(used_positive_points))
     used_negative_vis = np.array(list(used_negative_points))
         
@@ -230,7 +241,7 @@ def run_sam_whole(
             )
         napari.run()
 
-    return cur_best_mask, used_positive_vis, used_negative_vis
+    return cur_best_mask.astype(np.bool_), used_positive_vis, used_negative_vis
 
 
 if __name__ == "__main__":

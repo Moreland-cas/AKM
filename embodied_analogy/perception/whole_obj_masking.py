@@ -18,9 +18,10 @@ def whole_obj_masking_sam(rgb_seq, positive_tracks2d, negative_tracks2d, visuali
         positive_points = positive_tracks2d[i]
         negative_points = negative_tracks2d[i]
         mask_i, used_pos_i, used_neg_i = run_sam_whole(
-            rgb_img, 
-            positive_points, 
-            negative_points, 
+            rgb_img=rgb_img, 
+            positive_points=positive_points, 
+            positive_bbox=None,
+            negative_points=negative_points,
             num_iterations=3,
             acceptable_thr=0.9,
             visualize=False
@@ -42,7 +43,7 @@ def whole_obj_masking_sam(rgb_seq, positive_tracks2d, negative_tracks2d, visuali
     
     if visualize:
         viewer.add_labels(video_masks.astype(np.int32), name=f'whole obj mask (sam)')
-        
+        napari.run()
     return video_masks.astype(np.bool_)
 
 # 方式2： 通过 sam 对单个帧进行分割

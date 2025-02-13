@@ -629,22 +629,59 @@ def sample_array(arr, k):
     
     return sampled_array
 
+def sample_points_within_bbox_and_mask(bbox, mask, N):
+    """
+    从给定的bbox和mask中采样N个有效的(u, v)点。
+    
+    参数：
+    - bbox: 形状为(4,)的bbox数组，格式为[u_left, v_left, u_right, v_right]。
+    - mask: 大小为(H, W)的布尔数组，表示图像中每个像素是否有效。
+    - N: 需要采样的点数。
+    
+    返回：
+    - 一个形状为(N, 2)的numpy数组，表示采样的(u, v)坐标。
+      其中，N是有效采样点的数量。
+    """
+    # 获取bbox的坐标
+    u_left, v_left, u_right, v_right = bbox
+
+    # bbox的宽高
+    bbox_u_range = u_right - u_left
+    bbox_v_range = v_right - v_left
+
+    # 计算步长，使得采样点的数量接近N
+    step_size_u = np.sqrt(bbox_u_range * bbox_v_range / N)
+    step_size_v = step_size_u * bbox_v_range / bbox_u_range  # 保持长宽比
+
+    # 计算采样点的数量
+    num_u = int(np.floor(bbox_u_range / step_size_u))
+    num_v = int(np.floor(bbox_v_range / step_size_v))
+
+    # 生成均匀采样的点
+    u_coords = np.linspace(u_left, u_right, num_u)
+    v_coords = np.linspace(v_left, v_right, num_v)
+
+    # 使用meshgrid生成(u, v)坐标网格
+    u_grid, v_grid = np.meshgrid(u_coords, v_coords)
+
+    # 将(u_grid, v_grid)展平为一维数组
+    u_flat = u_grid.flatten()
+    v_flat = v_grid.flatten()
+
+    # 转换为 (N, 2) 形状
+    points = np.stack([u_flat, v_flat], axis=1)
+
+    # 在mask中检查这些点是否有效
+    valid_points = points[mask[points[:, 1].astype(int), points[:, 0].astype(int)]]
+
+    return valid_points
 
 
 if __name__ == "__main__":
-    # 示例数据
-    data = np.random.randn(100)  # 生成标准正态分布数据
-    # sampled_points = quantile_sampling(data, 10)
-    sampled_points = farthest_scale_sampling(data, 5)
+    bbox = np.array([50, 50, 150, 150])  # 示例bbox
+    mask = np.random.choice([False, True], size=(200, 200))  # 随机生成一个mask
+    N = 200  # 需要采样的点数
 
-    print("抽取的分位数点：", sampled_points)
-    import matplotlib.pyplot as plt
-
-    # 可视化原始数据和抽取的数据点
-    plt.hist(data, bins=50, alpha=0.5, label='Original Data')
-    plt.scatter(sampled_points, np.zeros_like(sampled_points), color='red', label='Quantile Samples', zorder=5)
-    plt.legend()
-    plt.title('Quantile Sampling Visualization')
-    plt.xlabel('Value')
-    plt.ylabel('Frequency')
-    plt.show()
+    valid_points = sample_points_within_bbox_and_mask(bbox, mask, N)
+    print(f"有效采样点: {valid_points.shape[0]}个")
+    print(valid_points)

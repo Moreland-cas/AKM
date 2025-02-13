@@ -257,12 +257,31 @@ class RecordEnv(BaseEnv):
     
 if __name__ == '__main__':
     record_env = RecordEnv()
+    
+    # drawer
+    # obj_config = {
+    #     "index": 44962,
+    #     "scale": 0.8,
+    #     "pose": [1.0, 0., 0.5],
+    #     "active_link": "link_1"
+    # }
+    
+    # door 
     obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
+        "index": 9280,
+        "scale": 0.7,
+        "pose": [0.6, 0., 0.5],
         "active_link": "link_1"
     }
+    
+    # pot
+    obj_config = {
+        "index": 100015,
+        "scale": 0.3,
+        "pose": [0.5, 0., 0.2],
+        "active_link": "link_1"
+    }
+    
     record_env.load_articulated_object(obj_config)
     # record_env.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
     record_env.load_franka_arm()

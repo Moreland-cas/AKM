@@ -49,7 +49,11 @@ def run_groundingDINO(
     if visualize:
         annotated_frame_BGR = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
         annotated_frame_RGB = cv2.cvtColor(annotated_frame_BGR, cv2.COLOR_BGR2RGB)
-        Image.fromarray(annotated_frame_RGB).show()
+        # Image.fromarray(annotated_frame_RGB).show()
+        import napari
+        viewer = napari.view_image(annotated_frame_RGB, rgb=True)
+        viewer.title = "groundingDINO"
+        napari.run()
         
     boxes = boxes * torch.Tensor([w, h, w, h])
     bbox_scaled = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy() # N, 4

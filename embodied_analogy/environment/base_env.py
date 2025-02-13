@@ -29,7 +29,7 @@ class BaseEnv():
         scene_config.default_dynamic_friction = 1.0
         scene_config.default_static_friction = 1.0
         scene_config.default_restitution = 0.0
-        scene_config.contact_offset = 0.02
+        scene_config.contact_offset = 0.005
         scene_config.enable_pcm = False
         scene_config.solver_iterations = 25
         scene_config.solver_velocity_iterations = 1

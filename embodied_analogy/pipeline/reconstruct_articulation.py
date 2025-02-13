@@ -10,7 +10,10 @@ from embodied_analogy.utility import *
 
 
 ################################# PARAMS #################################
-visualize = True
+visualize = False
+num_initial_uvs = 1000
+num_informative_frame_idx = 5
+text_prompt = "object (not robot)"
 whole_obj_masking_with_sam = True
 ##########################################################################
 
@@ -20,8 +23,6 @@ whole_obj_masking_with_sam = True
 """
 # 读取数据
 record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-# file_name = "/2025-01-07_18-06-10.npz"
-# file_name = "/2025-02-08_14-57-26.npz"
 file_name = "/2025-02-13_13-43-47.npz"
 dr = RecordDataReader(record_path_prefix, file_name)
 dr.process_data()
@@ -80,47 +81,39 @@ for i, depth_mask in enumerate(depth_seq_mask):
 #     # raw_pc_list = np.stack(raw_pc_list)
 #     vis_pointcloud_series_napari(raw_pc_list)
 
-
+import time
+algo_start = time.time()
 """
     根据物体初始状态的图像, 得到一些初始跟踪点, initial_uvs
 """
-# 根据 initial rgb, 先得到 initial_bbox
+# 根据 rgb_seq[0], 先得到 initial_bbox
 from embodied_analogy.perception.grounding_dino import run_groundingDINO
 initial_bboxs, initial_bbox_scores = run_groundingDINO(
-    image=initial_rgb,
-    text_prompt="articulated object",
+    image=rgb_seq[0],
+    text_prompt=text_prompt,
     visualize=visualize
 )
 initial_bbox = initial_bboxs[0]
 
 # 然后根据 initial_bbox 得到 initial_mask
 from embodied_analogy.perception.sam_masking import run_sam_whole
-initial_mask = run_sam_whole(
-    rgb_img=initial_rgb, # numpy
+initial_mask, _, _ = run_sam_whole(
+    rgb_img=rgb_seq[0], # numpy
     positive_points=None,  # np.array([N, 2])
     positive_bbox=initial_bbox, # np.array([4]), [u_left, v_left, u_right, v_right]
-    negative_points=None,
+    negative_points=franka_tracks_seq[0],
     visualize=visualize
 )
 # 在 initial_bbox 内均匀采样
-# 然后把在 initial_mask 内的采样点进行保留
+initial_uvs = sample_points_within_bbox_and_mask(initial_bbox, initial_mask, num_initial_uvs)
 
-pc_0 = depth_image_to_pointcloud(depth_seq[0].squeeze(), object_mask_0, K) # N, 3
-rgb_0 = rgb_seq[0][object_mask_0] / 255. # N,3   
-
-# 对初始帧中的物体点云聚类得到 num_clusters 个点簇, 并计算 num_clusters 个簇中心在图像上的投影
-num_clusters = 600
-feat_for_kmeans = np.concatenate([pc_0, rgb_0], axis=-1)
-centroids, labels, _ = cluster.k_means(feat_for_kmeans, init="k-means++", n_clusters=num_clusters)
-initial_uvs = None
-
-# if visualize:
-#     # 可视化初始点云
-#     visualize_pc(pc_0, rgb_0)
-#     color_map = np.random.rand(num_clusters, 3)
-#     colors = color_map[labels]
-#     # 可视化聚类结果
-#     visualize_pc(pc_0, colors)
+if visualize:
+    import napari
+    viewer = napari.view_image(initial_rgb)
+    viewer.title = "initial uvs on intial rgb"
+    initial_uvs_vis = initial_uvs[:, [1, 0]]
+    viewer.add_points(initial_uvs_vis, size=2, name="initial_uvs", face_color="green")
+    napari.run()
 
 
 """
@@ -130,6 +123,7 @@ initial_uvs = None
 tracks_2d, pred_visibility = track_any_points(rgb_seq, initial_uvs, visiualize=visualize) # [T, M, 2], [T, M]
 
 # 在这里将 tracks_2d 根据图像坐标的变换聚类为两类
+# TODO: 这个要不要转移到 filter 之后
 moving_mask_2d, static_mask_2d = cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=visualize, viewer_title="dynamic clustering tracks2d")
 
 # filter tracks2d by visibility
@@ -137,8 +131,8 @@ tracks2d_filtered = filter_tracks2d_by_visibility(rgb_seq, tracks_2d, pred_visib
 
 # filter tracks2d by depthSeq_mask
 tracks2d_filtered = filter_tracks2d_by_depthSeq_mask(rgb_seq, tracks2d_filtered, depth_seq_mask, visualize)
-    
-        
+   
+           
 """
     dynamic segment tracks3d_filtered
 """  
@@ -162,7 +156,7 @@ joint_axis_world = Rc2w @ joint_axis_camera
     根据 rgb_seq 和 tracks2d 得到 video_masks (可以用 sam 或者 sam2)
 """
 # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
-informative_frame_idx = farthest_scale_sampling(joint_states, M=5)
+informative_frame_idx = farthest_scale_sampling(joint_states, M=num_informative_frame_idx)
 
 if whole_obj_masking_with_sam:
     video_masks = whole_obj_masking_sam(
@@ -208,15 +202,18 @@ joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     joint_axis_unit=joint_axis_camera, 
     joint_states=joint_states[informative_frame_idx],
     max_icp_iters=200, # ICP 最多迭代多少轮
-    lr=3e-4, # 0.1 mm
-    tol=1e-8,
+    lr=1e-4, # 0.1 mm
+    tol=1e-7,
     visualize=visualize
 )
 
+algo_end = time.time()
 
-translation_w_gt = np.array([0, 0, 1])
+translation_w_gt = np.array([-1, 0, 0])
 translation_c_gt = Rc2w.T @ translation_w_gt
 
-print(f"\t before: {np.dot(translation_c_gt, joint_axis_camera)}")
-print(f"\t after : {np.dot(translation_c_gt, joint_axis_updated)}")
-pass
+dot_before = np.dot(translation_c_gt, joint_axis_camera)
+dot_after = np.dot(translation_c_gt, joint_axis_updated)
+print(f"\t before: {np.degrees(np.arccos(dot_before))}")
+print(f"\t after : {np.degrees(np.arccos(dot_after))}")
+print(f"time used: {algo_end - algo_start} s")

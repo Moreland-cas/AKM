@@ -173,10 +173,10 @@ class RecordDataReader():
 if __name__ == "__main__":
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
     # file_name = "/2025-01-07_18-06-10.npz"
-    # file_name = "/2025-02-08_14-57-26.npz"
+    file_name = "/2025-02-08_14-57-26.npz"
     # file_name = "/2025-02-11_17-58-37.npz"
     # file_name = "/2025-02-12_09-20-48.npz"
-    file_name = "/2025-02-13_13-43-47.npz"
+    # file_name = "/2025-02-13_13-43-47.npz"
     dr = RecordDataReader(record_path_prefix, file_name)
     dr.process_data()
     dr.visualize()
