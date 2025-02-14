@@ -8,7 +8,7 @@ def icp_loss_torch(
     target_normals=None, 
     loss_type="point_to_point", 
     joint_type="prismatic",
-    coor_valid_distance=0.03
+    icp_select_range=0.03
 ):
     """
     计算 ICP 损失 (点到点 或 点到平面)，支持平移或旋转。
@@ -68,7 +68,7 @@ def icp_loss_torch(
     transformed_ref_pc = transformed_ref_pc_homogeneous[:, :3]  # 去掉齐次坐标 (N, 3)
 
     # 使用 find_correspondences 进行最近邻搜索
-    indices, valid_mask = find_correspondences(transformed_ref_pc.detach().cpu().numpy(), tgt_pc, max_distance=coor_valid_distance)
+    indices, valid_mask = find_correspondences(transformed_ref_pc.detach().cpu().numpy(), tgt_pc, max_distance=icp_select_range)
     matched_target_pc = target_pc[indices] # N, 3
 
     # 计算损失

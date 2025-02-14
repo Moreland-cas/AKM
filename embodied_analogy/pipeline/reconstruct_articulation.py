@@ -214,8 +214,11 @@ joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     max_icp_iters=200, # ICP 最多迭代多少轮
     optimize_joint_axis=False,
     optimize_state_mask=np.arange(num_informative_frame_idx)!=0,
+    # 这里设置不迭代的优化 dynamic_mask
+    update_dynamic_mask=np.zeros(num_informative_frame_idx).astype(np.bool_),
     lr=3e-4, # 0.1 mm
     tol=1e-7,
+    icp_select_range=0.03,
     visualize=visualize
 )
 
@@ -234,3 +237,33 @@ print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
 print("\tjoint axis: ", joint_axis_updated)
 print("\tjoint states: ", jonit_states_updated)
 print(f"time used: {algo_end - algo_start} s")
+
+reloc_states = []
+for i in range(num_informative_frame_idx):
+    other_mask = np.arange(num_informative_frame_idx)!=i
+    reloc_state = relocalization(
+        K=K, 
+        query_depth=depth_seq[informative_frame_idx][i], 
+        ref_depths=depth_seq[informative_frame_idx][other_mask], 
+        joint_type=joint_type, 
+        joint_axis_unit=joint_axis_updated, 
+        ref_joint_states=joint_states[informative_frame_idx][other_mask], 
+        ref_dynamics=dynamic_mask_seq_updated[other_mask], 
+        lr=3e-4,
+        tol=1e-7,
+        icp_select_range=0.1
+    )
+    reloc_states.append(reloc_state)
+    break
+print("reloc states: ", np.array(reloc_states))
+
+
+"""
+before: 2.0469924273118334
+    joint axis:  [ 0.51316935  0.14681542 -0.84563726]
+    joint states:  [-0.00016864  0.04898852  0.09450419  0.12406741  0.14798145]
+    
+after : 2.0468600711478997
+    joint axis:  [ 0.5131694   0.14681543 -0.8456373 ]
+    joint states:  [-0.00016864  0.05272457  0.09785931  0.12221941  0.14439656]
+"""

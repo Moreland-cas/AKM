@@ -159,12 +159,14 @@ def filter_dynamic_mask(
     uv_pred_int = np.floor(uv_pred.reshape(T, len(pc_moving), 2)).astype(int) # T, N, 2
     depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
     
-    # TODO:考虑超出图像边界的情况
-    # valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
-    #             (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H)
+    # 在这里进行一个筛选, 把那些得不到有效 depth_obs 的 moving point 也标记为 Unknown TODO: 这里会不会过于严格
+    valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
+                (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H) # T, N
+    # 且只有一个时间帧观测不到就认为得不到有效观测
+    valid_idx = valid_idx.all(axis=0) # N
+    uv_pred_int = uv_pred_int[:, valid_idx] # T, M, 2
+    depth_pred = depth_pred[:, valid_idx] # T, M
     
-    # valid_uv = uv_pred_int[valid_idx] # M, 2
-    # depth_pred_valid = depth_pred[valid_idx] # M
     # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
     # TODO：获取目标帧的真实深度, 是不是要考虑 depth_ref 等于 0 的情况是否需要拒绝
     
@@ -172,8 +174,8 @@ def filter_dynamic_mask(
     depth_obs = ref_depths[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
     
     # 计算误差并更新 dynamic_mask， M, 只要有一帧拒绝，则置为 UNKNOWN
-    unknown_mask = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  
-    query_dynamic_updated[y[unknown_mask], x[unknown_mask]] = UNKNOWN_LABEL
+    unknown_mask = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  # M
+    query_dynamic_updated[y[valid_idx][unknown_mask], x[valid_idx][unknown_mask]] = UNKNOWN_LABEL
     
     if visualize:
         # TODO: 在这里把 ref_frames 也展示一下
@@ -250,6 +252,7 @@ def moving_ij_intersection(
     """
     给定 moving_mask1 和 moving_mask2, 找到投影的交集, 并返回两个 point-cloud, 用于 point-to-plane-ICP
     """    
+    H, W = moving_mask_ref.shape
     Ttgt2ref = np.linalg.inv(Tref2tgt)
     
     # 首先把 mask_ref 中的点投影到 tgt_frame 中得到一个 projected_mask_ref
@@ -257,12 +260,20 @@ def moving_ij_intersection(
     pc_ref_projected, _ = camera_to_image((pc_ref_aug @ Tref2tgt.T)[:, :3], K) # N, 2
     # 求 pc_ref 变换到 tgt frame 后的投影与 moving_mask_tgt 的交集, 这个交集里的点满足能同时被 ref 和 tgt frame 观测到
     pc_ref_projected_int = np.floor(pc_ref_projected).astype(int) # N, 2
+    ref_valid_idx = (pc_ref_projected_int[..., 0] >= 0) & (pc_ref_projected_int[..., 0] < W) & \
+                    (pc_ref_projected_int[..., 1] >= 0) & (pc_ref_projected_int[..., 1] < H) # H, W
+    pc_ref_projected_int[~ref_valid_idx] = 0
     pc_ref_mask = moving_mask_tgt[pc_ref_projected_int[:, 1], pc_ref_projected_int[:, 0]] # N
+    pc_ref_mask[~ref_valid_idx] = False
     
     pc_tgt_aug = np.concatenate([pc_tgt, np.ones((len(pc_tgt), 1))], axis=1) # N, 4
     pc_tgt_projected, _ = camera_to_image((pc_tgt_aug @ Ttgt2ref.T)[:, :3], K) # N, 2
     pc_tgt_projected_int = np.floor(pc_tgt_projected).astype(int) # N, 2
+    tgt_valid_idx = (pc_tgt_projected_int[..., 0] >= 0) & (pc_tgt_projected_int[..., 0] < W) & \
+                    (pc_tgt_projected_int[..., 1] >= 0) & (pc_tgt_projected_int[..., 1] < H) # H, W
+    pc_tgt_projected_int[~tgt_valid_idx] = 0
     pc_tgt_mask = moving_mask_ref[pc_tgt_projected_int[:, 1], pc_tgt_projected_int[:, 0]] # N
+    pc_tgt_mask[~tgt_valid_idx] = False
 
     if visualize:
         import napari
@@ -290,8 +301,10 @@ def fine_joint_estimation_seq(
     max_icp_iters=200, # ICP 最多迭代多少轮
     optimize_joint_axis=True,
     optimize_state_mask=None, # boolean mask to select which states to optimize
+    update_dynamic_mask=None,
     lr=3e-4,
     tol=1e-8,
+    icp_select_range=0.03,
     visualize=False
 ):
     """
@@ -300,12 +313,15 @@ def fine_joint_estimation_seq(
         损失函数为所有 (frame_i, frame_j) 的 point-to-plane ICP loss + point-to-point ICP loss
         frame_i 和 frame_j 间的 pc_i 和 pc_j 需要使用验证对齐
         
+    如果 optimize_state_mask 或者 update_dynamic_mask 为 None, 则视为全部优化
     """
     T = depth_seq.shape[0]
     assert T >= 2
     
     if optimize_state_mask is None:
         optimize_state_mask = np.ones(T, dtype=np.bool_)
+    if update_dynamic_mask is None:
+        update_dynamic_mask = np.ones(T, dtype=np.bool_)
     
     # 准备 moving mask 数据, 点云数据 和 normal 数据
     moving_masks = [dynamic_mask_seq[i] == MOVING_LABEL for i in range(T)]
@@ -347,6 +363,29 @@ def fine_joint_estimation_seq(
             ij_pairs.append((i, j))
                     
     for k in range(max_icp_iters):
+        # 如果要 update dynamic mask, 就在这里进行
+        for l, need_update in enumerate(update_dynamic_mask):
+            if need_update:
+                ref_states = np.array([states_param.detach().cpu().item() for states_param in states_params])
+                ref_states = ref_states[np.arange(T)!=i]
+                dynamic_mask_seq[i] = filter_dynamic_mask(
+                    K=K, 
+                    query_depth=depth_seq[i], 
+                    query_dynamic=dynamic_mask_seq[i], 
+                    ref_depths=depth_seq[np.arange(T)!=i],  
+                    joint_type=joint_type,
+                    joint_axis_unit=axis_params.detach().cpu().numpy(),
+                    query_state=states_params[i].detach().cpu().numpy(),
+                    ref_states=ref_states,
+                    depth_tolerance=0.01, 
+                    visualize=False
+                )
+                
+                # 还需要更新对应 frame 的 moving_masks 等信息
+                moving_masks[l] = dynamic_mask_seq[i] == MOVING_LABEL
+                moving_pcs[l] = depth_image_to_pointcloud(depth_seq[l], moving_masks[l], K)
+                normals[l] = compute_normals(moving_pcs[l])
+        
         # 在这里计算 cur_icp_loss
         cur_icp_loss = 0
         
@@ -380,7 +419,7 @@ def fine_joint_estimation_seq(
                 target_normals[pc_tgt_mask],
                 loss_type="point_to_plane", # point_to_point
                 joint_type=joint_type,
-                coor_valid_distance=0.03
+                icp_select_range=icp_select_range
             )
         
         # 计算损失变化
