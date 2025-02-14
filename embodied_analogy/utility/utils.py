@@ -13,6 +13,8 @@ from scipy.spatial.distance import cdist
 from typing import List, Union
 import torch.nn.functional as F
 import matplotlib.cm as cm
+from scipy.spatial.transform import Rotation as R
+
 
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -675,6 +677,25 @@ def sample_points_within_bbox_and_mask(bbox, mask, N):
     valid_points = points[mask[points[:, 1].astype(int), points[:, 0].astype(int)]]
 
     return valid_points
+
+
+def joint_data_to_transform(
+    joint_type, # "prismatic" or "revolute"
+    joint_axis, # unit vector np.array([3, ])
+    joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
+):
+    # 根据 joint_type 和 joint_axis 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
+    T_ref2tgt = np.eye(4)
+    if joint_type == "prismatic":
+        # coor_tgt = coor_ref + joint_axis * (joint_state_tgt - joint_state_ref)
+        T_ref2tgt[:3, 3] = joint_axis * joint_state_ref2tgt
+    elif joint_type == "revolute":
+        # coor_tgt = coor_ref @ Rref2tgt.T
+        Rref2tgt = R.from_rotvec(joint_axis * joint_state_ref2tgt).as_matrix()
+        T_ref2tgt[:3, :3] = Rref2tgt
+    else:
+        assert False, "joint_type must be either prismatic or revolute"
+    return T_ref2tgt
 
 
 if __name__ == "__main__":

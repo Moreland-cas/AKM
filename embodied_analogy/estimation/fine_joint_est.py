@@ -1,31 +1,11 @@
 import os
 import numpy as np
 from PIL import Image
-from scipy.spatial.transform import Rotation as R
 from embodied_analogy.estimation.icp_loss import icp_loss_torch
 from embodied_analogy.utility import *
 from embodied_analogy.estimation.utils import *
 
-
-def joint_data_to_transform(
-    joint_type, # "prismatic" or "revolute"
-    joint_axis, # unit vector np.array([3, ])
-    joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
-):
-    # 根据 joint_type 和 joint_axis 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
-    T_ref2tgt = np.eye(4)
-    if joint_type == "prismatic":
-        # coor_tgt = coor_ref + joint_axis * (joint_state_tgt - joint_state_ref)
-        T_ref2tgt[:3, 3] = joint_axis * joint_state_ref2tgt
-    elif joint_type == "revolute":
-        # coor_tgt = coor_ref @ Rref2tgt.T
-        Rref2tgt = R.from_rotvec(joint_axis * joint_state_ref2tgt).as_matrix()
-        T_ref2tgt[:3, :3] = Rref2tgt
-    else:
-        assert False, "joint_type must be either prismatic or revolute"
-    return T_ref2tgt
-
-
+###################### deprecated ######################
 def segment_ref_obj_mask(
     K, # 相机内参
     depth_ref, depth_tgt, 
@@ -92,78 +72,6 @@ def segment_ref_obj_mask(
         pass
     return ref_mask_seg # (N, ), composed of 1, 2， 3
 
-
-def classify_unknown():
-    # 如果按照深度验证这个必要条件, Tmoving满足但是Tstatic不满足, 那就可以 classify 到 moving, 反之也是
-    pass
-
-def filter_dynamic_mask_seq(
-    K, # 相机内参
-    depth_seq,  # T, H, W
-    dynamic_mask_seq, # T, H, W
-    transform_seq, # (T, 4, 4) 把 frame_0 作为 world_frame, Tw2i
-    visualize=False
-):
-    """
-        根据当前的 joint state
-        验证所有的 moving points, 把不确定的 points 标记为 unknown
-    """
-    if isinstance(transform_seq, List):
-        transform_seq = np.array(transform_seq)
-        
-    T, H, W = depth_seq.shape
-    dynamic_mask_seq_updated = dynamic_mask_seq.copy()
-    
-    for i in range(T):
-        # 获取当前帧 MOVING_LABEL 的像素坐标
-        moving_mask = dynamic_mask_seq[i] == MOVING_LABEL
-        if not np.any(moving_mask):
-            continue
-        other_frame = np.arange(T) != i
-        
-        y, x = np.where(moving_mask) # N
-        pc_moving = depth_image_to_pointcloud(depth_seq[i], moving_mask, K)  # (N, 3)
-        pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
-        
-        # 批量计算所有其他帧的转换
-        T_i_to_all = transform_seq[other_frame] @ np.linalg.inv(transform_seq[i])  # (T, 4, 4)
-        pc_pred = np.einsum('tij,jk->tik', T_i_to_all, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
-        
-        # 投影到所有帧
-        uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K)  
-        uv_pred = uv_pred.reshape(T - 1, len(pc_moving), 2) # T, N, 2
-        depth_pred = depth_pred.reshape(T - 1, len(pc_moving)) # T, N
-        
-        uv_pred_int = np.floor(uv_pred).astype(int) # T, N, 2
-        # TODO:考虑超出图像边界的情况
-        # valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
-        #             (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H)
-        
-        # valid_uv = uv_pred_int[valid_idx] # M, 2
-        # depth_pred_valid = depth_pred[valid_idx] # M
-        # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
-        
-        # 获取目标帧的真实深度
-        T_idx = np.arange(T - 1)[:, None]
-        depth_obs = depth_seq[other_frame][T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
-        
-        # 计算误差并更新 dynamic_mask
-        depth_tolerance = 0.01
-        update_to_unknown = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  # M, 只要有一帧拒绝，则置为 UNKNOWN
-        dynamic_mask_seq_updated[i, y[update_to_unknown], x[update_to_unknown]] = UNKNOWN_LABEL
-    
-    if visualize:
-        import napari 
-        viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
-        viewer.title = "filter dynamic mask seq (moving part)"
-        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='before filtering')
-        viewer.add_labels(dynamic_mask_seq_updated.astype(np.int32), name='after filtering')
-        napari.run()
-    
-    return dynamic_mask_seq_updated  # (T, H, W), composed of 1, 2, 3
-
-
 def find_moving_part_intersection(
     K, # 相机内参
     depth_ref, depth_tgt, 
@@ -199,7 +107,137 @@ def find_moving_part_intersection(
         Image.fromarray((moving_mask_tgt_filtered.astype(np.int32) * 255).astype(np.uint8)).show()
         
     return pc_ref_filtered, pc_tgt_filtered
+###################### deprecated ######################
 
+
+def classify_unknown():
+    # 如果按照深度验证这个必要条件, Tmoving满足但是Tstatic不满足, 那就可以 classify 到 moving, 反之也是
+    pass
+
+def filter_dynamic_mask(
+    K, # 相机内参
+    query_depth, # H, W
+    query_dynamic, # H, W
+    ref_depths,  # T, H, W
+    # ref_dynamics, # T, H, W
+    joint_type,
+    joint_axis_unit,
+    query_state,
+    ref_states,
+    depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
+    visualize=False
+):
+    """
+        根据当前的 joint state
+        验证所有的 moving points, 把不确定的 points 标记为 unknown
+    """
+    Tquery2refs = [
+        joint_data_to_transform(
+            joint_type,
+            joint_axis_unit,
+            ref_state - query_state,
+    ) for ref_state in ref_states] 
+    Tquery2refs = np.array(Tquery2refs) # T, 4, 4
+        
+    T, H, W = ref_depths.shape
+    query_dynamic_updated = query_dynamic.copy()
+    
+    # 获取当前帧 MOVING_LABEL 的像素坐标
+    moving_mask = query_dynamic == MOVING_LABEL
+    if not np.any(moving_mask):
+        return query_dynamic_updated        
+
+    y, x = np.where(moving_mask) # N
+    pc_moving = depth_image_to_pointcloud(query_depth, moving_mask, K)  # (N, 3)
+    pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
+    
+    # 批量计算 moving_pc 在其他帧的 3d 坐标
+    pc_pred = np.einsum('tij,jk->tik', Tquery2refs, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+    
+    # 投影到所有帧
+    uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K) # T*N, 2
+    uv_pred_int = np.floor(uv_pred.reshape(T, len(pc_moving), 2)).astype(int) # T, N, 2
+    depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
+    
+    # TODO:考虑超出图像边界的情况
+    # valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
+    #             (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H)
+    
+    # valid_uv = uv_pred_int[valid_idx] # M, 2
+    # depth_pred_valid = depth_pred[valid_idx] # M
+    # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
+    # TODO：获取目标帧的真实深度, 是不是要考虑 depth_ref 等于 0 的情况是否需要拒绝
+    
+    T_idx = np.arange(T)[:, None]
+    depth_obs = ref_depths[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
+    
+    # 计算误差并更新 dynamic_mask， M, 只要有一帧拒绝，则置为 UNKNOWN
+    unknown_mask = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  
+    query_dynamic_updated[y[unknown_mask], x[unknown_mask]] = UNKNOWN_LABEL
+    
+    if visualize:
+        # TODO: 在这里把 ref_frames 也展示一下
+        import napari 
+        viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
+        viewer.title = "filter current dynamic mask using other frames"
+        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+        viewer.add_labels(query_dynamic.astype(np.int32), name='before filtering')
+        viewer.add_labels(query_dynamic_updated.astype(np.int32), name='after filtering')
+        napari.run()
+    
+    return query_dynamic_updated  
+
+def filter_dynamic_mask_seq(
+    K, # 相机内参
+    depth_seq,  # T, H, W
+    dynamic_mask_seq, # T, H, W
+    joint_type,
+    joint_axis_unit,
+    joint_states,
+    depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
+    visualize=False
+):
+    """
+        根据当前的 joint state
+        验证所有的 moving points, 把不确定的 points 标记为 unknown
+    """
+    T, H, W = depth_seq.shape
+    dynamic_mask_seq_updated = dynamic_mask_seq.copy()
+    
+    for i in range(T):
+        query_depth = depth_seq[i]
+        query_dynamic = dynamic_mask_seq[i]
+        query_state = joint_states[i]
+        
+        other_mask = np.arange(T) != i
+        ref_depths = depth_seq[other_mask]
+        ref_states = joint_states[other_mask]
+        
+        query_dynamic_updated = filter_dynamic_mask(
+            K, # 相机内参
+            query_depth, # H, W
+            query_dynamic, # H, W
+            ref_depths,  # T, H, W
+            # ref_dynamics, # T, H, W
+            joint_type,
+            joint_axis_unit,
+            query_state,
+            ref_states,
+            depth_tolerance=depth_tolerance, 
+            visualize=False
+        )
+        dynamic_mask_seq_updated[i] = query_dynamic_updated
+    
+    if visualize:
+        import napari 
+        viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+        viewer.title = "filter dynamic mask seq (moving part)"
+        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+        viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='before filtering')
+        viewer.add_labels(dynamic_mask_seq_updated.astype(np.int32), name='after filtering')
+        napari.run()
+    
+    return dynamic_mask_seq_updated  # (T, H, W), composed of 1, 2, 3
 
 def moving_ij_intersection(
     K, # 相机内参
@@ -264,35 +302,18 @@ def fine_joint_estimation_seq(
     T = depth_seq.shape[0]
     assert T >= 2
     
-    # 获取 transform_seq
-    transform_seq = [
-        joint_data_to_transform(
-            joint_type,
-            joint_axis_unit,
-            cur_state - joint_states[0],
-    ) for cur_state in joint_states] # T, 4, 4 (Tfirst2cur)
-    
-    # 首先对于 moving_part 进行 K 帧的验证（利用 joint states）, 去除那些可能有问题的 part, 至此 moving mask 不动了
-    dynamic_mask_seq_updated = filter_dynamic_mask_seq(
-        K,
-        depth_seq,
-        dynamic_mask_seq,
-        transform_seq,
-        visualize=visualize
-    ) # T, H, W
-    
     # 准备 moving mask 数据, 点云数据 和 normal 数据
-    moving_masks = [dynamic_mask_seq_updated[i] == MOVING_LABEL for i in range(T)]
+    moving_masks = [dynamic_mask_seq[i] == MOVING_LABEL for i in range(T)]
     moving_pcs = [depth_image_to_pointcloud(depth_seq[i], moving_masks[i], K) for i in range(T)] #  [(N, 3), ...], len=T
     normals = [compute_normals(moving_pcs[i]) for i in range(T)]
     
     # 进入 ICP 迭代
     prev_icp_loss = float('inf')
+    
     # 设置待优化参数
-    # joint_axis_unit_updated = joint_axis_unit
-    # joint_states_updated = joint_states
     axis_params = torch.from_numpy(joint_axis_unit).float().cuda().requires_grad_()
     states_params = torch.from_numpy(joint_states).float().cuda().requires_grad_()
+    
     for k in range(max_icp_iters):
         optimizer = torch.optim.Adam([
             {'params': axis_params, 'lr': lr}, 
@@ -330,8 +351,7 @@ def fine_joint_estimation_seq(
                     ref_pc[pc_ref_mask],
                     tgt_pc[pc_tgt_mask],
                     target_normals[pc_tgt_mask],
-                    loss_type="point_to_plane",
-                    # loss_type="point_to_point",
+                    loss_type="point_to_plane", # point_to_point
                     joint_type=joint_type,
                     coor_valid_distance=0.03
                 )
@@ -352,12 +372,19 @@ def fine_joint_estimation_seq(
     joint_states_updated = (states_params - states_params[0]).detach().cpu().numpy() 
     
     if visualize:
-        pc_series = moving_pcs
+        # 获取 transform_seq
+        transform_seq = [
+            joint_data_to_transform(
+                joint_type,
+                joint_axis_unit,
+                cur_state - joint_states[0],
+        ) for cur_state in joint_states] # T, 4, 4 (Tfirst2cur)
+        transform_seq = np.array(transform_seq)
+    
         # 给每个 time_stamp 加上 transformed_first
         pc_ref = moving_pcs[0] # N, 3
         pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1)  # (N, 4)
         
-        transform_seq = np.array(transform_seq)
         transform_seq = transform_seq @ np.linalg.inv(transform_seq[0])
         pc_ref_transformed = np.einsum('tij,jk->tik', transform_seq, pc_ref_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
         pc_ref_transformed = napari_time_series_transform(pc_ref_transformed) # T*N, d

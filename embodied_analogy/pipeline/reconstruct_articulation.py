@@ -10,10 +10,10 @@ from embodied_analogy.utility import *
 
 
 ################################# PARAMS #################################
-visualize = False
+visualize = True
 num_initial_uvs = 1000
 num_informative_frame_idx = 5
-text_prompt = "object (not robot)"
+text_prompt = "drawer"
 whole_obj_masking_with_sam = True
 ##########################################################################
 
@@ -193,12 +193,22 @@ dynamic_mask_seq = get_dynamic_mask_seq(
     根据 dynamic_mask 中的 moving_part, 利用 ICP 估计出精确的 joint params
 """
 # filter dynamic mask seq
-from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
+dynamic_mask_seq_updated = filter_dynamic_mask_seq(
+    K=K,
+    depth_seq=depth_seq[informative_frame_idx],
+    dynamic_mask_seq=dynamic_mask_seq,
+    joint_type=joint_type,
+    joint_axis_unit=joint_axis_camera,
+    joint_states=joint_states[informative_frame_idx],
+    visualize=visualize
+) # T, H, W
+
+# fine estimation
 joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
-    K,
-    depth_seq[informative_frame_idx], 
-    dynamic_mask_seq,
-    joint_type, 
+    K=K,
+    depth_seq=depth_seq[informative_frame_idx], 
+    dynamic_mask_seq=dynamic_mask_seq_updated,
+    joint_type=joint_type, 
     joint_axis_unit=joint_axis_camera, 
     joint_states=joint_states[informative_frame_idx],
     max_icp_iters=200, # ICP 最多迭代多少轮
