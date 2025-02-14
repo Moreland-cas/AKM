@@ -212,7 +212,9 @@ joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     joint_axis_unit=joint_axis_camera, 
     joint_states=joint_states[informative_frame_idx],
     max_icp_iters=200, # ICP 最多迭代多少轮
-    lr=1e-4, # 0.1 mm
+    optimize_joint_axis=False,
+    optimize_state_mask=np.arange(num_informative_frame_idx)!=0,
+    lr=3e-4, # 0.1 mm
     tol=1e-7,
     visualize=visualize
 )
@@ -224,6 +226,11 @@ translation_c_gt = Rc2w.T @ translation_w_gt
 
 dot_before = np.dot(translation_c_gt, joint_axis_camera)
 dot_after = np.dot(translation_c_gt, joint_axis_updated)
-print(f"\t before: {np.degrees(np.arccos(dot_before))}")
-print(f"\t after : {np.degrees(np.arccos(dot_after))}")
+print(f"\tbefore: {np.degrees(np.arccos(dot_before))}")
+print("\tjoint axis: ", joint_axis_camera)
+print("\tjoint states: ", joint_states[informative_frame_idx])
+
+print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
+print("\tjoint axis: ", joint_axis_updated)
+print("\tjoint states: ", jonit_states_updated)
 print(f"time used: {algo_end - algo_start} s")

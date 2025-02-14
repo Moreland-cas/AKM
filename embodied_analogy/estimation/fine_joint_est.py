@@ -304,6 +304,9 @@ def fine_joint_estimation_seq(
     T = depth_seq.shape[0]
     assert T >= 2
     
+    if optimize_state_mask is None:
+        optimize_state_mask = np.ones(T, dtype=np.bool_)
+    
     # 准备 moving mask 数据, 点云数据 和 normal 数据
     moving_masks = [dynamic_mask_seq[i] == MOVING_LABEL for i in range(T)]
     moving_pcs = [depth_image_to_pointcloud(depth_seq[i], moving_masks[i], K) for i in range(T)] #  [(N, 3), ...], len=T
@@ -314,22 +317,22 @@ def fine_joint_estimation_seq(
     
     # 设置待优化参数
     axis_params = torch.from_numpy(joint_axis_unit).float().cuda().requires_grad_()
-    states_params = [torch.from_numpy(joint_state).float().cuda().requires_grad_() for joint_state in joint_states]
     axis_lr = lr if optimize_joint_axis else 0.0
+    
+    states_params = [torch.tensor(joint_state).float().cuda().requires_grad_() for joint_state in joint_states]
     state_params_to_optimize = []
+    
     for i in range(T):
         param = states_params[i]
-        if optimize_state_mask is None:
-            state_lr = lr
-        elif optimize_state_mask[i]:
+        if optimize_state_mask[i]:
             state_lr = lr
         else:
             state_lr = 0.0
-        state_params_to_optimize.append({f'state_param{i}': param, 'lr': state_lr})
+        state_params_to_optimize.append({f'params': param, 'lr': state_lr})
             
     # 初始化优化器
     optimizer = torch.optim.Adam([
-        {'axis_params': axis_params, 'lr': axis_lr}, 
+        {'params': axis_params, 'lr': axis_lr}, 
         *state_params_to_optimize
     ])
     
@@ -393,7 +396,7 @@ def fine_joint_estimation_seq(
         optimizer.step()
 
     joint_axis_unit_updated = (axis_params / torch.norm(axis_params)).detach().cpu().numpy()
-    joint_states_updated = (states_params - states_params[0]).detach().cpu().numpy() 
+    joint_states_updated = np.array([states_param.detach().cpu().item() for states_param in states_params])
     
     if visualize:
         # 获取 transform_seq
