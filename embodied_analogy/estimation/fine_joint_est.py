@@ -288,6 +288,8 @@ def fine_joint_estimation_seq(
     joint_axis_unit, # unit vector here
     joint_states,
     max_icp_iters=200, # ICP 最多迭代多少轮
+    optimize_joint_axis=True,
+    optimize_state_mask=None, # boolean mask to select which states to optimize
     lr=3e-4,
     tol=1e-8,
     visualize=False
@@ -312,49 +314,71 @@ def fine_joint_estimation_seq(
     
     # 设置待优化参数
     axis_params = torch.from_numpy(joint_axis_unit).float().cuda().requires_grad_()
-    states_params = torch.from_numpy(joint_states).float().cuda().requires_grad_()
+    states_params = [torch.from_numpy(joint_state).float().cuda().requires_grad_() for joint_state in joint_states]
+    axis_lr = lr if optimize_joint_axis else 0.0
+    state_params_to_optimize = []
+    for i in range(T):
+        param = states_params[i]
+        if optimize_state_mask is None:
+            state_lr = lr
+        elif optimize_state_mask[i]:
+            state_lr = lr
+        else:
+            state_lr = 0.0
+        state_params_to_optimize.append({f'state_param{i}': param, 'lr': state_lr})
+            
+    # 初始化优化器
+    optimizer = torch.optim.Adam([
+        {'axis_params': axis_params, 'lr': axis_lr}, 
+        *state_params_to_optimize
+    ])
     
+    # 生成 (i, j) 对，根据 state_mask 和是否优化 joint_axis 来决定
+    ij_pairs = []
+    for i in range(T):
+        for j in range(T):
+            if i >= j:
+                continue
+            if not optimize_joint_axis and (not optimize_state_mask[i]) and (not optimize_state_mask[j]):
+                continue
+            ij_pairs.append((i, j))
+                    
     for k in range(max_icp_iters):
-        optimizer = torch.optim.Adam([
-            {'params': axis_params, 'lr': lr}, 
-            {'params': states_params, 'lr': lr}
-        ])
-        
         # 在这里计算 cur_icp_loss
         cur_icp_loss = 0
+        
         # 0, 1, 2, ..., T-2, T-1
-        for i in range(0, T-1):
-            for j in range(i+1, T):
-                # 提取需要的数据
-                ref_pc = moving_pcs[i]
-                tgt_pc = moving_pcs[j]
-                target_normals = normals[j]
-                
-                # 无梯度的计算 Tref2tgt
-                Tref2tgt = joint_data_to_transform(
-                    joint_type, 
-                    (axis_params / torch.norm(axis_params)).detach().cpu().numpy(), 
-                    (states_params[j] - states_params[i]).detach().cpu().numpy()
-                )
-                # 计算 pc_i 和 pc_j 的 intersection_mask
-                pc_ref_mask, pc_tgt_mask = moving_ij_intersection(
-                    K,
-                    ref_pc, tgt_pc,
-                    moving_masks[i], moving_masks[j],
-                    Tref2tgt,
-                    visualize=False
-                )
-                # 有梯度的计算 ICP loss
-                joint_axis_scaled = axis_params / torch.norm(axis_params) * (states_params[j] - states_params[i])
-                cur_icp_loss += icp_loss_torch(
-                    joint_axis_scaled,
-                    ref_pc[pc_ref_mask],
-                    tgt_pc[pc_tgt_mask],
-                    target_normals[pc_tgt_mask],
-                    loss_type="point_to_plane", # point_to_point
-                    joint_type=joint_type,
-                    coor_valid_distance=0.03
-                )
+        for i, j in ij_pairs:
+            # 提取需要的数据
+            ref_pc = moving_pcs[i]
+            tgt_pc = moving_pcs[j]
+            target_normals = normals[j]
+            
+            # 无梯度的计算 Tref2tgt
+            Tref2tgt = joint_data_to_transform(
+                joint_type, 
+                (axis_params / torch.norm(axis_params)).detach().cpu().numpy(), 
+                (states_params[j] - states_params[i]).detach().cpu().numpy()
+            )
+            # 计算 pc_i 和 pc_j 的 intersection_mask
+            pc_ref_mask, pc_tgt_mask = moving_ij_intersection(
+                K,
+                ref_pc, tgt_pc,
+                moving_masks[i], moving_masks[j],
+                Tref2tgt,
+                visualize=False
+            )
+            # 有梯度的计算 ICP loss
+            joint_axis_scaled = axis_params / torch.norm(axis_params) * (states_params[j] - states_params[i])
+            cur_icp_loss += icp_loss_torch(
+                joint_axis_scaled,
+                ref_pc[pc_ref_mask],
+                tgt_pc[pc_tgt_mask],
+                target_normals[pc_tgt_mask],
+                loss_type="point_to_plane", # point_to_point
+                joint_type=joint_type,
+                coor_valid_distance=0.03
+            )
         
         # 计算损失变化
         loss_change = abs(cur_icp_loss.item() - prev_icp_loss)

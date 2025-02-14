@@ -10,7 +10,7 @@ from embodied_analogy.utility import *
 
 
 ################################# PARAMS #################################
-visualize = True
+visualize = False
 num_initial_uvs = 1000
 num_informative_frame_idx = 5
 text_prompt = "drawer"
