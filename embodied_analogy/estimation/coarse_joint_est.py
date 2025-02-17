@@ -115,7 +115,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     optimizer = torch.optim.Adam([angles], lr=3e-4)
     
     # 运行优化
-    num_iterations = 200
+    num_iterations = 150
     for _ in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(angles)
@@ -133,8 +133,8 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors, viewer_title="coarse Rotation estimation")
     
     return unit_vector_axis, angles, est_loss
-
-
+    
+    
 def coarse_joint_estimation(tracks_3d, visualize=False):
     """
     tracks_3d: (T, M, 3)
@@ -152,3 +152,69 @@ def coarse_joint_estimation(tracks_3d, visualize=False):
         joint_axis = R_axis
         joint_states = R_states
     return joint_type, joint_axis, joint_states
+
+
+def generate_rotated_points(base_points, axis, angles, noise_std=0.01):
+    """
+    通过给定旋转轴和角度生成旋转后的点云，并加入噪声
+    :param base_points: 初始点云 (M, 3)
+    :param axis: 旋转轴 (3,)
+    :param angles: 每一帧的旋转角度 (T,)
+    :param noise_std: 每个点的噪声标准差
+    :return: 每一帧的点云 (T, M, 3)
+    """
+    T = len(angles)
+    rotated_points = []
+    
+    for t in range(T):
+        # 生成旋转矩阵
+        r = R.from_rotvec(angles[t] * axis)
+        rotation_matrix = r.as_matrix()
+        
+        # 旋转点云
+        rotated = base_points @ rotation_matrix.T
+        
+        # 添加噪声
+        noise = np.random.normal(0, noise_std, rotated.shape)
+        rotated_points.append(rotated + noise)
+    
+    return np.array(rotated_points)
+
+def test_coarse_R_from_tracks_3d():
+    """
+    测试 coarse_R_from_tracks_3d 函数
+    """
+    # 设置参数
+    T = 10  # 10 个时间步
+    M = 5   # 5 个点
+    true_axis = np.array([0, 0, 1])  # 真正的旋转轴是 Z 轴
+    true_angles = np.linspace(0, np.pi / 4, T)  # 旋转角度从 0 到 pi/4
+    noise_std = 0.01  # 加噪声的标准差
+
+    # 初始化第0帧点云
+    base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标
+    
+    # 生成带噪声的点云数据
+    tracks_3d = generate_rotated_points(base_points, true_axis, true_angles, noise_std)
+    
+    # 调用 coarse_R_from_tracks_3d 函数
+    unit_vector_axis, angles, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=False)
+    
+    # 打印优化后的旋转轴和角度
+    print("优化后的旋转轴:", unit_vector_axis)
+    print("优化后的角度:", angles)
+    
+    # 计算与真实旋转轴的夹角
+    axis_error = np.arccos(np.dot(unit_vector_axis, true_axis))  # 计算两旋转轴之间的夹角（弧度）
+    print(f"旋转轴误差: {np.degrees(axis_error)}°")
+    
+    # 计算角度误差
+    angle_error = np.abs(angles - true_angles)  # 每一帧的角度误差
+    print(f"每帧角度误差: {np.degrees(angle_error)}°")
+    
+    # 打印估计误差
+    print(f"估计误差 (loss): {est_loss}")
+    
+    
+if __name__ == "__main__":
+    test_coarse_R_from_tracks_3d()
