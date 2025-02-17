@@ -86,23 +86,15 @@ algo_start = time.time()
 """
     根据物体初始状态的图像, 得到一些初始跟踪点, initial_uvs
 """
-# 根据 rgb_seq[0], 先得到 initial_bbox
-from embodied_analogy.perception.grounding_dino import run_groundingDINO
-initial_bboxs, initial_bbox_scores = run_groundingDINO(
-    image=rgb_seq[0],
+# 根据 rgb_seq[0], 得到 initial_mask
+initial_bbox, initial_mask=run_grounded_sam(
+    rgb_image=rgb_seq[0],
     text_prompt=text_prompt,
-    visualize=visualize
-)
-initial_bbox = initial_bboxs[0]
-
-# 然后根据 initial_bbox 得到 initial_mask
-from embodied_analogy.perception.sam_masking import run_sam_whole
-initial_mask, _, _ = run_sam_whole(
-    rgb_img=rgb_seq[0], # numpy
-    positive_points=None,  # np.array([N, 2])
-    positive_bbox=initial_bbox, # np.array([4]), [u_left, v_left, u_right, v_right]
+    positive_points=None, 
     negative_points=franka_tracks_seq[0],
-    visualize=visualize
+    num_iterations=5,
+    acceptable_thr=0.9,
+    visualize=visualize,
 )
 # 在 initial_bbox 内均匀采样
 initial_uvs = sample_points_within_bbox_and_mask(initial_bbox, initial_mask, num_initial_uvs)
@@ -242,9 +234,22 @@ reloc_states = []
 
 for i in range(num_informative_frame_idx):
     other_mask = np.arange(num_informative_frame_idx)!=i
+    
+    # 在这里先生成 query dynamics, 方式是通过 sam 得到物体的 bbox
+    initial_bbox, initial_mask = run_grounded_sam(
+        rgb_image=rgb_seq[informative_frame_idx][i],
+        text_prompt=text_prompt,
+        positive_points=None,  # np.array([N, 2])
+        negative_points=franka_tracks_seq[informative_frame_idx][i],
+        num_iterations=5,
+        acceptable_thr=0.9,
+        visualize=visualize,
+    )
+    query_dynamic_initial = initial_mask.astype(np.int32) * MOVING_LABEL
+    
     reloc_state = relocalization(
         K=K, 
-        query_dynamic=None,
+        query_dynamic=query_dynamic_initial,
         query_depth=depth_seq[informative_frame_idx][i], 
         ref_depths=depth_seq[informative_frame_idx][other_mask], 
         joint_type=joint_type, 
@@ -260,14 +265,3 @@ for i in range(num_informative_frame_idx):
     reloc_states.append(reloc_state)
 print(f"gt states: {jonit_states_updated}")
 print("reloc states: ", np.array(reloc_states))
-
-
-"""
-before: 2.0469924273118334
-    joint axis:  [ 0.51316935  0.14681542 -0.84563726]
-    joint states:  [-0.00016864  0.04898852  0.09450419  0.12406741  0.14798145]
-    
-after : 2.0468600711478997
-    joint axis:  [ 0.5131694   0.14681543 -0.8456373 ]
-    joint states:  [-0.00016864  0.05272457  0.09785931  0.12221941  0.14439656]
-"""

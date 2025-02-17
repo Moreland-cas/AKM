@@ -31,6 +31,7 @@ def relocalization(
     num_ref = len(ref_joint_states)
     query_state = ref_joint_states[0] 
     
+    # TODO: 在这里补充一个基于 sampling 的初始化方法, 也就是先选取一个比较好的优化初值
     if query_dynamic is None:
         query_dynamic = (query_depth > 0).astype(np.int32) * MOVING_LABEL
     
