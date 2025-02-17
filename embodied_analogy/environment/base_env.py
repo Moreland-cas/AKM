@@ -295,10 +295,6 @@ class BaseEnv():
             config=load_config
         )
         
-        # 设置物体关节的参数, 把回弹关掉
-        for joint in self.asset.get_active_joints():
-            joint.set_drive_property(stiffness=0, damping=0.01)
-            
         self.asset.set_root_pose(sapien.Pose(pose, [1, 0, 0, 0]))
         # self.asset.set_qpos(dof_value)
         # self.asset.set_qvel(np.zeros_like(dof_value))
@@ -307,20 +303,35 @@ class BaseEnv():
         # lift_joint = self.asset.get_joints()[-1]
         # lift_joint.set_limit(np.array([0, 0.3]))
         
+        
+        # 设置物体关节的参数, 把回弹关掉
+        for joint in self.asset.get_active_joints():
+            joint.set_drive_property(stiffness=0, damping=0.01)
+            
+            # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
+            if joint.get_name() == obj_config["activate_joint"]:
+                self.evaluate_joint = joint
+                self.init_joint_transform = joint.get_global_pose().to_transformation_matrix() # 4, 4, Tw2j
+            
         # 在 load asset 之后拍一张物体的照片，作为初始状态
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
         self.viewer.render()
         
-        initial_rgb, initial_depth, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
+        # initial_rgb, initial_depth, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
         
-        if not hasattr(self, 'recorded_data'):
-            self.recorded_data = {}
+        # if not hasattr(self, 'recorded_data'):
+        #     self.recorded_data = {}
             
-        self.recorded_data["initial_rgb"] = initial_rgb
-        self.recorded_data["initial_depth"] = initial_depth
+        # self.recorded_data["initial_rgb"] = initial_rgb
+        # self.recorded_data["initial_depth"] = initial_depth
         
-        
+    def get_joint_state(self):
+        cur_transform = self.evaluate_joint.get_global_pose().to_transformation_matrix()
+        # Tinit2cur = Tw2cur @ Tw2init.inv
+        Tinit2cur = cur_transform @ np.linalg.inv(self.init_joint_transform)
+        return Tinit2cur
+    
     def load_panda_hand(self, scale=1., pos=[0, 0, 0], quat=[1, 0, 0, 0]):
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale

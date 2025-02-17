@@ -130,6 +130,9 @@ class RecordEnv(BaseEnv):
         self.cur_steps += 1
         self.cur_steps = self.cur_steps % self.record_interval
         
+        # 打印 joint relative states, Tinit2cur
+        print(self.get_joint_state())
+        
         # 如果机械手臂没有尝试关闭，则不录制
         # 关闭后按照 fps 的帧率录制
         if self.cur_steps == 0 and self.start_recording:
@@ -248,7 +251,7 @@ class RecordEnv(BaseEnv):
                     elif event.key == pygame.K_e:  
                         self.save_recoreded_data()
                         
-                    elif event.key == pygame.K_s:  
+                    elif event.key == pygame.K_r:  
                         self.start_recording = True
                         
                     continue
@@ -259,30 +262,35 @@ if __name__ == '__main__':
     record_env = RecordEnv()
     
     # drawer
-    # obj_config = {
-    #     "index": 44962,
-    #     "scale": 0.8,
-    #     "pose": [1.0, 0., 0.5],
-    #     "active_link": "link_1"
-    # }
+    obj_config = {
+        "index": 44962,
+        "scale": 0.8,
+        "pose": [1.0, 0., 0.5],
+        "active_link": "link_1",
+        "activate_joint": "joint_1"
+    }
     
     # door 
-    obj_config = {
-        "index": 9280,
-        "scale": 0.7,
-        "pose": [0.6, 0., 0.5],
-        "active_link": "link_1"
-    }
+    # obj_config = {
+    #     "index": 9280,
+    #     "scale": 0.7,
+    #     "pose": [0.6, 0., 0.5],
+    #     "active_link": "link_1",
+    #     "activate_joint": "joint_0"
+    # }
     
     # pot
-    obj_config = {
-        "index": 100015,
-        "scale": 0.3,
-        "pose": [0.5, 0., 0.2],
-        "active_link": "link_1"
-    }
+    # obj_config = {
+    #     "index": 100015,
+    #     "scale": 0.3,
+    #     "pose": [0.5, 0., 0.2],
+    #     "active_link": "link_1",
+    #     "activate_joint": "joint_0"
+    # }
     
     record_env.load_articulated_object(obj_config)
     # record_env.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
     record_env.load_franka_arm()
+    # while True:
+    #     record_env.step()
     record_env.manipulate_and_record()
