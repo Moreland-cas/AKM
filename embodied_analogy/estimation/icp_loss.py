@@ -29,7 +29,7 @@ def icp_loss_torch(
     assert joint_axis_scaled.requires_grad and "joint axis must requires grad to be optimized"
     assert loss_type in ["point_to_point", "point_to_plane"]
     assert joint_type in ["prismatic", "revolute"]
-
+    # print(f"len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
     if min(len(ref_pc), len(tgt_pc)) < 100:
         return torch.tensor(0).cuda()
     

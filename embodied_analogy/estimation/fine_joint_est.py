@@ -178,13 +178,15 @@ def filter_dynamic_mask(
     query_dynamic_updated[y[valid_idx][unknown_mask], x[valid_idx][unknown_mask]] = UNKNOWN_LABEL
     
     if visualize:
-        # TODO: 在这里把 ref_frames 也展示一下
         import napari 
         viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
         viewer.title = "filter current dynamic mask using other frames"
         # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
         viewer.add_labels(query_dynamic.astype(np.int32), name='before filtering')
         viewer.add_labels(query_dynamic_updated.astype(np.int32), name='after filtering')
+        
+        # 可视化 ref frames
+        # viewer.add_labels()
         napari.run()
     
     return query_dynamic_updated  
@@ -247,7 +249,9 @@ def moving_ij_intersection(
     pc_tgt,  # M
     moving_mask_ref, moving_mask_tgt,
     Tref2tgt, # (4, 4)
-    visualize=False
+    visualize=False,
+    i=-1,
+    j=-1
 ):
     """
     给定 moving_mask1 和 moving_mask2, 找到投影的交集, 并返回两个 point-cloud, 用于 point-to-plane-ICP
@@ -277,16 +281,17 @@ def moving_ij_intersection(
 
     if visualize:
         import napari
-        viewer = napari.view_labels(moving_mask_ref, name="ref before filter")
-        viewer.add_labels(moving_mask_tgt, name='tgt before filter')
+        viewer = napari.view_labels(moving_mask_ref, name=f"ref{i} before filter")
+        viewer.add_labels(moving_mask_tgt, name=f'tgt{j} before filter')
         
         moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref, pc_ref_mask)
-        viewer.add_labels(moving_mask_ref_filtered, name='ref after filter')
+        viewer.add_labels(moving_mask_ref_filtered, name=f'ref{i} after filter')
         
         moving_mask_tgt_filtered = reconstruct_mask(moving_mask_tgt, pc_tgt_mask)
-        viewer.add_labels(moving_mask_tgt_filtered, name='tgt after filter')
+        viewer.add_labels(moving_mask_tgt_filtered, name=f'tgt{j} after filter')
         
         viewer.title = "find moving mask ij intersection in 2d projection"
+        napari.run()
         
     return pc_ref_mask, pc_tgt_mask
 
@@ -315,6 +320,15 @@ def fine_joint_estimation_seq(
         
     如果 optimize_state_mask 或者 update_dynamic_mask 为 None, 则视为全部优化
     """
+    # 可视化输入
+    if visualize:
+        import napari 
+        viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+        viewer.title = "visualize input of function fine_joint_estimation_seq"
+        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+        viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='0-query other-ref')
+        napari.run()
+        
     T = depth_seq.shape[0]
     assert T >= 2
     
@@ -352,6 +366,8 @@ def fine_joint_estimation_seq(
         *state_params_to_optimize
     ])
     
+    # TODO：在这里加一个动态调整学习率的功能
+    
     # 生成 (i, j) 对，根据 state_mask 和是否优化 joint_axis 来决定
     ij_pairs = []
     for i in range(T):
@@ -365,24 +381,33 @@ def fine_joint_estimation_seq(
     for k in range(max_icp_iters):
         # 如果要 update dynamic mask, 就在这里进行
         for l, need_update in enumerate(update_dynamic_mask):
+            # 没啥卵用啊我草？？ 如果 initial state 太不准那 filter 出来的结果会很 bug
             if need_update:
                 ref_states = np.array([states_param.detach().cpu().item() for states_param in states_params])
-                ref_states = ref_states[np.arange(T)!=i]
-                dynamic_mask_seq[i] = filter_dynamic_mask(
+                ref_states = ref_states[np.arange(T)!=l]
+                dynamic_mask_seq[l] = filter_dynamic_mask(
                     K=K, 
-                    query_depth=depth_seq[i], 
-                    query_dynamic=dynamic_mask_seq[i], 
-                    ref_depths=depth_seq[np.arange(T)!=i],  
+                    query_depth=depth_seq[l], 
+                    query_dynamic=dynamic_mask_seq[l], 
+                    ref_depths=depth_seq[np.arange(T)!=l],  
                     joint_type=joint_type,
                     joint_axis_unit=axis_params.detach().cpu().numpy(),
-                    query_state=states_params[i].detach().cpu().numpy(),
+                    query_state=states_params[l].detach().cpu().numpy(),
                     ref_states=ref_states,
                     depth_tolerance=0.01, 
-                    visualize=False
+                    visualize=visualize
                 )
                 
+                if visualize:
+                    import napari 
+                    viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+                    viewer.title = "after first round of dynamic refinement"
+                    # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+                    viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='0-query other-ref')
+                    napari.run()
+                    
                 # 还需要更新对应 frame 的 moving_masks 等信息
-                moving_masks[l] = dynamic_mask_seq[i] == MOVING_LABEL
+                moving_masks[l] = dynamic_mask_seq[l] == MOVING_LABEL
                 moving_pcs[l] = depth_image_to_pointcloud(depth_seq[l], moving_masks[l], K)
                 normals[l] = compute_normals(moving_pcs[l])
         
@@ -408,7 +433,9 @@ def fine_joint_estimation_seq(
                 ref_pc, tgt_pc,
                 moving_masks[i], moving_masks[j],
                 Tref2tgt,
-                visualize=False
+                visualize=False,
+                i=i,
+                j=j
             )
             # 有梯度的计算 ICP loss
             joint_axis_scaled = axis_params / torch.norm(axis_params) * (states_params[j] - states_params[i])
@@ -425,7 +452,8 @@ def fine_joint_estimation_seq(
         # 计算损失变化
         loss_change = abs(cur_icp_loss.item() - prev_icp_loss)
         prev_icp_loss = cur_icp_loss.item()
-        print(f"ICP iter_{k}: ", prev_icp_loss)
+        # print(f"ICP iter_{k}: ", prev_icp_loss)
+        # print(f"current estimate state: {states_params[0].detach().cpu().item()}")
         if loss_change < tol:
             break
         

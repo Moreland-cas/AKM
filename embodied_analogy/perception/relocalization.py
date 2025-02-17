@@ -12,24 +12,27 @@ from embodied_analogy.utility import *
 def relocalization(
     K, 
     # query_rgb, 
+    query_dynamic,
     query_depth, 
     ref_depths, # T, H, W
     joint_type, 
     joint_axis_unit, 
     ref_joint_states, 
     ref_dynamics,
-    lr=3e-4,
+    lr=5e-3,
     tol=1e-7,
-    icp_select_range=0.1
+    icp_select_range=0.1,
     # text_prompt="object",
     # positive_points=None,
     # negative_points=None,
-    # visualize=False
+    visualize=False
 ):
     # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
     num_ref = len(ref_joint_states)
-    query_state = ref_joint_states[0] + 0.05
-    query_dynamic = (query_depth > 0).astype(np.int32) * MOVING_LABEL
+    query_state = ref_joint_states[0] 
+    
+    if query_dynamic is None:
+        query_dynamic = (query_depth > 0).astype(np.int32) * MOVING_LABEL
     
     # 然后使用其他帧过滤下 query_dynamic
             
@@ -48,13 +51,17 @@ def relocalization(
         max_icp_iters=200, 
         optimize_joint_axis=False,
         optimize_state_mask=np.arange(num_ref+1)==0,
-        update_dynamic_mask=np.arange(num_ref+1)==0,
+        # 目前不更新 dynamic_mask
+        update_dynamic_mask=np.arange(num_ref+1)==-1,
         lr=lr,
         tol=tol,
         icp_select_range=icp_select_range,
-        visualize=False
+        visualize=visualize
     )
     query_state_updated = updated_states[0]
+    
+    if visualize:
+        pass
     return query_state_updated
 
 

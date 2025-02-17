@@ -239,22 +239,26 @@ print("\tjoint states: ", jonit_states_updated)
 print(f"time used: {algo_end - algo_start} s")
 
 reloc_states = []
+
 for i in range(num_informative_frame_idx):
     other_mask = np.arange(num_informative_frame_idx)!=i
     reloc_state = relocalization(
         K=K, 
+        query_dynamic=None,
         query_depth=depth_seq[informative_frame_idx][i], 
         ref_depths=depth_seq[informative_frame_idx][other_mask], 
         joint_type=joint_type, 
         joint_axis_unit=joint_axis_updated, 
-        ref_joint_states=joint_states[informative_frame_idx][other_mask], 
+        ref_joint_states=jonit_states_updated[other_mask], 
         ref_dynamics=dynamic_mask_seq_updated[other_mask], 
-        lr=3e-4,
+        lr=5e-3, # 一次估计 0.5 cm?
         tol=1e-7,
-        icp_select_range=0.1
+        icp_select_range=0.2,
+        visualize=visualize
     )
+    # print(reloc_state)
     reloc_states.append(reloc_state)
-    break
+print(f"gt states: {jonit_states_updated}")
 print("reloc states: ", np.array(reloc_states))
 
 
