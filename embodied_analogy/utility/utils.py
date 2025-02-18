@@ -120,6 +120,42 @@ def camera_to_image(camera_points, K, image_width=None, image_height=None, norma
 
     return uv, depth  # (B, 2), (B, )
 
+def camera_to_image_torch(camera_points, K, image_width=None, image_height=None, normalized_uv=False):
+    """
+    将相机坐标点投影到图像平面，并归一化到 [0, 1] 范围。
+
+    Args:
+        camera_points (torch.Tensor): 相机坐标点，形状 (B, 3)
+        K (torch.Tensor): 相机内参矩阵，形状 (3, 3)
+        image_width (int): 图像宽度
+        image_height (int): 图像高度
+
+    Returns:
+        torch.Tensor: 归一化像素坐标，形状 (B, 2)
+        torch.Tensor: 深度值，形状 (B,)
+    """
+    # 使用内参矩阵进行投影
+    projected_points = torch.matmul(camera_points, K.T)  # (B, 3)
+
+    # 转换为非齐次像素坐标
+    u = projected_points[:, 0] / projected_points[:, 2]  # (B,)
+    v = projected_points[:, 1] / projected_points[:, 2]  # (B,)
+    uv = torch.stack((u, v), dim=1)  # (B, 2)
+
+    # 提取深度值
+    depth = projected_points[:, 2]  # (B,)
+
+    # 归一化到 [0, 1]
+    if normalized_uv:
+        assert image_width is not None and image_height is not None, \
+            "image_width and image_height must be provided when normalized_uv is True"
+        u = u / image_width
+        v = v / image_height
+        uv = torch.stack((u, v), dim=1)  # (B, 2)
+
+    return uv, depth  # (B, 2), (B,)
+
+
 def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, normalized_uv=False):
     """
     将世界坐标点转换为归一化像素坐标 (u, v) [0, 1]。

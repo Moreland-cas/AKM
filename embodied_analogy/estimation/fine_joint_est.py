@@ -295,6 +295,81 @@ def moving_ij_intersection(
         
     return pc_ref_mask, pc_tgt_mask
 
+@torch.no_grad()
+def moving_ij_intersection_torch(
+    K,  # 相机内参
+    pc_ref,  # N
+    pc_tgt,  # M
+    moving_mask_ref, moving_mask_tgt,
+    Tref2tgt,  # (4, 4)
+    visualize=False,
+    i=-1,
+    j=-1
+):
+    """
+    给定 moving_mask1 和 moving_mask2, 找到投影的交集, 并返回两个 point-cloud, 用于 point-to-plane-ICP
+    """
+    # 将数据转换为 torch 张量并移动到 GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    K = torch.tensor(K, dtype=torch.float32, device=device)
+    pc_ref = torch.tensor(pc_ref, dtype=torch.float32, device=device)
+    pc_tgt = torch.tensor(pc_tgt, dtype=torch.float32, device=device)
+    moving_mask_ref = torch.tensor(moving_mask_ref, dtype=torch.bool, device=device)
+    moving_mask_tgt = torch.tensor(moving_mask_tgt, dtype=torch.bool, device=device)
+    Tref2tgt = torch.tensor(Tref2tgt, dtype=torch.float32, device=device)
+
+    # 获取图像的高度和宽度
+    H, W = moving_mask_ref.shape
+
+    # 计算反变换 Ttgt2ref
+    Ttgt2ref = torch.linalg.inv(Tref2tgt)
+
+    # 将 pc_ref 转换为 4xN 的齐次坐标
+    pc_ref_aug = torch.cat([pc_ref, torch.ones((pc_ref.shape[0], 1), device=device)], dim=1)  # N, 4
+    pc_ref_projected = (pc_ref_aug @ Tref2tgt.T)[:, :3]  # N, 3
+
+    # 投影到图像平面
+    pc_ref_projected, _ = camera_to_image_torch(pc_ref_projected, K)  # N, 2
+    pc_ref_projected_int = torch.floor(pc_ref_projected).to(torch.int64)  # N, 2
+
+    # 判断投影是否在图像范围内
+    ref_valid_idx = (pc_ref_projected_int[:, 0] >= 0) & (pc_ref_projected_int[:, 0] < W) & \
+                    (pc_ref_projected_int[:, 1] >= 0) & (pc_ref_projected_int[:, 1] < H)
+    pc_ref_projected_int[~ref_valid_idx] = 0
+    pc_ref_mask = moving_mask_tgt[pc_ref_projected_int[:, 1], pc_ref_projected_int[:, 0]]  # N
+    pc_ref_mask[~ref_valid_idx] = False
+
+    # 将 pc_tgt 转换为 4xM 的齐次坐标
+    pc_tgt_aug = torch.cat([pc_tgt, torch.ones((pc_tgt.shape[0], 1), device=device)], dim=1)  # M, 4
+    pc_tgt_projected = (pc_tgt_aug @ Ttgt2ref.T)[:, :3]  # M, 3
+
+    # 投影到图像平面
+    pc_tgt_projected, _ = camera_to_image_torch(pc_tgt_projected, K)  # M, 2
+    pc_tgt_projected_int = torch.floor(pc_tgt_projected).to(torch.int64)  # M, 2
+
+    # 判断投影是否在图像范围内
+    tgt_valid_idx = (pc_tgt_projected_int[:, 0] >= 0) & (pc_tgt_projected_int[:, 0] < W) & \
+                    (pc_tgt_projected_int[:, 1] >= 0) & (pc_tgt_projected_int[:, 1] < H)
+    pc_tgt_projected_int[~tgt_valid_idx] = 0
+    pc_tgt_mask = moving_mask_ref[pc_tgt_projected_int[:, 1], pc_tgt_projected_int[:, 0]]  # M
+    pc_tgt_mask[~tgt_valid_idx] = False
+
+    if visualize:
+        import napari
+        viewer = napari.view_labels(moving_mask_ref.cpu().numpy(), name=f"ref{i} before filter")
+        viewer.add_labels(moving_mask_tgt.cpu().numpy(), name=f'tgt{j} before filter')
+
+        moving_mask_ref_filtered = reconstruct_mask(moving_mask_ref.cpu().numpy(), pc_ref_mask.cpu().numpy())
+        viewer.add_labels(moving_mask_ref_filtered, name=f'ref{i} after filter')
+
+        moving_mask_tgt_filtered = reconstruct_mask(moving_mask_tgt.cpu().numpy(), pc_tgt_mask.cpu().numpy())
+        viewer.add_labels(moving_mask_tgt_filtered, name=f'tgt{j} after filter')
+
+        viewer.title = "find moving mask ij intersection in 2d projection"
+        napari.run()
+
+    return pc_ref_mask.cpu().numpy(), pc_tgt_mask.cpu().numpy()
+
 
 def fine_joint_estimation_seq(
     K,
@@ -338,6 +413,7 @@ def fine_joint_estimation_seq(
         update_dynamic_mask = np.ones(T, dtype=np.bool_)
     
     # 准备 moving mask 数据, 点云数据 和 normal 数据
+    pass
     moving_masks = [dynamic_mask_seq[i] == MOVING_LABEL for i in range(T)]
     moving_pcs = [depth_image_to_pointcloud(depth_seq[i], moving_masks[i], K) for i in range(T)] #  [(N, 3), ...], len=T
     normals = [compute_normals(moving_pcs[i]) for i in range(T)]
@@ -428,7 +504,8 @@ def fine_joint_estimation_seq(
                 (states_params[j] - states_params[i]).detach().cpu().numpy()
             )
             # 计算 pc_i 和 pc_j 的 intersection_mask
-            pc_ref_mask, pc_tgt_mask = moving_ij_intersection(
+            # pc_ref_mask, pc_tgt_mask = moving_ij_intersection(
+            pc_ref_mask, pc_tgt_mask = moving_ij_intersection_torch(
                 K,
                 ref_pc, tgt_pc,
                 moving_masks[i], moving_masks[j],

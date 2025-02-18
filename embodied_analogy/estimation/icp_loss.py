@@ -30,9 +30,10 @@ def icp_loss_torch(
     assert loss_type in ["point_to_point", "point_to_plane"]
     assert joint_type in ["prismatic", "revolute"]
     # print(f"len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    
     if min(len(ref_pc), len(tgt_pc)) < 100:
         return torch.tensor(0).cuda()
-    
+
     # 将 numpy 数组转换为 torch.Tensor
     ref_pc = torch.tensor(ref_pc, dtype=torch.float32, device=joint_axis_scaled.device)
     target_pc = torch.tensor(tgt_pc, dtype=torch.float32, device=joint_axis_scaled.device)

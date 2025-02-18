@@ -244,40 +244,17 @@ print("\tjoint axis: ", joint_axis_updated)
 print("\tjoint states: ", jonit_states_updated)
 print(f"time used: {algo_end - algo_start} s")
 
-reloc_states = []
+# 将重建的数据保存在 tmp_folder 下
+# 需要保存: rgb_seq[informative_frame_idx], depth_seq[informative_frame_idx], dynamic_mask_seq_updated, joint_axis_updated, jonit_states_updated
+np.savez(
+    tmp_folder + "reconstructed_data.npz",
+    K=K,
+    rgb_seq=rgb_seq[informative_frame_idx],
+    depth_seq=depth_seq[informative_frame_idx],
+    dynamic_mask_seq=dynamic_mask_seq_updated,
+    joint_axis=joint_axis_updated,
+    jonit_states=jonit_states_updated,
+    joint_type=joint_type,
+    franka_tracks_seq=franka_tracks_seq[informative_frame_idx],
+)
 
-for i in range(num_informative_frame_idx):
-    pass
-    other_mask = np.arange(num_informative_frame_idx)!=i
-    
-    # 在这里先生成 query dynamics, 方式是通过 sam 得到物体的 bbox
-    initial_bbox, initial_mask = run_grounded_sam(
-        rgb_image=rgb_seq[informative_frame_idx][i],
-        text_prompt=text_prompt,
-        positive_points=None,  # np.array([N, 2])
-        negative_points=franka_tracks_seq[informative_frame_idx][i],
-        num_iterations=5,
-        acceptable_thr=0.9,
-        visualize=visualize,
-    )
-    query_dynamic_initial = initial_mask.astype(np.int32) * MOVING_LABEL
-    
-    reloc_state = relocalization(
-        K=K, 
-        query_dynamic=query_dynamic_initial,
-        query_depth=depth_seq[informative_frame_idx][i], 
-        ref_depths=depth_seq[informative_frame_idx][other_mask], 
-        joint_type=joint_type, 
-        joint_axis_unit=joint_axis_updated, 
-        ref_joint_states=jonit_states_updated[other_mask], 
-        ref_dynamics=dynamic_mask_seq_updated[other_mask], 
-        lr=5e-3, # 一次估计 0.5 cm?
-        tol=1e-7,
-        icp_select_range=0.2,
-        # icp_select_range=0.1,
-        visualize=visualize
-    )
-    # print(reloc_state)
-    reloc_states.append(reloc_state)
-print(f"gt states: {jonit_states_updated}")
-print("reloc states: ", np.array(reloc_states))
