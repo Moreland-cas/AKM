@@ -232,3 +232,19 @@ def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     distances, indices = tree.query(ref_pc)
     valid_mask = distances < max_distance
     return indices, valid_mask
+
+
+def test_find_correspondences():
+    """
+    测试 find_correspondences 函数的不同输入场景。
+    """
+
+    # 测试 1: 正常情况，参考点云和目标点云都是有效的
+    ref_pc = np.array([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])
+    target_pc = np.array([[0.1, 1.1, 2.1], [3.1, 4.1, 5.1], [6.1, 7.1, 8.1], [0.0, 1.0, 2.0]]) + 1
+    max_distance = 0.2
+    indices, valid_mask = find_correspondences(ref_pc, target_pc, max_distance)
+    print(indices, valid_mask)
+    
+if __name__ == "__main__":
+    test_find_correspondences()

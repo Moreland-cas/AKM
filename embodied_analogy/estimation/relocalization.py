@@ -7,7 +7,7 @@
     一种是基于 sampling
 """
 import random
-from embodied_analogy.estimation import *
+from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
 from embodied_analogy.utility import *
 def relocalization(
     K, 
@@ -29,7 +29,7 @@ def relocalization(
 ):
     # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
     num_ref = len(ref_joint_states)
-    query_state = ref_joint_states[0] 
+    query_state = ref_joint_states[-1] 
     
     # TODO: 在这里补充一个基于 sampling 的初始化方法, 也就是先选取一个比较好的优化初值
     if query_dynamic is None:

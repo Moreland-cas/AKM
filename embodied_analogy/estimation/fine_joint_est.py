@@ -321,7 +321,7 @@ def fine_joint_estimation_seq(
     如果 optimize_state_mask 或者 update_dynamic_mask 为 None, 则视为全部优化
     """
     # 可视化输入
-    if visualize:
+    if visualize and False:
         import napari 
         viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
         viewer.title = "visualize input of function fine_joint_estimation_seq"
@@ -412,7 +412,7 @@ def fine_joint_estimation_seq(
                 normals[l] = compute_normals(moving_pcs[l])
         
         # 在这里计算 cur_icp_loss
-        cur_icp_loss = 0
+        cur_icp_loss = 0.0
         
         # 0, 1, 2, ..., T-2, T-1
         for i, j in ij_pairs:
@@ -449,10 +449,15 @@ def fine_joint_estimation_seq(
                 icp_select_range=icp_select_range
             )
         
+        if cur_icp_loss.item() == 0:
+            # 如果等于 0, 说明就根本没有有效的数据 pair, 这时候选择更改 icp_range 的参数, 或者直接退出
+            print("No valid data pair, exit ICP loop")
+            break
+            
         # 计算损失变化
         loss_change = abs(cur_icp_loss.item() - prev_icp_loss)
         prev_icp_loss = cur_icp_loss.item()
-        # print(f"ICP iter_{k}: ", prev_icp_loss)
+        print(f"ICP iter_{k}: ", prev_icp_loss)
         # print(f"current estimate state: {states_params[0].detach().cpu().item()}")
         if loss_change < tol:
             break

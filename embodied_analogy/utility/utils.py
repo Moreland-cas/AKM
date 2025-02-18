@@ -1,5 +1,6 @@
 import pygame
 import torch
+import random
 from PIL import Image
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -698,6 +699,30 @@ def joint_data_to_transform(
     return T_ref2tgt
 
 
+def set_random_seed(seed: int):
+    """
+    设置 Python, NumPy 和 PyTorch 的随机种子，确保实验的可重复性
+    :param seed: 要设置的随机种子
+    """
+    # 设置 Python 的随机种子
+    random.seed(seed)
+    
+    # 设置 NumPy 的随机种子
+    np.random.seed(seed)
+    
+    # 设置 PyTorch 的随机种子
+    torch.manual_seed(seed)
+    
+    # 如果使用 GPU，还需要设置 CUDA 随机种子
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # 设置所有 GPU 的种子
+        
+    # 为了确保结果可重复，设置 cudnn 的确定性算法
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    
 if __name__ == "__main__":
     bbox = np.array([50, 50, 150, 150])  # 示例bbox
     mask = np.random.choice([False, True], size=(200, 200))  # 随机生成一个mask

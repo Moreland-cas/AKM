@@ -64,6 +64,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     :param tracks_3d: 形状为 (T, M, 3) 的 numpy 数组, T 是时间步数, M 是点的数量
     :return: 旋转轴的单位向量 (3,), 每帧的旋转角度数组 (T,), 以及估计误差 est_loss
     """
+    # TODO: 改得更简单一些
     if isinstance(tracks_3d, torch.Tensor):
         tracks_3d = tracks_3d.cpu().numpy()
     
@@ -140,9 +141,11 @@ def coarse_joint_estimation(tracks_3d, visualize=False):
     tracks_3d: (T, M, 3)
     """
     t_axis, t_states, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
-    R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
-
+    # R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
+    R_axis, R_states, R_est_loss = None, None, 1e6
+    
     print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
+    # TODO：记得改回来
     if t_est_loss < R_est_loss:
         joint_type = "prismatic"
         joint_axis = t_axis

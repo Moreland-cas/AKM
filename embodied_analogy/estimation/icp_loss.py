@@ -67,8 +67,13 @@ def icp_loss_torch(
     transformed_ref_pc_homogeneous = ref_pc_homogeneous @ Tref2tgt.T  # 变换为齐次坐标 (N, 4)
     transformed_ref_pc = transformed_ref_pc_homogeneous[:, :3]  # 去掉齐次坐标 (N, 3)
 
-    # 使用 find_correspondences 进行最近邻搜索
+    # 最近邻搜索
+    # TODO: 处理找不到最近点的情况
     indices, valid_mask = find_correspondences(transformed_ref_pc.detach().cpu().numpy(), tgt_pc, max_distance=icp_select_range)
+    
+    if valid_mask.sum() < 100: # 如果太少返回 0
+        return torch.tensor(0).cuda()
+
     matched_target_pc = target_pc[indices] # N, 3
 
     # 计算损失

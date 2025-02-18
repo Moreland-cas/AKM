@@ -121,8 +121,8 @@ class RecordDataReader():
         self.franka_tracks_2d = np.delete(franka_tracks_2d, 10, axis=1)
         
         # 读取初始帧的物体图像数据
-        self.initial_rgb = self.data["initial_rgb"]
-        self.initial_depth = self.data["initial_depth"]
+        # self.initial_rgb = self.data["initial_rgb"]
+        # self.initial_depth = self.data["initial_depth"]
         
     def get_img(self, idx=0):
         # return pil image of the first view
@@ -173,10 +173,11 @@ class RecordDataReader():
 if __name__ == "__main__":
     record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
     # file_name = "/2025-01-07_18-06-10.npz"
-    file_name = "/2025-02-08_14-57-26.npz"
+    # file_name = "/2025-02-08_14-57-26.npz"
     # file_name = "/2025-02-11_17-58-37.npz"
     # file_name = "/2025-02-12_09-20-48.npz"
     # file_name = "/2025-02-13_13-43-47.npz"
+    file_name = "/2025-02-17_18-31-14.npz"
     dr = RecordDataReader(record_path_prefix, file_name)
     dr.process_data()
     dr.visualize()

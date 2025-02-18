@@ -15,6 +15,10 @@ num_initial_uvs = 1000
 num_informative_frame_idx = 5
 text_prompt = "drawer"
 whole_obj_masking_with_sam = True
+
+set_random_seed(79)
+torch.autograd.set_detect_anomaly(True)
+
 ##########################################################################
 
 
@@ -23,7 +27,8 @@ whole_obj_masking_with_sam = True
 """
 # 读取数据
 record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-file_name = "/2025-02-13_13-43-47.npz"
+# file_name = "/2025-02-13_13-43-47.npz"
+file_name = "/2025-02-17_18-31-14.npz"
 dr = RecordDataReader(record_path_prefix, file_name)
 dr.process_data()
 
@@ -34,8 +39,8 @@ K = dr.intrinsic # 3, 3
 Tw2c = dr.data["extrinsic"] # 4, 4
 # object_mask_0 = dr.seg
 # TODO: initial rgb 里还可以看到 camera 的可视化框??
-initial_rgb = dr.initial_rgb
-initial_depth = dr.initial_depth
+# initial_rgb = dr.initial_rgb
+# initial_depth = dr.initial_depth
 
 # 对于 depth_seq 进行处理, 得到 depth_seq_mask, 用于标记其中depth为 0, 或者重投影在地面上的位置
 depth_seq_mask = np.ones_like(depth_seq, dtype=np.bool_) # T, H, W
@@ -59,13 +64,13 @@ os.makedirs(depth_folder, exist_ok=True)
 os.makedirs(depth_mask_folder, exist_ok=True)
 os.makedirs(vis_folder, exist_ok=True)
 
-for i, rgb in enumerate(rgb_seq):
-    Image.fromarray(rgb).save(os.path.join(rgb_folder, f"{i}.jpg"))
-for i, depth in enumerate(depth_seq):
-    np.save(os.path.join(depth_folder, f"{i}.npy"), depth) # H, W, 1
-for i, depth_mask in enumerate(depth_seq_mask):
-    depth_mask_255 = (depth_mask * 255).astype(np.uint8)
-    Image.fromarray(depth_mask_255).save(os.path.join(depth_mask_folder, f"{i}.png"))
+# for i, rgb in enumerate(rgb_seq):
+#     Image.fromarray(rgb).save(os.path.join(rgb_folder, f"{i}.jpg"))
+# for i, depth in enumerate(depth_seq):
+#     np.save(os.path.join(depth_folder, f"{i}.npy"), depth) # H, W, 1
+# for i, depth_mask in enumerate(depth_seq_mask):
+#     depth_mask_255 = (depth_mask * 255).astype(np.uint8)
+#     Image.fromarray(depth_mask_255).save(os.path.join(depth_mask_folder, f"{i}.png"))
         
 # if visualize:
 #     # 展示初始的 pointcloud sequence
@@ -86,6 +91,7 @@ algo_start = time.time()
 """
     根据物体初始状态的图像, 得到一些初始跟踪点, initial_uvs
 """
+pass
 # 根据 rgb_seq[0], 得到 initial_mask
 initial_bbox, initial_mask=run_grounded_sam(
     rgb_image=rgb_seq[0],
@@ -101,7 +107,7 @@ initial_uvs = sample_points_within_bbox_and_mask(initial_bbox, initial_mask, num
 
 if visualize:
     import napari
-    viewer = napari.view_image(initial_rgb)
+    viewer = napari.view_image(rgb_seq[0])
     viewer.title = "initial uvs on intial rgb"
     initial_uvs_vis = initial_uvs[:, [1, 0]]
     viewer.add_points(initial_uvs_vis, size=2, name="initial_uvs", face_color="green")
@@ -112,6 +118,7 @@ if visualize:
     对于 initial_uvs 进行追踪得到 tracks_2d 
     根据 depth filter 得到 tracks2d_filtered
 """
+pass
 tracks_2d, pred_visibility = track_any_points(rgb_seq, initial_uvs, visiualize=visualize) # [T, M, 2], [T, M]
 
 # 在这里将 tracks_2d 根据图像坐标的变换聚类为两类
@@ -128,6 +135,7 @@ tracks2d_filtered = filter_tracks2d_by_depthSeq_mask(rgb_seq, tracks2d_filtered,
 """
     dynamic segment tracks3d_filtered
 """  
+pass
 # 根据 tracks2d 得到 tracks3d
 T, M, _ = tracks2d_filtered.shape
 tracks2d_filtered_depth = extract_tracked_depths(depth_seq, tracks2d_filtered) # T, M
@@ -139,6 +147,7 @@ moving_mask_3d, static_mask_3d = cluster_tracks_3d(tracks3d_filtered, use_diff=T
 """
     coarse joint estimation with tracks3d_filtered
 """
+pass
 joint_type, joint_axis_camera, joint_states = coarse_joint_estimation(tracks3d_filtered[:, moving_mask_3d, :], visualize)
 Rc2w = Tw2c[:3, :3].T # 3, 3
 joint_axis_world = Rc2w @ joint_axis_camera
@@ -147,6 +156,7 @@ joint_axis_world = Rc2w @ joint_axis_camera
 """
     根据 rgb_seq 和 tracks2d 得到 video_masks (可以用 sam 或者 sam2)
 """
+pass
 # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
 informative_frame_idx = farthest_scale_sampling(joint_states, M=num_informative_frame_idx)
 
@@ -173,6 +183,7 @@ video_masks = video_masks & depth_seq_mask[informative_frame_idx]
 """
     根据 tracks2d 和 whole obj video_masks 得到 dynamic_mask
 """
+pass
 dynamic_mask_seq = get_dynamic_mask_seq(
     video_masks, 
     tracks_2d[informative_frame_idx][:, moving_mask_2d, :],
@@ -192,10 +203,12 @@ dynamic_mask_seq_updated = filter_dynamic_mask_seq(
     joint_type=joint_type,
     joint_axis_unit=joint_axis_camera,
     joint_states=joint_states[informative_frame_idx],
+    depth_tolerance=0.05, # 假设 coarse 阶段的误差估计在 5 cm 内
     visualize=visualize
 ) # T, H, W
 
 # fine estimation
+pass
 joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     K=K,
     depth_seq=depth_seq[informative_frame_idx], 
@@ -204,13 +217,13 @@ joint_axis_updated, jonit_states_updated = fine_joint_estimation_seq(
     joint_axis_unit=joint_axis_camera, 
     joint_states=joint_states[informative_frame_idx],
     max_icp_iters=200, # ICP 最多迭代多少轮
-    optimize_joint_axis=False,
+    optimize_joint_axis=True,
     optimize_state_mask=np.arange(num_informative_frame_idx)!=0,
     # 这里设置不迭代的优化 dynamic_mask
     update_dynamic_mask=np.zeros(num_informative_frame_idx).astype(np.bool_),
-    lr=3e-4, # 0.1 mm
-    tol=1e-7,
-    icp_select_range=0.03,
+    lr=5e-3, # 5 mm
+    tol=1e-8,
+    icp_select_range=0.05,
     visualize=visualize
 )
 
@@ -218,6 +231,7 @@ algo_end = time.time()
 
 translation_w_gt = np.array([-1, 0, 0])
 translation_c_gt = Rc2w.T @ translation_w_gt
+print(f"\tgt axis: {translation_c_gt}")
 
 dot_before = np.dot(translation_c_gt, joint_axis_camera)
 dot_after = np.dot(translation_c_gt, joint_axis_updated)
@@ -233,6 +247,7 @@ print(f"time used: {algo_end - algo_start} s")
 reloc_states = []
 
 for i in range(num_informative_frame_idx):
+    pass
     other_mask = np.arange(num_informative_frame_idx)!=i
     
     # 在这里先生成 query dynamics, 方式是通过 sam 得到物体的 bbox
@@ -259,6 +274,7 @@ for i in range(num_informative_frame_idx):
         lr=5e-3, # 一次估计 0.5 cm?
         tol=1e-7,
         icp_select_range=0.2,
+        # icp_select_range=0.1,
         visualize=visualize
     )
     # print(reloc_state)

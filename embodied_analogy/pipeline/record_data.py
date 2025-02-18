@@ -236,7 +236,7 @@ class RecordEnv(BaseEnv):
                         target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
-                    elif event.key == pygame.K_r:  # "r"键归位
+                    elif event.key == pygame.K_x:  # "r"键归位
                         target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(90), np.deg2rad(90), axes="syxz")
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
