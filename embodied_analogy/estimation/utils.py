@@ -235,41 +235,26 @@ def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     valid_mask = distances < max_distance
     return indices, valid_mask
 
-def find_correspondences_with_faiss(ref_pc, target_pc, max_distance=0.01):
-    """
-    使用 Faiss 进行最近邻搜索，找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
-    :param ref_pc: numpy 数组，形状 (M, 3)，参考点云
-    :param target_pc: numpy 数组，形状 (N, 3)，目标点云
-    :param max_distance: 最大距离，超过这个距离的点会被忽略
-    :return: 匹配的索引数组
-    """
-    # 将点云转换为 float32 类型，因为 Faiss 要求输入是 float32 类型
-    target_pc = target_pc.astype(np.float32)
-    ref_pc = ref_pc.astype(np.float32)
+def rotation_matrix_between_vectors(a, b):
+    # 假设满足 R @ a = b, 求R
+    
+    # 确保 a 和 b 是单位向量
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+    
+    # 计算旋转轴 u 和旋转角度 theta
+    u = np.cross(a, b)  # 旋转轴是 a 和 b 的叉积
+    sin_theta = np.linalg.norm(u)
+    cos_theta = np.dot(a, b)  # 夹角余弦
+    u = u / sin_theta if sin_theta != 0 else u  # 归一化旋转轴
 
-    # 构建 Faiss 索引
-    index = faiss.IndexFlatL2(3)  # 使用 L2 距离
-    index.add(target_pc)  # 将目标点云添加到索引中
+    # 计算旋转矩阵
+    I = np.eye(3)
+    u_cross = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]])  # 叉积矩阵
 
-    # 查询参考点云的最近邻
-    distances, indices = index.search(ref_pc, 1)  # 1 表示每次只查询一个最近邻
-
-    # 筛选出有效的匹配
-    valid_mask = distances[:, 0] < max_distance
-
-    return indices.flatten(), valid_mask
-
-def test_find_correspondences():
-    """
-    测试 find_correspondences 函数的不同输入场景。
-    """
-
-    # 测试 1: 正常情况，参考点云和目标点云都是有效的
-    ref_pc = np.array([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])
-    target_pc = np.array([[0.1, 1.1, 2.1], [3.1, 4.1, 5.1], [6.1, 7.1, 8.1], [0.0, 1.0, 2.0]]) + 1
-    max_distance = 0.2
-    indices, valid_mask = find_correspondences(ref_pc, target_pc, max_distance)
-    print(indices, valid_mask)
+    R = I + np.sin(np.arccos(cos_theta)) * u_cross + (1 - cos_theta) * np.dot(u_cross, u_cross)
+    return R
+    
     
 if __name__ == "__main__":
-    test_find_correspondences()
+    pass

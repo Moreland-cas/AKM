@@ -1,44 +1,57 @@
+"""
+    应该说给定一个物体表示（由重建算法得到）
+    然后给定物体的初始状态, 和要达到的状态
+    控制机器人将物体操作到指定状态, 并进行评估
+
+"""
 import sapien
 import mplib
 from PIL import Image
 import numpy as np
 import transforms3d as t3d
-from embodied_analogy.base_env import BaseEnv
-from embodied_analogy.process_record import RecordDataReader
-from embodied_analogy.utils import image_to_camera, camera_to_world, visualize_pc, SimilarityMap
-from embodied_analogy.dino_featup import match_points_dino_featup
-from embodied_analogy.dift_sd import match_points_dift_sd
+from embodied_analogy.environment.base_env import BaseEnv
+from embodied_analogy.utility import *
+from embodied_analogy.perception import *
+from embodied_analogy.estimation.relocalization import relocalization
 
-class ImitateEnv(BaseEnv):
+class ManipulateEnv(BaseEnv):
     def __init__(
             self,
             phy_timestep=1/250.,
-            record_path_prefix="/home/zby/Programs/Embodied_Analogy/assets/recorded_data",
-            record_file_name="/2025-01-07_18-06-10.npz"
+            use_sapien2=True
         ):
-        super().__init__(phy_timestep)
+        super().__init__(
+            phy_timestep=phy_timestep,
+            use_sapien2=use_sapien2
+        )
+        self.load_franka_arm()
         
-        # self.load_articulated_object(index=100015, pose=[0.4, 0.4, 0.2], scale=0.4)
-        self.load_articulated_object(index=100051, pose=[0.4, 0.4, 0.2], scale=0.2)
+        obj_config = {
+            "index": 44962,
+            "scale": 0.8,
+            "pose": [1.0, 0., 0.5],
+            "active_link": "link_1",
+            "active_joint": "joint_1"
+        }
+        self.load_articulated_object(obj_config)
+        
+        # 随机初始化物体对应 joint 的状态
+        cur_joint_state = self.asset.get_qpos()
+        active_joint_names = [joint.name for joint in self.asset.get_active_joints()]
+        initial_state = []
+        for i, joint_name in enumerate(active_joint_names):
+            if joint_name == obj_config["active_joint"]:
+                limit = self.asset.get_active_joints()[i].get_limits() # (2, )
+                initial_state.append(0.15)
+            else:
+                initial_state.append(cur_joint_state[i])
+        self.asset.set_qpos(initial_state)
+        
         self.setup_camera()
         
-        self.DataReader = RecordDataReader(record_path_prefix, record_file_name)
-        self.DataReader.process_data()
-        
-    def spawn_cube(self, pose, color=[1, 0, 0]):
-        # cube
-        builder = self.scene.create_actor_builder()
-        
-        # builder.use_density = False
-        builder.add_box_collision(half_size=[0, 0, 0])
-        builder.add_box_visual(half_size=[0.01, 0.01, 0.01], material=color)
-        cube = builder.build(name='cube')
-        cube.set_pose(sapien.Pose(pose))
-        
-        # cube.get_links()[0].set_collision_enabled(False)
-
-        # 取消重力
-        # cube.set_gravity(False)
+        # load obj representation
+        recon_data_path = "/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstructed_data.npz"
+        self.obj_repr = np.load(recon_data_path)
 
     def follow_path(self, result):
         n_step = result['position'].shape[0]
@@ -58,9 +71,6 @@ class ImitateEnv(BaseEnv):
         # point_cloud: N, 3 in world space
         self.planner.update_point_cloud(point_cloud)
     
-    def is_task_success(self):
-        return False
-    
     def find_nearest_grasp(self, grasp_group, contact_point):
         '''
             grasp_group: graspnetAPI 
@@ -78,7 +88,77 @@ class ImitateEnv(BaseEnv):
         nearest_index = int(nearest_index)
         return grasp_group[nearest_index]
     
-    def imitate_from_record(self):
+    def manipulate(self, delta_state=0):
+        # 1) 首先估计出当前的 joint state
+        self.scene.step()
+        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        self.viewer.render()
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        
+        initial_bbox, initial_mask = run_grounded_sam(
+            rgb_image=rgb_np,
+            text_prompt="drawer",
+            positive_points=None, 
+            negative_points=self.get_points_on_arm()[0], # N, 2
+            num_iterations=5,
+            acceptable_thr=0.9,
+            visualize=False
+        )
+        query_dynamic = initial_mask.astype(np.int32) * MOVING_LABEL
+        
+        # start_state = relocalization(
+        #     K=self.camera_intrinsic, 
+        #     query_dynamic=query_dynamic,
+        #     query_depth=depth_np, 
+        #     ref_depths=self.obj_repr["depth_seq"], 
+        #     joint_type=self.obj_repr["joint_type"], 
+        #     joint_axis_unit=self.obj_repr["joint_axis"], 
+        #     ref_joint_states=self.obj_repr["joint_states"], 
+        #     ref_dynamics=self.obj_repr["dynamic_mask_seq"],
+        #     lr=5e-3,
+        #     tol=1e-7,
+        #     icp_select_range=0.1,
+        #     visualize=False
+        # )
+        start_state = 0
+        
+        print("cur state est: ", start_state)
+        
+        # 根据 target_joint_state 计算出 delta joint state
+        target_state = start_state + delta_state
+        
+        # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
+        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic > 0, self.camera_intrinsic) # N, 3
+        start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
+        joint_axis_c = self.obj_repr["joint_axis"]
+        Rc2w = np.linalg.inv(self.camera_extrinsic)[:3, :3]
+        joint_axis_w = Rc2w @ joint_axis_c
+        joint_axis_outward_w = -joint_axis_w
+        start_color = rgb_np[query_dynamic > 0] / 256.
+        self.grasp_group = self.detect_grasp_anygrasp(
+            start_pc_w, 
+            start_color, 
+            joint_axis=joint_axis_outward_w, 
+            visualize=True
+        )
+        # self.reset_franka_arm()
+        
+        # 筛选出评分比较高的 grasp
+        # 评分标准: 离 moving part比较近, approaching vector 尽可能的平行于 joint_axis
+        # TODO
+        
+        # 更新 planner 的点云, 并移动 gripper 到 grasp 的位置进行抓取
+        
+        # 保持抓取姿势，向着 axis 移动（此时需要关闭点云遮挡）
+        
+        # 进行 reset, 并进行状态估计
+        pass
+    
+    def evaluate(self):
+        # 从环境中获取当前的 joint state
+        pass
+    
+    def manipulate_deprecated(self):
         # 让物体落下
         for i in range(100):
             self.step()
@@ -201,6 +281,10 @@ class ImitateEnv(BaseEnv):
             self.step()        
 
 if __name__ == '__main__':
-    demo = ImitateEnv()
-    demo.imitate_from_record()
+    demo = ManipulateEnv()
+    
+    demo.manipulate()
+    
+    while True:
+        demo.step()
     

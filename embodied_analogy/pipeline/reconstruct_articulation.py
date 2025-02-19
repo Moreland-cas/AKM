@@ -253,7 +253,7 @@ np.savez(
     depth_seq=depth_seq[informative_frame_idx],
     dynamic_mask_seq=dynamic_mask_seq_updated,
     joint_axis=joint_axis_updated,
-    jonit_states=jonit_states_updated,
+    joint_states=jonit_states_updated,
     joint_type=joint_type,
     franka_tracks_seq=franka_tracks_seq[informative_frame_idx],
 )

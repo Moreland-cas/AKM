@@ -4,6 +4,7 @@ import argparse
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 from embodied_analogy.utility import *
+from embodied_analogy.estimation.utils import rotation_matrix_between_vectors
 from PIL import Image, ImageColor
 import open3d as o3d
 import transforms3d as t3d
@@ -133,7 +134,8 @@ class BaseEnv():
         # 记录相机的内参和外参
         self.camera_intrinsic = self.camera.get_intrinsic_matrix() # [3, 3], K
         Tw2c = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
-        self.camera_extrinsic = np.vstack([Tw2c, np.array([0, 0, 0, 1])]) # 4, 4
+        # self.camera_extrinsic = np.vstack([Tw2c, np.array([0, 0, 0, 1])]) # 4, 4
+        self.camera_extrinsic = Tw2c
         
         # 将相机的内参和外参保存到 self.recorded_data 中
         if not hasattr(self, 'recorded_data'):
@@ -309,14 +311,14 @@ class BaseEnv():
             joint.set_drive_property(stiffness=0, damping=0.01)
             
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
-            if joint.get_name() == obj_config["activate_joint"]:
+            if joint.get_name() == obj_config["active_joint"]:
                 self.evaluate_joint = joint
                 self.init_joint_transform = joint.get_global_pose().to_transformation_matrix() # 4, 4, Tw2j
             
         # 在 load asset 之后拍一张物体的照片，作为初始状态
-        self.scene.step()
-        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        self.viewer.render()
+        # self.scene.step()
+        # self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        # self.viewer.render()
         
         # initial_rgb, initial_depth, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
         
@@ -447,58 +449,66 @@ class BaseEnv():
         ee_quat = ee_link.get_pose().q
         return ee_pos, ee_quat # numpy array
     
-    def detect_grasp_anygrasp(self, points, colors, visualize=True):
+    def detect_grasp_anygrasp(self, points, colors, joint_axis, visualize=True):
         '''
         输入世界坐标系下的点云和颜色, 返回 grasp_group
         
-        定义 grasp 坐标系为 xy 轴平行地面, z 轴指向重力方向
-        定义 gripper 坐标系为 x 轴指向物体内部, y 轴指向物体的宽度
+        定义 approach 坐标系为 xy 轴平行物体表面, z 轴指向物体内部 (joint axis 的反方向)
+        定义 grasp 坐标系为 x 轴指向物体内部, y 轴指向物体的宽度
         
         '''
         # 传入的点是在世界坐标系下的(xy 轴平行地面, z 轴指向重力反方向)
-        # 因此首先将世界坐标系下的点转换到 grasp 坐标系下
+        # 因此首先将世界坐标系下的点转换到 app 坐标系下
         points = points.astype(np.float32)
         colors = colors.astype(np.float32)
         points_input = points.copy() # N, 3
         colors_input = colors.copy()
         
-        # 坐标系转换,将世界坐标系绕着 x 轴旋转 180 度得到 grasp 坐标系
-        Tw2grasp = np.array([
-            [1, 0, 0],
-            [0, -1, 0],
-            [0, 0, -1]
-        ])
-        points_input = points_input @ Tw2grasp.T # N, 3
+        # 坐标系转换,将世界坐标系绕着 x 轴旋转 180 度得到 app 坐标系
+        # Rw2app = np.array([
+        #     [1, 0, 0],
+        #     [0, -1, 0],
+        #     [0, 0, -1]
+        # ])
+        
+        # coor_app = Rw2app @ coor_w, 也即 -joint_axis = Rw2app @ (0, 0, 1)
+        Rw2app = rotation_matrix_between_vectors(np.array([0, 0, 1]), -joint_axis)
+        points_input = points_input @ Rw2app.T # N, 3
         points_input = points_input.astype(np.float32)
         
         from gsnet import AnyGrasp # gsnet.so
         # get a argument namespace
         cfgs = argparse.Namespace()
         cfgs.checkpoint_path = 'assets/ckpts/checkpoint_detection.tar'
-        cfgs.max_gripper_width = 0.1
+        cfgs.max_gripper_width = 0.04
         cfgs.gripper_height = 0.03
         cfgs.top_down_grasp = False
         cfgs.debug = visualize
         model = AnyGrasp(cfgs)
         model.load_net()
         
-        lims = [-1, 1, -1, 1, -1, 1]
-        gg, cloud = model.get_grasp(points_input, colors_input, lims, \
-            apply_object_mask=True, dense_grasp=False, collision_detection=True
-                                       )
+        lims = np.array([-1, 1, -1, 1, -1, 1]) * 10
+        gg, cloud = model.get_grasp(
+            points_input,
+            colors_input, 
+            lims,
+            apply_object_mask=True,
+            dense_grasp=False,
+            collision_detection=True
+        )
         print('grasp num:', len(gg))
         
         if visualize:
             grippers = gg.to_open3d_geometry_list()
             o3d.visualization.draw_geometries([*grippers, cloud])
             
-        # 此时的 gg 中的 rotation 和 translation 对应 Tgripper2grasp
-        # 将预测的 grasp pose 从 grasp 坐标系转换回世界坐标系
+        # 此时的 gg 中的 rotation 和 translation 对应 Tgrasp2app
+        # 将预测的 app pose 从 app 坐标系转换回世界坐标系
         zero_translation = np.array([[0], [0], [0]])
-        Tgrasp2w = Tw2grasp.T
-        Tgrasp2w = np.hstack((Tgrasp2w, zero_translation))
-        gg.transform(Tgrasp2w)
-        # 此时的 gg 中的 rotation 和 translation 对应 Tgripper2world
+        Rapp2w = Rw2app.T
+        Tapp2w = np.hstack((Rapp2w, zero_translation))
+        gg.transform(Tapp2w)
+        # 此时的 gg 中的 rotation 和 translation 对应 Tgrasp2w
         return gg
 
 

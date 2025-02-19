@@ -111,7 +111,7 @@ if __name__ == "__main__":
             ref_depths=recon_data["depth_seq"][other_mask], 
             joint_type=recon_data["joint_type"], 
             joint_axis_unit=recon_data["joint_axis"], 
-            ref_joint_states=recon_data["jonit_states"][other_mask], 
+            ref_joint_states=recon_data["joint_states"][other_mask], 
             ref_dynamics=recon_data["dynamic_mask_seq"][other_mask], 
             lr=5e-3, # 一次估计 0.5 cm?
             tol=1e-7,
