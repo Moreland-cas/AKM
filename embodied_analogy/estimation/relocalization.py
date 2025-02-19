@@ -18,15 +18,30 @@ def relocalization(
     # negative_points=None,
     visualize=False
 ):
-    # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
-    num_ref = len(ref_joint_states)
-    query_state = ref_joint_states[-1] 
-    
-    # TODO: 在这里补充一个基于 sampling 的初始化方法, 也就是先选取一个比较好的优化初值
     if query_dynamic is None:
         query_dynamic = (query_depth > 0).astype(np.int32) * MOVING_LABEL
+        
+    # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
+    num_ref = len(ref_joint_states)
     
-    # 然后使用其他帧过滤下 query_dynamic
+    # 初始化状态, 通过 rgb 或者 depth 找到最近的图像, 我觉得可以先通过 depth
+    best_err = 1e10
+    best_matched_idx = -1
+    for i in range(num_ref):
+        query_depth_mask = query_dynamic > 0 # 除去背景的部分就是物体的所有点
+        ref_depth = ref_depths[i]
+        ref_depth_mask = ref_dynamics[i] > 0
+        
+        # 计算 mask 的交集, 对交集中点的深度计算一个观测误差
+        inter_mask = query_depth_mask & ref_depth_mask
+        delta_depth = (ref_depth - query_depth)**2
+        cur_mean_err = delta_depth[inter_mask].mean()
+        
+        if cur_mean_err < best_err:
+            best_err = cur_mean_err
+            best_matched_idx = i
+    query_state = ref_joint_states[best_matched_idx] 
+    print("best_matched_idx: ", best_matched_idx)
             
     # 复用求 fine jont estimation 的函数, 把需要优化的帧放第一个
     tmp_depths = np.concatenate([query_depth[None], ref_depths], axis=0)
