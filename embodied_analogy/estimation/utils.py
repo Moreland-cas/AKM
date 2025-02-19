@@ -1,4 +1,5 @@
 import os
+# import faiss
 import torch
 import numpy as np
 import open3d as o3d
@@ -228,11 +229,35 @@ def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     :param max_distance: 最大距离，超过这个距离的点会被忽略
     :return: 匹配的索引数组
     """
+    # TODO: 将 leafsize 和 num_workers 再优化
     tree = cKDTree(target_pc)
-    distances, indices = tree.query(ref_pc)
+    distances, indices = tree.query(ref_pc, workers=8)
     valid_mask = distances < max_distance
     return indices, valid_mask
 
+def find_correspondences_with_faiss(ref_pc, target_pc, max_distance=0.01):
+    """
+    使用 Faiss 进行最近邻搜索，找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
+    :param ref_pc: numpy 数组，形状 (M, 3)，参考点云
+    :param target_pc: numpy 数组，形状 (N, 3)，目标点云
+    :param max_distance: 最大距离，超过这个距离的点会被忽略
+    :return: 匹配的索引数组
+    """
+    # 将点云转换为 float32 类型，因为 Faiss 要求输入是 float32 类型
+    target_pc = target_pc.astype(np.float32)
+    ref_pc = ref_pc.astype(np.float32)
+
+    # 构建 Faiss 索引
+    index = faiss.IndexFlatL2(3)  # 使用 L2 距离
+    index.add(target_pc)  # 将目标点云添加到索引中
+
+    # 查询参考点云的最近邻
+    distances, indices = index.search(ref_pc, 1)  # 1 表示每次只查询一个最近邻
+
+    # 筛选出有效的匹配
+    valid_mask = distances[:, 0] < max_distance
+
+    return indices.flatten(), valid_mask
 
 def test_find_correspondences():
     """
