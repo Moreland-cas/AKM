@@ -30,7 +30,7 @@ class BaseEnv():
         scene_config.default_dynamic_friction = 1.0
         scene_config.default_static_friction = 1.0
         scene_config.default_restitution = 0.0
-        scene_config.contact_offset = 0.005
+        scene_config.contact_offset = 0.0001 # 0.1 mm
         scene_config.enable_pcm = False
         scene_config.solver_iterations = 25
         scene_config.solver_velocity_iterations = 1
@@ -60,15 +60,39 @@ class BaseEnv():
             self.capture_rgb = self.capture_rgb_sapien3
             self.capture_rgbd = self.capture_rgbd_sapien3
     
-    def load_franka_arm(self):
+    def load_franka_arm(self, dof_value=None):
         # Robot
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.fix_root_link = True
         self.robot: sapien.Articulation = loader.load(self.asset_prefix + "/panda/panda_v3.urdf")
+        
+        self.arm_qlimit = self.robot.get_qlimits()
+        self.arm_q_lower = self.arm_qlimit[:, 0]
+        self.arm_q_higher = self.arm_qlimit[:, 1]
+
+        init_qpos = dof_value
+        if dof_value is None :
+            init_qpos = (self.arm_q_higher + self.arm_q_lower) / 2
+            # init_qpos = self.arm_q_lower
+        
+        # Setup control properties 
+        # self.active_joints = self.robot.get_active_joints()
+        # for joint in self.active_joints[:4]:
+        #     joint.set_drive_property(stiffness=160, damping=40, force_limit=100)    # original: 200
+        # for joint in self.active_joints[4:-2]:
+        #     joint.set_drive_property(stiffness=160, damping=40, force_limit=50)    # original: 200
+        # for joint in self.active_joints[-2:]:
+        #     joint.set_drive_property(stiffness=4000, damping=10)
+            
         # Set initial joint positions
-        init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
+        # init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
         self.robot.set_qpos(init_qpos)
         self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
+        self.robot.set_qvel(np.zeros(self.robot.dof))
+        self.robot.set_qf(np.zeros(self.robot.dof))
+        self.robot.set_qacc(np.zeros(self.robot.dof))
+        
+        self.robot_init_qpos = init_qpos
                     
         # set joints property to enable pd control
         self.active_joints = self.robot.get_active_joints()
@@ -308,7 +332,7 @@ class BaseEnv():
         
         # 设置物体关节的参数, 把回弹关掉
         for joint in self.asset.get_active_joints():
-            joint.set_drive_property(stiffness=0, damping=0.01)
+            joint.set_drive_property(stiffness=0, damping=0.1)
             
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
             if joint.get_name() == obj_config["active_joint"]:
@@ -377,10 +401,10 @@ class BaseEnv():
         self.cur_steps += 1
             
     def open_gripper(self):
-        # for i in range(100):
-        #     self.step()
+        for i in range(50):
+            self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.4)
+            joint.set_drive_target(0.04)
         for i in range(100): 
             qf = self.robot.compute_passive_force(
                 gravity=True, 
@@ -389,10 +413,10 @@ class BaseEnv():
             self.step()
 
     def close_gripper(self):
-        for i in range(100):
+        for i in range(50):
             self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(-0.1)
+            joint.set_drive_target(-0.01)
         for i in range(100):  
             qf = self.robot.compute_passive_force(
                 gravity=True, 
@@ -458,6 +482,10 @@ class BaseEnv():
         定义 grasp 坐标系为 x 轴指向物体内部, y 轴指向物体的宽度
         
         '''
+        # 在这里将 grasp depth 设置的小一点
+        # from graspnetAPI import graspnet
+        # graspnet.GRASP_HEIGHT = 0.
+        
         # 传入的点是在世界坐标系下的(xy 轴平行地面, z 轴指向重力反方向)
         # 因此首先将世界坐标系下的点转换到 app 坐标系下
         points = points.astype(np.float32)

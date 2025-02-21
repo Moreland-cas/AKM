@@ -9,7 +9,7 @@ setup(
         'opencv-python',
         'pygame==2.6.1',
         # 'sapien==3.0.0b1',
-        # 'sapien==2.2.2'
+        'sapien==2.2.2',
         'transforms3d',
         'trimesh',
         "ftfy",

@@ -3,7 +3,7 @@
 """
 import torch
 import numpy as np
-import napari
+
 
 def vis_tracks3d_napari(tracks_3d, colors=None, viewer_title="napari"):
     """
@@ -20,7 +20,7 @@ def vis_tracks3d_napari(tracks_3d, colors=None, viewer_title="napari"):
     for i in range(T):
         napari_data[i * M: (i + 1) * M, 0] = i
         napari_data[i * M: (i + 1) * M, 1:] = tracks_3d[i]
-    
+    import napari
     viewer = napari.Viewer(ndisplay=3)
     viewer.title = viewer_title
     

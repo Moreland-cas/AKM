@@ -12,6 +12,7 @@ def whole_obj_masking_sam(rgb_seq, positive_tracks2d, negative_tracks2d, visuali
         import napari
         viewer = napari.view_image(rgb_seq, rgb=True)
         viewer.title = "whole_obj_masking by sam"
+        
     
     for i in range(len(rgb_seq)):
         rgb_img = rgb_seq[i]

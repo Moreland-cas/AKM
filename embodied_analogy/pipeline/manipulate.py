@@ -4,8 +4,8 @@
     控制机器人将物体操作到指定状态, 并进行评估
 
 """
-import sapien
 import mplib
+from graspnetAPI import Grasp
 from PIL import Image
 import numpy as np
 import transforms3d as t3d
@@ -79,7 +79,7 @@ class ManipulateEnv(BaseEnv):
             use_sapien2=use_sapien2
         )
         self.load_franka_arm()
-        
+            
         obj_config = {
             "index": 44962,
             "scale": 0.8,
@@ -114,12 +114,58 @@ class ManipulateEnv(BaseEnv):
             for _ in range(int(250 / 30.) + 1):
                 qf = self.robot.compute_passive_force(
                     gravity=True, 
-                    coriolis_and_centrifugal=True)
+                    coriolis_and_centrifugal=True
+                )
                 self.robot.set_qf(qf)
                 for j in range(7):
+                # for j in range(9):    
                     self.active_joints[j].set_drive_target(result['position'][i][j])
                     self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
                 self.step()
+    
+    def grasp2ph(self, grasp_input):
+        # ph is panda hand for short
+        # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
+        grasp = Grasp()
+        grasp.grasp_array = np.copy(grasp_input.grasp_array)
+        
+        R_grasp2w = grasp.rotation_matrix # 3, 3
+        t_grasp2w = grasp.translation # 3
+        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
+        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
+        
+        # 先 dynamic 的调整 approaching vector, 使其尽可能平行于 joint axis
+        # 这个需要在 grasp 坐标系下调整比较好
+        # 我们要做的是, 调整 R_grasp2w 使得其平行于 joint axis
+        # 考虑到 grasp 坐标系, 我们需要绕着 y 轴旋转, 使得 x 轴平行于 joint axis
+        
+        # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
+        def T_with_offset(offset):
+            Tph2grasp = np.array([
+                [0, 0, 1, -(0.045 + 0.069) + offset], 
+                [0, 1, 0, 0], 
+                [-1, 0, 0, 0], 
+                [0, 0, 0, 1]
+            ])
+            return Tph2grasp
+
+        # 再 dynamic 的调整 offset, 使得找到一个离物体表面最近, 且可以规划得到的 Tph2w
+        # offset_list = [0.05, 0.04, 0.03, 0.02, 0.01, 0.0]  # 从近到远的顺序, 对应 offset 从大到小的试
+        offset_list = [0.05, 0.04, 0.03, 0.02]
+        best_offset = None
+        for offset in offset_list:
+            result = self.plan_path(target_pose=Tgrasp2w @ T_with_offset(offset), wrt_world=True)
+            if result is not None:
+                best_offset = offset
+                break
+        
+        if best_offset is None:
+            return None, None
+        # 最后得到 Tph2w_pre, 为远离 target grasp pose 一定距离的版本, 防止碰撞发生
+        Tph2w = Tgrasp2w @ T_with_offset(best_offset)
+        Tph2w_pre = Tgrasp2w @ T_with_offset(best_offset - 0.05)
+        
+        return Tph2w_pre, Tph2w
     
     def manipulate(self, delta_state=0):
         # 1) 首先估计出当前的 joint state
@@ -151,7 +197,7 @@ class ManipulateEnv(BaseEnv):
             lr=5e-3,
             tol=1e-7,
             icp_select_range=0.1,
-            visualize=False
+            visualize=True
         )
         print("cur state est: ", start_state)      
         
@@ -159,7 +205,8 @@ class ManipulateEnv(BaseEnv):
         target_state = start_state + delta_state
         
         # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
-        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic == MOVING_LABEL, self.camera_intrinsic) # N, 3
+        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic_updated == MOVING_LABEL, self.camera_intrinsic) # N, 3
+        # start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic == MOVING_LABEL, self.camera_intrinsic) # N, 3
         start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
         joint_axis_c = self.obj_repr["joint_axis"]
         Rc2w = np.linalg.inv(self.camera_extrinsic)[:3, :3]
@@ -171,7 +218,7 @@ class ManipulateEnv(BaseEnv):
             start_pc_w, 
             start_color, 
             joint_axis=joint_axis_outward_w, 
-            visualize=False
+            visualize=True
         )
         # self.reset_franka_arm()
         
@@ -197,23 +244,25 @@ class ManipulateEnv(BaseEnv):
         # visualize_pc(start_pc_w)
         self.open_gripper()
         # 将抓取姿势从 Tgrasp2w 转换到 Tph2w, 从而可以移动 panda_hand
-        move_to_initial = False
         for grasp in self.sorted_grasps:
-            if move_to_initial:
-                break
-            visualize_pc(start_pc_w, start_color, grasp)
-            Tph2w_list = self.grasp2panda_hand(grasp)
-            for Tph2w in Tph2w_list:
-                # 尝试移动到这里
-                result = self.plan_path(target_pose=Tph2w, wrt_world=True)
-                if result is None:
-                    print("find another target pose")
-                    continue
-                # visualize_pc(start_pc_w, start_color, grasp)
-                self.follow_path(result)
-                # self.close_gripper()
-                move_to_initial = True
-                break
+            # visualize_pc(start_pc_w, start_color, grasp)
+            
+            Tph2w_pre, Tph2w = self.grasp2ph(grasp)
+            
+            if Tph2w_pre is None:
+                continue
+            # visualize_pc(start_pc_w, start_color, grasp)
+            # 先移动到 result_pre
+            result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
+            self.follow_path(result_pre)
+            
+            # 再移动到 result
+            result = self.plan_path(target_pose=Tph2w, wrt_world=True)
+            # visualize_pc(start_pc_w, start_color, grasp)
+            self.follow_path(result)
+            break
+        
+        self.close_gripper()
         
         # 关闭点云, 保持抓取姿势，向着 axis 移动（此时需要关闭点云遮挡）
         
@@ -222,27 +271,6 @@ class ManipulateEnv(BaseEnv):
             self.step()
             
         pass
-    
-    def grasp2panda_hand(self, grasp):
-        # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
-        R_grasp2w = grasp.rotation_matrix # 3, 3
-        t_grasp2w = grasp.translation # 3
-        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
-        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
-        
-        # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
-        # offset_list = [0.03, 0.02, 0.04, 0.01, 0.05]
-        offset_list = [0.03]
-        def T_with_offset(offset):
-            Tph2grasp = np.array([
-                [0, 0, 1, -(0.045 + 0.069 - offset)], 
-                [0, 1, 0, 0], 
-                [-1, 0, 0, 0], 
-                [0, 0, 0, 1]
-            ])
-            return Tph2grasp
-        Tph2w_list = [Tgrasp2w @ T_with_offset(offset) for offset in offset_list]
-        return Tph2w_list
     
     def evaluate(self):
         # 从环境中获取当前的 joint state
