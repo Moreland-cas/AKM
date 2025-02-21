@@ -13,6 +13,60 @@ from embodied_analogy.environment.base_env import BaseEnv
 from embodied_analogy.utility import *
 from embodied_analogy.perception import *
 from embodied_analogy.estimation.relocalization import relocalization
+from embodied_analogy.estimation.utils import find_correspondences
+from scipy.spatial.transform import Rotation as R
+
+def find_nearest_grasp(grasp_group, contact_point):
+    '''
+        grasp_group: graspnetAPI 
+        contact_point: (3, )
+    '''
+    # 找到 grasp_group 中距离 contact_point 最近的 grasp 并返回
+    # 首先根据 grasp 的 score 排序, 筛选出前20
+    grasp_group = grasp_group.nms().sort_by_score()
+    grasp_group = grasp_group[0:50]
+    
+    # 找到距离 contact_point 最近的 grasp
+    translations = grasp_group.translations # N, 3
+    distances = np.linalg.norm(translations - contact_point, axis=1)
+    nearest_index = np.argmin(distances)
+    nearest_index = int(nearest_index)
+    return grasp_group[nearest_index]
+    
+def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=False):
+    '''
+        找到离 contact region 中点最近的 grasp, 且越是垂直于 joint_axis 越好
+        grasp_group: from graspnetAPI 
+        contact_point: (N, 3), 也即是 moving part
+    '''
+    if grasp_pre_filter: # 保留前 50 的 grasp
+        grasp_group = grasp_group.nms().sort_by_score()
+        grasp_group = grasp_group[0:50]
+        
+    t_grasp2w = grasp_group.translations # N, 3
+    pred_scores = grasp_group.scores # N
+    
+    _, distances, _ = find_correspondences(t_grasp2w, contact_region) # N
+    distance_scores = np.exp(-2 * distances) 
+    
+    R_grasp2w = grasp_group.rotation_matrices # N, 3, 3
+    def R2unitAxis(rotation_matrix):
+        rotation = R.from_matrix(rotation_matrix)
+        axis_angle = rotation.as_rotvec()
+        rotation_axis = axis_angle / np.linalg.norm(axis_angle)
+        return rotation_axis
+    pred_axis = np.array([R2unitAxis(R_grasp2w[i]) for i in range(len(R_grasp2w))]) # N, 3
+    angle_scores = np.abs(np.sum(pred_axis * joint_axis, axis=-1)) # N
+    
+    grasp_scores = pred_scores * distance_scores * angle_scores # N
+    
+    # 找到距离 contact_point 最近的 grasp
+    index = np.argsort(grasp_scores)
+    index = index[::-1]
+    grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
+    
+    return grasp_group, grasp_scores[index]
+
 
 class ManipulateEnv(BaseEnv):
     def __init__(
@@ -42,7 +96,7 @@ class ManipulateEnv(BaseEnv):
         for i, joint_name in enumerate(active_joint_names):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
-                initial_state.append(0.15)
+                initial_state.append(0.1)
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -66,27 +120,6 @@ class ManipulateEnv(BaseEnv):
                     self.active_joints[j].set_drive_target(result['position'][i][j])
                     self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
                 self.step()
-            
-    def update_pointcloud_for_avoidance(self, point_cloud):
-        # point_cloud: N, 3 in world space
-        self.planner.update_point_cloud(point_cloud)
-    
-    def find_nearest_grasp(self, grasp_group, contact_point):
-        '''
-            grasp_group: graspnetAPI 
-            contact_point: (3, )
-        '''
-        # 找到 grasp_group 中距离 contact_point 最近的 grasp 并返回
-        # 首先根据 grasp 的 score 排序, 筛选出前20
-        grasp_group = grasp_group.nms().sort_by_score()
-        grasp_group = grasp_group[0:50]
-        
-        # 找到距离 contact_point 最近的 grasp
-        translations = grasp_group.translations # N, 3
-        distances = np.linalg.norm(translations - contact_point, axis=1)
-        nearest_index = np.argmin(distances)
-        nearest_index = int(nearest_index)
-        return grasp_group[nearest_index]
     
     def manipulate(self, delta_state=0):
         # 1) 首先估计出当前的 joint state
@@ -95,7 +128,7 @@ class ManipulateEnv(BaseEnv):
         self.viewer.render()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
         
-        initial_bbox, initial_mask = run_grounded_sam(
+        _, initial_mask = run_grounded_sam(
             rgb_image=rgb_np,
             text_prompt="drawer",
             positive_points=None, 
@@ -106,53 +139,110 @@ class ManipulateEnv(BaseEnv):
         )
         query_dynamic = initial_mask.astype(np.int32) * MOVING_LABEL
         
-        # start_state = relocalization(
-        #     K=self.camera_intrinsic, 
-        #     query_dynamic=query_dynamic,
-        #     query_depth=depth_np, 
-        #     ref_depths=self.obj_repr["depth_seq"], 
-        #     joint_type=self.obj_repr["joint_type"], 
-        #     joint_axis_unit=self.obj_repr["joint_axis"], 
-        #     ref_joint_states=self.obj_repr["joint_states"], 
-        #     ref_dynamics=self.obj_repr["dynamic_mask_seq"],
-        #     lr=5e-3,
-        #     tol=1e-7,
-        #     icp_select_range=0.1,
-        #     visualize=False
-        # )
-        start_state = 0
-        
-        print("cur state est: ", start_state)
+        start_state, query_dynamic_updated = relocalization(
+            K=self.camera_intrinsic, 
+            query_dynamic=query_dynamic,
+            query_depth=depth_np, 
+            ref_depths=self.obj_repr["depth_seq"], 
+            joint_type=self.obj_repr["joint_type"], 
+            joint_axis_unit=self.obj_repr["joint_axis"], 
+            ref_joint_states=self.obj_repr["joint_states"], 
+            ref_dynamics=self.obj_repr["dynamic_mask_seq"],
+            lr=5e-3,
+            tol=1e-7,
+            icp_select_range=0.1,
+            visualize=False
+        )
+        print("cur state est: ", start_state)      
         
         # 根据 target_joint_state 计算出 delta joint state
         target_state = start_state + delta_state
         
         # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
-        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic > 0, self.camera_intrinsic) # N, 3
+        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic == MOVING_LABEL, self.camera_intrinsic) # N, 3
         start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
         joint_axis_c = self.obj_repr["joint_axis"]
         Rc2w = np.linalg.inv(self.camera_extrinsic)[:3, :3]
         joint_axis_w = Rc2w @ joint_axis_c
         joint_axis_outward_w = -joint_axis_w
         start_color = rgb_np[query_dynamic > 0] / 256.
-        self.grasp_group = self.detect_grasp_anygrasp(
+        
+        grasp_group = self.detect_grasp_anygrasp(
             start_pc_w, 
             start_color, 
             joint_axis=joint_axis_outward_w, 
-            visualize=True
+            visualize=False
         )
         # self.reset_franka_arm()
         
         # 筛选出评分比较高的 grasp
-        # 评分标准: 离 moving part比较近, approaching vector 尽可能的平行于 joint_axis
-        # TODO
+        contact_region_c = depth_image_to_pointcloud(depth_np, query_dynamic_updated == MOVING_LABEL, self.camera_intrinsic)
+        contact_region_w = camera_to_world(contact_region_c, self.camera_extrinsic)
+        self.sorted_grasps, grasp_scores = score_grasp_group(
+            grasp_group=grasp_group, 
+            contact_region=contact_region_w, 
+            joint_axis=joint_axis_w, 
+            grasp_pre_filter=False
+        )
+
+        if False:
+            visualize_pc(
+                np.concatenate([start_pc_w, contact_region_w + 0.02], axis=0), 
+                np.concatenate([start_color, np.array([[1, 0, 0]] * len(contact_region_w))], axis=0),
+                self.sorted_grasps[:10]
+            )
         
-        # 更新 planner 的点云, 并移动 gripper 到 grasp 的位置进行抓取
+        # 更新 planner 的点云, 让 panda_hand 可以成功到达抓取位置
+        self.planner.update_point_cloud(start_pc_w, resolution=0.01)
+        # visualize_pc(start_pc_w)
+        self.open_gripper()
+        # 将抓取姿势从 Tgrasp2w 转换到 Tph2w, 从而可以移动 panda_hand
+        move_to_initial = False
+        for grasp in self.sorted_grasps:
+            if move_to_initial:
+                break
+            visualize_pc(start_pc_w, start_color, grasp)
+            Tph2w_list = self.grasp2panda_hand(grasp)
+            for Tph2w in Tph2w_list:
+                # 尝试移动到这里
+                result = self.plan_path(target_pose=Tph2w, wrt_world=True)
+                if result is None:
+                    print("find another target pose")
+                    continue
+                # visualize_pc(start_pc_w, start_color, grasp)
+                self.follow_path(result)
+                # self.close_gripper()
+                move_to_initial = True
+                break
         
-        # 保持抓取姿势，向着 axis 移动（此时需要关闭点云遮挡）
+        # 关闭点云, 保持抓取姿势，向着 axis 移动（此时需要关闭点云遮挡）
         
         # 进行 reset, 并进行状态估计
+        while True:
+            self.step()
+            
         pass
+    
+    def grasp2panda_hand(self, grasp):
+        # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
+        R_grasp2w = grasp.rotation_matrix # 3, 3
+        t_grasp2w = grasp.translation # 3
+        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
+        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
+        
+        # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
+        # offset_list = [0.03, 0.02, 0.04, 0.01, 0.05]
+        offset_list = [0.03]
+        def T_with_offset(offset):
+            Tph2grasp = np.array([
+                [0, 0, 1, -(0.045 + 0.069 - offset)], 
+                [0, 1, 0, 0], 
+                [-1, 0, 0, 0], 
+                [0, 0, 0, 1]
+            ])
+            return Tph2grasp
+        Tph2w_list = [Tgrasp2w @ T_with_offset(offset) for offset in offset_list]
+        return Tph2w_list
     
     def evaluate(self):
         # 从环境中获取当前的 joint state
@@ -240,7 +330,7 @@ class ManipulateEnv(BaseEnv):
                 # self.spawn_cube(contact_point, color=[0, 1, 0])
             
             # 找到与 contact_point 最近的 grasp, 即得到了 Tgrasp2w, 但这里的 grasp 和 panda_hand 坐标系还不同
-            grasp = self.find_nearest_grasp(self.grasp_group, contact_point)
+            grasp = find_nearest_grasp(self.grasp_group, contact_point)
             visualize_pc(target_pc, target_pc_color, grasp)
             Tgrasp2w_R = grasp.rotation_matrix # 3, 3
             Tgrasp2w_t = grasp.translation # 3
@@ -285,6 +375,6 @@ if __name__ == '__main__':
     
     demo.manipulate()
     
-    while True:
-        demo.step()
+    # while True:
+    #     demo.step()
     

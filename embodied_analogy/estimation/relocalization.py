@@ -63,13 +63,41 @@ def relocalization(
         lr=lr,
         tol=tol,
         icp_select_range=icp_select_range,
-        visualize=visualize
+        visualize=False
     )
     query_state_updated = updated_states[0]
+
+    # 在这里对于 query_dynamic 进行更新
+    # 也就是说把 ref_frame 的 moving part 投影到 query frame 上, 对 query_dynamic 进行一个更新 (其余部分设置为 unknown)
+    query_dynamic_zero = np.zeros_like(query_dynamic).astype(np.bool_) # H, W
+    for i in range(num_ref):
+        ref_moving_pc = depth_image_to_pointcloud(ref_depths[i], ref_dynamics[i]==MOVING_LABEL, K) # N, 3
+        Tref2query = joint_data_to_transform(
+            joint_type=joint_type,
+            joint_axis=joint_axis_unit,
+            joint_state_ref2tgt=query_state_updated-ref_joint_states[i]
+        )
+        ref_moving_pc_aug = np.concatenate([ref_moving_pc, np.ones((len(ref_moving_pc), 1))], axis=1) # N, 4
+        moving_pc = (ref_moving_pc_aug @ Tref2query.T)[:, :3] # N, 3
+        moving_uv, _ = camera_to_image(moving_pc, K) # N, 2
+        moving_uv = moving_uv.astype(np.int32)
+        tmp_zero = np.zeros_like(query_dynamic)
+        tmp_zero[moving_uv[:, 1], moving_uv[:, 0]] = True # H, W
+        query_dynamic_zero = query_dynamic_zero | tmp_zero
+    
+    obj_mask = (query_dynamic > 0)
+    query_dynamic_updated = obj_mask * UNKNOWN_LABEL # H, W, 一些为 True 的地方 
+    query_dynamic_updated[(obj_mask & query_dynamic_zero).astype(np.bool_)] = MOVING_LABEL
     
     if visualize:
-        pass
-    return query_state_updated
+        # 展示 dynamic query 的变化
+        import napari 
+        viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
+        viewer.title = "relocalization"
+        viewer.add_labels(query_dynamic.astype(np.int32), name='initial query dynamic')
+        viewer.add_labels(query_dynamic_updated.astype(np.int32), name='filtered query dynamic')
+        napari.run()
+    return query_state_updated, query_dynamic_updated
 
 
 if __name__ == "__main__":

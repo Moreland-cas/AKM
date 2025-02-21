@@ -231,9 +231,13 @@ def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     """
     # TODO: 将 leafsize 和 num_workers 再优化
     tree = cKDTree(target_pc)
-    distances, indices = tree.query(ref_pc, workers=8)
-    valid_mask = distances < max_distance
-    return indices, valid_mask
+    distances, indices = tree.query(ref_pc, workers=4)
+    
+    if max_distance > 0.0:
+        valid_mask = distances < max_distance
+    else:
+        valid_mask = np.ones(distances.shape, dtype=np.bool_)
+    return indices, distances, valid_mask
 
 def rotation_matrix_between_vectors(a, b):
     # 假设满足 R @ a = b, 求R

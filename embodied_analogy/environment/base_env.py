@@ -376,19 +376,6 @@ class BaseEnv():
         self.viewer.render()
         self.cur_steps += 1
             
-    def follow_path(self, result):
-        n_step = result['position'].shape[0]
-        # print("n_step:", n_step)
-        for i in range(n_step):  
-            qf = self.robot.compute_passive_force(
-                gravity=True, 
-                coriolis_and_centrifugal=True)
-            self.robot.set_qf(qf)
-            for j in range(7):
-                self.active_joints[j].set_drive_target(result['position'][i][j])
-                self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
-            self.step()
-            
     def open_gripper(self):
         # for i in range(100):
         #     self.step()
@@ -421,21 +408,35 @@ class BaseEnv():
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
         self.close_gripper()
         
-    def move_to_pose_with_RRTConnect(self, pose: mplib.pymp.Pose, wrt_world: bool):
+    def plan_path(self, target_pose, wrt_world: bool):
+        # 传入的 target_pose 是 Tph2w
+        if isinstance(target_pose, np.ndarray):
+            target_pose = mplib.Pose(target_pose)
         result = self.planner.plan_pose(
-            goal_pose=pose, 
+            goal_pose=target_pose, 
             current_qpos=self.robot.get_qpos(), 
             time_step=0.1, 
             rrt_range=0.1,
-            # planning_time=1,
-            planning_time=0.5,
+            planning_time=1,
+            # planning_time=0.5,
             wrt_world=wrt_world
         )
         if result['status'] != "Success":
-            # print(result['status'])
-            return -1
-        self.follow_path(result)
-        return 0
+            return None
+        return result
+    
+    def follow_path(self, result):
+        n_step = result['position'].shape[0]
+        # print("n_step:", n_step)
+        for i in range(n_step):  
+            qf = self.robot.compute_passive_force(
+                gravity=True, 
+                coriolis_and_centrifugal=True)
+            self.robot.set_qf(qf)
+            for j in range(7):
+                self.active_joints[j].set_drive_target(result['position'][i][j])
+                self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
+            self.step()
     
     def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
         status = self.move_to_pose_with_RRTConnect(pose, wrt_world)
@@ -463,13 +464,6 @@ class BaseEnv():
         colors = colors.astype(np.float32)
         points_input = points.copy() # N, 3
         colors_input = colors.copy()
-        
-        # 坐标系转换,将世界坐标系绕着 x 轴旋转 180 度得到 app 坐标系
-        # Rw2app = np.array([
-        #     [1, 0, 0],
-        #     [0, -1, 0],
-        #     [0, 0, -1]
-        # ])
         
         # coor_app = Rw2app @ coor_w, 也即 -joint_axis = Rw2app @ (0, 0, 1)
         Rw2app = rotation_matrix_between_vectors(np.array([0, 0, 1]), -joint_axis)
