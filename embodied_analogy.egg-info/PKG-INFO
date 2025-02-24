@@ -4,6 +4,7 @@ Version: 1.0
 Author: Boyuan Zhang
 Author-email: zhangboyuan17@mails.ucas.ac.cn
 Requires-Dist: open3d
+Requires-Dist: opencv-python-headless
 Requires-Dist: pygame==2.6.1
 Requires-Dist: sapien==2.2.2
 Requires-Dist: transforms3d

@@ -33,20 +33,22 @@ conda create -n $ENV_NAME python=3.10 -y
 source $(conda info --base)/etc/profile.d/conda.sh
 conda activate $ENV_NAME
 
-# 安装 Grounding DINO
-# echo "Installing Grounding DINO..."
-# cd third_party/GroundingDINO
-# pip install -e .
+# 设置 CUDA 相关变量
+export CUDA_HOME=/home/zby/Cudas/cuda-12.1
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-# 修复 opencv-python qt5 bug
-# pip uninstall opencv-python -y
-# pip install opencv-python-headless
+# 安装 Grounding DINO
+echo "Installing Grounding DINO..."
+cd third_party/GroundingDINO
+pip install -e .
+
+# resolve opencv
+pip uninstall opencv-python opencv-python-headless -y
+pip install opencv-python-headless 
 
 # 安装 napari
 echo "Installing napari..."
-# pip install opencv-python-headless
-# conda install numpy=1.24 -y
-python -m pip install "napari[pyqt5]" numpy==1.24 opencv-python
-# pip install opencv-python
+python -m pip install "napari[pyqt5]" numpy==1.24 
 
 echo "Setup complete!"

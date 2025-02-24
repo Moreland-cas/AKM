@@ -5,7 +5,6 @@ import numpy as np
 # napari.run()
 
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
-from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
@@ -133,6 +132,7 @@ if __name__ == "__main__":
         other_mask = np.arange(num_informative_frame_idx)!=i
         
         # 在这里先生成 query dynamics, 方式是通过 sam 得到物体的 bbox
+        from embodied_analogy.perception.grounded_sam import run_grounded_sam
         initial_bbox, initial_mask = run_grounded_sam(
             rgb_image=recon_data["rgb_seq"][i],
             text_prompt=text_prompt,

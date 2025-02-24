@@ -13,7 +13,6 @@ from graspnetAPI import Grasp
 from scipy.spatial.transform import Rotation as R
 
 from embodied_analogy.environment.base_env import BaseEnv
-from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.estimation.relocalization import relocalization
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
@@ -21,6 +20,7 @@ from embodied_analogy.utility.utils import (
     find_correspondences,
     camera_to_world
 )
+from embodied_analogy.perception.grounded_sam import run_grounded_sam
 
 def find_nearest_grasp(grasp_group, contact_point):
     '''
