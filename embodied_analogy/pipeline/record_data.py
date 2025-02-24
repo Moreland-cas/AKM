@@ -9,6 +9,7 @@ from embodied_analogy.utility.utils import (
     world_to_image,
     update_image
 )
+
     
 class RecordEnv(BaseEnv):
     def __init__(

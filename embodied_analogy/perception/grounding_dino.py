@@ -17,6 +17,10 @@ import groundingdino.datasets.transforms as T
 
 from groundingdino.util.inference import load_model, predict, annotate
 
+# import napari
+# viewer = napari.Viewer()
+# napari.run()
+
 def run_groundingDINO(
     image,
     text_prompt,
@@ -87,7 +91,7 @@ if __name__ == "__main__":
     # viewer.add_image(np.random.random((100, 100)))
     # napari.run()
     bbox_scaled, bbox_score = run_groundingDINO(
-        image="/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png",
+        image="/home/zby/Programs/Embodied_Analogy/assets/sapien_test.png",
         text_prompt="object",
         visualize=True
     )

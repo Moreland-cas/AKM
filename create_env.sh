@@ -23,7 +23,7 @@ ENV_NAME="$1"
 # 检查环境是否已存在
 if conda info --envs | grep -q "$ENV_NAME"; then
     echo "Conda environment '$ENV_NAME' already exists. Removing it..."
-    conda remove -n $ENV_NAME --all -y
+    conda remove -n $ENV_NAME -y
 fi
 
 # 创建 Conda 环境
@@ -38,7 +38,7 @@ conda activate $ENV_NAME
 echo "Installing dependencies..."
 conda install openblas-devel -c anaconda -y
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-pip install ninja scipy
+pip install ninja scipy numpy==1.24.4
 
 # 设置 CUDA 相关变量
 export CUDA_HOME=/home/zby/Cudas/cuda-12.1
@@ -105,15 +105,18 @@ cd ../../
 pip install -e .
 
 # 修复 opencv-python qt5 bug
-pip uninstall opencv-python -y
+echo "Replace opencv-python with its headless version..."
+pip uninstall opencv-python opencv-python-headless -y
 pip install opencv-python-headless
 
 # 安装 napari
 echo "Installing napari..."
-# 在这里指定 numpy 版本以防止升级到 2.0
 python -m pip install "napari[pyqt5]" numpy==1.24.4
 
 # 删除 opencv 中的 qt5 插件, 防止与 cv2 冲突
 # rm /home/zby/ProgramFiles/anaconda3/envs/$ENV_NAME/lib/python3.10/site-packages/cv2/qt/plugins/platforms/libqxcb.so
 
 echo "Setup complete!"
+
+# TROUBLE SHOOTING
+# 1) 要确保 initialize_napari 函数和 sapien 的 renderer 函数在 import grounding_dino  之前执行 !!!

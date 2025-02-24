@@ -4,10 +4,6 @@
     控制机器人将物体操作到指定状态, 并进行评估
 
 """
-# import napari
-# viewer = napari.Viewer()
-# napari.run()
-
 import numpy as np
 from graspnetAPI import Grasp
 from scipy.spatial.transform import Rotation as R
@@ -18,9 +14,10 @@ from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
     find_correspondences,
-    camera_to_world
+    camera_to_world,
+    initialize_napari
 )
-from embodied_analogy.perception.grounded_sam import run_grounded_sam
+initialize_napari()
 
 def find_nearest_grasp(grasp_group, contact_point):
     '''
@@ -180,6 +177,8 @@ class ManipulateEnv(BaseEnv):
         self.viewer.render()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
         
+        from embodied_analogy.perception.grounded_sam import run_grounded_sam
+        
         _, initial_mask = run_grounded_sam(
             rgb_image=rgb_np,
             text_prompt="drawer",
@@ -187,7 +186,7 @@ class ManipulateEnv(BaseEnv):
             negative_points=self.get_points_on_arm()[0], # N, 2
             num_iterations=5,
             acceptable_thr=0.9,
-            visualize=False
+            visualize=True
         )
         query_dynamic = initial_mask.astype(np.int32) * MOVING_LABEL
         
@@ -203,7 +202,7 @@ class ManipulateEnv(BaseEnv):
             lr=5e-3,
             tol=1e-7,
             icp_select_range=0.1,
-            visualize=True
+            visualize=False
         )
         print("cur state est: ", start_state)      
         

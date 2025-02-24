@@ -18,11 +18,25 @@ import matplotlib.cm as cm
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial import cKDTree
 
-from cotracker.utils.visualizer import Visualizer
 from embodied_analogy.utility.constants import *
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 
+def initialize_napari():
+    # there are 2 ways:
+    # 1) need to manually close
+    # import napari
+    # viewer = napari.Viewer()
+    # napari.run()
+    # 2) automatically close
+    import napari
+    from qtpy.QtCore import QTimer
 
+    with napari.gui_qt() as app:
+        viewer = napari.Viewer()
+        time_in_msec = 100
+        QTimer().singleShot(time_in_msec, app.quit)
+    viewer.close()
+    
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
     return pygame.image.fromstring(np.array(pil_image).tobytes(), pil_image.size, "RGB")
