@@ -577,6 +577,7 @@ def fine_joint_estimation_seq(
         
         moving_pcs = napari_time_series_transform(moving_pcs) # T*N, d
         
+        import napari
         viewer = napari.Viewer(ndisplay=3)
         size = 0.002
         viewer.add_points(moving_pcs, size=size, name='moving_pc', opacity=0.8, face_color="blue")

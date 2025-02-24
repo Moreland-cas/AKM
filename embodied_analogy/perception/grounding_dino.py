@@ -1,11 +1,21 @@
 import os
+import numpy as np
+# from PyQt5.QtCore import QCoreApplication, QLibraryInfo
+
+# # 在代码开头添加以下配置
+# os.environ["QT_DEBUG_PLUGINS"] = "1"  # 开启插件调试
+# os.environ["QT_PLUGIN_PATH"] = QLibraryInfo.location(QLibraryInfo.PluginsPath)
 import cv2
 import torch
-import numpy as np
 from PIL import Image
 from torchvision.ops import box_convert
 import groundingdino.datasets.transforms as T
-from groundingdino.util.inference import load_model, predict, annotate, load_image
+
+# import napari
+# viewer = napari.Viewer()
+# napari.run()
+
+from groundingdino.util.inference import load_model, predict, annotate
 
 def run_groundingDINO(
     image,
@@ -46,6 +56,7 @@ def run_groundingDINO(
         box_threshold=0.35, 
         text_threshold=0.25
     )
+
     if visualize:
         annotated_frame_BGR = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
         annotated_frame_RGB = cv2.cvtColor(annotated_frame_BGR, cv2.COLOR_BGR2RGB)
@@ -67,16 +78,17 @@ def run_groundingDINO(
     return bbox_scaled_sorted, bbox_score_sorted
 
 
-def get_cur_frame_obj_mask(image):
-    pass
-
-
 
 if __name__ == "__main__":
+    # test()
     # load_image("/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png")
+    # import napari
+    # viewer = napari.Viewer()
+    # viewer.add_image(np.random.random((100, 100)))
+    # napari.run()
     bbox_scaled, bbox_score = run_groundingDINO(
         image="/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png",
         text_prompt="object",
-        visualize=True
+        visualize=False
     )
-    pass
+    print(bbox_scaled, bbox_score)

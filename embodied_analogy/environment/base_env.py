@@ -8,6 +8,7 @@ from embodied_analogy.estimation.utils import rotation_matrix_between_vectors
 from PIL import Image, ImageColor
 import open3d as o3d
 import transforms3d as t3d
+import napari
 
 class BaseEnv():
     def __init__(
@@ -463,8 +464,11 @@ class BaseEnv():
             self.step()
     
     def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
-        status = self.move_to_pose_with_RRTConnect(pose, wrt_world)
-        return status
+        result = self.plan_path(target_pose=pose, wrt_world=wrt_world)
+        if result is not None:
+            self.follow_path(result)
+        else:
+            "plan path failed!"
     
     def get_ee_pose(self):
         # 获取ee_pos和ee_quat
@@ -543,7 +547,7 @@ if __name__ == "__main__":
     # for i in range(100):
     while True:
         env.step()
-        env.capture_rgbd_sapien2(visualize=True)
+        # env.capture_rgbd_sapien2(visualize=True)
         
     pts_on_arm_2d, pts_on_arm_3d = env.get_points_on_arm() # N, 3
     from embodied_analogy.utility.utils import world_to_image

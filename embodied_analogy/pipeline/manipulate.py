@@ -8,6 +8,12 @@ import mplib
 from graspnetAPI import Grasp
 from PIL import Image
 import numpy as np
+
+import napari
+viewer = napari.Viewer()
+viewer.add_image(np.random.random((100, 100)))
+napari.run()
+
 import transforms3d as t3d
 from embodied_analogy.environment.base_env import BaseEnv
 from embodied_analogy.utility import *

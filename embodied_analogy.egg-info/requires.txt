@@ -1,5 +1,4 @@
 open3d
-opencv-python
 pygame==2.6.1
 sapien==2.2.2
 transforms3d

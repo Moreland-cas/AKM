@@ -236,7 +236,7 @@ class RecordEnv(BaseEnv):
                         target_quat = t3d.quaternions.qmult(target_quat, delta_quat)
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
-                    elif event.key == pygame.K_x:  # "r"键归位
+                    elif event.key == pygame.K_x:  # "x"键归位
                         target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(90), np.deg2rad(90), axes="syxz")
                         target_pose = mplib.Pose(p=target_pos, q=target_quat)
                         self.move_to_pose(target_pose, wrt_world=True)
@@ -267,7 +267,7 @@ if __name__ == '__main__':
         "scale": 0.8,
         "pose": [1.0, 0., 0.5],
         "active_link": "link_1",
-        "activate_joint": "joint_1"
+        "active_joint": "joint_1"
     }
     
     # door 
@@ -276,7 +276,7 @@ if __name__ == '__main__':
     #     "scale": 0.7,
     #     "pose": [0.6, 0., 0.5],
     #     "active_link": "link_1",
-    #     "activate_joint": "joint_0"
+    #     "active_joint": "joint_0"
     # }
     
     # pot
@@ -285,7 +285,7 @@ if __name__ == '__main__':
     #     "scale": 0.3,
     #     "pose": [0.5, 0., 0.2],
     #     "active_link": "link_1",
-    #     "activate_joint": "joint_0"
+    #     "active_joint": "joint_0"
     # }
     
     record_env.load_articulated_object(obj_config)

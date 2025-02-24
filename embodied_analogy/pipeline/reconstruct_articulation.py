@@ -1,5 +1,12 @@
 import os
 import numpy as np
+
+
+import napari
+viewer = napari.Viewer()
+viewer.add_image(np.random.random((100, 100)))
+napari.run()
+
 from PIL import Image
 import sklearn.cluster as cluster
 
@@ -10,7 +17,7 @@ from embodied_analogy.utility import *
 
 
 ################################# PARAMS #################################
-visualize = False
+visualize = True
 num_initial_uvs = 1000
 num_informative_frame_idx = 5
 text_prompt = "drawer"
@@ -246,15 +253,17 @@ print(f"time used: {algo_end - algo_start} s")
 
 # 将重建的数据保存在 tmp_folder 下
 # 需要保存: rgb_seq[informative_frame_idx], depth_seq[informative_frame_idx], dynamic_mask_seq_updated, joint_axis_updated, jonit_states_updated
-np.savez(
-    tmp_folder + "reconstructed_data.npz",
-    K=K,
-    rgb_seq=rgb_seq[informative_frame_idx],
-    depth_seq=depth_seq[informative_frame_idx],
-    dynamic_mask_seq=dynamic_mask_seq_updated,
-    joint_axis=joint_axis_updated,
-    joint_states=jonit_states_updated,
-    joint_type=joint_type,
-    franka_tracks_seq=franka_tracks_seq[informative_frame_idx],
-)
+save = False
+if save:
+    np.savez(
+        tmp_folder + "reconstructed_data.npz",
+        K=K,
+        rgb_seq=rgb_seq[informative_frame_idx],
+        depth_seq=depth_seq[informative_frame_idx],
+        dynamic_mask_seq=dynamic_mask_seq_updated,
+        joint_axis=joint_axis_updated,
+        joint_states=jonit_states_updated,
+        joint_type=joint_type,
+        franka_tracks_seq=franka_tracks_seq[informative_frame_idx],
+    )
 

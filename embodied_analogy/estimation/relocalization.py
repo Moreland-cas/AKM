@@ -1,3 +1,8 @@
+import numpy as np
+# import napari
+# viewer = napari.Viewer()
+# napari.run()
+
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
 from embodied_analogy.utility import *
 def relocalization(
@@ -116,7 +121,7 @@ if __name__ == "__main__":
     # 开始 relocalization 的部分
     reloc_states = []
 
-    num_informative_frame_idx = len(recon_data["jonit_states"])
+    num_informative_frame_idx = len(recon_data["joint_states"])
     for i in range(num_informative_frame_idx):
         other_mask = np.arange(num_informative_frame_idx)!=i
         
@@ -132,7 +137,7 @@ if __name__ == "__main__":
         )
         query_dynamic_initial = initial_mask.astype(np.int32) * MOVING_LABEL
         
-        reloc_state = relocalization(
+        reloc_state, _ = relocalization(
             K=recon_data["K"], 
             query_dynamic=query_dynamic_initial,
             query_depth=recon_data["depth_seq"][i], 
@@ -149,6 +154,6 @@ if __name__ == "__main__":
         )
         # print(reloc_state)
         reloc_states.append(reloc_state)
-    jonit_states = recon_data["jonit_states"]
+    jonit_states = recon_data["joint_states"]
     print(f"gt states: {jonit_states}")
     print("reloc states: ", np.array(reloc_states))
