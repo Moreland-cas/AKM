@@ -1,5 +1,5 @@
-from embodied_analogy.perception.sam_masking import *
-from embodied_analogy.perception.grounding_dino import *
+from embodied_analogy.perception.sam_masking import run_sam_whole
+from embodied_analogy.perception.grounding_dino import run_groundingDINO
 
 def run_grounded_sam(
     rgb_image,

@@ -1,9 +1,19 @@
 import os
+import torch
 import numpy as np
 from PIL import Image
 from embodied_analogy.estimation.icp_loss import icp_loss_torch
-from embodied_analogy.utility import *
-from embodied_analogy.estimation.utils import *
+from embodied_analogy.utility.utils import (
+    depth_image_to_pointcloud,
+    camera_to_image, 
+    camera_to_image_torch,
+    reconstruct_mask, 
+    depth_image_to_pointcloud, 
+    joint_data_to_transform,
+    napari_time_series_transform,
+    compute_normals
+)
+from embodied_analogy.utility.constants import *
 
 ###################### deprecated ######################
 def segment_ref_obj_mask(

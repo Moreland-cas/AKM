@@ -4,7 +4,9 @@ import numpy as np
 # napari.run()
 
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
-from embodied_analogy.utility import *
+from embodied_analogy.utility.constants import *
+
+
 def relocalization(
     K, 
     # query_rgb, 
@@ -109,7 +111,6 @@ if __name__ == "__main__":
     visualize = False
     text_prompt = "drawer"
 
-    set_random_seed(79)
     torch.autograd.set_detect_anomaly(True)
 
     from embodied_analogy.pipeline.process_recorded_data import *

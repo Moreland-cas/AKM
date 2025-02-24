@@ -50,6 +50,7 @@ def vis_pointcloud_series_napari(pc_series, colors=None):
         napari_data.append(pc_with_t)
     napari_data = np.concatenate(napari_data, axis=0)
     
+    import napari
     viewer = napari.Viewer(ndisplay=3)
     # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
     if colors is not None:
@@ -59,21 +60,6 @@ def vis_pointcloud_series_napari(pc_series, colors=None):
         viewer.add_points(napari_data, size=0.02, name='pc_series', opacity=0.8)
     napari.run()
 
-
-def napari_time_series_transform(original_data):
-    """
-        将原始的时序数据转换为 napari 可视化所需的格式。
-        original_data: np.ndarray, (T, N, d)
-        returned_data: np.ndarray, (T*N, 1+d), 1代表时间维度
-    """
-    T = len(original_data)
-    napari_data = []
-    for i in range(T):
-        tmp_data = original_data[i] # M, d
-        tmp_data_with_t = np.concatenate([np.ones((tmp_data.shape[0], 1)) * i, tmp_data], axis=1) # M, (1+d)
-        napari_data.append(tmp_data_with_t)
-    napari_data = np.concatenate(napari_data, axis=0)
-    return napari_data
 
 
 if __name__ == '__main__':

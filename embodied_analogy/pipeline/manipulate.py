@@ -4,22 +4,21 @@
     控制机器人将物体操作到指定状态, 并进行评估
 
 """
+# import napari
+# viewer = napari.Viewer()
+# napari.run()
+
 import mplib
 from graspnetAPI import Grasp
 from PIL import Image
 import numpy as np
-
-import napari
-viewer = napari.Viewer()
-viewer.add_image(np.random.random((100, 100)))
-napari.run()
-
 import transforms3d as t3d
 from embodied_analogy.environment.base_env import BaseEnv
 from embodied_analogy.utility import *
-from embodied_analogy.perception import *
+# from embodied_analogy.perception.grounded_sam import run_grounded_sam
+# from embodied_analogy.perception.sam_masking import run_sam_whole
 from embodied_analogy.estimation.relocalization import relocalization
-from embodied_analogy.estimation.utils import find_correspondences
+from embodied_analogy.utility.utils import find_correspondences
 from scipy.spatial.transform import Rotation as R
 
 def find_nearest_grasp(grasp_group, contact_point):

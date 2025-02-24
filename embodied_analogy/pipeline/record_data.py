@@ -1,13 +1,14 @@
-import sapien.core as sapien
-from sapien.utils.viewer import Viewer
 import mplib
+import pygame
 import numpy as np
 import transforms3d as t3d
-import trimesh
-# from trimesh_utils import *
 from datetime import datetime
-from embodied_analogy.utility.utils import *
+from PIL import Image
 from embodied_analogy.environment.base_env import BaseEnv
+from embodied_analogy.utility.utils import (
+    world_to_image,
+    update_image
+)
     
 class RecordEnv(BaseEnv):
     def __init__(

@@ -1,13 +1,7 @@
-import os
-import shutil
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
-from PIL import Image
-import hydra
-
-from sam2.build_sam import build_sam2_video_predictor
 import sys
+import torch
+import numpy as np
+from sam2.build_sam import build_sam2_video_predictor
 sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/sam2")
 
 def run_sam2_part(
