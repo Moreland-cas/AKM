@@ -8,18 +8,19 @@
 # viewer = napari.Viewer()
 # napari.run()
 
-import mplib
-from graspnetAPI import Grasp
-from PIL import Image
 import numpy as np
-import transforms3d as t3d
-from embodied_analogy.environment.base_env import BaseEnv
-from embodied_analogy.utility import *
-# from embodied_analogy.perception.grounded_sam import run_grounded_sam
-# from embodied_analogy.perception.sam_masking import run_sam_whole
-from embodied_analogy.estimation.relocalization import relocalization
-from embodied_analogy.utility.utils import find_correspondences
+from graspnetAPI import Grasp
 from scipy.spatial.transform import Rotation as R
+
+from embodied_analogy.environment.base_env import BaseEnv
+from embodied_analogy.perception.grounded_sam import run_grounded_sam
+from embodied_analogy.estimation.relocalization import relocalization
+from embodied_analogy.utility.constants import *
+from embodied_analogy.utility.utils import (
+    depth_image_to_pointcloud,
+    find_correspondences,
+    camera_to_world
+)
 
 def find_nearest_grasp(grasp_group, contact_point):
     '''
@@ -280,7 +281,7 @@ class ManipulateEnv(BaseEnv):
     def evaluate(self):
         # 从环境中获取当前的 joint state
         pass
-    
+    """
     def manipulate_deprecated(self):
         # 让物体落下
         for i in range(100):
@@ -402,6 +403,7 @@ class ManipulateEnv(BaseEnv):
         
         while not self.viewer.closed:
             self.step()        
+            """
 
 if __name__ == '__main__':
     demo = ManipulateEnv()

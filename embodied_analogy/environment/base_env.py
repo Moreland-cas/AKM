@@ -3,19 +3,19 @@ import numpy as np
 import argparse
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
-# from embodied_analogy.utility import *
+from PIL import Image, ImageColor
+import open3d as o3d
+import transforms3d as t3d
+
 from embodied_analogy.utility.utils import (
     visualize_pc,
-    world_to_image
+    world_to_image,
+    rotation_matrix_between_vectors
 )
 from embodied_analogy.utility.sapien_utils import (
     parse_urdf_config,
     check_urdf_config,
 )
-from embodied_analogy.estimation.utils import rotation_matrix_between_vectors
-from PIL import Image, ImageColor
-import open3d as o3d
-import transforms3d as t3d
 
 class BaseEnv():
     def __init__(

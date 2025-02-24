@@ -89,6 +89,6 @@ if __name__ == "__main__":
     bbox_scaled, bbox_score = run_groundingDINO(
         image="/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png",
         text_prompt="object",
-        visualize=False
+        visualize=True
     )
     print(bbox_scaled, bbox_score)

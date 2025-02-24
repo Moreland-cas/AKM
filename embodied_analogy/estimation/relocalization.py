@@ -1,11 +1,17 @@
+import torch
 import numpy as np
 # import napari
 # viewer = napari.Viewer()
 # napari.run()
 
 from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
+from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.utility.constants import *
-
+from embodied_analogy.utility.utils import (
+    depth_image_to_pointcloud,
+    joint_data_to_transform,
+    camera_to_image
+)
 
 def relocalization(
     K, 
@@ -108,7 +114,7 @@ def relocalization(
 
 
 if __name__ == "__main__":
-    visualize = False
+    visualize = True
     text_prompt = "drawer"
 
     torch.autograd.set_detect_anomaly(True)
@@ -151,7 +157,7 @@ if __name__ == "__main__":
             tol=1e-7,
             # icp_select_range=0.2,
             icp_select_range=0.2,
-            visualize=False
+            visualize=visualize
         )
         # print(reloc_state)
         reloc_states.append(reloc_state)

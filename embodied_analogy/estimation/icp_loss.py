@@ -1,6 +1,9 @@
 import torch
 import numpy as np
-from embodied_analogy.estimation.utils import *
+from embodied_analogy.utility.utils import (
+    compute_normals,
+    find_correspondences
+)
 
 def icp_loss_torch(
     joint_axis_scaled, 
