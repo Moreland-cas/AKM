@@ -498,7 +498,8 @@ class BaseEnv():
         else:
             "plan path failed!"
     
-    def move_forward(self, moving_distance):
+    def move_along_axis(self, moving_direction, moving_distance, num_interpolation=10):
+        # moving_direction 是在世界坐标系下的方向
         # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
@@ -508,19 +509,26 @@ class BaseEnv():
             Tph2w = np.eye(4)
             Tph2w[:3, :3] = Rph2w
             # 对于 panda_hand 来说, z-axis 的正方向是向前
-            Tph2w[:3, 3] = ee_pose[:3] + Rph2w @ np.array([0, 0, delta])
+            Tph2w[:3, 3] = ee_pose[:3] + delta * moving_direction
             return Tph2w
         
         # 先得到连续的插值位姿
-        deltas = np.linspace(0, moving_distance, 10)
+        deltas = np.linspace(0, moving_distance, num_interpolation)
         T_list = [T_with_delta(delta) for delta in deltas]
         
         # 然后依次执行这些位姿
-        self.planner.update_point_cloud(np.array([[0, 0, -1]]))
         for Tph2w in T_list:
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
             self.follow_path(result)
     
+    def move_forward(self, moving_distance):
+        # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
+        _, ee_quat = self.get_ee_pose() # Tph2w
+        # scalar_first means quat in (w, x, y, z) order
+        Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
+        moving_direction = Rph2w @ np.array([0, 0, 1]) # 3
+        self.move_along_axis(moving_direction, moving_distance)
+            
     def get_ee_pose(self):
         # 获取ee_pos和ee_quat
         ee_link = self.robot.get_links()[9] # panda_hand

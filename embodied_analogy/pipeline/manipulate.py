@@ -9,7 +9,6 @@ from graspnetAPI import Grasp
 from scipy.spatial.transform import Rotation as R
 
 from embodied_analogy.environment.base_env import BaseEnv
-from embodied_analogy.estimation.relocalization import relocalization
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
@@ -17,9 +16,11 @@ from embodied_analogy.utility.utils import (
     camera_to_world,
     initialize_napari,
     compute_bbox_from_pc,
-    sample_points_on_bbox_surface
+    sample_points_on_bbox_surface,
+    visualize_pc
 )
 initialize_napari()
+
 
 def find_nearest_grasp(grasp_group, contact_point):
     '''
@@ -63,7 +64,8 @@ def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=
     pred_axis = np.array([R2unitAxis(R_grasp2w[i]) for i in range(len(R_grasp2w))]) # N, 3
     angle_scores = np.abs(np.sum(pred_axis * joint_axis, axis=-1)) # N
     
-    grasp_scores = pred_scores * distance_scores * angle_scores # N
+    # grasp_scores = pred_scores * distance_scores * angle_scores # N
+    grasp_scores = pred_scores * distance_scores  # N
     
     # 找到距离 contact_point 最近的 grasp
     index = np.argsort(grasp_scores)
@@ -101,7 +103,7 @@ class ManipulateEnv(BaseEnv):
         for i, joint_name in enumerate(active_joint_names):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
-                initial_state.append(0.06)
+                initial_state.append(0.1)
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -127,10 +129,12 @@ class ManipulateEnv(BaseEnv):
                     self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
                 self.step()
     
-    def grasp2ph(self, grasp_input):
+    def anyGrasp2executable_ph(self, grasp_input, pc_obs, reserved_distance=0.05):
         """
             根据 
         """
+        self.planner.update_point_cloud(pc_obs)
+        
         # ph is panda hand for short
         # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
         grasp = Grasp()
@@ -158,7 +162,7 @@ class ManipulateEnv(BaseEnv):
 
         # 再 dynamic 的调整 offset, 使得找到一个离物体表面最近, 且可以规划得到的 Tph2w
         # offset_list = [0.05, 0.04, 0.03, 0.02, 0.01, 0.0]  # 从近到远的顺序, 对应 offset 从大到小的试
-        offset_list = [0.02, 0.01, 0.0, -0.01, -0.02, -0.03, -0.04, -0.05]
+        offset_list = [0.05, 0.04, 0.03, 0.02]
         best_offset = None
         for offset in offset_list:
             result = self.plan_path(target_pose=Tgrasp2w @ T_with_offset(offset), wrt_world=True)
@@ -168,35 +172,25 @@ class ManipulateEnv(BaseEnv):
         
         if best_offset is None:
             return None, None
+        
         # 最后得到 Tph2w_pre, 为远离 target grasp pose 一定距离的版本, 防止碰撞发生
         Tph2w = Tgrasp2w @ T_with_offset(best_offset)
-        Tph2w_pre = Tgrasp2w @ T_with_offset(best_offset - 0.05)
+        Tph2w_pre = Tgrasp2w @ T_with_offset(best_offset - reserved_distance)
         
         return Tph2w_pre, Tph2w
     
-    def manipulate(self, delta_state=0):
+    def manipulate(self, delta_state=0, reserved_distance=0.05):
+        from embodied_analogy.estimation.relocalization import relocalization
+        
         # 1) 首先估计出当前的 joint state
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
         self.viewer.render()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
         
-        from embodied_analogy.perception.grounded_sam import run_grounded_sam
-        
-        _, initial_mask = run_grounded_sam(
-            rgb_image=rgb_np,
-            text_prompt="drawer",
-            positive_points=None, 
-            negative_points=self.get_points_on_arm()[0], # N, 2
-            num_iterations=5,
-            acceptable_thr=0.9,
-            visualize=False
-        )
-        query_dynamic = initial_mask.astype(np.int32) * MOVING_LABEL
-        
-        start_state, query_dynamic_updated = relocalization(
+        start_state, query_dynamic, query_dynamic_updated = relocalization(
             K=self.camera_intrinsic, 
-            query_dynamic=query_dynamic,
+            query_rgb=rgb_np,
             query_depth=depth_np, 
             ref_depths=self.obj_repr["depth_seq"], 
             joint_type=self.obj_repr["joint_type"], 
@@ -206,16 +200,15 @@ class ManipulateEnv(BaseEnv):
             lr=5e-3,
             tol=1e-7,
             icp_select_range=0.1,
+            text_prompt="drawer",
+            negative_points=self.get_points_on_arm()[0],
             visualize=False
         )
-        print("cur state est: ", start_state)      
-        
-        # 根据 target_joint_state 计算出 delta joint state
-        target_state = start_state + delta_state
+        print("current state estimation: ", start_state)      
+        print("target state estimation: ", start_state + delta_state)
         
         # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
-        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic_updated == MOVING_LABEL, self.camera_intrinsic) # N, 3
-        # start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic == MOVING_LABEL, self.camera_intrinsic) # N, 3
+        start_pc_c = depth_image_to_pointcloud(depth_np, query_dynamic == MOVING_LABEL, self.camera_intrinsic) # N, 3
         start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
         joint_axis_c = self.obj_repr["joint_axis"]
         Rc2w = np.linalg.inv(self.camera_extrinsic)[:3, :3]
@@ -229,12 +222,11 @@ class ManipulateEnv(BaseEnv):
             joint_axis=joint_axis_outward_w, 
             visualize=False
         )
-        # self.reset_franka_arm()
         
         # 筛选出评分比较高的 grasp
         contact_region_c = depth_image_to_pointcloud(depth_np, query_dynamic_updated == MOVING_LABEL, self.camera_intrinsic)
         contact_region_w = camera_to_world(contact_region_c, self.camera_extrinsic)
-        self.sorted_grasps, grasp_scores = score_grasp_group(
+        self.sorted_grasps, _ = score_grasp_group(
             grasp_group=grasp_group, 
             contact_region=contact_region_w, 
             joint_axis=joint_axis_w, 
@@ -248,49 +240,69 @@ class ManipulateEnv(BaseEnv):
                 self.sorted_grasps[:10]
             )
         
-        # 更新 planner 的点云, 让 panda_hand 可以成功到达抓取位置
-        # TODO: 在这里修改为将当前的观测点云用一个 bbox 进行拟合
-        start_bbox_min, start_bbox_max = compute_bbox_from_pc(start_pc_w, offset=0.03)
-        start_collision_points = sample_points_on_bbox_surface(start_bbox_min, start_bbox_max, num_samples=1000)
-        
-        # visualize_pc(start_pc_w)
         self.open_gripper()
         
         # 将抓取姿势从 Tgrasp2w 转换到 Tph2w, 从而可以移动 panda_hand
         for grasp in self.sorted_grasps:
             # visualize_pc(start_pc_w, start_color, grasp)
             
-            self.planner.update_point_cloud(start_pc_w)
-            Tph2w_pre, Tph2w = self.grasp2ph(grasp)
+            Tph2w_pre, _ = self.anyGrasp2executable_ph(grasp, start_pc_w, reserved_distance=reserved_distance)
             
             if Tph2w_pre is None:
                 continue
-            # visualize_pc(start_pc_w, start_color, grasp)
-            # 先移动到 result_pre
-            self.planner.update_point_cloud(start_collision_points)
-            # self.planner.update_point_cloud(start_pc_w)
-            result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
+            visualize_pc(start_pc_w, start_color, grasp)
             
-            # 在这里去掉 pc
+            # 先移动到 pre_grasp_pose
+            start_bbox_min, start_bbox_max = compute_bbox_from_pc(start_pc_w, offset=0.02)
+            start_collision_points = sample_points_on_bbox_surface(start_bbox_min, start_bbox_max, num_samples=1000)
+            self.planner.update_point_cloud(start_collision_points)
+            result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             self.follow_path(result_pre)
             
-            # 再移动到 result
-            self.planner.update_point_cloud(start_pc_w)
-            result = self.plan_path(target_pose=Tph2w, wrt_world=True)
-            # visualize_pc(start_pc_w, start_color, grasp)
-            self.follow_path(result)
+            # 再从 pre_grasp_pose 向前移动一段距离
+            self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+            self.move_forward(reserved_distance)
             break
         
         self.close_gripper()
         
         # 关闭点云, 保持抓取姿势，向着 axis 移动（此时需要关闭点云遮挡）
+        self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+        self.move_along_axis(joint_axis_outward_w, delta_state)
         
-        # 进行 reset, 并进行状态估计
+        # TODO：在这里加入 arm 的 reset 过程
+        
+        # 在这里进行一个状态估计, 输出算法 predict 的当前状态
+        # TODO：同时输出 gt 的 joint 状态
+        self.scene.step()
+        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        self.viewer.render()
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        
+        state_after_manip, _, _ = relocalization(
+            K=self.camera_intrinsic, 
+            query_rgb=rgb_np,
+            query_depth=depth_np, 
+            ref_depths=self.obj_repr["depth_seq"], 
+            joint_type=self.obj_repr["joint_type"], 
+            joint_axis_unit=self.obj_repr["joint_axis"], 
+            ref_joint_states=self.obj_repr["joint_states"], 
+            ref_dynamics=self.obj_repr["dynamic_mask_seq"],
+            lr=5e-3,
+            tol=1e-7,
+            icp_select_range=0.1,
+            text_prompt="drawer",
+            negative_points=self.get_points_on_arm()[0],
+            visualize=False
+        )
+        print("state estimation after manipulate: ", state_after_manip)   
+        
         while True:
             self.step()
     
     def reset_franka_arm_with_pc(self):        
         # 先打开 gripper, 再撤退一段距离
+        self.move_forward(-0.05) # 向后撤退 5 cm
         
         # 读取一帧 rgbd， 经过 sam 得到 pc， 对 pc 进行处理
         self.planner.update_point_cloud(pc)
@@ -430,7 +442,7 @@ class ManipulateEnv(BaseEnv):
 if __name__ == '__main__':
     demo = ManipulateEnv()
     
-    demo.manipulate()
+    demo.manipulate(delta_state=-0.1)
     
     # while True:
     #     demo.step()

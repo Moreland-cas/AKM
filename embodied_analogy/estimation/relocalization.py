@@ -1,20 +1,61 @@
 import torch
 import numpy as np
-# import napari
-# viewer = napari.Viewer()
-# napari.run()
 
-from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
-from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
     joint_data_to_transform,
     camera_to_image
 )
+from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
+from embodied_analogy.perception.grounded_sam import run_grounded_sam
+from embodied_analogy.utility.constants import *
 
 def relocalization(
     K, 
-    # query_rgb, 
+    query_rgb, 
+    query_depth, 
+    ref_depths, # T, H, W
+    joint_type, 
+    joint_axis_unit, 
+    ref_joint_states, 
+    ref_dynamics,
+    lr=5e-3,
+    tol=1e-7,
+    icp_select_range=0.1,
+    text_prompt="object",
+    negative_points=None, # N, 2
+    visualize=False
+):
+    # 相较与 _relocalization, 加入了 grounded sam 的部分    
+    _, obj_mask = run_grounded_sam(
+        rgb_image=query_rgb,
+        text_prompt=text_prompt,
+        positive_points=None, 
+        negative_points=negative_points, # N, 2
+        num_iterations=5,
+        acceptable_thr=0.9,
+        visualize=False
+    )
+    query_dynamic = obj_mask.astype(np.int32) * MOVING_LABEL
+        
+    query_state_updated, query_dynamic_updated = _relocalization(
+        K, 
+        query_dynamic,
+        query_depth, 
+        ref_depths, 
+        joint_type, 
+        joint_axis_unit, 
+        ref_joint_states, 
+        ref_dynamics,
+        lr=lr,
+        tol=tol,
+        icp_select_range=icp_select_range,
+        visualize=visualize
+    )
+    return query_state_updated, query_dynamic, query_dynamic_updated
+
+def _relocalization(
+    K, 
     query_dynamic,
     query_depth, 
     ref_depths, # T, H, W
@@ -25,9 +66,6 @@ def relocalization(
     lr=5e-3,
     tol=1e-7,
     icp_select_range=0.1,
-    # text_prompt="object",
-    # positive_points=None,
-    # negative_points=None,
     visualize=False
 ):
     if query_dynamic is None:
