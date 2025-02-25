@@ -28,14 +28,17 @@ def initialize_napari():
     # viewer = napari.Viewer()
     # napari.run()
     # 2) automatically close
-    import napari
-    from qtpy.QtCore import QTimer
+    global NAPARI_INITIALIZED
+    if not NAPARI_INITIALIZED:
+        import napari
+        from qtpy.QtCore import QTimer
 
-    with napari.gui_qt() as app:
-        viewer = napari.Viewer()
-        time_in_msec = 100
-        QTimer().singleShot(time_in_msec, app.quit)
-    viewer.close()
+        with napari.gui_qt() as app:
+            viewer = napari.Viewer()
+            time_in_msec = 100
+            QTimer().singleShot(time_in_msec, app.quit)
+        viewer.close()
+        NAPARI_INITIALIZED = True
     
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
@@ -1042,11 +1045,80 @@ def rotation_matrix_between_vectors(a, b):
     return R
 
 
-if __name__ == "__main__":
-    bbox = np.array([50, 50, 150, 150])  # 示例bbox
-    mask = np.random.choice([False, True], size=(200, 200))  # 随机生成一个mask
-    N = 200  # 需要采样的点数
+# 从点云中获取 bbox
+def compute_bbox_from_pc(points, offset=0):
+    """
+    计算点云的边界框，并根据offset扩张bbox。
 
-    valid_points = sample_points_within_bbox_and_mask(bbox, mask, N)
-    print(f"有效采样点: {valid_points.shape[0]}个")
-    print(valid_points)
+    参数:
+    - points: numpy数组，形状为 (N, 3)，表示点云的坐标。
+    - offset: 浮点数，表示bbox的扩张量。
+
+    返回:
+    - bbox_min: numpy数组，形状为 (3,)，表示bbox的最小角点。
+    - bbox_max: numpy数组，形状为 (3,)，表示bbox的最大角点。
+    """
+    bbox_min = np.min(points, axis=0) - offset
+    bbox_max = np.max(points, axis=0) + offset
+    return bbox_min, bbox_max
+
+def sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples):
+    """
+    在bbox的表面上采样一些点。
+
+    参数:
+    - bbox_min: numpy数组，形状为 (3,)，表示bbox的最小角点。
+    - bbox_max: numpy数组，形状为 (3,)，表示bbox的最大角点。
+    - num_samples: 整数，表示要采样的点的数量。
+
+    返回:
+    - samples: numpy数组，形状为 (num_samples, 3)，表示采样点的坐标。
+    """
+    # 计算bbox的尺寸
+    bbox_size = bbox_max - bbox_min
+
+    # 采样点在6个面上均匀分布
+    samples_per_face = num_samples // 6
+    samples = []
+
+    for i in range(6):
+        if i < 2:
+            # 前后两个面 (x轴方向)
+            x = bbox_min[0] if i == 0 else bbox_max[0]
+            x = np.ones(samples_per_face) * x
+            y = np.random.uniform(bbox_min[1], bbox_max[1], samples_per_face)
+            z = np.random.uniform(bbox_min[2], bbox_max[2], samples_per_face)
+        elif i < 4:
+            # 左右两个面 (y轴方向)
+            y = bbox_min[1] if i == 2 else bbox_max[1]
+            y = np.ones(samples_per_face) * y
+            x = np.random.uniform(bbox_min[0], bbox_max[0], samples_per_face)
+            z = np.random.uniform(bbox_min[2], bbox_max[2], samples_per_face)
+        else:
+            # 上下两个面 (z轴方向)
+            z = bbox_min[2] if i == 4 else bbox_max[2]
+            z = np.ones(samples_per_face) * z
+            x = np.random.uniform(bbox_min[0], bbox_max[0], samples_per_face)
+            y = np.random.uniform(bbox_min[1], bbox_max[1], samples_per_face)
+
+        face_samples = np.column_stack((x, y, z))
+        samples.append(face_samples)
+
+    # 合并所有面的采样点
+    samples = np.vstack(samples)
+
+    return samples
+
+
+if __name__ == "__main__":
+    points = np.random.rand(100, 3)  # 随机生成100个点
+    bbox_min, bbox_max = compute_bbox_from_pc(points, offset=0.1)
+    samples = sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples=3000) # M, 3
+    visualize_pc(
+        points=np.concatenate([points, samples], axis=0),
+        colors=np.concatenate([
+            np.array([[1, 0, 0]] * len(points)),
+            np.array([[0, 1, 0]] * len(samples))
+        ])
+    )
+

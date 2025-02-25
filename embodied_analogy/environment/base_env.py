@@ -6,6 +6,7 @@ from sapien.utils.viewer import Viewer
 from PIL import Image, ImageColor
 import open3d as o3d
 import transforms3d as t3d
+from scipy.spatial.transform import Rotation as R
 
 from embodied_analogy.utility.utils import (
     visualize_pc,
@@ -393,6 +394,24 @@ class BaseEnv():
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
         joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
+        # active joints
+        # ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 
+        # 'panda_joint6', 'panda_joint7', 'panda_finger_joint1', 'panda_finger_joint2']
+        
+        # link names
+        # ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 
+        # 'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand', 'panda_hand_tcp', 'panda_leftfinger', 
+        # 'panda_rightfinger', 'camera_base_link', 'camera_link']
+        
+        # self.planner = mplib.Planner(
+        #     urdf=self.asset_prefix + "/panda/panda_v3.urdf",
+        #     srdf=self.asset_prefix + "/panda/panda_v3.srdf",
+        #     user_link_names=link_names,
+        #     user_joint_names=joint_names,
+        #     move_group="panda_hand",
+        #     joint_vel_limits=np.ones(7),
+        #     joint_acc_limits=np.ones(7))
+        
         self.planner = mplib.Planner(
             urdf=self.asset_prefix + "/panda/panda_v3.urdf",
             srdf=self.asset_prefix + "/panda/panda_v3.srdf",
@@ -401,6 +420,7 @@ class BaseEnv():
             move_group="panda_hand",
             joint_vel_limits=np.ones(7),
             joint_acc_limits=np.ones(7))
+        pass
     
     def step(self):
         self.scene.step()
@@ -412,7 +432,7 @@ class BaseEnv():
         for i in range(50):
             self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.04)
+            joint.set_drive_target(0.03)
         for i in range(100): 
             qf = self.robot.compute_passive_force(
                 gravity=True, 
@@ -435,10 +455,10 @@ class BaseEnv():
 
     def reset_franka_arm(self):
         # reset实现为让 panda hand移动到最开始的位置，并关闭夹爪
-        self.open_gripper()
+        # self.open_gripper()
         init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
-        self.close_gripper()
+        # self.close_gripper()
         
     def plan_path(self, target_pose, wrt_world: bool):
         # 传入的 target_pose 是 Tph2w
@@ -471,11 +491,35 @@ class BaseEnv():
             self.step()
     
     def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
+        # pose: Tph2w
         result = self.plan_path(target_pose=pose, wrt_world=wrt_world)
         if result is not None:
             self.follow_path(result)
         else:
             "plan path failed!"
+    
+    def move_forward(self, moving_distance):
+        # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
+        ee_pose, ee_quat = self.get_ee_pose() # Tph2w
+        # scalar_first means quat in (w, x, y, z) order
+        Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
+        
+        def T_with_delta(delta):
+            Tph2w = np.eye(4)
+            Tph2w[:3, :3] = Rph2w
+            # 对于 panda_hand 来说, z-axis 的正方向是向前
+            Tph2w[:3, 3] = ee_pose[:3] + Rph2w @ np.array([0, 0, delta])
+            return Tph2w
+        
+        # 先得到连续的插值位姿
+        deltas = np.linspace(0, moving_distance, 10)
+        T_list = [T_with_delta(delta) for delta in deltas]
+        
+        # 然后依次执行这些位姿
+        self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+        for Tph2w in T_list:
+            result = self.plan_path(target_pose=Tph2w, wrt_world=True)
+            self.follow_path(result)
     
     def get_ee_pose(self):
         # 获取ee_pos和ee_quat

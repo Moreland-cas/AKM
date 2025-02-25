@@ -15,9 +15,7 @@ from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
     find_correspondences,
     camera_to_world,
-    initialize_napari,
-    compute_bbox_from_pc,
-    sample_points_on_bbox_surface
+    initialize_napari
 )
 initialize_napari()
 
@@ -101,7 +99,7 @@ class ManipulateEnv(BaseEnv):
         for i, joint_name in enumerate(active_joint_names):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
-                initial_state.append(0.06)
+                initial_state.append(0.1)
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -123,14 +121,12 @@ class ManipulateEnv(BaseEnv):
                 )
                 self.robot.set_qf(qf)
                 for j in range(7):
+                # for j in range(9):    
                     self.active_joints[j].set_drive_target(result['position'][i][j])
                     self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
                 self.step()
     
     def grasp2ph(self, grasp_input):
-        """
-            根据 
-        """
         # ph is panda hand for short
         # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
         grasp = Grasp()
@@ -158,7 +154,7 @@ class ManipulateEnv(BaseEnv):
 
         # 再 dynamic 的调整 offset, 使得找到一个离物体表面最近, 且可以规划得到的 Tph2w
         # offset_list = [0.05, 0.04, 0.03, 0.02, 0.01, 0.0]  # 从近到远的顺序, 对应 offset 从大到小的试
-        offset_list = [0.02, 0.01, 0.0, -0.01, -0.02, -0.03, -0.04, -0.05]
+        offset_list = [0.05, 0.04, 0.03, 0.02]
         best_offset = None
         for offset in offset_list:
             result = self.plan_path(target_pose=Tgrasp2w @ T_with_offset(offset), wrt_world=True)
@@ -190,7 +186,7 @@ class ManipulateEnv(BaseEnv):
             negative_points=self.get_points_on_arm()[0], # N, 2
             num_iterations=5,
             acceptable_thr=0.9,
-            visualize=False
+            visualize=True
         )
         query_dynamic = initial_mask.astype(np.int32) * MOVING_LABEL
         
@@ -227,7 +223,7 @@ class ManipulateEnv(BaseEnv):
             start_pc_w, 
             start_color, 
             joint_axis=joint_axis_outward_w, 
-            visualize=False
+            visualize=True
         )
         # self.reset_franka_arm()
         
@@ -249,33 +245,23 @@ class ManipulateEnv(BaseEnv):
             )
         
         # 更新 planner 的点云, 让 panda_hand 可以成功到达抓取位置
-        # TODO: 在这里修改为将当前的观测点云用一个 bbox 进行拟合
-        start_bbox_min, start_bbox_max = compute_bbox_from_pc(start_pc_w, offset=0.03)
-        start_collision_points = sample_points_on_bbox_surface(start_bbox_min, start_bbox_max, num_samples=1000)
-        
+        self.planner.update_point_cloud(start_pc_w, resolution=0.01)
         # visualize_pc(start_pc_w)
         self.open_gripper()
-        
         # 将抓取姿势从 Tgrasp2w 转换到 Tph2w, 从而可以移动 panda_hand
         for grasp in self.sorted_grasps:
             # visualize_pc(start_pc_w, start_color, grasp)
             
-            self.planner.update_point_cloud(start_pc_w)
             Tph2w_pre, Tph2w = self.grasp2ph(grasp)
             
             if Tph2w_pre is None:
                 continue
             # visualize_pc(start_pc_w, start_color, grasp)
             # 先移动到 result_pre
-            self.planner.update_point_cloud(start_collision_points)
-            # self.planner.update_point_cloud(start_pc_w)
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-            
-            # 在这里去掉 pc
             self.follow_path(result_pre)
             
             # 再移动到 result
-            self.planner.update_point_cloud(start_pc_w)
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
             # visualize_pc(start_pc_w, start_color, grasp)
             self.follow_path(result)
@@ -288,21 +274,12 @@ class ManipulateEnv(BaseEnv):
         # 进行 reset, 并进行状态估计
         while True:
             self.step()
+            
+        pass
     
-    def reset_franka_arm_with_pc(self):        
-        # 先打开 gripper, 再撤退一段距离
-        
-        # 读取一帧 rgbd， 经过 sam 得到 pc， 对 pc 进行处理
-        self.planner.update_point_cloud(pc)
-        self.reset_franka_arm()
-
-        # 重置 point cloud
-        self.planner.update_point_cloud(np.array([]))
-        
     def evaluate(self):
         # 从环境中获取当前的 joint state
         pass
-    
     """
     def manipulate_deprecated(self):
         # 让物体落下

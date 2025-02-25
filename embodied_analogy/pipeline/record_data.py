@@ -133,7 +133,7 @@ class RecordEnv(BaseEnv):
         self.cur_steps = self.cur_steps % self.record_interval
         
         # 打印 joint relative states, Tinit2cur
-        print(self.get_joint_state())
+        # print(self.get_joint_state())
         
         # 如果机械手臂没有尝试关闭，则不录制
         # 关闭后按照 fps 的帧率录制
@@ -266,8 +266,8 @@ if __name__ == '__main__':
     # drawer
     obj_config = {
         "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
+        "scale": 1.0,
+        "pose": [1.2, 0., 0.8],
         "active_link": "link_1",
         "active_joint": "joint_1"
     }
@@ -289,10 +289,9 @@ if __name__ == '__main__':
     #     "active_link": "link_1",
     #     "active_joint": "joint_0"
     # }
-    
-    record_env.load_articulated_object(obj_config)
-    # record_env.load_articulated_object(index=9280, scale=0.7, pose=[0.6, 0., 0.4])
     record_env.load_franka_arm()
+    record_env.load_articulated_object(obj_config)
+    
     # while True:
     #     record_env.step()
     record_env.manipulate_and_record()
