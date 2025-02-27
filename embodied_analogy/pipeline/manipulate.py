@@ -220,7 +220,7 @@ class ManipulateEnv(BaseEnv):
             start_pc_w, 
             start_color, 
             joint_axis=joint_axis_outward_w, 
-            visualize=False
+            visualize=True
         )
         
         # 筛选出评分比较高的 grasp

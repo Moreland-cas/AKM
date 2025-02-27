@@ -547,7 +547,8 @@ class BaseEnv():
         '''
         # 在这里将 grasp depth 设置的小一点
         # from graspnetAPI import graspnet
-        # graspnet.GRASP_HEIGHT = 0.
+        # graspnet.GRASP_HEIGHT = 0.02
+        # graspnet.GRASP_HEIGHT = 0.00
         
         # 传入的点是在世界坐标系下的(xy 轴平行地面, z 轴指向重力反方向)
         # 因此首先将世界坐标系下的点转换到 app 坐标系下

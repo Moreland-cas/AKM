@@ -12,8 +12,8 @@ setup(
         'sapien==2.2.2',
         'transforms3d',
         'trimesh',
-        "ftfy",
-        "regex",
+        # "ftfy",
+        # "regex",
         "mplib==0.2.1",
         "pyglet<2"
     ],
