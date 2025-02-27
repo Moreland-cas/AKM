@@ -1,7 +1,8 @@
 import numpy as np
 import sklearn.cluster as cluster
 from embodied_analogy.utility.utils import tracksNd_variance
-from embodied_analogy.visualization import vis_tracks2d_napari, vis_tracks3d_napari
+from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
+from embodied_analogy.visualization.vis_tracks_3d import vis_tracks3d_napari
 
 def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=False, visualize=False, viewer_title="napari"):
     """

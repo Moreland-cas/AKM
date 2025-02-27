@@ -12,7 +12,7 @@ import numpy as np
 
 from cotracker.utils.visualizer import Visualizer
 from cotracker.predictor import CoTrackerOnlinePredictor
-from embodied_analogy.visualization import vis_tracks2d_napari
+from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 
 
 import cv2

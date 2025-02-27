@@ -1,5 +1,8 @@
 import numpy as np
-from embodied_analogy.utility import *
+from embodied_analogy.utility.utils import (
+    napari_time_series_transform,
+    draw_points_on_image
+)
 from embodied_analogy.visualization import *
 from PIL import Image
 
@@ -98,7 +101,7 @@ class RecordDataReader():
             franka_tracks_2d.append(data_dict["franka_tracks2d"])
             
         self.rgb = np.stack(rgb) # numpy array in shape [T, H, W, 3], in uint8
-        self.depth = np.stack(depth)[..., None] # numpy array in shape [T, H, W, 1], in meters
+        self.depth = np.stack(depth) # numpy array in shape [T, H, W], in meters
         # self.seg = (self.data["object_seg"] != 0) & (self.data["object_seg"] != 1) # numpy array in shape [H, W]
         
         self.intrinsic = self.data["intrinsic"]
@@ -151,7 +154,7 @@ class RecordDataReader():
             rgb_pil_with_contact.append(rgb_pil)
             
         save_name = self.filename.split(".")[0]
-        pil_images_to_mp4(rgb_pil_with_contact, self.record_path_prefix + f"/{save_name}.mp4")
+        # pil_images_to_mp4(rgb_pil_with_contact, self.record_path_prefix + f"/{save_name}.mp4")
         
     def visualize(self):
         """

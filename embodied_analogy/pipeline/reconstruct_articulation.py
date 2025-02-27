@@ -1,20 +1,38 @@
 import os
 import numpy as np
+import torch
 
+from embodied_analogy.utility.utils import (
+    initialize_napari,   
+    set_random_seed,
+    depth_image_to_pointcloud,
+    camera_to_world,
+    sample_points_within_bbox_and_mask,
+    image_to_camera,
+    filter_tracks2d_by_visibility,
+    filter_tracks2d_by_depthSeq_diff,
+    filter_tracks2d_by_depthSeq_mask,
+    extract_tracked_depths,
+    farthest_scale_sampling,
+    get_dynamic_mask_seq,
+    
+)
 
-import napari
-viewer = napari.Viewer()
-viewer.add_image(np.random.random((100, 100)))
-napari.run()
-
-from PIL import Image
-import sklearn.cluster as cluster
+initialize_napari()
 
 from embodied_analogy.pipeline.process_recorded_data import RecordDataReader
-from embodied_analogy.perception import *
-from embodied_analogy.estimation import *
-from embodied_analogy.utility import *
-
+from embodied_analogy.perception.online_cotracker import track_any_points
+from embodied_analogy.perception.grounded_sam import run_grounded_sam
+from embodied_analogy.perception.whole_obj_masking import (
+    whole_obj_masking_sam,
+    whole_obj_masking_sam2
+)
+from embodied_analogy.estimation.clustering import cluster_tracks_2d, cluster_tracks_3d
+from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
+from embodied_analogy.estimation.fine_joint_est import (
+    fine_joint_estimation_seq,
+    filter_dynamic_mask_seq
+)
 
 ################################# PARAMS #################################
 visualize = True
@@ -34,7 +52,6 @@ torch.autograd.set_detect_anomaly(True)
 """
 # 读取数据
 record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-# file_name = "/2025-02-13_13-43-47.npz"
 file_name = "/2025-02-17_18-31-14.npz"
 dr = RecordDataReader(record_path_prefix, file_name)
 dr.process_data()
