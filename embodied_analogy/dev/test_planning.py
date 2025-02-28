@@ -219,7 +219,7 @@ class ManipulateEnv(BaseEnv):
         joint_axis_outward_w = -joint_axis_w
         start_color = rgb_np[query_dynamic > 0] / 256.
         
-        grasp_group = self.detect_grasp_anygrasp(
+        grasp_group = detect_grasp_anygrasp(
             start_pc_w, 
             start_color, 
             joint_axis=joint_axis_outward_w, 
@@ -299,7 +299,7 @@ class ManipulateEnv(BaseEnv):
         target_pc = target_pc[ground_mask] 
         target_pc_color = target_pc_color[ground_mask]
         
-        self.grasp_group = self.detect_grasp_anygrasp(target_pc, target_pc_color, visualize=False)
+        self.grasp_group = detect_grasp_anygrasp(target_pc, target_pc_color, visualize=False)
         # visualize_pc(target_pc, target_pc_color, self.grasp_group)
         
         # load franka after capture first image so that franka pc are not in the captured data

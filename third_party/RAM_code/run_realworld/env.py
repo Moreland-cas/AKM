@@ -158,7 +158,7 @@ class MiniEnv():
                     position, partial_points, partial_colors, thres=crop_radius, save_root=self.cfgs['SAVE_ROOT']
                 )
                 try:
-                    # gg = self.detect_grasp_anygrasp(cropped_points, cropped_colors, save_vis=True) # use AnyGrasp if properly set up
+                    # gg = detect_grasp_anygrasp(cropped_points, cropped_colors, save_vis=True) # use AnyGrasp if properly set up
                     gg = self.detect_grasp_gsnet(cropped_points, cropped_colors, save_vis=True)
                 except KeyboardInterrupt:
                     exit(0)

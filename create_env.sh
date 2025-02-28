@@ -66,7 +66,7 @@ cd pointnet2
 python setup.py install
 cd ../
 
-# 安装 FeatUp
+# 安装 FeatUp TODO: 这个可能没必要
 echo "Installing FeatUp..."
 # git clone https://github.com/mhamilton723/FeatUp.git
 cd FeatUp

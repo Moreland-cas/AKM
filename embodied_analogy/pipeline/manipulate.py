@@ -12,7 +12,6 @@ from embodied_analogy.environment.base_env import BaseEnv
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
-    find_correspondences,
     camera_to_world,
     initialize_napari,
     compute_bbox_from_pc,
@@ -20,59 +19,10 @@ from embodied_analogy.utility.utils import (
     visualize_pc
 )
 initialize_napari()
-
-
-def find_nearest_grasp(grasp_group, contact_point):
-    '''
-        grasp_group: graspnetAPI 
-        contact_point: (3, )
-    '''
-    # 找到 grasp_group 中距离 contact_point 最近的 grasp 并返回
-    # 首先根据 grasp 的 score 排序, 筛选出前20
-    grasp_group = grasp_group.nms().sort_by_score()
-    grasp_group = grasp_group[0:50]
-    
-    # 找到距离 contact_point 最近的 grasp
-    translations = grasp_group.translations # N, 3
-    distances = np.linalg.norm(translations - contact_point, axis=1)
-    nearest_index = np.argmin(distances)
-    nearest_index = int(nearest_index)
-    return grasp_group[nearest_index]
-    
-def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=False):
-    '''
-        找到离 contact region 中点最近的 grasp, 且越是垂直于 joint_axis 越好
-        grasp_group: from graspnetAPI 
-        contact_point: (N, 3), 也即是 moving part
-    '''
-    if grasp_pre_filter: # 保留前 50 的 grasp
-        grasp_group = grasp_group.nms().sort_by_score()
-        grasp_group = grasp_group[0:50]
-        
-    t_grasp2w = grasp_group.translations # N, 3
-    pred_scores = grasp_group.scores # N
-    
-    _, distances, _ = find_correspondences(t_grasp2w, contact_region) # N
-    distance_scores = np.exp(-2 * distances) 
-    
-    R_grasp2w = grasp_group.rotation_matrices # N, 3, 3
-    def R2unitAxis(rotation_matrix):
-        rotation = R.from_matrix(rotation_matrix)
-        axis_angle = rotation.as_rotvec()
-        rotation_axis = axis_angle / np.linalg.norm(axis_angle)
-        return rotation_axis
-    pred_axis = np.array([R2unitAxis(R_grasp2w[i]) for i in range(len(R_grasp2w))]) # N, 3
-    angle_scores = np.abs(np.sum(pred_axis * joint_axis, axis=-1)) # N
-    
-    # grasp_scores = pred_scores * distance_scores * angle_scores # N
-    grasp_scores = pred_scores * distance_scores  # N
-    
-    # 找到距离 contact_point 最近的 grasp
-    index = np.argsort(grasp_scores)
-    index = index[::-1]
-    grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
-    
-    return grasp_group, grasp_scores[index]
+from embodied_analogy.grasping.anygrasp import (
+    detect_grasp_anygrasp,
+    score_grasp_group
+)
 
 
 class ManipulateEnv(BaseEnv):
@@ -107,7 +57,6 @@ class ManipulateEnv(BaseEnv):
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
-        
         self.setup_camera()
         
         # load obj representation
@@ -216,7 +165,7 @@ class ManipulateEnv(BaseEnv):
         joint_axis_outward_w = -joint_axis_w
         start_color = rgb_np[query_dynamic > 0] / 256.
         
-        grasp_group = self.detect_grasp_anygrasp(
+        grasp_group = detect_grasp_anygrasp(
             start_pc_w, 
             start_color, 
             joint_axis=joint_axis_outward_w, 
@@ -299,7 +248,6 @@ class ManipulateEnv(BaseEnv):
         
         while True:
             self.step()
-    
     def reset_franka_arm_with_pc(self):        
         # 先打开 gripper, 再撤退一段距离
         self.move_forward(-0.05) # 向后撤退 5 cm
@@ -315,133 +263,10 @@ class ManipulateEnv(BaseEnv):
         # 从环境中获取当前的 joint state
         pass
     
-    """
-    def manipulate_deprecated(self):
-        # 让物体落下
-        for i in range(100):
-            self.step()
-            
-        # 获取target场景初始位置的rgb图
-        target_img_np, target_depth_np, target_pc, target_pc_color = self.capture_rgbd(
-            return_point_cloud=True,
-            visualize=False,
-        )
-        # 测试抓取
-        # visualize_pc(target_pc, target_pc_color)
-        
-        # mask 掉地面
-        ground_mask = target_pc[:, 2] > 0.01
-        target_pc = target_pc[ground_mask] 
-        target_pc_color = target_pc_color[ground_mask]
-        
-        self.grasp_group = self.detect_grasp_anygrasp(target_pc, target_pc_color, visualize=False)
-        # visualize_pc(target_pc, target_pc_color, self.grasp_group)
-        
-        # load franka after capture first image so that franka pc are not in the captured data
-        self.load_franka_arm()
-        
-        # while not self.viewer.closed:
-        #     self.step()      
-            
-        self.setup_planner()
-        
-        # update pointcloud to avoid collision
-        self.update_pointcloud_for_avoidance(target_pc)
-        
-        target_img_pil = Image.fromarray(target_img_np)
-        source_img_pil = self.DataReader.get_img(idx=0)
-        source_u, source_v = self.DataReader.first_cp_2d
-        
-        similarity_map = match_points_dino_featup(
-        # similarity_map = match_points_dift_sd(
-            source_img_pil, 
-            target_img_pil, 
-            (source_u, source_v), 
-            resize=224 * 3, 
-            device="cuda",
-            visualize=True
-        )
-        
-        self.similarity_map = SimilarityMap(similarity_map, alpha=20)
-        target_uvs = self.similarity_map.sample(num_samples=50, visualize=True)
-        
-        # 使用 segmentation map 进行过滤
-        # similarity_map = None # H, W, 0-1之间
-        actor_level_seg = self.capture_segmentation()
-        
-        ph_pos = self.DataReader.panda_hand_pos
-        ph_quat = self.DataReader.panda_hand_quat
-         
-            
-        for i in range(len(target_uvs)):
-            # 根据深度图找到三维空间点
-            target_u, target_v = target_uvs[i]
-            depth_h, depth_w = target_depth_np.shape
-            
-            row = int(target_v * depth_h)
-            col = int(target_u * depth_w)
-            
-            depth = target_depth_np[row, col]
-            K = self.camera.get_intrinsic_matrix()
-            
-            point_camera = image_to_camera(target_u, target_v, depth, K, depth_w, depth_h)
-            extrinsic_matric = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
-            contact_point = camera_to_world(point_camera, extrinsic_matric)
-            
-            # 如果 contact_point 没有落在物体上
-            if actor_level_seg[row, col] < 2:
-                # self.spawn_cube(contact_point, color=[1, 0, 0])
-                print(f"{i} not in mask")
-                continue
-            else:
-                pass
-                # self.spawn_cube(contact_point, color=[0, 1, 0])
-            
-            # 找到与 contact_point 最近的 grasp, 即得到了 Tgrasp2w, 但这里的 grasp 和 panda_hand 坐标系还不同
-            grasp = find_nearest_grasp(self.grasp_group, contact_point)
-            visualize_pc(target_pc, target_pc_color, grasp)
-            Tgrasp2w_R = grasp.rotation_matrix # 3, 3
-            Tgrasp2w_t = grasp.translation # 3
-            Tgrasp2w = np.hstack((Tgrasp2w_R, Tgrasp2w_t[..., None])) # 3, 4
-            Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
-            
-            # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
-            offset = 0.03 # [0.01, 0.02, 0.03, 0.04, 0.05]
-            Tph2grasp = np.array([
-                [0, 0, 1, -(0.045 + 0.069 - offset)], 
-                [0, 1, 0, 0], 
-                [-1, 0, 0, 0], 
-                [0, 0, 0, 1]
-            ])
-            Tph2w = Tgrasp2w @ Tph2grasp # 4, 4
-            
-            self.open_gripper()
-            
-            # target_quat = t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz")
-            # target_pose = mplib.Pose(p=contact_point, q=target_quat)
-            target_pose = mplib.Pose(Tph2w)
-            status = self.move_to_pose(target_pose, wrt_world=True)
-            
-            if status < 0:
-                print(f"{i} not reachable")
-                continue
-            
-            self.close_gripper()
-            
-            # traj imitation
-            cur_pos, cur_quat = self.get_ee_pose()
-            for i in range(int(len(ph_pos) * 0.25)):
-                self.move_to_pose(mplib.Pose(p=cur_pos + ph_pos[i], q=t3d.quaternions.mat2quat(Tph2w[:3, :3])), wrt_world=True)
-                
-            self.reset_franka_arm()
-        
-        while not self.viewer.closed:
-            self.step()        
-            """
+    
 
 if __name__ == '__main__':
     demo = ManipulateEnv()
-    
     demo.manipulate(delta_state=-0.1)
     
     # while True:
