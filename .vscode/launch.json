@@ -7,7 +7,10 @@
         "request": "launch",
         "program": "${file}",
         "console":"integratedTerminal",
-        "justMyCode": false  // 如果为 true，调试器将仅调试当前文件中的代码
+        "justMyCode": false,  // 如果为 true，调试器将仅调试当前文件中的代码
+        // "env": {
+        //     "PYTHONPATH": "${workspaceFolder}/third_party/RAM_code"
+        // }
       }
     ]
   }

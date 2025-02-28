@@ -4,10 +4,12 @@ from PIL import Image
 import random
 from sklearn.cluster import KMeans
 
-from sam2.build_sam import build_sam2
-from sam2.sam2_image_predictor import SAM2ImagePredictor
 import sys
 sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/sam2")
+
+from sam2.build_sam import build_sam2
+from sam2.sam2_image_predictor import SAM2ImagePredictor
+
 
 
 def select_farthest_point(unsatisfied_points, used_same_class_points, used_diff_class_points):
