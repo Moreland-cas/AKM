@@ -1,0 +1,7 @@
+pycocoevalcap
+scikit-image
+opencv-python-headless
+tqdm
+pillow
+numpy
+matplotlib

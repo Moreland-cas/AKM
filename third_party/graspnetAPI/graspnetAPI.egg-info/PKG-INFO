@@ -1,0 +1,32 @@
+Metadata-Version: 2.2
+Name: graspnetAPI
+Version: 1.2.11
+Summary: graspnet API
+Home-page: https://graspnet.net
+Author: Hao-Shu Fang, Chenxi Wang, Minghao Gou
+Author-email: gouminghao@gmail.com
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: transforms3d
+Requires-Dist: open3d
+Requires-Dist: trimesh
+Requires-Dist: tqdm
+Requires-Dist: Pillow
+Requires-Dist: opencv-python-headless
+Requires-Dist: pillow
+Requires-Dist: matplotlib
+Requires-Dist: pywavefront
+Requires-Dist: trimesh
+Requires-Dist: scikit-image
+Requires-Dist: autolab_core
+Requires-Dist: autolab-perception
+Requires-Dist: cvxopt
+Requires-Dist: dill
+Requires-Dist: h5py
+Requires-Dist: scikit-learn
+Requires-Dist: grasp_nms
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary

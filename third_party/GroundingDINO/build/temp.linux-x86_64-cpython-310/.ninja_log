@@ -1,0 +1,5 @@
+# ninja log v5
+1	334	1740379915615641500	/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/build/temp.linux-x86_64-cpython-310/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/cuda_version.o	8fc5ddfdc3961ebb
+0	2609	1740379917891668506	/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/build/temp.linux-x86_64-cpython-310/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cpu.o	d4e932a8d272c021
+1	8350	1740379923631736552	/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/build/temp.linux-x86_64-cpython-310/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/vision.o	ee68282b88cca5cd
+0	9074	1740379924351745080	/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/build/temp.linux-x86_64-cpython-310/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cuda.o	ee772abc76930ec8
