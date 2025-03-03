@@ -36,7 +36,7 @@ def find_nearest_grasp(grasp_group, contact_point):
     nearest_index = int(nearest_index)
     return grasp_group[nearest_index]
     
-def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=False):
+def sort_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=False):
     '''
         找到离 contact region 中点最近的 grasp, 且越是垂直于 joint_axis 越好
         grasp_group: from graspnetAPI 
@@ -230,7 +230,7 @@ class ManipulateEnv(BaseEnv):
         # 筛选出评分比较高的 grasp
         contact_region_c = depth_image_to_pointcloud(depth_np, query_dynamic_updated == MOVING_LABEL, self.camera_intrinsic)
         contact_region_w = camera_to_world(contact_region_c, self.camera_extrinsic)
-        self.sorted_grasps, grasp_scores = score_grasp_group(
+        self.sorted_grasps, grasp_scores = sort_grasp_group(
             grasp_group=grasp_group, 
             contact_region=contact_region_w, 
             joint_axis=joint_axis_w, 

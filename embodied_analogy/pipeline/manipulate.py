@@ -21,7 +21,7 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
-    score_grasp_group
+    sort_grasp_group
 )
 
 
@@ -175,7 +175,7 @@ class ManipulateEnv(BaseEnv):
         # 筛选出评分比较高的 grasp
         contact_region_c = depth_image_to_pointcloud(depth_np, query_dynamic_updated == MOVING_LABEL, self.camera_intrinsic)
         contact_region_w = camera_to_world(contact_region_c, self.camera_extrinsic)
-        self.sorted_grasps, _ = score_grasp_group(
+        self.sorted_grasps, _ = sort_grasp_group(
             grasp_group=grasp_group, 
             contact_region=contact_region_w, 
             joint_axis=joint_axis_w, 

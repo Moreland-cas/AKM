@@ -325,8 +325,8 @@ def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalize
     Y = (y_pixel - c_y) * Z / f_y
     
     # 5. 返回点云 (B, 3)
-    point_cloud = torch.stack((X, Y, Z), dim=1)  # 将 X, Y, Z 合并成 (B, 3)
-    
+    # point_cloud = torch.stack((X, Y, Z), dim=1)  # 将 X, Y, Z 合并成 (B, 3)
+    point_cloud = np.stack((X, Y, Z), axis=-1)
     return point_cloud
 
 
@@ -408,8 +408,10 @@ def visualize_pc(points, colors=None, grasp=None):
     """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
-    if colors is not None:
-        pcd.colors = o3d.utility.Vector3dVector(colors)
+    if colors is None:
+        colors = np.zeros([points.shape[0], 3])
+        colors[:, 0] = 1
+    pcd.colors = o3d.utility.Vector3dVector(colors)
     if isinstance(grasp, graspnetAPI.grasp.Grasp):
         grasp_o3d = grasp.to_open3d_geometry()
         o3d.visualization.draw_geometries([grasp_o3d, pcd])
@@ -993,7 +995,7 @@ def quantile_sampling(arr, M):
     sampled_data = arr_sorted[indices]
     return sampled_data
 
-def compute_normals(target_pc, k_neighbors=10):
+def compute_normals(target_pc, k_neighbors=30):
     """
     计算目标点云的法向量
     :param target_pc: numpy 数组，形状为 (N, 3)，目标点云
@@ -1002,7 +1004,8 @@ def compute_normals(target_pc, k_neighbors=10):
     """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(target_pc)
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=k_neighbors))
+    # pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=k_neighbors))
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=k_neighbors))
     normals = np.asarray(pcd.normals)
     return normals
 

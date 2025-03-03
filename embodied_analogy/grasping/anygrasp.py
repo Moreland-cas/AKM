@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import open3d as o3d
+from scipy.spatial.transform import Rotation as R
 from embodied_analogy.utility.utils import (
     visualize_pc,
     world_to_image,
@@ -8,7 +9,7 @@ from embodied_analogy.utility.utils import (
     find_correspondences
 )
 
-def detect_grasp_anygrasp(points, colors, joint_axis_out, visualize=True):
+def detect_grasp_anygrasp(points, colors, joint_axis_out, visualize=False):
     '''
     输入世界坐标系下的点云和颜色, 返回 grasp_group
         定义 approach 坐标系为 xy 轴平行物体表面, z 轴指向物体内部 (joint axis 的反方向)
@@ -83,11 +84,11 @@ def find_nearest_grasp(grasp_group, contact_point):
     nearest_index = int(nearest_index)
     return grasp_group[nearest_index]
 
-def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=False):
+def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=False):
     '''
-        找到离 contact region 中点最近的 grasp, 且越是垂直于 joint_axis 越好
+        找到离 contact region 中点最近的 grasp, 且越是垂直于 axis 越好
         grasp_group: from graspnetAPI 
-        contact_point: (N, 3), 也即是 moving part
+        contact_region: (N, 3), 也即是 moving part
     '''
     if grasp_pre_filter: # 保留前 50 的 grasp
         grasp_group = grasp_group.nms().sort_by_score()
@@ -97,7 +98,8 @@ def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=
     pred_scores = grasp_group.scores # N
     
     _, distances, _ = find_correspondences(t_grasp2w, contact_region) # N
-    distance_scores = np.exp(-2 * distances) 
+    # distance_scores = np.exp(-2 * distances) 
+    distance_scores = (distances < 0.05).astype(np.float32)
     
     R_grasp2w = grasp_group.rotation_matrices # N, 3, 3
     def R2unitAxis(rotation_matrix):
@@ -105,8 +107,13 @@ def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=
         axis_angle = rotation.as_rotvec()
         rotation_axis = axis_angle / np.linalg.norm(axis_angle)
         return rotation_axis
+    
     pred_axis = np.array([R2unitAxis(R_grasp2w[i]) for i in range(len(R_grasp2w))]) # N, 3
-    angle_scores = np.abs(np.sum(pred_axis * joint_axis, axis=-1)) # N
+    
+    angle_scores = 1.
+    if axis is not None:
+        # TODO: 这里需要 debug, 似乎需要的不是 grasp 的 rotation matrix 对应的 axis 平行于 axis， 而是 z 轴也平行于 axis
+        angle_scores = np.abs(np.sum(pred_axis * axis, axis=-1)) # N
     
     # grasp_scores = pred_scores * distance_scores * angle_scores # N
     grasp_scores = pred_scores * distance_scores  # N
@@ -117,3 +124,8 @@ def score_grasp_group(grasp_group, contact_region, joint_axis, grasp_pre_filter=
     grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
     
     return grasp_group, grasp_scores[index]
+
+
+if __name__ == '__main__':
+    pass
+    # TODO: 给 anygrasp 写一个测试函数

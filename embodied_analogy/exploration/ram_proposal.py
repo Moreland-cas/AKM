@@ -19,12 +19,18 @@ import cv2
 import matplotlib.pyplot as plt
 import open3d as o3d
 from embodied_analogy.utility.constants import *
-from embodied_analogy.utility.utils import seed_everything
+from embodied_analogy.utility.utils import (
+    seed_everything,
+    image_to_camera,
+    depth_image_to_pointcloud,
+    compute_normals,
+    visualize_pc
+)
 # from embodied_analogy.perception.grounded_sam import run_grounded_sam
 
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
-    score_grasp_group
+    sort_grasp_group
 )
 
 def draw_arrows_on_img(img, pixel, normals_2d_directions):
@@ -91,12 +97,11 @@ def get_ram_proposal(
     #     rgb_image=query_rgb,
     #     text_prompt=obj, # drawer
     #     positive_points=None,
-    #     negative_points=None, # 如果有遮挡的话, 在这里需要加入 negative points, 默认在初始时没有遮挡
+    #     negative_points=None,
     #     num_iterations=5,
     #     acceptable_thr=0.9,
     #     visualize=False,
     # )
-    
     # query_mask = np.repeat(query_mask[..., None], 3, axis=-1).astype(np.uint8) # H, W, C (0 or 1)
     # query_img_masked = query_rgb * query_mask + 255 * (1 - query_mask) # 0-255
     # query_img_PIL = Image.fromarray(query_img_masked).convert('RGB')
@@ -107,6 +112,7 @@ def get_ram_proposal(
     ref_img_np = top1_retrieved_data_dict['masked_img']
     ref_img_PIL = Image.fromarray(ref_img_np).convert('RGB')
     
+    query_mask = top1_retrieved_data_dict["query_mask"]
     masked_query_np = top1_retrieved_data_dict["masked_query"]
     query_img_PIL = Image.fromarray(masked_query_np).convert('RGB')
 
@@ -140,114 +146,108 @@ def get_ram_proposal(
         viewer.add_image(query_img_with_arrow_np, name="query_img + arrow")
         napari.run()
         
-    return contact_point, post_contact_dir
-
-    # lift into 3d and generate grasp pose
-    # ret_dict = lift_affordance(
-    #     rgb,
-    #     pcd,
-    #     contact_point,
-    #     post_contact_dir
-    # )
-    
-    # print("3D Affordance:\n", ret_dict)
+    return contact_point, post_contact_dir, query_mask
             
-def lift_affordance(rgb, pcd, pixel, dir, visualize=False):
-    H, W = rgb.shape[:2]
-    post_contact_dirs_2d, post_contact_dirs_3d = None, None
-    partial_points = np.array(pcd.points)
-    partial_colors = np.array(pcd.colors)
-    position = partial_points[pixel[1] * W + pixel[0]]
+def lift_affordance(
+    K, 
+    query_rgb, 
+    query_mask, # H, W
+    query_depth, 
+    contact_uv, 
+    contact_dir_2d, 
+    visualize=False
+):
+    # TODO: 检查坐标系 + 写一个函数注释
+    """
+        rgb_image: numpy.array, (H, W, 3)
+        point_cloud: H*W, 3
+        contact_uv: (2, )
+        contact_dir_2d: (2, )
+        
+    """
+    H, W = query_rgb.shape[:2]
+    contact_3d = image_to_camera(
+        uv=contact_uv[None],
+        depth=np.array(query_depth[contact_uv[1], contact_uv[0]])[None],
+        K=K,
+    )[0] # 3
     
-    # visualization
-    # ds_points, _, _ = get_downsampled_pc(partial_points, None, 20000)
-    ds_points, _, _ = crop_points(position, partial_points, thres=0.5)
-    save_pcd = o3d.geometry.PointCloud()
-    save_pcd.points = o3d.utility.Vector3dVector(ds_points)
-    # red
-    save_pcd.colors = o3d.utility.Vector3dVector(np.array([1, 0, 0]) * np.ones((ds_points.shape[0], 3)))
-    # add a point
-    save_pcd.points.append(position)
-    save_pcd.colors.append(np.array([0, 1, 0]))
+    # 找到 contact_uv 附近区域的点云
+    crop_radius = 100 # in pixels
+    partial_mask = np.zeros((H, W), dtype=np.bool_)
+    partial_mask[contact_uv[1] - crop_radius:contact_uv[1] + crop_radius, contact_uv[0] - crop_radius:contact_uv[0] + crop_radius] = True
+    partial_mask = partial_mask & query_mask
+    # TODO: 是不是还需要根据 depth 过滤一下
     
+    partial_points = depth_image_to_pointcloud(query_depth, partial_mask, K) # N, 3
+    partial_colors = query_rgb[partial_mask]  # N, 3
     if visualize:
-        o3d.io.write_point_cloud(f"{cfgs['SAVE_ROOT']}/grasp_point.ply", save_pcd)
+        visualize_pc(partial_points, partial_colors / 255.)
     
-    MAX_ATTEMPTS = 20 # in case there is no good grasp at one time
-    max_dis = 0.05
-    best_grasp = None
-    max_radius, min_radius = 0.2, 0.1
-    gg = None
-    for num_attempt in range(MAX_ATTEMPTS):
-        try:
-            crop_radius = max_radius - (max_radius - min_radius) * num_attempt / MAX_ATTEMPTS
-            print('=> crop_radius:', crop_radius)
-            cropped_points, cropped_colors, cropped_normals = crop_points(
-                position, partial_points, partial_colors, thres=crop_radius, save_root=self.cfgs['SAVE_ROOT']
-            )
-            try:
-                gg = detect_grasp_anygrasp(cropped_points, cropped_colors, save_vis=True) # use AnyGrasp if properly set up
-                # gg = detect_grasp_gsnet(cropped_points, cropped_colors, save_vis=True)
-            except KeyboardInterrupt:
-                exit(0)
-            except:
-                traceback.print_exc()
-            if gg is None:
-                continue
-            print('=> total grasp:', len(gg))
-            if len(gg) == 0:
-                continue
-            
-            best_grasp = get_best_grasp(gg, position, max_dis=max_dis) # original: 0.03
-            if best_grasp is None:
-                print('==>> no best grasp')
-            else:
-                break
-        except KeyboardInterrupt:
-            exit(0)
-        except:
-            traceback.print_exc()
-    if best_grasp is None:
-        try:
-            gg = detect_grasp_gsnet(cropped_points, cropped_colors, False)
-        except:
-            gg = detect_grasp_gsnet(partial_points, partial_colors, False)
-        best_grasp = get_closest_grasp(gg, position)
-        print('==>> use GSNet for closest grasp')
+    # 选取 post-grasp-direction, 对于 partial_point 的区域求一个 normal
+    partial_normals = compute_normals(partial_points) # N, 3
     n_clusters = 5
-    
-    if visualize:
-        vis_save_grasp(cropped_points, best_grasp, f"{cfgs['SAVE_ROOT']}/best_grasp.ply")
-    clustered_centers = cluster_normals(cropped_normals, n_clusters=n_clusters) # (2*n_clusters, 3)
-    visualize_point_directions(cropped_points, position, clustered_centers, cfgs['SAVE_ROOT'])
+    clustered_centers = cluster_normals(partial_normals, n_clusters=n_clusters) # (2*n_clusters, 3)
     post_contact_dirs_3d = clustered_centers
-    post_contact_dirs_2d = project_normals(rgb, pixel, clustered_centers)
-    grasp_array = best_grasp.grasp_array.tolist()
+    post_contact_dirs_2d = project_normals(query_rgb, contact_uv, clustered_centers, visualize=visualize)
     
-    # post-grasp
+    # find clustered_dir that best align with dir
     best_dir_3d, best_score = None, -1
     for i in range(post_contact_dirs_2d.shape[0]):
-        score = np.dot(post_contact_dirs_2d[i], dir)
+        score = np.dot(post_contact_dirs_2d[i], contact_dir_2d)
         if score > best_score:
             best_score = score
             best_dir_3d = post_contact_dirs_3d[i]
-    visualize_point_directions(ds_points, position, [best_dir_3d], cfgs['SAVE_ROOT'], "best_dir_3d")
-    post_grasp_dir = best_dir_3d.tolist()
+            
+    gg = detect_grasp_anygrasp(
+        points=partial_points, 
+        colors=partial_colors / 255.,
+        joint_axis_out=np.array([0, 0, -1]), 
+        visualize=False
+    ) 
+    if visualize:
+        visualize_pc(points=partial_points, colors=partial_colors / 255., grasp=gg)
+        
+    gg, _ = sort_grasp_group(
+        grasp_group=gg,
+        contact_region=contact_3d[None],
+        # axis=np.array([0, 0, -1])
+    )
+    best_grasp = gg[0]
+
+    if visualize:
+        visualize_pc(points=partial_points, colors=partial_colors / 255., grasp=best_grasp)
     
-    ret_dict = {
-        "grasp_array": grasp_array,
-        "post_grasp_dir": post_grasp_dir
-    }
-    return ret_dict
+    return best_grasp, best_dir_3d
 
 
 if __name__ == "__main__":
-    query_rgb = np.asarray(Image.open("/home/zby/Programs/RAM_code/run_realworld/sapien_data/input/rgb.png"))
-    contact_point, post_contact_dir = get_ram_proposal(
-        query_rgb, # H, W, 3 in numpy
-        instruction="open the drawer",
-        prompt="a photo of a drawer", 
-        data_source="droid",
-        save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
+    query_rgb = np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/rgb.png"))
+    query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
+    query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
+    # contact_point_2d, post_contact_dir_2d, query_mask = get_ram_proposal(
+    #     query_rgb, # H, W, 3 in numpy
+    #     instruction="open the drawer",
+    #     prompt="a photo of a drawer", 
+    #     data_source="droid",
+    #     save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
+    #     visualize=False
+    # )
+    
+    contact_point_2d = np.array([455, 154])
+    post_contact_dir_2d = np.array([0.64614357, 0.76321588])
+    
+    K = np.array(
+        [[300.,   0., 400.],
+       [  0., 300., 300.],
+       [  0.,   0.,   1.]], dtype=np.float32)
+    
+    best_grasp, best_dir_3d = lift_affordance(
+        K=K,
+        query_rgb=query_rgb,
+        query_mask=query_mask,
+        query_depth=query_depth,
+        contact_uv=contact_point_2d,
+        contact_dir_2d=post_contact_dir_2d,
         visualize=True
     )
