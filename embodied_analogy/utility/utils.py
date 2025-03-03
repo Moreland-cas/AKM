@@ -398,29 +398,55 @@ def camera_to_world(point_camera, extrinsic_matrix):
     point_world = point_camera @ Rw2c + tc2w
     
     return point_world
-
-def visualize_pc(points, colors=None, grasp=None):
+        
+def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_contact_dirs=None):
     """
-        visualize pointcloud
-        points: Nx3
-        colors: Nx3 (0-1)
-        grasp: None
+    visualize pointcloud
+    points: Nx3
+    colors: Nx3 (0-1)
+    grasp: None
     """
+    # 初始化点云
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
+    
+    # 处理点云颜色
     if colors is None:
         colors = np.zeros([points.shape[0], 3])
-        colors[:, 0] = 1
+        colors[:, 0] = 1  # 默认颜色为红色
     pcd.colors = o3d.utility.Vector3dVector(colors)
+    
+    # 初始化要绘制的几何对象列表
+    geometries_to_draw = [pcd]
+    
+    # 处理 grasp
     if isinstance(grasp, graspnetAPI.grasp.Grasp):
         grasp_o3d = grasp.to_open3d_geometry()
-        o3d.visualization.draw_geometries([grasp_o3d, pcd])
+        geometries_to_draw.append(grasp_o3d)
     elif isinstance(grasp, graspnetAPI.grasp.GraspGroup):
         grasp_o3ds = grasp.to_open3d_geometry_list()
-        o3d.visualization.draw_geometries([*grasp_o3ds, pcd])
-    else:
-        o3d.visualization.draw_geometries([pcd])
+        geometries_to_draw.extend(grasp_o3ds)
+    
+    if contact_point is not None:
+        sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)  # 创建小球
+        sphere.translate(contact_point)  # 平移到 contact_point
+        sphere.paint_uniform_color([1, 0, 0])  # 设置颜色为红色
+        geometries_to_draw.append(sphere)
         
+    # 处理 contact_point 和 post_contact_dirs
+    if contact_point is not None and post_contact_dirs is not None:
+        for post_contact_dir in post_contact_dirs:
+            start_point = contact_point
+            end_point = start_point + post_contact_dir * 0.1
+            line_set = o3d.geometry.LineSet()
+            line_set.points = o3d.utility.Vector3dVector([start_point, end_point])
+            line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
+            line_set.paint_uniform_color([1, 0, 0])  # 红色
+            geometries_to_draw.append(line_set)
+    
+    # 统一绘制所有几何对象
+    o3d.visualization.draw_geometries(geometries_to_draw)
+
 @torch.no_grad()
 def plot_matching(image1, image2, hr1, hr2, span):
     seed_everything(0)

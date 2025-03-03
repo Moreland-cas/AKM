@@ -176,21 +176,21 @@ def lift_affordance(
     crop_radius = 100 # in pixels
     partial_mask = np.zeros((H, W), dtype=np.bool_)
     partial_mask[contact_uv[1] - crop_radius:contact_uv[1] + crop_radius, contact_uv[0] - crop_radius:contact_uv[0] + crop_radius] = True
-    partial_mask = partial_mask & query_mask
-    # TODO: 是不是还需要根据 depth 过滤一下
+    partial_mask = partial_mask & query_mask & (query_depth > 0)
     
     partial_points = depth_image_to_pointcloud(query_depth, partial_mask, K) # N, 3
     partial_colors = query_rgb[partial_mask]  # N, 3
-    if visualize:
-        visualize_pc(partial_points, partial_colors / 255.)
     
     # 选取 post-grasp-direction, 对于 partial_point 的区域求一个 normal
     partial_normals = compute_normals(partial_points) # N, 3
     n_clusters = 5
     clustered_centers = cluster_normals(partial_normals, n_clusters=n_clusters) # (2*n_clusters, 3)
-    post_contact_dirs_3d = clustered_centers
-    post_contact_dirs_2d = project_normals(query_rgb, contact_uv, clustered_centers, visualize=visualize)
+    post_contact_dirs_3d = clustered_centers # N, 3
+    post_contact_dirs_2d = project_normals(query_rgb, contact_uv, clustered_centers, visualize=False)
     
+    # if visualize:
+    #     visualize_pc(partial_points, partial_colors / 255., contact_point=contact_3d, post_contact_dirs=post_contact_dirs_3d)
+        
     # find clustered_dir that best align with dir
     best_dir_3d, best_score = None, -1
     for i in range(post_contact_dirs_2d.shape[0]):
@@ -198,15 +198,16 @@ def lift_affordance(
         if score > best_score:
             best_score = score
             best_dir_3d = post_contact_dirs_3d[i]
-            
+    
+    # if visualize:
+    #     visualize_pc(partial_points, partial_colors / 255., contact_point=contact_3d, post_contact_dirs=best_dir_3d[None])
+        
     gg = detect_grasp_anygrasp(
         points=partial_points, 
         colors=partial_colors / 255.,
         joint_axis_out=np.array([0, 0, -1]), 
         visualize=False
     ) 
-    if visualize:
-        visualize_pc(points=partial_points, colors=partial_colors / 255., grasp=gg)
         
     gg, _ = sort_grasp_group(
         grasp_group=gg,
@@ -216,8 +217,11 @@ def lift_affordance(
     best_grasp = gg[0]
 
     if visualize:
-        visualize_pc(points=partial_points, colors=partial_colors / 255., grasp=best_grasp)
-    
+        visualize_pc(
+            points=partial_points, colors=partial_colors / 255., grasp=best_grasp, 
+            contact_point=contact_3d, post_contact_dirs=best_dir_3d[None]
+        )
+        
     return best_grasp, best_dir_3d
 
 

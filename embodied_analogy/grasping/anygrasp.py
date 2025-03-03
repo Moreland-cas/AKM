@@ -98,8 +98,8 @@ def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=Fa
     pred_scores = grasp_group.scores # N
     
     _, distances, _ = find_correspondences(t_grasp2w, contact_region) # N
-    # distance_scores = np.exp(-2 * distances) 
-    distance_scores = (distances < 0.05).astype(np.float32)
+    distance_scores = np.exp(-2 * distances) 
+    # distance_scores = (distances < 0.05).astype(np.float32)
     
     R_grasp2w = grasp_group.rotation_matrices # N, 3, 3
     def R2unitAxis(rotation_matrix):
@@ -116,7 +116,8 @@ def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=Fa
         angle_scores = np.abs(np.sum(pred_axis * axis, axis=-1)) # N
     
     # grasp_scores = pred_scores * distance_scores * angle_scores # N
-    grasp_scores = pred_scores * distance_scores  # N
+    # grasp_scores = pred_scores * distance_scores  # N
+    grasp_scores = distance_scores  # N
     
     # 找到距离 contact_point 最近的 grasp
     index = np.argsort(grasp_scores)
