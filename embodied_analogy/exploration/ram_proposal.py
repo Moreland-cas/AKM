@@ -76,11 +76,15 @@ def project_normals(img, pixel, normals, visualize=False):
 def get_ram_proposal(
     query_rgb, # H, W, 3 in numpy
     instruction, # open the drawwer
-    prompt, # a photo of a drawer
-    data_source, # droid
+    data_source, # droid TODO: 把 data_source 扩充一下
+    prompt=".", # a photo of a drawer
     save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
     visualize=False
 ):
+    """
+        instruction: open the drawer (task description)
+        prompt: used to extract dift feature
+    """
     seed_everything(SEED)
 
     subset_retrieve_pipeline = SubsetRetrievePipeline(
@@ -112,7 +116,7 @@ def get_ram_proposal(
     ref_img_np = top1_retrieved_data_dict['masked_img']
     ref_img_PIL = Image.fromarray(ref_img_np).convert('RGB')
     
-    query_mask = top1_retrieved_data_dict["query_mask"]
+    query_mask = top1_retrieved_data_dict["query_mask"][..., 0].astype(np.bool_)
     masked_query_np = top1_retrieved_data_dict["masked_query"]
     query_img_PIL = Image.fromarray(masked_query_np).convert('RGB')
 
@@ -146,9 +150,9 @@ def get_ram_proposal(
         viewer.add_image(query_img_with_arrow_np, name="query_img + arrow")
         napari.run()
         
-    return contact_point, post_contact_dir, query_mask
+    return np.array(contact_point), post_contact_dir, query_mask
             
-def lift_affordance(
+def lift_ram_affordance(
     K, 
     query_rgb, 
     query_mask, # H, W
@@ -209,7 +213,7 @@ def lift_affordance(
         visualize=False
     ) 
         
-    gg, _ = sort_grasp_group(
+    sorted_grasps, _ = sort_grasp_group(
         grasp_group=gg,
         contact_region=contact_3d[None],
         # axis=np.array([0, 0, -1])
@@ -222,31 +226,31 @@ def lift_affordance(
             contact_point=contact_3d, post_contact_dirs=best_dir_3d[None]
         )
         
-    return best_grasp, best_dir_3d
+    return sorted_grasps, best_dir_3d
 
 
 if __name__ == "__main__":
     query_rgb = np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/rgb.png"))
     query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
-    query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
-    # contact_point_2d, post_contact_dir_2d, query_mask = get_ram_proposal(
-    #     query_rgb, # H, W, 3 in numpy
-    #     instruction="open the drawer",
-    #     prompt="a photo of a drawer", 
-    #     data_source="droid",
-    #     save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
-    #     visualize=False
-    # )
+    # query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
+    contact_point_2d, post_contact_dir_2d, query_mask = get_ram_proposal(
+        query_rgb, # H, W, 3 in numpy
+        instruction="open the drawer",
+        # prompt="a photo of a drawer", 
+        data_source="droid",
+        save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
+        visualize=False
+    )
     
-    contact_point_2d = np.array([455, 154])
-    post_contact_dir_2d = np.array([0.64614357, 0.76321588])
+    # contact_point_2d = np.array([455, 154])
+    # post_contact_dir_2d = np.array([0.64614357, 0.76321588])
     
     K = np.array(
         [[300.,   0., 400.],
        [  0., 300., 300.],
        [  0.,   0.,   1.]], dtype=np.float32)
     
-    best_grasp, best_dir_3d = lift_affordance(
+    best_grasp, best_dir_3d = lift_ram_affordance(
         K=K,
         query_rgb=query_rgb,
         query_mask=query_mask,

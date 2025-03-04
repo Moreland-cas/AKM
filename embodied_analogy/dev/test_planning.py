@@ -124,7 +124,7 @@ class ManipulateEnv(BaseEnv):
                 # for j in range(9):    
                     self.active_joints[j].set_drive_target(result['position'][i][j])
                     self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
-                self.step()
+                self.base_step()
     
     def grasp2ph(self, grasp_input):
         # ph is panda hand for short
@@ -273,7 +273,7 @@ class ManipulateEnv(BaseEnv):
         
         # 进行 reset, 并进行状态估计
         while True:
-            self.step()
+            self.base_step()
             
         pass
     
@@ -284,7 +284,7 @@ class ManipulateEnv(BaseEnv):
     def manipulate_deprecated(self):
         # 让物体落下
         for i in range(100):
-            self.step()
+            self.base_step()
             
         # 获取target场景初始位置的rgb图
         target_img_np, target_depth_np, target_pc, target_pc_color = self.capture_rgbd(
@@ -306,7 +306,7 @@ class ManipulateEnv(BaseEnv):
         self.load_franka_arm()
         
         # while not self.viewer.closed:
-        #     self.step()      
+        #     self.base_step()      
             
         self.setup_planner()
         
@@ -401,7 +401,7 @@ class ManipulateEnv(BaseEnv):
             self.reset_franka_arm()
         
         while not self.viewer.closed:
-            self.step()        
+            self.base_step()        
             """
 
 if __name__ == '__main__':

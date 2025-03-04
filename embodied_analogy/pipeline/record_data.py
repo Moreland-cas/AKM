@@ -63,11 +63,7 @@ class RecordEnv(BaseEnv):
         np.savez(prefix + f'/{timestamp}.npz', **self.recorded_data)
         
     def step_sapien3(self):
-        self.scene.step()
-        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        self.viewer.render()
-        
-        self.cur_steps += 1
+        self.base_step()
         self.cur_steps = self.cur_steps % self.record_interval
         
         # 如果机械手臂没有尝试关闭，则不录制
@@ -125,11 +121,7 @@ class RecordEnv(BaseEnv):
             self.recorded_data["traj"].append(cur_dict)
 
     def step_sapien2(self):
-        self.scene.step()
-        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        self.viewer.render()
-        
-        self.cur_steps += 1
+        self.base_step()
         self.cur_steps = self.cur_steps % self.record_interval
         
         # 打印 joint relative states, Tinit2cur
@@ -258,7 +250,7 @@ class RecordEnv(BaseEnv):
                         
                     continue
             
-            self.step()
+            self.base_step()
     
 if __name__ == '__main__':
     record_env = RecordEnv()

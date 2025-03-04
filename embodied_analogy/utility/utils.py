@@ -413,7 +413,7 @@ def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_conta
     # 处理点云颜色
     if colors is None:
         colors = np.zeros([points.shape[0], 3])
-        colors[:, 0] = 1  # 默认颜色为红色
+        colors[:, 1] = 1  # 默认颜色为蓝色
     pcd.colors = o3d.utility.Vector3dVector(colors)
     
     # 初始化要绘制的几何对象列表

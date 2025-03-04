@@ -1,3 +1,4 @@
+import math
 import mplib
 import numpy as np
 import sapien.core as sapien
@@ -42,6 +43,7 @@ class BaseEnv():
         scene_config.solver_velocity_iterations = 1
         
         self.scene = self.engine.create_scene(scene_config)
+        self.phy_timestep = phy_timestep
         self.scene.set_timestep(phy_timestep)
         self.scene.add_ground(0)
         
@@ -65,6 +67,8 @@ class BaseEnv():
         else:
             self.capture_rgb = self.capture_rgb_sapien3
             self.capture_rgbd = self.capture_rgbd_sapien3
+            
+        self.step = self.base_step
     
     def load_franka_arm(self, dof_value=None):
         # Robot
@@ -307,8 +311,11 @@ class BaseEnv():
         urdf_config = {
             "_materials": {
                 "gripper" : {
-                    "static_friction": 2.0,
-                    "dynamic_friction": 2.0,
+                    # TODO
+                    # "static_friction": 2.0,
+                    # "dynamic_friction": 2.0,
+                    "static_friction": 1.0,
+                    "dynamic_friction": 1.0,
                     "restitution": 0.0
                 }
             },
@@ -419,7 +426,7 @@ class BaseEnv():
             joint_acc_limits=np.ones(7))
         pass
     
-    def step(self):
+    def base_step(self):
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
         self.viewer.render()
@@ -441,7 +448,7 @@ class BaseEnv():
         for i in range(50):
             self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(-0.01)
+            joint.set_drive_target(0.01)
         for i in range(100):  
             qf = self.robot.compute_passive_force(
                 gravity=True, 
@@ -457,7 +464,7 @@ class BaseEnv():
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
         # self.close_gripper()
         
-    def plan_path(self, target_pose, wrt_world: bool):
+    def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w
         if isinstance(target_pose, np.ndarray):
             target_pose = mplib.Pose(target_pose)
@@ -473,19 +480,26 @@ class BaseEnv():
         if result['status'] != "Success":
             return None
         return result
-    
+            
     def follow_path(self, result):
         n_step = result['position'].shape[0]
-        # print("n_step:", n_step)
+        print("n_step:", n_step)
         for i in range(n_step):  
-            qf = self.robot.compute_passive_force(
-                gravity=True, 
-                coriolis_and_centrifugal=True)
-            self.robot.set_qf(qf)
-            for j in range(7):
-                self.active_joints[j].set_drive_target(result['position'][i][j])
-                self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
-            self.step()
+            position_target = result['position'][i]
+            velocity_target = result['velocity'][i]
+            # TODO
+            # num_repeat = int(result['time'][i] / self.phy_timestep)
+            num_repeat = 7
+            for _ in range(num_repeat + 1): 
+                qf = self.robot.compute_passive_force(
+                    gravity=True, 
+                    coriolis_and_centrifugal=True
+                )
+                self.robot.set_qf(qf)
+                for j in range(7):
+                    self.active_joints[j].set_drive_target(position_target[j])
+                    self.active_joints[j].set_drive_velocity_target(velocity_target[j])
+                self.step()
     
     def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
         # pose: Tph2w
@@ -494,6 +508,74 @@ class BaseEnv():
             self.follow_path(result)
         else:
             "plan path failed!"
+    
+    def get_translated_ph(self, Tph2w, distance):
+        """
+            输出 Tph2w 沿着当前模型向前或者向后一定距离的一个 ph 位姿
+            distance 大于 0 为向前移动, 反之为向后移动
+        """
+        Tph2w_ = np.copy(Tph2w)
+        forward_direction = Tph2w[:3, :3] @ np.array([0, 0, 1]) # 3
+        Tph2w_[:3, 3] = Tph2w[:3, 3] + distance * forward_direction
+        return Tph2w_
+    
+    def get_rotated_grasp(self, grasp, axis_out_w):
+        """
+            绕着 y 轴旋转 grasp 坐标系使得 grasp 坐标系的 x 轴与 axis_out_w 的点乘尽可能小
+            grasp: anygrasp Grasp, Tgrasp2w
+            axis_w: np.array, 3
+        """
+        from graspnetAPI import Grasp
+        grasp_ = Grasp()
+        grasp_.grasp_array = np.copy(grasp.grasp_array)
+        
+        Rgrasp2w = grasp_.rotation_matrix
+        """
+        Rrefine2w = Rgrasp2w @ Rrefine2grasp
+        Rrefine2w[:, 0] * axis_out_w 尽可能小
+        又因为 Rrefine2grasp 是绕着 y 轴的旋转, 所以有形式:
+            cos(a), 0, sin(a)
+            0, 1, 0, 
+            -sin(a), 0, cos(a)
+        所以 
+            Rrefine2w[:, 0]  
+            = Rgrasp2w @ [cos(a), 0, -sin(a)].t
+            = cos(a) * Rgrasp2w[:, 0] - sin(a) * Rgrasp2w[:, 2]
+        所以 
+            Rrefine2w[:, 0] * axis_out_w
+            = cos(a) * Rgrasp2w[:, 0] * axis_out_w - sin(a) * Rgrasp2w[:, 2] * axis_out_w
+        对 a 求导数, 有:
+            derivatives
+            = -sin(a) * Rgrasp2w[:, 0] * axis_out_w - cos(a) * Rgrasp2w[:, 2] * axis_out_w
+        另导数为 0, 有
+            a1 = arctan( - (axis_out_w * Rgrasp2w[:, 2]) / (axis_out_w * Rgrasp2w[:, 0])   )
+            a2 = arctan( + (axis_out_w * Rgrasp2w[:, 2]) / (axis_out_w * Rgrasp2w[:, 0])   )
+        然后筛选出 a1 和 a2 中更合理的那个
+        """
+        def rotation_y(theta):
+            rotation_matrix = np.array([
+                [math.cos(theta), 0, math.sin(theta)],
+                [0, 1, 0],
+                [-math.sin(theta), 0, math.cos(theta)]
+            ])
+            return rotation_matrix
+        
+        theta1 = np.arctan(-(axis_out_w * Rgrasp2w[:, 2]).sum() / (axis_out_w * Rgrasp2w[:, 0]).sum())
+        theta2 = np.arctan(+(axis_out_w * Rgrasp2w[:, 2]).sum() / (axis_out_w * Rgrasp2w[:, 0]).sum())
+        
+        Rrefine2grasp1 = rotation_y(theta1)
+        Rrefine2grasp2 = rotation_y(theta2)
+        
+        Rrefine2w1 = Rgrasp2w @ Rrefine2grasp1
+        Rrefine2w2 = Rgrasp2w @ Rrefine2grasp2
+        
+        if (Rrefine2w1[:, 0] * axis_out_w).sum() < (Rrefine2w2[:, 0] * axis_out_w).sum():
+            grasp_.rotation_matrix = Rrefine2w1.reshape(-1)
+        else:
+            grasp_.rotation_matrix = Rrefine2w2.reshape(-1)
+        
+        return grasp_
+    
     
     def move_along_axis(self, moving_direction, moving_distance, num_interpolation=10):
         # moving_direction 是在世界坐标系下的方向

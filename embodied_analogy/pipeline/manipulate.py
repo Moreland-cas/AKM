@@ -28,6 +28,7 @@ from embodied_analogy.grasping.anygrasp import (
 class ManipulateEnv(BaseEnv):
     def __init__(
             self,
+            obj_config,
             phy_timestep=1/250.,
             use_sapien2=True
         ):
@@ -36,14 +37,6 @@ class ManipulateEnv(BaseEnv):
             use_sapien2=use_sapien2
         )
         self.load_franka_arm()
-            
-        obj_config = {
-            "index": 44962,
-            "scale": 0.8,
-            "pose": [1.0, 0., 0.5],
-            "active_link": "link_1",
-            "active_joint": "joint_1"
-        }
         self.load_articulated_object(obj_config)
         
         # 随机初始化物体对应 joint 的状态
@@ -53,7 +46,8 @@ class ManipulateEnv(BaseEnv):
         for i, joint_name in enumerate(active_joint_names):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
-                initial_state.append(0.1)
+                # initial_state.append(0.1)
+                initial_state.append(0.0)
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -63,42 +57,11 @@ class ManipulateEnv(BaseEnv):
         recon_data_path = "/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstructed_data.npz"
         self.obj_repr = np.load(recon_data_path)
 
-    def follow_path(self, result):
-        n_step = result['position'].shape[0]
-        print("n_step:", n_step)
-        for i in range(n_step):  
-            for _ in range(int(250 / 30.) + 1):
-                qf = self.robot.compute_passive_force(
-                    gravity=True, 
-                    coriolis_and_centrifugal=True
-                )
-                self.robot.set_qf(qf)
-                for j in range(7):
-                    self.active_joints[j].set_drive_target(result['position'][i][j])
-                    self.active_joints[j].set_drive_velocity_target(result['velocity'][i][j])
-                self.step()
-    
-    def anyGrasp2executable_ph(self, grasp_input, pc_obs, reserved_distance=0.05):
+    def anyGrasp2ph(self, grasp):
         """
-            根据 
+            从 anygrasp 输出的 grasp 中提取出 Tph2w, 也就是做一个 Tgrasp2w 到 Tph2w 的转换
+            grasp: Grasp 对象
         """
-        self.planner.update_point_cloud(pc_obs)
-        
-        # ph is panda hand for short
-        # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
-        grasp = Grasp()
-        grasp.grasp_array = np.copy(grasp_input.grasp_array)
-        
-        R_grasp2w = grasp.rotation_matrix # 3, 3
-        t_grasp2w = grasp.translation # 3
-        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
-        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
-        
-        # 先 dynamic 的调整 approaching vector, 使其尽可能平行于 joint axis
-        # 这个需要在 grasp 坐标系下调整比较好
-        # 我们要做的是, 调整 R_grasp2w 使得其平行于 joint axis
-        # 考虑到 grasp 坐标系, 我们需要绕着 y 轴旋转, 使得 x 轴平行于 joint axis
-        
         # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
         def T_with_offset(offset):
             Tph2grasp = np.array([
@@ -108,33 +71,66 @@ class ManipulateEnv(BaseEnv):
                 [0, 0, 0, 1]
             ])
             return Tph2grasp
+        
+        R_grasp2w = grasp.rotation_matrix # 3, 3
+        t_grasp2w = grasp.translation # 3
+        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
+        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
+        Tph2w = Tgrasp2w @ T_with_offset(0.03)
+        return Tph2w
+    
+    # def anyGrasp2ph(self, grasp_input, pc_obs, reserved_distance=0.05):
+    #     """
+    #         根据 
+    #     """
+    #     self.planner.update_point_cloud(pc_obs)
+        
+    #     # ph is panda hand for short
+    #     # 输入一个 grasp, 输出为该 grasp 包含的 Tgrasp2w 转换为 Tph2w 的结果
+    #     grasp = Grasp()
+    #     grasp.grasp_array = np.copy(grasp_input.grasp_array)
+        
+    #     R_grasp2w = grasp.rotation_matrix # 3, 3
+    #     t_grasp2w = grasp.translation # 3
+    #     Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
+    #     Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
+        
+    #     # 将 grasp 坐标系转换到为 panda_hand 坐标系, 即 Tph2w
+    #     def T_with_offset(offset):
+    #         Tph2grasp = np.array([
+    #             [0, 0, 1, -(0.045 + 0.069) + offset], 
+    #             [0, 1, 0, 0], 
+    #             [-1, 0, 0, 0], 
+    #             [0, 0, 0, 1]
+    #         ])
+    #         return Tph2grasp
 
-        # 再 dynamic 的调整 offset, 使得找到一个离物体表面最近, 且可以规划得到的 Tph2w
-        # offset_list = [0.05, 0.04, 0.03, 0.02, 0.01, 0.0]  # 从近到远的顺序, 对应 offset 从大到小的试
-        offset_list = [0.05, 0.04, 0.03, 0.02]
-        best_offset = None
-        for offset in offset_list:
-            result = self.plan_path(target_pose=Tgrasp2w @ T_with_offset(offset), wrt_world=True)
-            if result is not None:
-                best_offset = offset
-                break
+    #     # 再 dynamic 的调整 offset, 使得找到一个离物体表面最近, 且可以规划得到的 Tph2w
+    #     # offset_list = [0.05, 0.04, 0.03, 0.02, 0.01, 0.0]  # 从近到远的顺序, 对应 offset 从大到小的试
+    #     offset_list = [0.05, 0.04, 0.03, 0.02]
+    #     best_offset = None
+    #     for offset in offset_list:
+    #         result = self.plan_path(target_pose=Tgrasp2w @ T_with_offset(offset), wrt_world=True)
+    #         if result is not None:
+    #             best_offset = offset
+    #             break
         
-        if best_offset is None:
-            return None, None
+    #     if best_offset is None:
+    #         return None, None
         
-        # 最后得到 Tph2w_pre, 为远离 target grasp pose 一定距离的版本, 防止碰撞发生
-        Tph2w = Tgrasp2w @ T_with_offset(best_offset)
-        Tph2w_pre = Tgrasp2w @ T_with_offset(best_offset - reserved_distance)
+    #     # 最后得到 Tph2w_pre, 为远离 target grasp pose 一定距离的版本, 防止碰撞发生
+    #     Tph2w = Tgrasp2w @ T_with_offset(best_offset)
+    #     Tph2w_pre = Tgrasp2w @ T_with_offset(best_offset - reserved_distance)
         
-        return Tph2w_pre, Tph2w
+    #     # 将碰撞点云恢复
+    #     self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+    #     return Tph2w_pre, Tph2w
     
     def manipulate(self, delta_state=0, reserved_distance=0.05):
         from embodied_analogy.estimation.relocalization import relocalization
         
         # 1) 首先估计出当前的 joint state
-        self.scene.step()
-        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        self.viewer.render()
+        self.base_step()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
         
         start_state, query_dynamic, query_dynamic_updated = relocalization(
@@ -193,18 +189,15 @@ class ManipulateEnv(BaseEnv):
         
         # 将抓取姿势从 Tgrasp2w 转换到 Tph2w, 从而可以移动 panda_hand
         for grasp in self.sorted_grasps:
-            # visualize_pc(start_pc_w, start_color, grasp)
             
-            Tph2w_pre, _ = self.anyGrasp2executable_ph(grasp, start_pc_w, reserved_distance=reserved_distance)
-            
-            if Tph2w_pre is None:
-                continue
+            Tph2w = self.anyGrasp2ph(grasp)
+            Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
             visualize_pc(start_pc_w, start_color, grasp)
             
             # 先移动到 pre_grasp_pose
-            start_bbox_min, start_bbox_max = compute_bbox_from_pc(start_pc_w, offset=0.02)
-            start_collision_points = sample_points_on_bbox_surface(start_bbox_min, start_bbox_max, num_samples=1000)
-            self.planner.update_point_cloud(start_collision_points)
+            # start_bbox_min, start_bbox_max = compute_bbox_from_pc(start_pc_w, offset=0.02)
+            # start_collision_points = sample_points_on_bbox_surface(start_bbox_min, start_bbox_max, num_samples=1000)
+            self.planner.update_point_cloud(start_pc_w)
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             self.follow_path(result_pre)
             
@@ -266,7 +259,14 @@ class ManipulateEnv(BaseEnv):
     
 
 if __name__ == '__main__':
-    demo = ManipulateEnv()
+    obj_config = {
+        "index": 44962,
+        "scale": 0.8,
+        "pose": [1.0, 0., 0.5],
+        "active_link": "link_1",
+        "active_joint": "joint_1"
+    }
+    demo = ManipulateEnv(obj_config=obj_config)
     demo.manipulate(delta_state=-0.1)
     
     # while True:
