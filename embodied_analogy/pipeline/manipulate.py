@@ -36,8 +36,8 @@ class ManipulateEnv(BaseEnv):
             phy_timestep=phy_timestep,
             use_sapien2=use_sapien2
         )
-        self.load_franka_arm()
-        self.load_articulated_object(obj_config)
+        self.load_robot()
+        self.load_object(obj_config)
         
         # 随机初始化物体对应 joint 的状态
         cur_joint_state = self.asset.get_qpos()

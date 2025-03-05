@@ -37,8 +37,8 @@ class RecordEnv(BaseEnv):
         self.setup_pygame() 
         
         # setup articulated object and franka arm
-        # self.load_articulated_object()                
-        # self.load_franka_arm()
+        # self.load_object()                
+        # self.load_robot()
         if use_sapien2:
             self.step = self.step_sapien2
         else:
@@ -281,8 +281,8 @@ if __name__ == '__main__':
     #     "active_link": "link_1",
     #     "active_joint": "joint_0"
     # }
-    record_env.load_franka_arm()
-    record_env.load_articulated_object(obj_config)
+    record_env.load_robot()
+    record_env.load_object(obj_config)
     
     # while True:
     #     record_env.step()

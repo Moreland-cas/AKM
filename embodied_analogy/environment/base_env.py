@@ -37,7 +37,8 @@ class BaseEnv():
         scene_config.default_dynamic_friction = 1.0
         scene_config.default_static_friction = 1.0
         scene_config.default_restitution = 0.0
-        scene_config.contact_offset = 0.0001 # 0.1 mm
+        # scene_config.contact_offset = 0.0001 # 0.1 mm
+        scene_config.contact_offset = 0.02 # TODO: RGBManip 设置的为 0.02
         scene_config.enable_pcm = False
         scene_config.solver_iterations = 25
         scene_config.solver_velocity_iterations = 1
@@ -70,11 +71,28 @@ class BaseEnv():
             
         self.step = self.base_step
     
-    def load_franka_arm(self, dof_value=None):
-        # Robot
+    def load_robot(self, dof_value=None):
+        # Robot config
+        urdf_config = dict(
+            _materials=dict(
+                gripper=dict(static_friction=2.0, dynamic_friction=2.0, restitution=0.0)
+            ),
+            link=dict(
+                panda_leftfinger=dict(
+                    material="gripper", patch_radius=0.1, min_patch_radius=0.1
+                ),
+                panda_rightfinger=dict(
+                    material="gripper", patch_radius=0.1, min_patch_radius=0.1
+                ),
+            ),
+        )
+        config = parse_urdf_config(urdf_config, self.scene)
+        check_urdf_config(config)
+        
+        # load Robot
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.fix_root_link = True
-        self.robot: sapien.Articulation = loader.load(self.asset_prefix + "/panda/panda_v3.urdf")
+        self.robot: sapien.Articulation = loader.load(self.asset_prefix + "/panda/panda_v3.urdf", config)
         
         self.arm_qlimit = self.robot.get_qlimits()
         self.arm_q_lower = self.arm_qlimit[:, 0]
@@ -86,13 +104,14 @@ class BaseEnv():
             # init_qpos = self.arm_q_lower
         
         # Setup control properties 
-        # self.active_joints = self.robot.get_active_joints()
-        # for joint in self.active_joints[:4]:
-        #     joint.set_drive_property(stiffness=160, damping=40, force_limit=100)    # original: 200
-        # for joint in self.active_joints[4:-2]:
-        #     joint.set_drive_property(stiffness=160, damping=40, force_limit=50)    # original: 200
-        # for joint in self.active_joints[-2:]:
-        #     joint.set_drive_property(stiffness=4000, damping=10)
+        self.active_joints = self.robot.get_active_joints()
+        for joint in self.active_joints[:4]:
+            joint.set_drive_property(stiffness=160, damping=40, force_limit=100)    # original: 200
+        for joint in self.active_joints[4:-2]:
+            joint.set_drive_property(stiffness=160, damping=40, force_limit=50)    # original: 200
+        for joint in self.active_joints[-2:]:
+            # joint.set_drive_property(stiffness=4000, damping=10)
+            joint.set_drive_property(stiffness=160, damping=10)
             
         # Set initial joint positions
         # init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
@@ -105,9 +124,9 @@ class BaseEnv():
         self.robot_init_qpos = init_qpos
                     
         # set joints property to enable pd control
-        self.active_joints = self.robot.get_active_joints()
-        for joint in self.active_joints:
-            joint.set_drive_property(stiffness=1000, damping=200)
+        # self.active_joints = self.robot.get_active_joints()
+        # for joint in self.active_joints:
+        #     joint.set_drive_property(stiffness=1000, damping=200)
 
         # disable joints gravity
         # for link in self.robot.get_links():
@@ -296,8 +315,7 @@ class BaseEnv():
         actor_pil = Image.fromarray(color_palette[actor_np])
         return actor_np # [H, W]
         
-    # def load_articulated_object(self, index=100015, scale=0.4, pose=[0.4, 0.4, 0.2]):
-    def load_articulated_object(self, obj_config):
+    def load_object(self, obj_config):
         index = obj_config["index"]
         scale = obj_config["scale"]
         pose = obj_config["pose"]
@@ -311,11 +329,8 @@ class BaseEnv():
         urdf_config = {
             "_materials": {
                 "gripper" : {
-                    # TODO
-                    # "static_friction": 2.0,
-                    # "dynamic_friction": 2.0,
-                    "static_friction": 1.0,
-                    "dynamic_friction": 1.0,
+                    "static_friction": 2.0,
+                    "dynamic_friction": 2.0,
                     "restitution": 0.0
                 }
             },
@@ -406,15 +421,6 @@ class BaseEnv():
         # ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 
         # 'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand', 'panda_hand_tcp', 'panda_leftfinger', 
         # 'panda_rightfinger', 'camera_base_link', 'camera_link']
-        
-        # self.planner = mplib.Planner(
-        #     urdf=self.asset_prefix + "/panda/panda_v3.urdf",
-        #     srdf=self.asset_prefix + "/panda/panda_v3.srdf",
-        #     user_link_names=link_names,
-        #     user_joint_names=joint_names,
-        #     move_group="panda_hand",
-        #     joint_vel_limits=np.ones(7),
-        #     joint_acc_limits=np.ones(7))
         
         self.planner = mplib.Planner(
             urdf=self.asset_prefix + "/panda/panda_v3.urdf",
@@ -619,9 +625,9 @@ class BaseEnv():
 
 if __name__ == "__main__":
     env = BaseEnv()
-    env.load_franka_arm()
+    env.load_robot()
     env.setup_camera()
-    # env.load_articulated_object()
+    # env.load_object()
     
     # for i in range(100):
     while True:

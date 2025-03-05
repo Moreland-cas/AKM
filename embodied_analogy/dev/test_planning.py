@@ -81,7 +81,7 @@ class ManipulateEnv(BaseEnv):
             phy_timestep=phy_timestep,
             use_sapien2=use_sapien2
         )
-        self.load_franka_arm()
+        self.load_robot()
             
         obj_config = {
             "index": 44962,
@@ -90,7 +90,7 @@ class ManipulateEnv(BaseEnv):
             "active_link": "link_1",
             "active_joint": "joint_1"
         }
-        self.load_articulated_object(obj_config)
+        self.load_object(obj_config)
         
         # 随机初始化物体对应 joint 的状态
         cur_joint_state = self.asset.get_qpos()
@@ -303,7 +303,7 @@ class ManipulateEnv(BaseEnv):
         # visualize_pc(target_pc, target_pc_color, self.grasp_group)
         
         # load franka after capture first image so that franka pc are not in the captured data
-        self.load_franka_arm()
+        self.load_robot()
         
         # while not self.viewer.closed:
         #     self.base_step()      

@@ -59,12 +59,12 @@ class ExploreEnv(ManipulateEnv):
         # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
         pc_collision_c = depth_image_to_pointcloud(depth_np, obj_mask, self.camera_intrinsic) # N, 3
         pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
-        visualize_pc(pc_collision_w, contact_point=contact_3d_w, post_contact_dirs=best_dir_3d[None])
+        # visualize_pc(pc_collision_w, contact_point=contact_3d_w, post_contact_dirs=best_dir_3d[None])
         
         for grasp in sorted_grasps:
-            visualize_pc(pc_collision_w, grasp=grasp)
+            # visualize_pc(pc_collision_w, grasp=grasp)
             grasp = self.get_rotated_grasp(grasp, axis_out_w=best_dir_3d)
-            visualize_pc(pc_collision_w, grasp=grasp)
+            # visualize_pc(pc_collision_w, grasp=grasp)
             
             Tph2w = self.anyGrasp2ph(grasp=grasp)
             
@@ -121,5 +121,5 @@ if __name__ == "__main__":
     exploreEnv.explore(
         instruction="open the drawer",  
         reserved_distance=0.05,
-        visualize=True
+        visualize=False
     )
