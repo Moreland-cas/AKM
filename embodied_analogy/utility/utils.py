@@ -849,19 +849,16 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
     return depth_tracks.cpu()
 
-def filter_tracks2d_by_visibility(rgb_seq, pred_tracks_2d, pred_visibility, visualize=False):
+def filter_tracks2d_by_visibility(pred_tracks_2d, pred_visibility):
     """
         pred_tracks_2d: torch.tensor([T, M, 2])
         pred_visibility: torch.tensor([T, M])
     """
     always_visible_mask = pred_visibility.all(dim=0) # num_clusters
     pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
-    
-    if visualize:
-        vis_tracks2d_napari(rgb_seq, pred_tracks_2d, viewer_title="filter_tracks2d_by_visibility")
     return pred_tracks_2d
 
-def filter_tracks2d_by_depthSeq_mask(rgb_seq, pred_tracks_2d, depthSeq_mask, visualize=False):
+def filter_tracks2d_by_depth_mask_seq(rgb_seq, pred_tracks_2d, depthSeq_mask, visualize=False):
     """
     筛选出那些不曾落到 invalid depth_mask 中的 tracks
     Args:
@@ -876,13 +873,11 @@ def filter_tracks2d_by_depthSeq_mask(rgb_seq, pred_tracks_2d, depthSeq_mask, vis
     
     # 然后在时间维度上取交, 得到一个大小为 M 的 mask, 把其中一直为 True 的保留下来并返回
     mask_and = np.all(pred_tracks_2d_mask, axis=0) # M
-    
     pred_tracks_2d = pred_tracks_2d[:, mask_and, :]
-    if visualize:
-        vis_tracks2d_napari(rgb_seq, pred_tracks_2d, viewer_title="filter_tracks2d_by_depthSeq_mask")
+    
     return pred_tracks_2d
 
-def filter_tracks2d_by_depthSeq_diff(pred_tracks, depth_tracks, thr=1.5):
+def filter_tracks2d_by_depth_diff_seq(pred_tracks, depth_tracks, thr=1.5):
     """
     过滤深度序列中的无效序列,基于相邻元素的相对变化率。
     

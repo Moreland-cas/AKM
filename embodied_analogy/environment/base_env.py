@@ -195,15 +195,7 @@ class BaseEnv():
         # 记录相机的内参和外参
         self.camera_intrinsic = self.camera.get_intrinsic_matrix() # [3, 3], K
         Tw2c = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
-        # self.camera_extrinsic = np.vstack([Tw2c, np.array([0, 0, 0, 1])]) # 4, 4
         self.camera_extrinsic = Tw2c
-        
-        # 将相机的内参和外参保存到 self.recorded_data 中
-        if not hasattr(self, 'recorded_data'):
-            self.recorded_data = {}
-            
-        self.recorded_data["intrinsic"] = self.camera_intrinsic # [3, 3]
-        self.recorded_data["extrinsic"] =  self.camera_extrinsic # [4, 4]
     
     def capture_rgb_sapien2(self):
         camera = self.camera
@@ -373,20 +365,7 @@ class BaseEnv():
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
             if joint.get_name() == obj_config["active_joint"]:
                 self.evaluate_joint = joint
-                self.init_joint_transform = joint.get_global_pose().to_transformation_matrix() # 4, 4, Tw2j
-            
-        # 在 load asset 之后拍一张物体的照片，作为初始状态
-        # self.scene.step()
-        # self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        # self.viewer.render()
-        
-        # initial_rgb, initial_depth, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
-        
-        # if not hasattr(self, 'recorded_data'):
-        #     self.recorded_data = {}
-            
-        # self.recorded_data["initial_rgb"] = initial_rgb
-        # self.recorded_data["initial_depth"] = initial_depth
+                self.init_joint_transform = joint.get_global_pose().to_transformation_matrix() # 4, 4, Tw2c
         
     def get_joint_state(self):
         cur_transform = self.evaluate_joint.get_global_pose().to_transformation_matrix()

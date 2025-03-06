@@ -22,14 +22,14 @@ def relocalization(
     lr=5e-3,
     tol=1e-7,
     icp_select_range=0.1,
-    text_prompt="object",
+    obj_description="object",
     negative_points=None, # N, 2
     visualize=False
 ):
     # 相较与 _relocalization, 加入了 grounded sam 的部分    
     _, obj_mask = run_grounded_sam(
         rgb_image=query_rgb,
-        text_prompt=text_prompt,
+        obj_description=obj_description,
         positive_points=None, 
         negative_points=negative_points, # N, 2
         num_iterations=5,
@@ -152,7 +152,7 @@ def _relocalization(
 
 if __name__ == "__main__":
     visualize = True
-    text_prompt = "drawer"
+    obj_description = "drawer"
 
     torch.autograd.set_detect_anomaly(True)
 
@@ -173,7 +173,7 @@ if __name__ == "__main__":
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
         initial_bbox, initial_mask = run_grounded_sam(
             rgb_image=recon_data["rgb_seq"][i],
-            text_prompt=text_prompt,
+            obj_description=obj_description,
             positive_points=None,  # np.array([N, 2])
             negative_points=recon_data["franka_tracks_seq"][i],
             num_iterations=5,

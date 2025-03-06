@@ -23,7 +23,7 @@ from groundingdino.util.inference import load_model, predict, annotate
 
 def run_groundingDINO(
     image,
-    text_prompt,
+    obj_description,
     visualize=False
 ):
     groundingDINO_home = "/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO"
@@ -56,7 +56,7 @@ def run_groundingDINO(
     boxes, logits, phrases = predict(
         model=model, 
         image=image_transformed, 
-        caption=text_prompt, 
+        caption=obj_description, 
         box_threshold=0.35, 
         text_threshold=0.25
     )
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     # napari.run()
     bbox_scaled, bbox_score = run_groundingDINO(
         image="/home/zby/Programs/Embodied_Analogy/assets/sapien_test.png",
-        text_prompt="object",
+        obj_description="object",
         visualize=True
     )
     print(bbox_scaled, bbox_score)

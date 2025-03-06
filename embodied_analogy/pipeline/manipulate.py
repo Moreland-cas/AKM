@@ -145,7 +145,7 @@ class ManipulateEnv(BaseEnv):
             lr=5e-3,
             tol=1e-7,
             icp_select_range=0.1,
-            text_prompt="drawer",
+            obj_description="drawer",
             negative_points=self.get_points_on_arm()[0],
             visualize=False
         )
@@ -233,7 +233,7 @@ class ManipulateEnv(BaseEnv):
             lr=5e-3,
             tol=1e-7,
             icp_select_range=0.1,
-            text_prompt="drawer",
+            obj_description="drawer",
             negative_points=self.get_points_on_arm()[0],
             visualize=False
         )

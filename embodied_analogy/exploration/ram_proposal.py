@@ -78,7 +78,7 @@ def get_ram_proposal(
     instruction, # open the drawwer
     data_source, # droid TODO: 把 data_source 扩充一下
     prompt=".", # a photo of a drawer
-    save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
+    save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
     visualize=False
 ):
     """
@@ -99,7 +99,7 @@ def get_ram_proposal(
     # get rgb mask from grounded sam
     # _, query_mask = run_grounded_sam(
     #     rgb_image=query_rgb,
-    #     text_prompt=obj, # drawer
+    #     obj_description=obj, # drawer
     #     positive_points=None,
     #     negative_points=None,
     #     num_iterations=5,

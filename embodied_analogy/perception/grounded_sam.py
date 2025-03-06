@@ -3,7 +3,7 @@ from embodied_analogy.perception.grounding_dino import run_groundingDINO
 
 def run_grounded_sam(
     rgb_image,
-    text_prompt,
+    obj_description,
     positive_points=None,  # np.array([N, 2])
     negative_points=None,
     num_iterations=3,
@@ -13,7 +13,7 @@ def run_grounded_sam(
     
     initial_bboxs, initial_bbox_scores = run_groundingDINO(
         image=rgb_image,
-        text_prompt=text_prompt,
+        obj_description=obj_description,
         visualize=visualize
     )
     initial_bbox = initial_bboxs[0]

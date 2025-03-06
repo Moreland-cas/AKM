@@ -4,7 +4,7 @@ from embodied_analogy.utility.utils import tracksNd_variance
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 from embodied_analogy.visualization.vis_tracks_3d import vis_tracks3d_napari
 
-def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=False, visualize=False, viewer_title="napari"):
+def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=False, viewer_title="napari"):
     """
         tracks_2d: torch.tensor([T, M, Nd])
         将 pred_tracks_3d 进行聚类，得到两个部分，分别代表移动和静止的轨迹, 返回两个 mask

@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 MAX_IMD_RANKING_NUM = 30 # change this for different levels of efficiency
 
-def segment_images(frames, trajs, text_prompt, visualize=False):
+def segment_images(frames, trajs, obj_description, visualize=False):
     from embodied_analogy.perception.grounded_sam import run_grounded_sam
     # 重写了这个函数, 用 embodied_analogy 的 grounded sam 来完成
     masked_frames = []
@@ -23,7 +23,7 @@ def segment_images(frames, trajs, text_prompt, visualize=False):
         # masks = inference_one_image(frame, grounded_dino_model, sam_predictor, box_threshold=box_threshold, text_threshold=text_threshold, text_prompt=text_prompt, device=device).cpu().numpy()
         _, mask = run_grounded_sam(
             rgb_image=frame,
-            text_prompt=text_prompt, # drawer
+            obj_description=obj_description, # drawer
             positive_points=None,
             negative_points=None, # 如果有遮挡的话, 在这里需要加入 negative points, 默认在初始时没有遮挡
             num_iterations=5,
@@ -212,7 +212,7 @@ class SubsetRetrievePipeline:
         masked_frames, masks = segment_images(
             frames=retrieved_data_imgs,
             trajs=trajs,
-            text_prompt=obj_name,
+            obj_description=obj_name,
             visualize=False
         )
         # masked_frames, masks = segment_images(retrieved_data_imgs, trajs, obj_name, self.grounded_dino_model, self.sam_predictor)
