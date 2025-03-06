@@ -6,7 +6,7 @@ def run_grounded_sam(
     text_prompt,
     positive_points=None,  # np.array([N, 2])
     negative_points=None,
-    num_iterations=5,
+    num_iterations=3,
     acceptable_thr=0.9,
     visualize=False,
 ):

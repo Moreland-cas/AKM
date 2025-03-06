@@ -123,7 +123,7 @@ class ManipulateEnv(BaseEnv):
     #     Tph2w_pre = Tgrasp2w @ T_with_offset(best_offset - reserved_distance)
         
     #     # 将碰撞点云恢复
-    #     self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+    #     self.clear_planner_pc()
     #     return Tph2w_pre, Tph2w
     
     def manipulate(self, delta_state=0, reserved_distance=0.05):
@@ -202,14 +202,14 @@ class ManipulateEnv(BaseEnv):
             self.follow_path(result_pre)
             
             # 再从 pre_grasp_pose 向前移动一段距离
-            self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+            self.clear_planner_pc()
             self.move_forward(reserved_distance)
             break
         
         self.close_gripper()
         
         # 关闭点云, 保持抓取姿势，向着 axis 移动（此时需要关闭点云遮挡）
-        self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+        self.clear_planner_pc()
         self.move_along_axis(joint_axis_outward_w, delta_state)
         
         # TODO：在这里加入 arm 的 reset 过程

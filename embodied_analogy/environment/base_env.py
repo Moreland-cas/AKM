@@ -20,6 +20,7 @@ class BaseEnv():
     def __init__(
             self,
             phy_timestep=1/250.,
+            planner_timestep=None,
             use_sapien2=True # otherwise use sapien3
         ):        
         self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
@@ -46,6 +47,10 @@ class BaseEnv():
         self.scene = self.engine.create_scene(scene_config)
         self.phy_timestep = phy_timestep
         self.scene.set_timestep(phy_timestep)
+        if planner_timestep is None:
+            self.planner_timestep = self.phy_timestep
+        else:
+            self.planner_timestep = planner_timestep
         self.scene.add_ground(0)
         
         # add some lights
@@ -71,6 +76,9 @@ class BaseEnv():
             
         self.step = self.base_step
     
+    def clear_planner_pc(self):
+        self.planner.update_point_cloud(np.array([[0, 0, -1]]))
+        
     def load_robot(self, dof_value=None):
         # Robot config
         urdf_config = dict(
@@ -111,7 +119,7 @@ class BaseEnv():
             joint.set_drive_property(stiffness=160, damping=40, force_limit=50)    # original: 200
         for joint in self.active_joints[-2:]:
             # joint.set_drive_property(stiffness=4000, damping=10)
-            joint.set_drive_property(stiffness=160, damping=10)
+            joint.set_drive_property(stiffness=160, damping=10, force_limit=50)
             
         # Set initial joint positions
         # init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
@@ -442,7 +450,7 @@ class BaseEnv():
         for i in range(50):
             self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.04)
+            joint.set_drive_target(0.03)
         for i in range(100): 
             qf = self.robot.compute_passive_force(
                 gravity=True, 
@@ -477,10 +485,9 @@ class BaseEnv():
         result = self.planner.plan_pose(
             goal_pose=target_pose, 
             current_qpos=self.robot.get_qpos(), 
-            time_step=0.1, 
+            time_step=self.planner_timestep, 
             rrt_range=0.1,
             planning_time=1,
-            # planning_time=0.5,
             wrt_world=wrt_world
         )
         if result['status'] != "Success":
@@ -493,10 +500,10 @@ class BaseEnv():
         for i in range(n_step):  
             position_target = result['position'][i]
             velocity_target = result['velocity'][i]
-            # TODO
-            # num_repeat = int(result['time'][i] / self.phy_timestep)
-            num_repeat = 7
-            for _ in range(num_repeat + 1): 
+            # num_repeat 需要根据 mplib.planner 初始化时候的 time_step 进行计算
+            # num_repeat = int(self.time_step / self.phy_timestep)
+            num_repeat = math.ceil(self.planner_timestep / self.phy_timestep)
+            for _ in range(num_repeat): 
                 qf = self.robot.compute_passive_force(
                     gravity=True, 
                     coriolis_and_centrifugal=True
