@@ -154,6 +154,7 @@ def coarse_joint_estimation(tracks_3d, visualize=False):
         joint_type = "revolute"
         joint_axis = R_axis
         joint_states = R_states
+        
     return joint_type, joint_axis, joint_states
 
 

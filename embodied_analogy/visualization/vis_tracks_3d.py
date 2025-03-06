@@ -29,7 +29,7 @@ def vis_tracks3d_napari(tracks_3d, colors=None, viewer_title="napari"):
         # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
     colors = np.tile(colors, (T, 1))
         
-    viewer.add_points(napari_data, size=0.02, name='tracks_3d', opacity=0.8, face_color=colors)
+    viewer.add_points(napari_data, size=0.01, name='tracks_3d', opacity=0.8, face_color=colors)
     napari.run()
     
 def vis_pointcloud_series_napari(pc_series, colors=None):

@@ -641,7 +641,7 @@ def reconstruct_mask(mask1: np.ndarray, mask2: np.ndarray) -> np.ndarray:
     
     return new_mask
 
-def tracksNd_variance(tracks: torch.Tensor) -> torch.Tensor:
+def tracksNd_variance_torch(tracks: torch.Tensor) -> torch.Tensor:
     """
     计算 T, M, 3 形状的 3D 轨迹数据的平均方差 (PyTorch 版本)。
 
@@ -662,6 +662,26 @@ def tracksNd_variance(tracks: torch.Tensor) -> torch.Tensor:
 
     return average_variance
 
+def tracksNd_variance_np(tracks: np.ndarray) -> float:
+    """
+    计算形状为 (T, M, Nd) 的 2D/3D 轨迹数据的平均方差 (NumPy 版本)。
+
+    参数:
+        tracks (np.ndarray): 形状为 (T, M, Nd) 的数组，表示 T 个时刻 M 个点的 2D/3D 轨迹。
+
+    返回:
+        float: M 个点的方差均值（标量）。
+    """
+    # 计算每个点在 T 个时刻的方差 (M, Nd)
+    pointwise_variance = np.var(tracks, axis=0, ddof=0)  # 计算 M 个点的 Nd 维方差
+
+    # 计算每个点的总方差（对 Nd 维坐标求均值）
+    pointwise_variance_mean = np.mean(pointwise_variance, axis=1)  # (M,)
+
+    # 计算所有点的方差均值
+    average_variance = np.mean(pointwise_variance_mean)
+
+    return average_variance
 
 def farthest_scale_sampling(arr, M):
     """
@@ -858,7 +878,7 @@ def filter_tracks2d_by_visibility(pred_tracks_2d, pred_visibility):
     pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
     return pred_tracks_2d
 
-def filter_tracks2d_by_depth_mask_seq(rgb_seq, pred_tracks_2d, depthSeq_mask, visualize=False):
+def filter_tracks2d_by_depth_mask_seq(pred_tracks_2d, depthSeq_mask):
     """
     筛选出那些不曾落到 invalid depth_mask 中的 tracks
     Args:
@@ -973,7 +993,7 @@ def get_dynamic_mask(mask, moving_points, static_points, visualize=False):
         napari.run()
     return dynamic_mask
 
-def get_dynamic_mask_seq(mask_seq, moving_points_seq, static_points_seq, visualize=False):
+def get_dynamic_seq(mask_seq, moving_points_seq, static_points_seq, visualize=False):
     T = mask_seq.shape[0]
     dynamic_seg_seq = []
     

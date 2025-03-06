@@ -201,10 +201,10 @@ def filter_dynamic_mask(
     
     return query_dynamic_updated  
 
-def filter_dynamic_mask_seq(
+def filter_dynamic_seq(
     K, # 相机内参
     depth_seq,  # T, H, W
-    dynamic_mask_seq, # T, H, W
+    dynamic_seq, # T, H, W
     joint_type,
     joint_axis_unit,
     joint_states,
@@ -216,11 +216,11 @@ def filter_dynamic_mask_seq(
         验证所有的 moving points, 把不确定的 points 标记为 unknown
     """
     T, H, W = depth_seq.shape
-    dynamic_mask_seq_updated = dynamic_mask_seq.copy()
+    dynamic_seq_updated = dynamic_seq.copy()
     
     for i in range(T):
         query_depth = depth_seq[i]
-        query_dynamic = dynamic_mask_seq[i]
+        query_dynamic = dynamic_seq[i]
         query_state = joint_states[i]
         
         other_mask = np.arange(T) != i
@@ -240,18 +240,18 @@ def filter_dynamic_mask_seq(
             depth_tolerance=depth_tolerance, 
             visualize=False
         )
-        dynamic_mask_seq_updated[i] = query_dynamic_updated
+        dynamic_seq_updated[i] = query_dynamic_updated
     
     if visualize:
         import napari 
-        viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+        viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
         viewer.title = "filter dynamic mask seq (moving part)"
         # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='before filtering')
-        viewer.add_labels(dynamic_mask_seq_updated.astype(np.int32), name='after filtering')
+        viewer.add_labels(dynamic_seq.astype(np.int32), name='before filtering')
+        viewer.add_labels(dynamic_seq_updated.astype(np.int32), name='after filtering')
         napari.run()
     
-    return dynamic_mask_seq_updated  # (T, H, W), composed of 1, 2, 3
+    return dynamic_seq_updated  # (T, H, W), composed of 1, 2, 3
 
 def moving_ij_intersection(
     K, # 相机内参
@@ -384,7 +384,7 @@ def moving_ij_intersection_torch(
 def fine_joint_estimation_seq(
     K,
     depth_seq, 
-    dynamic_mask_seq,
+    dynamic_seq,
     joint_type, 
     joint_axis_unit, # unit vector here
     joint_states,
@@ -408,10 +408,10 @@ def fine_joint_estimation_seq(
     # 可视化输入
     if visualize and False:
         import napari 
-        viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+        viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
         viewer.title = "visualize input of function fine_joint_estimation_seq"
         # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='0-query other-ref')
+        viewer.add_labels(dynamic_seq.astype(np.int32), name='0-query other-ref')
         napari.run()
         
     T = depth_seq.shape[0]
@@ -424,7 +424,7 @@ def fine_joint_estimation_seq(
     
     # 准备 moving mask 数据, 点云数据 和 normal 数据
     pass
-    moving_masks = [dynamic_mask_seq[i] == MOVING_LABEL for i in range(T)]
+    moving_masks = [dynamic_seq[i] == MOVING_LABEL for i in range(T)]
     moving_pcs = [depth_image_to_pointcloud(depth_seq[i], moving_masks[i], K) for i in range(T)] #  [(N, 3), ...], len=T
     normals = [compute_normals(moving_pcs[i]) for i in range(T)]
     
@@ -471,10 +471,10 @@ def fine_joint_estimation_seq(
             if need_update:
                 ref_states = np.array([states_param.detach().cpu().item() for states_param in states_params])
                 ref_states = ref_states[np.arange(T)!=l]
-                dynamic_mask_seq[l] = filter_dynamic_mask(
+                dynamic_seq[l] = filter_dynamic_mask(
                     K=K, 
                     query_depth=depth_seq[l], 
-                    query_dynamic=dynamic_mask_seq[l], 
+                    query_dynamic=dynamic_seq[l], 
                     ref_depths=depth_seq[np.arange(T)!=l],  
                     joint_type=joint_type,
                     joint_axis_unit=axis_params.detach().cpu().numpy(),
@@ -486,14 +486,14 @@ def fine_joint_estimation_seq(
                 
                 if visualize:
                     import napari 
-                    viewer = napari.view_image((dynamic_mask_seq != 0).astype(np.int32), rgb=False)
+                    viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
                     viewer.title = "after first round of dynamic refinement"
                     # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-                    viewer.add_labels(dynamic_mask_seq.astype(np.int32), name='0-query other-ref')
+                    viewer.add_labels(dynamic_seq.astype(np.int32), name='0-query other-ref')
                     napari.run()
                     
                 # 还需要更新对应 frame 的 moving_masks 等信息
-                moving_masks[l] = dynamic_mask_seq[l] == MOVING_LABEL
+                moving_masks[l] = dynamic_seq[l] == MOVING_LABEL
                 moving_pcs[l] = depth_image_to_pointcloud(depth_seq[l], moving_masks[l], K)
                 normals[l] = compute_normals(moving_pcs[l])
         
