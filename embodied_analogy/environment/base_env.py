@@ -442,7 +442,7 @@ class BaseEnv():
         for i in range(50):
             self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.03)
+            joint.set_drive_target(0.04)
         for i in range(100): 
             qf = self.robot.compute_passive_force(
                 gravity=True, 
@@ -454,7 +454,7 @@ class BaseEnv():
         for i in range(50):
             self.step()
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.01)
+            joint.set_drive_target(0.0)
         for i in range(100):  
             qf = self.robot.compute_passive_force(
                 gravity=True, 
