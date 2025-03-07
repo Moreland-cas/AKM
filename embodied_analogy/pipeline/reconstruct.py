@@ -15,7 +15,7 @@ from embodied_analogy.utility.utils import (
     extract_tracked_depths,
     farthest_scale_sampling,
     get_dynamic_seq,
-    
+    get_depth_mask_seq
 )
 
 initialize_napari()
@@ -56,16 +56,13 @@ def reconstruct(
     franka_seq = explore_data["franka_seq"]
     K = explore_data["K"]
     Tw2c = explore_data["Tw2c"]
-
-    # 对于 depth_seq 进行处理, 得到 depth_mask_seq, 用于标记其中depth为 0, 或者重投影在地面上的位置
-    depth_mask_seq = depth_seq > 0
-    for i in range(depth_seq.shape[0]):
-        _, H, W = depth_seq.shape
-        pc_camera = depth_image_to_pointcloud(depth_seq[i], None, K) # H*W, 3
-        pc_world = camera_to_world(pc_camera, Tw2c)
-        pc_height_mask = (pc_world[:, 2] > 0.03).reshape(H, W) # H*W
-        depth_mask_seq[i] = depth_mask_seq[i] & pc_height_mask
-
+        
+    depth_mask_seq = get_depth_mask_seq(
+        depth_seq=depth_seq,
+        K=K,
+        Tw2c=Tw2c,
+        height=0.02 # 2 cm
+    )
     """
         根据物体初始状态的图像, 得到一些初始跟踪点, initial_uvs
     """

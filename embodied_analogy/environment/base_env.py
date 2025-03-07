@@ -141,7 +141,8 @@ class BaseEnv():
         #     link.disable_gravity = True
         
         # 让机械手臂复原
-        for i in range(100):
+        # TODO: 这里改为用 cur_qpos 和 init_state 的差值来判断是不是应该停止
+        for i in range(200):
             self.step()
             
         self.setup_planner()
@@ -455,7 +456,7 @@ class BaseEnv():
         # self.open_gripper()
         init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
-        # self.close_gripper()
+        self.close_gripper()
         
     def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w

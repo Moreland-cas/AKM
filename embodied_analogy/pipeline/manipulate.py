@@ -48,8 +48,8 @@ class ManipulateEnv(BaseEnv):
         for i, joint_name in enumerate(active_joint_names):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
-                initial_state.append(0.1)
-                # initial_state.append(0.0)
+                # initial_state.append(0.1)
+                initial_state.append(0.0)
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -116,6 +116,7 @@ class ManipulateEnv(BaseEnv):
         print("target state destination: ", start_state + delta_state)
         
         # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
+        # TODO: 在这里进行一个 depth_np 的进一步过滤
         start_pc_c = depth_image_to_pointcloud(depth_np, obj_mask, self.camera_intrinsic) # N, 3
         start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
         

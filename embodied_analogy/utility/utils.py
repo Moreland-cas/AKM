@@ -1013,6 +1013,29 @@ def get_dynamic_seq(mask_seq, moving_points_seq, static_points_seq, visualize=Fa
         napari.run()
     return dynamic_seg_seq # T, H, W
 
+def get_depth_mask(depth, K, Tw2c, height=0.02):
+    """
+    返回一个 mask, 标记出 depth 不为 0, 且重投影会世界坐标系不在地面上的点
+    depth: np.array([H, W])
+    height: 默认高于 1 cm 的点才会保留
+    """
+    H, W = depth.shape
+    pc_camera = depth_image_to_pointcloud(depth, None, K) # H*W, 3
+    pc_world = camera_to_world(pc_camera, Tw2c) # H*W, 3
+    height_mask = (pc_world[:, 2] > height).reshape(H, W) # H*W
+    depth_mask = (depth > 0.0) & height_mask
+    return depth_mask
+
+def get_depth_mask_seq(depth_seq, K, Tw2c, height=0.01):
+    """
+    返回一个 mask, 标记出 depth 不为 0, 且重投影会世界坐标系不在地面上的点
+    depth: np.array([H, W])
+    height: 默认高于 1 cm 的点才会保留
+    """
+    depth_mask_seq = depth_seq > 0
+    for i in range(len(depth_seq)):
+        depth_mask_seq[i] = get_depth_mask(depth_seq[i], K, Tw2c, height)
+    return depth_mask_seq
 
 def quantile_sampling(arr, M):
     """

@@ -1,13 +1,15 @@
 import os
 import math
 import numpy as np
+import sklearn.cluster as cluster
 from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
     camera_to_world,
     initialize_napari,
     image_to_camera,
     visualize_pc,
-    napari_time_series_transform
+    napari_time_series_transform,
+    get_depth_mask
 )
 initialize_napari()
 from embodied_analogy.pipeline.manipulate import ManipulateEnv
@@ -34,13 +36,13 @@ class ExploreEnv(ManipulateEnv):
         self.save_dir = save_dir
         self.has_valid_explore = False
     
-    def start_explore_loop(self, allowed_num_tries=10):
+    def start_explore_loop(self, allowed_num_tries=10, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
         """
         num_tries_so_far = 0
-        while (not self.explore_data_isValid()) and (num_tries_so_far < allowed_num_tries):
-            self.explore_once()
+        while (not self.explore_data_is_valid()) and (num_tries_so_far < allowed_num_tries):
+            self.explore_once(visualize=visualize)
             num_tries_so_far += 1
             
         # save explore data
@@ -60,8 +62,19 @@ class ExploreEnv(ManipulateEnv):
         self, 
         reserved_distance=0.05,
         pertubation_distance=0.1,
+        # TODO: 后续实现一个功能, 就是每次 explore 可以复用前一步得到的 contact map, 从而大大的增加探索效率
+        contact_map=None,
         visualize=False      
     ):
+        """
+            在当前状态下进行一次探索
+        """
+        self.open_gripper()
+        self.reset_franka_arm()
+        
+        # 一定要记得在每次开启新的 explore_once 前, 将 explore_data 中的 frames 清空
+        self.explore_data["frames"] = []
+        
         from embodied_analogy.exploration.ram_proposal import get_ram_proposal, lift_ram_affordance
         self.base_step()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
@@ -74,13 +87,14 @@ class ExploreEnv(ManipulateEnv):
             save_root=self.save_dir,
             visualize=visualize
         )
-        contact_3d_c = image_to_camera(
-            uv=contact_uv[None],
-            depth=np.array(depth_np[contact_uv[1], contact_uv[0]])[None],
-            K=self.camera_intrinsic,
-        )[0] # 3
-        contact_3d_w = camera_to_world(contact_3d_c[None], self.camera_extrinsic)[0]
-        # 在这一步保存一下中间输出
+        
+        # contact_3d_c = image_to_camera(
+        #     uv=contact_uv[None],
+        #     depth=np.array(depth_np[contact_uv[1], contact_uv[0]])[None],
+        #     K=self.camera_intrinsic,
+        # )[0] # 3
+        # contact_3d_w = camera_to_world(contact_3d_c[None], self.camera_extrinsic)[0]
+        # visualize_pc(pc_collision_w, contact_point=contact_3d_w, post_contact_dirs=best_dir_3d[None])
         
         # 这个输出的是在相机坐标系下的(Tgrasp2c), 需要转换到世界坐标系下
         sorted_grasps_c, best_dir_3d_c = lift_ram_affordance(
@@ -99,9 +113,9 @@ class ExploreEnv(ManipulateEnv):
         best_dir_3d = camera_to_world(best_dir_3d_c[None], Tw2c)[0] # 3
         
         # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
-        pc_collision_c = depth_image_to_pointcloud(depth_np, obj_mask, self.camera_intrinsic) # N, 3
+        depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, Tw2c, height=0.02)
+        pc_collision_c = depth_image_to_pointcloud(depth_np, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
         pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
-        # visualize_pc(pc_collision_w, contact_point=contact_3d_w, post_contact_dirs=best_dir_3d[None])
         
         for grasp in sorted_grasps:
             # visualize_pc(pc_collision_w, grasp=grasp)
@@ -136,10 +150,10 @@ class ExploreEnv(ManipulateEnv):
             # 之后再根据 best_dir_3d 移动一定距离 (1dm)
             self.move_along_axis(moving_direction=best_dir_3d, moving_distance=pertubation_distance)
             
-            # 打开 gripper, 并返回初始位置
-            self.open_gripper()
-            self.move_forward(-reserved_distance)
-            self.reset_franka_arm()
+            # 打开 gripper, 并返回初始位置 (这里先不设置)
+            # self.open_gripper()
+            # self.move_forward(-reserved_distance)
+            # self.reset_franka_arm()
             
             break
     
@@ -168,7 +182,7 @@ class ExploreEnv(ManipulateEnv):
             }
             self.explore_data["frames"].append(cur_frame)
             
-    def explore_data_isValid(self):
+    def explore_data_is_valid(self):
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
         if len(self.explore_data["frames"]) == 0:
             return False
@@ -204,16 +218,20 @@ class ExploreEnv(ManipulateEnv):
         last_mask = last_mask & (last_depth > 0)
         
         # 计算前后两帧 depth_map 的差值的变化程度
-        diff = np.abs(last_depth - first_depth)
-        diff_masked = diff * first_mask.astype(np.float32) * last_mask.astype(np.float32)
+        diff = np.abs(last_depth - first_depth) # H, W
+        diff_masked = diff[first_mask & last_mask] # N
         
-        if diff_masked.max() > self.pertubation_distance * 0.5:
+        # 将 diff_masked 进行聚类, 将变化大的一部分的平均值与 pertubation_distance 的 0.5 倍进行比较
+        diff_centroid, _, _ = cluster.k_means(diff_masked[:, None], init="k-means++", n_clusters=2)
+
+        # 这里 0.5 是一个经验值, 因为对于旋转这个值不好解析的计算
+        if diff_centroid.max() > self.pertubation_distance * 0.5:
             self.has_valid_explore = True
             return True
         else:
             return False
         
-    def process_explore_data(self, visualize=False, save=False):
+    def process_explore_data(self, save=False):
         """
             process rgb and depth data in self.explore_data
         """
@@ -223,8 +241,8 @@ class ExploreEnv(ManipulateEnv):
         self.depth_seq = np.stack([self.explore_data["frames"][i]["depth_np"] for i in range(num_frames)]) # T, H, W
         self.franka_seq = np.stack([self.explore_data["frames"][i]["franka_tracks2d"] for i in range(num_frames)]) # T, N, 2
         
-        if visualize:
-            self.visualize_explore_data()
+        # if visualize:
+        #     self.visualize_explore_data()
             
         if save:
             np.savez(
@@ -266,9 +284,7 @@ if __name__ == "__main__":
         obj_config=obj_config,
         instruction="open the drawer"
     )
-    exploreEnv.start_explore_loop()
-    exploreEnv.process_explore_data(
-        visualize=True,
-        save=True
-    )
+    exploreEnv.start_explore_loop(visualize=False)
+    exploreEnv.process_explore_data(save=False)
+    exploreEnv.visualize_explore_data()
     
