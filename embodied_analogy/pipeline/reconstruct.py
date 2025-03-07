@@ -15,7 +15,8 @@ from embodied_analogy.utility.utils import (
     extract_tracked_depths,
     farthest_scale_sampling,
     get_dynamic_seq,
-    get_depth_mask_seq
+    get_depth_mask_seq,
+    visualize_pc
 )
 
 initialize_napari()
@@ -202,12 +203,38 @@ def reconstruct(
 
     Rc2w = Tw2c[:3, :3].T # 3, 3
     joint_axis_w = Rc2w @ joint_axis_c
-    joint_axis_w_updated = Rc2w @ joint_axis_c_updated
+    joint_axis_w_updated = Rc2w @ joint_axis_c_updated # 3
+    
+    # 在这里调整 joint_axis_w_updated 的方向, 使得其指向使得物体点云方差变大的方向
+    # TODO：似乎跟 joint_type 还有关系
+    if joint_type == "prismatic":
+        # 首先根据 tracks3d 的方差判断当前 track 随着时间是 open 还是 close
+        if np.var(tracks3d_filtered[0]) > np.var(tracks3d_filtered[-1]):
+            track_type = 0 # "close"
+        else:
+            track_type = 1 # "open"
+            
+        # 然后判断估计出的 joint_axis 与当前  tracks3d 变化的对应关系
+        moving_coarse_3d = tracks3d_filtered[:, moving_mask_3d, :] # T, N, 3
+        moving_coarse_3d_diff = moving_coarse_3d - moving_coarse_3d[0] # T, N, 3
+        dot_product_with_joint_axis = np.mean(moving_coarse_3d_diff * joint_axis_w_updated)
+        
+        if dot_product_with_joint_axis > 0:
+            joint_est_type = track_type
+        else:
+            joint_est_type = 1 - track_type
+            
+        if joint_est_type == 0:
+            joint_axis_w_updated = -joint_axis_w_updated
+
+    else:
+        assert "revolute not implemented yet"
         
     if save_dir is not None:
         np.savez(
             save_dir + "obj_repr.npz",
             K=K,
+            track_type="open" if track_type == 1 else "close",
             rgb_seq=rgb_seq[kf_idx],
             depth_seq=depth_seq[kf_idx],
             dynamic_seq=dynamic_seq_updated,
@@ -234,6 +261,6 @@ def reconstruct(
 if __name__ == "__main__":
     reconstruct(
         explore_data=np.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/explore_data.npz"),
-        visualize=False,
+        visualize=True,
         gt_joint_axis=np.array([-1, 0, 0])
     )

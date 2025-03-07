@@ -120,22 +120,28 @@ def run_sam_whole(
 
     # 选择正样本点的聚类中心和一个随机负样本点作为初始输入
     # initial_neg_idx = -5 # panda_hand
-    if positive_points.shape[0] > 0:
-        initial_pos_idx = select_cluster_center_point(positive_points, return_k_points=1)
-    else:
-        initial_pos_idx = []
+    # if positive_points.shape[0] > 0:
+    #     initial_pos_idx = select_cluster_center_point(positive_points, return_k_points=1)
+    # else:
+    #     initial_pos_idx = []
 
-    if negative_points.shape[0] > 0:
-        initial_neg_idx = select_cluster_center_point(negative_points, return_k_points=1)
-    else:
-        initial_neg_idx = []
+    # if negative_points.shape[0] > 0:
+    #     initial_neg_idx = select_cluster_center_point(negative_points, return_k_points=1)
+    # else:
+    #     initial_neg_idx = []
+        
+    initial_pos_idx, initial_neg_idx = [], []
     
-    input_point = np.vstack([positive_points[initial_pos_idx], negative_points[initial_neg_idx]])
-    input_label = np.append(np.ones(len(initial_pos_idx)), np.zeros(len(initial_neg_idx)))
+    # input_point = np.vstack([positive_points[initial_pos_idx], negative_points[initial_neg_idx]])
+    # input_label = np.append(np.ones(len(initial_pos_idx)), np.zeros(len(initial_neg_idx)))
+    input_point = np.empty((0, 2))
+    input_label = np.empty(0)
 
     # 记录已使用的点
-    used_positive_points = set(map(tuple, positive_points[initial_pos_idx])) if len(initial_pos_idx) > 0 else set()
-    used_negative_points = set(map(tuple, negative_points[initial_neg_idx])) if len(initial_neg_idx) > 0 else set()
+    # used_positive_points = set(map(tuple, positive_points[initial_pos_idx])) if len(initial_pos_idx) > 0 else set()
+    # used_negative_points = set(map(tuple, negative_points[initial_neg_idx])) if len(initial_neg_idx) > 0 else set()
+    used_positive_points = set()
+    used_negative_points = set()
     
     acceptable_score = acceptable_thr * len(positive_points) if positive_points is not None else 0
         

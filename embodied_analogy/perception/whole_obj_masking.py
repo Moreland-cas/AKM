@@ -18,6 +18,7 @@ def whole_obj_masking_sam(rgb_seq, positive_tracks2d, negative_tracks2d, visuali
         rgb_img = rgb_seq[i]
         positive_points = positive_tracks2d[i]
         negative_points = negative_tracks2d[i]
+        # TODO: 加入 grounding DINO 的 box prompt
         mask_i, used_pos_i, used_neg_i = run_sam_whole(
             rgb_img=rgb_img, 
             positive_points=positive_points, 

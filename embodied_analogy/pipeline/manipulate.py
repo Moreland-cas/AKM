@@ -16,7 +16,8 @@ from embodied_analogy.utility.utils import (
     initialize_napari,
     compute_bbox_from_pc,
     sample_points_on_bbox_surface,
-    visualize_pc
+    visualize_pc,
+    get_depth_mask
 )
 initialize_napari()
 from embodied_analogy.grasping.anygrasp import (
@@ -117,7 +118,9 @@ class ManipulateEnv(BaseEnv):
         
         # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
         # TODO: 在这里进行一个 depth_np 的进一步过滤
-        start_pc_c = depth_image_to_pointcloud(depth_np, obj_mask, self.camera_intrinsic) # N, 3
+        
+        depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, self.camera_extrinsic, height=0.02)
+        start_pc_c = depth_image_to_pointcloud(depth_np, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
         start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
         
         joint_axis_w = self.obj_repr["joint_axis_w"]
@@ -126,8 +129,8 @@ class ManipulateEnv(BaseEnv):
         grasp_group = detect_grasp_anygrasp(
             start_pc_w, 
             start_color, 
-            joint_axis_out=joint_axis_w, 
-            visualize=visualize
+            joint_axis_out=-joint_axis_w, 
+            visualize=True
         )
         
         # 筛选出评分比较高的 grasp
