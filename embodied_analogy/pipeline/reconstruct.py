@@ -209,7 +209,7 @@ def reconstruct(
         
     if save_dir is not None:
         np.savez(
-            save_dir + "reconstructed_data.npz",
+            save_dir + "obj_repr.npz",
             K=K,
             rgb_seq=rgb_seq[kf_idx],
             depth_seq=depth_seq[kf_idx],
@@ -224,11 +224,11 @@ def reconstruct(
         print(f"\tgt axis: {gt_joint_axis}")
 
         dot_before = np.dot(gt_joint_axis, joint_axis_w)
-        dot_after = np.dot(gt_joint_axis, joint_axis_w_updated)
         print(f"\tbefore: {np.degrees(np.arccos(dot_before))}")
         print("\tjoint axis: ", joint_axis_w)
         print("\tjoint states: ", joint_states[kf_idx])
 
+        dot_after = np.dot(gt_joint_axis, joint_axis_w_updated)
         print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
         print("\tjoint axis: ", joint_axis_w_updated)
         print("\tjoint states: ", jonit_states_updated)

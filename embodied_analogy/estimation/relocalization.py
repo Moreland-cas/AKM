@@ -52,7 +52,7 @@ def relocalization(
         icp_select_range=icp_select_range,
         visualize=visualize
     )
-    return query_state_updated, query_dynamic, query_dynamic_updated
+    return query_state_updated, obj_mask, query_dynamic_updated
 
 def _relocalization(
     K, 
@@ -101,7 +101,7 @@ def _relocalization(
     _, updated_states = fine_joint_estimation_seq(
         K=K,
         depth_seq=tmp_depths, 
-        dynamic_mask_seq=tmp_dynamics,
+        dynamic_seq=tmp_dynamics,
         joint_type=joint_type, 
         joint_axis_unit=joint_axis_unit, 
         joint_states=tmp_joint_states,
@@ -190,7 +190,7 @@ if __name__ == "__main__":
             joint_type=recon_data["joint_type"], 
             joint_axis_unit=recon_data["joint_axis"], 
             ref_joint_states=recon_data["joint_states"][other_mask], 
-            ref_dynamics=recon_data["dynamic_mask_seq"][other_mask], 
+            ref_dynamics=recon_data["dynamic_seq"][other_mask], 
             lr=5e-3, # 一次估计 0.5 cm?
             tol=1e-7,
             # icp_select_range=0.2,

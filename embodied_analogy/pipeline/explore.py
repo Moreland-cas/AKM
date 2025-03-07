@@ -21,12 +21,11 @@ class ExploreEnv(ManipulateEnv):
         pertubation_distance=0.1,
         save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/"
     ):
-        super().__init__(obj_config)
+        super().__init__(obj_config=obj_config, instruction=instruction)
         self.record_fps = record_fps
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
         self.pertubation_distance = pertubation_distance
-        self.instruction = instruction
-        self.obj_description = self.instruction.split(" ")[-1] # TODO: 改为从 instruction 中提取
+        
         self.explore_data = {
             "frames": []
         }
