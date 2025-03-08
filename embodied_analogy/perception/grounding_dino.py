@@ -1,35 +1,31 @@
 import os
 import numpy as np
-# from PyQt5.QtCore import QCoreApplication, QLibraryInfo
-
-# # 在代码开头添加以下配置
-# os.environ["QT_DEBUG_PLUGINS"] = "1"  # 开启插件调试
-# os.environ["QT_PLUGIN_PATH"] = QLibraryInfo.location(QLibraryInfo.PluginsPath)
 import cv2
 import torch
 from PIL import Image
 from torchvision.ops import box_convert
 import groundingdino.datasets.transforms as T
-
-# import napari
-# viewer = napari.Viewer()
-# napari.run()
-
+from embodied_analogy.utility.utils import initialize_napari
+initialize_napari()
 from groundingdino.util.inference import load_model, predict, annotate
 
-# import napari
-# viewer = napari.Viewer()
-# napari.run()
-
-def run_groundingDINO(
-    image,
-    obj_description,
-    visualize=False
-):
+def load_groundingDINO_model():
     groundingDINO_home = "/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO"
     WEIGHTS_PATH = os.path.join(groundingDINO_home, "weights", "groundingdino_swint_ogc.pth")
     CONFIG_PATH = os.path.join(groundingDINO_home, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
-
+    model = load_model(CONFIG_PATH, WEIGHTS_PATH)
+    return model
+    
+def run_groundingDINO(
+    image,
+    obj_description,
+    dino_model=None,
+    visualize=False
+):
+    model = dino_model
+    if model is None:
+        model = load_groundingDINO_model()
+        
     if isinstance(image, str):
         image_pil = Image.open(image).convert("RGB")
         image_np = np.asarray(image_pil)
@@ -52,7 +48,6 @@ def run_groundingDINO(
     image_transformed, _ = transform(image_pil, None) # torch.Tensor
 
     # load model
-    model = load_model(CONFIG_PATH, WEIGHTS_PATH)
     boxes, logits, phrases = predict(
         model=model, 
         image=image_transformed, 
@@ -84,15 +79,10 @@ def run_groundingDINO(
 
 
 if __name__ == "__main__":
-    # test()
-    # load_image("/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/sapien_test.png")
-    # import napari
-    # viewer = napari.Viewer()
-    # viewer.add_image(np.random.random((100, 100)))
-    # napari.run()
     bbox_scaled, bbox_score = run_groundingDINO(
-        image="/home/zby/Programs/Embodied_Analogy/assets/sapien_test.png",
+        image="/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/sapien_test.png",
         obj_description="object",
+        dino_model=load_groundingDINO_model(),
         visualize=True
     )
     print(bbox_scaled, bbox_score)

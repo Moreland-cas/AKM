@@ -23,9 +23,9 @@ initialize_napari()
 
 from embodied_analogy.perception.online_cotracker import track_any_points
 from embodied_analogy.perception.grounded_sam import run_grounded_sam
-from embodied_analogy.perception.whole_obj_masking import (
-    whole_obj_masking_sam,
-    whole_obj_masking_sam2
+from embodied_analogy.perception.mask_obj_from_video import (
+    mask_obj_from_video_with_image_sam2,
+    # mask_obj_from_video_with_video_sam2
 )
 from embodied_analogy.estimation.clustering import cluster_tracks_2d, cluster_tracks_3d
 from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
@@ -50,7 +50,8 @@ def reconstruct(
         读取 exploration 阶段获取的视频数据, 进而对物体结构进行恢复
         返回一个 obj_repr, 包含物体表示和 joint 估计
     """
-    os.makedirs(save_dir, exist_ok=True)
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
     
     rgb_seq = explore_data["rgb_seq"]
     depth_seq = explore_data["depth_seq"]
@@ -142,14 +143,15 @@ def reconstruct(
     # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
     kf_idx = farthest_scale_sampling(joint_states, M=num_key_frames)
     # obj_mask_seq by sam2 image mode
-    obj_mask_seq = whole_obj_masking_sam(
-        rgb_seq[kf_idx], 
-        tracks2d_filtered[kf_idx], 
-        franka_seq[kf_idx], 
-        visualize
+    obj_mask_seq = mask_obj_from_video_with_image_sam2(
+        rgb_seq=rgb_seq[kf_idx], 
+        obj_description=obj_description,
+        positive_tracks2d=tracks2d_filtered[kf_idx], 
+        negative_tracks2d=franka_seq[kf_idx], 
+        visualize=visualize
     ) 
     # obj_mask_seq by sam2 video mode
-    # obj_mask_seq = whole_obj_masking_sam2(
+    # obj_mask_seq = mask_obj_from_video_with_video_sam2(
     #     rgb_folder,
     #     kf_idx,
     #     tracks2d_filtered[kf_idx], 
@@ -195,9 +197,9 @@ def reconstruct(
         optimize_state_mask=np.arange(num_key_frames)!=0,
         # 这里设置不迭代的优化 dynamic_mask
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
-        lr=5e-3, # 5 mm
-        tol=1e-8,
-        icp_select_range=0.05,
+        lr=7e-3, # 5 mm
+        tol=1e-9,
+        icp_select_range=0.1,
         visualize=visualize
     )
 
@@ -261,6 +263,7 @@ def reconstruct(
 if __name__ == "__main__":
     reconstruct(
         explore_data=np.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/explore_data.npz"),
-        visualize=True,
-        gt_joint_axis=np.array([-1, 0, 0])
+        visualize=False,
+        gt_joint_axis=np.array([-1, 0, 0]),
+        save_dir=None
     )

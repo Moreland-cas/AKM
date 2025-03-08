@@ -82,17 +82,31 @@ def select_cluster_center_point(points, return_k_points=1):
     else:
         return np.array(closest_indices)
 
-
+def load_sam2_image_model():
+     # 加载 SAM2 模型
+    sam2_proj_path = "/home/zby/Programs/Embodied_Analogy/third_party/sam2"
+    sam2_model = build_sam2(
+        config_file="configs/sam2.1/sam2.1_hiera_l.yaml",
+        ckpt_path=sam2_proj_path + "/checkpoints/sam2.1_hiera_large.pt",
+        device=torch.device("cuda")
+    )
+    return sam2_model
+    
 # 运行 SAM2 模型，并逐步优化输入点，以提高分割效果
-def run_sam_whole(
+def sam2_on_image(
     rgb_img, # numpy
     positive_points=None,  # np.array([N, 2])
     positive_bbox=None, # np.array([4]), [u_left, v_left, u_right, v_right]
     negative_points=None,
     num_iterations=5,
     acceptable_thr=0.9,
+    sam2_image_model=None,
     visualize=False
 ):
+    sam2_model = sam2_image_model
+    if sam2_model is None:
+        sam2_model = load_sam2_image_model()
+        
     assert num_iterations >= 1
     # positive points 或者 positive box 至少有一个不为 None
     assert (positive_bbox is not None) or (positive_points is not None)
@@ -108,13 +122,6 @@ def run_sam_whole(
     if isinstance(negative_points, torch.Tensor):
         negative_points = negative_points.cpu().numpy()
 
-    # 加载 SAM2 模型
-    sam2_proj_path = "/home/zby/Programs/Embodied_Analogy/third_party/sam2"
-    sam2_model = build_sam2(
-        config_file="configs/sam2.1/sam2.1_hiera_l.yaml",
-        ckpt_path=sam2_proj_path + "/checkpoints/sam2.1_hiera_large.pt",
-        device=torch.device("cuda")
-    )
     predictor = SAM2ImagePredictor(sam2_model)
     predictor.set_image(rgb_img)
 
@@ -253,7 +260,7 @@ def run_sam_whole(
 
 
 if __name__ == "__main__":
-    image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/assets/cat.png")
+    image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/cat.png")
     # image_pil.show() # 1100 x 1100
     image_np = np.array(image_pil.convert("RGB"))
     input_bbox = np.array([0, 0, 1000, 400])
@@ -262,12 +269,13 @@ if __name__ == "__main__":
     positive_points = None
     negative_points = np.array([[5, 5]])
     negative_points = None
-    run_sam_whole(
+    sam2_on_image(
         rgb_img=image_np, 
         positive_points=positive_points, 
         positive_bbox=input_bbox,
         negative_points=negative_points, 
         num_iterations=3,
         acceptable_thr=0.9,
+        sam2_image_model=load_sam2_image_model(),
         visualize=True
     )
