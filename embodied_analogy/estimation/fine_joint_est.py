@@ -386,7 +386,7 @@ def fine_joint_estimation_seq(
     depth_seq, 
     dynamic_seq,
     joint_type, 
-    joint_axis_unit, # unit vector here
+    joint_axis_unit, # unit vector here, in camera frame
     joint_states,
     max_icp_iters=200, # ICP 最多迭代多少轮
     optimize_joint_axis=True,
@@ -589,7 +589,7 @@ def fine_joint_estimation_seq(
         
         import napari
         viewer = napari.Viewer(ndisplay=3)
-        size = 0.002
+        size = 0.02
         viewer.add_points(moving_pcs, size=size, name='moving_pc', opacity=0.8, face_color="blue")
         viewer.add_points(pc_ref_transformed, size=size, name='before icp', opacity=0.8, face_color="red")
         viewer.add_points(pc_ref_transformed_updated, size=size, name='after icp', opacity=0.8, face_color="green")
@@ -670,7 +670,7 @@ if __name__ == "__main__":
     
     use_intersection = True
     if use_intersection:
-        pc_ref, pc_tgt = find_moving_part_intersection(K, depth_ref, depth_tgt, moving_mask_ref, moving_mask_tgt, T_ref_to_tgt, visualize=True)
+        pc_ref, pc_tgt = find_moving_part_intersection(K, depth_ref, depth_tgt, moving_mask_ref, moving_mask_tgt, T_ref_to_tgt, visualize=False)
     else:
         pc_ref = depth_image_to_pointcloud(depth_ref, moving_mask_ref, K)
         pc_tgt = depth_image_to_pointcloud(depth_tgt, moving_mask_tgt, K)

@@ -25,7 +25,6 @@ from embodied_analogy.grasping.anygrasp import (
     sort_grasp_group
 )
 
-
 class ManipulateEnv(BaseEnv):
     def __init__(
             self,
@@ -106,15 +105,14 @@ class ManipulateEnv(BaseEnv):
             joint_axis_unit=self.obj_repr["joint_axis_w"], 
             ref_joint_states=self.obj_repr["joint_states"], 
             ref_dynamics=self.obj_repr["dynamic_seq"],
-            lr=5e-3,
+            lr=1e-3,
             tol=1e-7,
             icp_select_range=0.1,
             obj_description=self.obj_description,
             negative_points=self.get_points_on_arm()[0],
-            visualize=visualize
+            visualize=False
         )
-        print("current state estimation: ", start_state)      
-        print("target state destination: ", start_state + delta_state)
+        print("start state: ", start_state)      
         
         # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
         # TODO: 在这里进行一个 depth_np 的进一步过滤
@@ -157,7 +155,7 @@ class ManipulateEnv(BaseEnv):
             grasp = self.get_rotated_grasp(grasp, axis_out_w=joint_axis_w)
             Tph2w = self.anyGrasp2ph(grasp)
             
-            visualize_pc(start_pc_w, start_color, grasp)
+            # visualize_pc(start_pc_w, start_color, grasp)
             
             result_test = self.plan_path(target_pose=Tph2w, wrt_world=True)
             if not result_test:
@@ -172,7 +170,7 @@ class ManipulateEnv(BaseEnv):
             if not result_pre:
                 continue
             
-            visualize_pc(start_pc_w, start_color, grasp)
+            # visualize_pc(start_pc_w, start_color, grasp)
             self.follow_path(result_pre)
             
             self.open_gripper()
@@ -187,7 +185,7 @@ class ManipulateEnv(BaseEnv):
         self.base_step()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
         
-        state_after_manip, _, _ = relocalization(
+        end_state, _, _ = relocalization(
             K=self.camera_intrinsic, 
             query_rgb=rgb_np,
             query_depth=depth_np, 
@@ -201,9 +199,9 @@ class ManipulateEnv(BaseEnv):
             icp_select_range=0.1,
             obj_description="drawer",
             negative_points=self.get_points_on_arm()[0],
-            visualize=visualize
+            visualize=True
         )
-        print("state estimation after manipulate: ", state_after_manip)   
+        print("predicted delta: ", end_state - start_state)   
         
         while True:
             self.step()

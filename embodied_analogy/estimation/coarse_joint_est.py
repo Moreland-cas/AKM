@@ -192,10 +192,9 @@ def coarse_joint_estimation(tracks_3d, visualize=False):
     """
     t_axis, t_states, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
     # R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
-    R_axis, R_states, R_est_loss = None, None, 1e6
+    R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
     
     print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
-    # TODO：记得改回来
     if t_est_loss < R_est_loss:
         joint_type = "prismatic"
         joint_axis = t_axis
@@ -240,10 +239,10 @@ def test_coarse_R_from_tracks_3d():
     """
     # 设置参数
     T = 10  # 10 个时间步
-    M = 50   # 5 个点
+    M = 200   # 5 个点
     true_axis = np.array([0, 0, 1])  # 真正的旋转轴是 Z 轴
-    true_angles = np.linspace(0, np.pi / 4, T)  # 旋转角度从 0 到 pi/4
-    noise_std = 0.05  # 加噪声的标准差
+    true_angles = np.linspace(0, np.pi / 3, T)  # 旋转角度从 0 到 pi/4
+    noise_std = 0.01  # 加噪声的标准差
 
     # 初始化第0帧点云
     base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标

@@ -32,9 +32,9 @@ def relocalization(
         obj_description=obj_description,
         positive_points=None, 
         negative_points=negative_points, # N, 2
-        num_iterations=5,
+        num_iterations=3,
         acceptable_thr=0.9,
-        visualize=False
+        visualize=visualize
     )
     query_dynamic = obj_mask.astype(np.int32) * MOVING_LABEL
         
@@ -64,7 +64,7 @@ def _relocalization(
     ref_joint_states, 
     ref_dynamics,
     lr=5e-3,
-    tol=1e-7,
+    tol=1e-9,
     icp_select_range=0.1,
     visualize=False
 ):
@@ -90,6 +90,7 @@ def _relocalization(
         if cur_mean_err < best_err:
             best_err = cur_mean_err
             best_matched_idx = i
+    # best_matched_idx = 1
     query_state = ref_joint_states[best_matched_idx] 
     print("best_matched_idx: ", best_matched_idx)
             
@@ -113,7 +114,7 @@ def _relocalization(
         lr=lr,
         tol=tol,
         icp_select_range=icp_select_range,
-        visualize=False
+        visualize=visualize
     )
     query_state_updated = updated_states[0]
 
@@ -151,54 +152,52 @@ def _relocalization(
 
 
 if __name__ == "__main__":
-    visualize = True
+    visualize = False
     obj_description = "drawer"
 
     torch.autograd.set_detect_anomaly(True)
 
-    from embodied_analogy.pipeline.process_recorded_data import *
-    from embodied_analogy.perception import *
+    # from embodied_analogy.perception import *
     # 读取数据
-    tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/"
-    recon_data = np.load(tmp_folder + "reconstructed_data.npz")
+    tmp_folder = "/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/"
+    obj_repr = np.load(tmp_folder + "obj_repr.npz")
     
     # 开始 relocalization 的部分
     reloc_states = []
 
-    num_informative_frame_idx = len(recon_data["joint_states"])
+    num_informative_frame_idx = len(obj_repr["joint_states"])
     for i in range(num_informative_frame_idx):
         other_mask = np.arange(num_informative_frame_idx)!=i
         
         # 在这里先生成 query dynamics, 方式是通过 sam 得到物体的 bbox
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
         initial_bbox, initial_mask = run_grounded_sam(
-            rgb_image=recon_data["rgb_seq"][i],
+            rgb_image=obj_repr["rgb_seq"][i],
             obj_description=obj_description,
             positive_points=None,  # np.array([N, 2])
-            negative_points=recon_data["franka_tracks_seq"][i],
+            negative_points=None,
             num_iterations=5,
             acceptable_thr=0.9,
             visualize=visualize,
         )
-        query_dynamic_initial = initial_mask.astype(np.int32) * MOVING_LABEL
-        
-        reloc_state, _ = relocalization(
-            K=recon_data["K"], 
-            query_dynamic=query_dynamic_initial,
-            query_depth=recon_data["depth_seq"][i], 
-            ref_depths=recon_data["depth_seq"][other_mask], 
-            joint_type=recon_data["joint_type"], 
-            joint_axis_unit=recon_data["joint_axis"], 
-            ref_joint_states=recon_data["joint_states"][other_mask], 
-            ref_dynamics=recon_data["dynamic_seq"][other_mask], 
-            lr=5e-3, # 一次估计 0.5 cm?
-            tol=1e-7,
-            # icp_select_range=0.2,
+        # query_dynamic_initial = initial_mask.astype(np.int32) * MOVING_LABEL
+        # query_state_updated, obj_mask, query_dynamic_updated
+        reloc_state, _, _ = relocalization(
+            K=obj_repr["K"], 
+            # query_dynamic=query_dynamic_initial,
+            query_rgb=obj_repr["rgb_seq"][i],
+            query_depth=obj_repr["depth_seq"][i], 
+            ref_depths=obj_repr["depth_seq"][other_mask], 
+            joint_type=obj_repr["joint_type"], 
+            joint_axis_unit=obj_repr["joint_axis_c"], 
+            ref_joint_states=obj_repr["joint_states"][other_mask], 
+            ref_dynamics=obj_repr["dynamic_seq"][other_mask], 
+            lr=1e-3, # 一次估计 1 mm
+            tol=1e-8,
             icp_select_range=0.2,
             visualize=visualize
         )
-        # print(reloc_state)
         reloc_states.append(reloc_state)
-    jonit_states = recon_data["joint_states"]
-    print(f"gt states: {jonit_states}")
+    joint_states = obj_repr["joint_states"]
+    print(f"gt states: {joint_states}")
     print("reloc states: ", np.array(reloc_states))

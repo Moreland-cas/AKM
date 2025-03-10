@@ -193,7 +193,7 @@ def reconstruct(
         # visualize=True
     ) 
     # fine estimation
-    joint_axis_c_updated, jonit_states_updated = fine_joint_estimation_seq(
+    joint_axis_c_updated, joint_states_updated = fine_joint_estimation_seq(
         K=K,
         depth_seq=depth_seq[kf_idx], 
         dynamic_seq=dynamic_seq_updated,
@@ -228,25 +228,32 @@ def reconstruct(
         # 首先根据 tracks3d_moving 和 tracks3d_static 类中心的方差判断当前 track 随着时间是 open 还是 close
         # if np.var(tracks3d_filtered[0]) > np.var(tracks3d_filtered[-1]):
         if np.linalg.norm(moving_mean_start - static_mean_start) > np.linalg.norm(moving_mean_end - static_mean_end):
-            track_type = 0 # "close"
+            track_type = "close"
         else:
-            track_type = 1 # "open"
+            track_type = "open"
             
         # 然后判断估计出的 joint_axis 与当前  tracks3d 变化的对应关系
         moving_dir_c = (tracks_3d_moving_c - tracks_3d_moving_c[0]).reshape(-1, 3) # T*N, 3
         moving_dir_w = camera_to_world(moving_dir_c, Tw2c) # T*N, 3
         dot_product_with_joint_axis = np.mean(moving_dir_w * joint_axis_w_updated)
-        
-        if dot_product_with_joint_axis > 0:
-            joint_est_type = track_type
-        else:
-            joint_est_type = 1 - track_type
             
-        if joint_est_type == 0:
-            joint_axis_out_w = -joint_axis_w_updated
+        if dot_product_with_joint_axis < 0:
+            # 代表估计出的 joint 方向与重建数据的变化方向相反, 此时如果重建数据的方向为 open, 则估计出的 joint 实际指向为 close 方向, 此时需要反转
+            if track_type == "open":
+                joint_axis_out_w = -joint_axis_w_updated
+                joint_axis_c = - joint_axis_c
+                joint_states = -joint_states
+                joint_states_updated = -joint_states_updated
+            else:
+                joint_axis_out_w = joint_axis_w_updated
         else:
-            joint_axis_out_w = joint_axis_w_updated
-
+            if track_type == "close":
+                joint_axis_out_w = -joint_axis_w_updated
+                joint_axis_c = - joint_axis_c
+                joint_states = -joint_states
+                joint_states_updated = -joint_states_updated
+            else:
+                joint_axis_out_w = joint_axis_w_updated
     else:
         assert "revolute not implemented yet"
         
@@ -254,12 +261,13 @@ def reconstruct(
         np.savez(
             save_dir + "obj_repr.npz",
             K=K,
-            track_type="open" if track_type == 1 else "close",
+            track_type=track_type,
             rgb_seq=rgb_seq[kf_idx],
             depth_seq=depth_seq[kf_idx],
             dynamic_seq=dynamic_seq_updated,
+            joint_axis_c=joint_axis_c,
             joint_axis_w=joint_axis_out_w,
-            joint_states=jonit_states_updated,
+            joint_states=joint_states_updated,
             joint_type=joint_type,
             franka_seq=franka_seq[kf_idx],
         )
@@ -275,7 +283,7 @@ def reconstruct(
         dot_after = np.dot(gt_joint_axis, joint_axis_w_updated)
         print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
         print("\tjoint axis: ", joint_axis_w_updated)
-        print("\tjoint states: ", jonit_states_updated)
+        print("\tjoint states: ", joint_states_updated)
     
 
 if __name__ == "__main__":
@@ -283,5 +291,5 @@ if __name__ == "__main__":
         explore_data=np.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/explore_data.npz"),
         visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
-        save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct"
+        save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/"
     )
