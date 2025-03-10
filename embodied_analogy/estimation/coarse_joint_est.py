@@ -9,13 +9,12 @@ Output:
 """
 import torch
 import numpy as np
-from scipy.linalg import svd
 from scipy.spatial.transform import Rotation as R
-from scipy.optimize import minimize
 from embodied_analogy.visualization.vis_tracks_3d import (
     vis_tracks3d_napari,
     vis_pointcloud_series_napari
 )
+from embodied_analogy.utility.utils import napari_time_series_transform
 
 def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     """
@@ -83,33 +82,17 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     avg_unit_vector_init = avg_unit_vector_init / torch.norm(avg_unit_vector_init)
     avg_unit_vector = avg_unit_vector_init.detach().cpu().numpy()
     
-    reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
-    
     if visualize:
-        # TODO 修改
-        # 绿色代表 moving part, 红色代表 renconstructed moving part
-        colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1)))) # 2M, 3
-        vis_tracks3d_napari(np.concatenate([tracks_3d, reconstructed_tracks], axis=1), colors, viewer_title="coarse translation estimation")
+        reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
         
-        # if isinstance(tracks_3d, torch.Tensor):
-        #     tracks_3d = tracks_3d.cpu().numpy()
+        import napari
+        viewer = napari.Viewer(ndisplay=3)
+        viewer.title = "coarse translation estimation"
         
-        # T, M, _ = tracks_3d.shape
-        # napari_data = np.zeros((T * M, 1 + 3))
-        # for i in range(T):
-        #     napari_data[i * M: (i + 1) * M, 0] = i
-        #     napari_data[i * M: (i + 1) * M, 1:] = tracks_3d[i]
-        # import napari
-        # viewer = napari.Viewer(ndisplay=3)
-        # viewer.title = viewer_title
+        viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
+        viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
         
-        # if colors is None:
-        #     colors = np.random.rand(M, 3)
-        #     # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
-        # colors = np.tile(colors, (T, 1))
-            
-        # viewer.add_points(napari_data, size=0.01, name='tracks_3d', opacity=0.8, face_color=colors)
-        # napari.run()
+        napari.run()
         
     return avg_unit_vector, scales, est_loss
 
@@ -304,10 +287,10 @@ def test_coarse_t_from_tracks_3d():
     """
     # 设置参数
     T = 10  # 10 个时间步
-    M = 5   # 5 个点
+    M = 50   # 5 个点
     true_direction = np.array([1, 0, 0])  # 真正的平移方向是 X 轴
     true_scales = np.linspace(0, 1, T)  # 平移标量从 0 到 1
-    noise_std = 0.01  # 加噪声的标准差
+    noise_std = 0.1  # 加噪声的标准差
 
     # 初始化第0帧点云
     base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标
@@ -316,7 +299,7 @@ def test_coarse_t_from_tracks_3d():
     tracks_3d = generate_translated_points(base_points, true_direction, true_scales, noise_std)
     
     # 调用 coarse_t_from_tracks_3d 函数
-    avg_unit_vector, scales, est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize=False)
+    avg_unit_vector, scales, est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize=True)
     
     # 打印优化后的平移方向和标量
     print("优化后的平移方向:", avg_unit_vector)
