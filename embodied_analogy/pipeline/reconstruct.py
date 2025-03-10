@@ -131,6 +131,7 @@ def reconstruct(
         tracks3d_filtered, 
         use_diff=True, 
         visualize=visualize, 
+        # visualize=True,
         viewer_title="dynamic clustering tracks3d_filtered"
     )
     """
@@ -217,16 +218,24 @@ def reconstruct(
     # 在这里调整 joint_axis_w_updated 的方向, 使得其指向使得物体点云方差变大的方向
     # TODO：似乎跟 joint_type 还有关系
     if joint_type == "prismatic":
-        # 首先根据 tracks3d 的方差判断当前 track 随着时间是 open 还是 close
-        if np.var(tracks3d_filtered[0]) > np.var(tracks3d_filtered[-1]):
+        tracks_3d_moving_c = tracks3d_filtered[:, moving_mask_3d, :] 
+        moving_mean_start = tracks_3d_moving_c[0].mean(0)
+        moving_mean_end = tracks_3d_moving_c[-1].mean(0)
+        tracks_3d_static_c = tracks3d_filtered[:, static_mask_3d, :]
+        static_mean_start = tracks_3d_static_c[0].mean(0)
+        static_mean_end = tracks_3d_static_c[-1].mean(0)
+        
+        # 首先根据 tracks3d_moving 和 tracks3d_static 类中心的方差判断当前 track 随着时间是 open 还是 close
+        # if np.var(tracks3d_filtered[0]) > np.var(tracks3d_filtered[-1]):
+        if np.linalg.norm(moving_mean_start - static_mean_start) > np.linalg.norm(moving_mean_end - static_mean_end):
             track_type = 0 # "close"
         else:
             track_type = 1 # "open"
             
         # 然后判断估计出的 joint_axis 与当前  tracks3d 变化的对应关系
-        moving_coarse_3d = tracks3d_filtered[:, moving_mask_3d, :] # T, N, 3
-        moving_coarse_3d_diff = moving_coarse_3d - moving_coarse_3d[0] # T, N, 3
-        dot_product_with_joint_axis = np.mean(moving_coarse_3d_diff * joint_axis_w_updated)
+        moving_dir_c = (tracks_3d_moving_c - tracks_3d_moving_c[0]).reshape(-1, 3) # T*N, 3
+        moving_dir_w = camera_to_world(moving_dir_c, Tw2c) # T*N, 3
+        dot_product_with_joint_axis = np.mean(moving_dir_w * joint_axis_w_updated)
         
         if dot_product_with_joint_axis > 0:
             joint_est_type = track_type
@@ -234,7 +243,9 @@ def reconstruct(
             joint_est_type = 1 - track_type
             
         if joint_est_type == 0:
-            joint_axis_w_updated = -joint_axis_w_updated
+            joint_axis_out_w = -joint_axis_w_updated
+        else:
+            joint_axis_out_w = joint_axis_w_updated
 
     else:
         assert "revolute not implemented yet"
@@ -247,7 +258,7 @@ def reconstruct(
             rgb_seq=rgb_seq[kf_idx],
             depth_seq=depth_seq[kf_idx],
             dynamic_seq=dynamic_seq_updated,
-            joint_axis_w=joint_axis_w_updated,
+            joint_axis_w=joint_axis_out_w,
             joint_states=jonit_states_updated,
             joint_type=joint_type,
             franka_seq=franka_seq[kf_idx],
@@ -272,5 +283,5 @@ if __name__ == "__main__":
         explore_data=np.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/explore_data.npz"),
         visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
-        save_dir=None
+        save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct"
     )

@@ -3,14 +3,14 @@ import numpy as np
 from PIL import Image
 import random
 from sklearn.cluster import KMeans
+from skimage import morphology
+from scipy import ndimage
 
 import sys
 sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/sam2")
 
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
-
-
 
 def select_farthest_point(unsatisfied_points, used_same_class_points, used_diff_class_points):
     if not used_same_class_points and not used_diff_class_points:
@@ -101,6 +101,7 @@ def sam2_on_image(
     num_iterations=5,
     acceptable_thr=0.9,
     sam2_image_model=None,
+    post_process=False,
     visualize=False
 ):
     sam2_model = sam2_image_model
@@ -219,20 +220,29 @@ def sam2_on_image(
             used_positive_points.add(tuple(new_positive_point))
             
         if visualize:
-            viewer.add_labels(cur_best_mask.astype(np.int32), name=f'cur best mask {i}')
+            pass
+            # viewer.add_labels(cur_best_mask.astype(np.int32), name=f'cur best mask {i}')
             # viewer.add_labels(tmp_best_mask.astype(np.int32), name=f'tmp best mask {i}')
             
-            used_positive_vis = np.array(list(used_positive_points))
-            used_negative_vis = np.array(list(used_negative_points))
+            # used_positive_vis = np.array(list(used_positive_points))
+            # used_negative_vis = np.array(list(used_negative_points))
     
             # viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
             # viewer.add_points(used_negative_vis[:, [1, 0]], face_color="red", name=f"used negative points {i}")
-            pass
         
     used_positive_vis = np.array(list(used_positive_points))
     used_negative_vis = np.array(list(used_negative_points))
+    
+    cur_best_mask = cur_best_mask.astype(np.bool_)
+    
+    # 在这里对于输出的 mask 进行一个 post-processing
+    if post_process:
+        cur_best_mask = morphology.binary_closing(cur_best_mask, morphology.disk(10))
+        cur_best_mask = ndimage.binary_fill_holes(cur_best_mask)   
         
     if visualize:
+        viewer.add_labels(cur_best_mask.astype(np.int32), name='cur best mask')
+        
         if len(used_positive_vis) > 0:
             viewer.add_points(used_positive_vis[:, [1, 0]], face_color="green", name=f"used positive points {i}")
         if len(used_negative_vis) > 0:
@@ -256,11 +266,11 @@ def sam2_on_image(
             )
         napari.run()
 
-    return cur_best_mask.astype(np.bool_), used_positive_vis, used_negative_vis
+    return cur_best_mask, used_positive_vis, used_negative_vis
 
 
 if __name__ == "__main__":
-    image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/cat.png")
+    image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/sapien_test.png")
     # image_pil.show() # 1100 x 1100
     image_np = np.array(image_pil.convert("RGB"))
     input_bbox = np.array([0, 0, 1000, 400])

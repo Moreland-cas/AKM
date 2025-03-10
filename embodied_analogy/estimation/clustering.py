@@ -1,6 +1,12 @@
 import numpy as np
 import sklearn.cluster as cluster
-from embodied_analogy.utility.utils import tracksNd_variance_np, tracksNd_variance_torch
+from embodied_analogy.utility.utils import (
+    tracksNd_variance_np, 
+    tracksNd_variance_torch,
+    camera_to_world,
+    visualize_pc,
+    napari_time_series_transform
+)
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 from embodied_analogy.visualization.vis_tracks_3d import vis_tracks3d_napari
 
@@ -66,9 +72,17 @@ def cluster_tracks_3d(tracks_3d, use_diff=True, visualize=False, viewer_title="n
         static_mask = (moving_labels == 0)
 
     if visualize:
-        rigid_part_colors = np.zeros((tracks_3d.shape[1], 3)) # M, 3
-        rigid_part_colors[moving_mask] = np.array([1, 0, 0]) # red
-        rigid_part_colors[static_mask] = np.array([0, 0, 1])
-        vis_tracks3d_napari(tracks_3d, colors=rigid_part_colors, viewer_title=viewer_title)
+        # if Tw2c is not None:
+        #     tracks_3d = camera_to_world(tracks_3d, Tw2c)
+        # visualize_pc(tracks_3d[-1])
+        import napari
+        viewer = napari.Viewer(ndisplay=3)
+        viewer.title = "clustring 3d tracks"
+        
+        tracks_3d[..., 1] = -tracks_3d[..., 1]
+        viewer.add_points(napari_time_series_transform(tracks_3d[:, moving_mask]), size=0.01, name='moving part', opacity=0.8, face_color="red")
+        viewer.add_points(napari_time_series_transform(tracks_3d[:, static_mask]), size=0.01, name='static part', opacity=0.8, face_color="green")
+        
+        napari.run()
         
     return moving_mask, static_mask
