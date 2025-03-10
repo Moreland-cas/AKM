@@ -136,7 +136,11 @@ def reconstruct(
     """
         coarse joint estimation with tracks3d_filtered
     """
-    joint_type, joint_axis_c, joint_states = coarse_joint_estimation(tracks3d_filtered[:, moving_mask_3d, :], visualize)
+    joint_type, joint_axis_c, joint_states = coarse_joint_estimation(
+        tracks_3d=tracks3d_filtered[:, moving_mask_3d, :], 
+        visualize=visualize
+        # visualize=True
+    )
     """
         根据 rgb_seq 和 tracks2d 得到 obj_mask_seq (可以用 sam 或者 sam2)
     """
@@ -149,6 +153,7 @@ def reconstruct(
         positive_tracks2d=tracks2d_filtered[kf_idx], 
         negative_tracks2d=franka_seq[kf_idx], 
         visualize=visualize
+        # visualize=True
     ) 
     # obj_mask_seq by sam2 video mode
     # obj_mask_seq = mask_obj_from_video_with_video_sam2(
@@ -165,10 +170,11 @@ def reconstruct(
         根据 tracks2d 和 obj_mask_seq 得到 dynamic_seq
     """
     dynamic_seq = get_dynamic_seq(
-        obj_mask_seq, 
-        tracks_2d[kf_idx][:, moving_mask_2d, :],
-        tracks_2d[kf_idx][:, static_mask_2d, :], 
-        visualize
+        mask_seq=obj_mask_seq, 
+        moving_points_seq=tracks_2d[kf_idx][:, moving_mask_2d, :],
+        static_points_seq=tracks_2d[kf_idx][:, static_mask_2d, :], 
+        visualize=visualize
+        # visualize=True
     )
     """
         根据 dynamic_seq 中的 moving_part, 利用 ICP 估计出精确的 joint params
@@ -183,6 +189,7 @@ def reconstruct(
         joint_states=joint_states[kf_idx],
         depth_tolerance=0.05, # 假设 coarse 阶段的误差估计在 5 cm 内
         visualize=visualize
+        # visualize=True
     ) 
     # fine estimation
     joint_axis_c_updated, jonit_states_updated = fine_joint_estimation_seq(
@@ -197,7 +204,7 @@ def reconstruct(
         optimize_state_mask=np.arange(num_key_frames)!=0,
         # 这里设置不迭代的优化 dynamic_mask
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
-        lr=7e-3, # 5 mm
+        lr=1e-3, # 1 mm
         tol=1e-9,
         icp_select_range=0.1,
         visualize=visualize

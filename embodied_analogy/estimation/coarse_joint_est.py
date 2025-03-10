@@ -49,14 +49,69 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
         scales.append(scale_t)
 
     # 计算重投影误差 loss
+    # reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
+    # est_loss = np.mean(np.linalg.norm(reconstructed_tracks - tracks_3d, axis=2))  # 计算点对点 L2 误差的平均值
+    
+        # 初始化每帧的位移标量
+    scales = np.array(scales)
+    scales_init = torch.from_numpy(scales).cuda().requires_grad_()
+    avg_unit_vector_init = torch.from_numpy(avg_unit_vector).cuda().requires_grad_()
+
+    # 定义损失函数
+    def loss_function_torch(scales, avg_unit_vector):
+        avg_unit_vector = avg_unit_vector / torch.norm(avg_unit_vector)
+        reconstructed_tracks = torch.from_numpy(tracks_3d[0][None]).cuda() + (scales[:, None] * avg_unit_vector).unsqueeze(1)  # T, M, 3
+        est_loss = torch.mean(torch.norm(reconstructed_tracks - torch.from_numpy(tracks_3d).cuda(), dim=2))  # 计算点对点 L2 误差的平均值
+        return est_loss
+
+    # 设置优化器
+    optimizer = torch.optim.Adam([scales_init, avg_unit_vector_init], lr=1e-2) # 1 cm
+
+    # 运行优化
+    num_iterations = 100
+    for _ in range(num_iterations):
+        optimizer.zero_grad()
+        loss = loss_function_torch(scales_init, avg_unit_vector_init)
+        print("coarse loss: ", loss.item())
+        loss.backward()
+        optimizer.step()
+
+    with torch.no_grad():
+        est_loss = loss_function_torch(scales_init, avg_unit_vector_init)
+
+    scales = scales_init.detach().cpu().numpy()
+    avg_unit_vector_init = avg_unit_vector_init / torch.norm(avg_unit_vector_init)
+    avg_unit_vector = avg_unit_vector_init.detach().cpu().numpy()
+    
     reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
-    est_loss = np.mean(np.linalg.norm(reconstructed_tracks - tracks_3d, axis=2))  # 计算点对点 L2 误差的平均值
     
     if visualize:
+        # TODO 修改
         # 绿色代表 moving part, 红色代表 renconstructed moving part
         colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1)))) # 2M, 3
         vis_tracks3d_napari(np.concatenate([tracks_3d, reconstructed_tracks], axis=1), colors, viewer_title="coarse translation estimation")
-    return avg_unit_vector, np.array(scales), est_loss
+        
+        # if isinstance(tracks_3d, torch.Tensor):
+        #     tracks_3d = tracks_3d.cpu().numpy()
+        
+        # T, M, _ = tracks_3d.shape
+        # napari_data = np.zeros((T * M, 1 + 3))
+        # for i in range(T):
+        #     napari_data[i * M: (i + 1) * M, 0] = i
+        #     napari_data[i * M: (i + 1) * M, 1:] = tracks_3d[i]
+        # import napari
+        # viewer = napari.Viewer(ndisplay=3)
+        # viewer.title = viewer_title
+        
+        # if colors is None:
+        #     colors = np.random.rand(M, 3)
+        #     # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
+        # colors = np.tile(colors, (T, 1))
+            
+        # viewer.add_points(napari_data, size=0.01, name='tracks_3d', opacity=0.8, face_color=colors)
+        # napari.run()
+        
+    return avg_unit_vector, scales, est_loss
 
 def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     """
@@ -99,6 +154,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         angles_init.append(angle)
     angles_init = np.array(angles_init)
     
+    # TODO: 这里不光需要优化 angles, 还需要优化 axis
     def loss_function_torch(angles):
         est_loss = 0
         for t in range(T):
@@ -218,7 +274,67 @@ def test_coarse_R_from_tracks_3d():
     
     # 打印估计误差
     print(f"估计误差 (loss): {est_loss}")
+
+def generate_translated_points(base_points, direction, scales, noise_std=0.01):
+    """
+    通过给定平移方向和标量生成平移后的点云，并加入噪声
+    :param base_points: 初始点云 (M, 3)
+    :param direction: 平移方向 (3,)
+    :param scales: 每一帧的平移标量 (T,)
+    :param noise_std: 每个点的噪声标准差
+    :return: 每一帧的点云 (T, M, 3)
+    """
+    T = len(scales)
+    translated_points = []
     
+    for t in range(T):
+        # 计算平移
+        translation = scales[t] * direction
+        translated = base_points + translation
+        
+        # 添加噪声
+        noise = np.random.normal(0, noise_std, translated.shape)
+        translated_points.append(translated + noise)
     
+    return np.array(translated_points)
+
+def test_coarse_t_from_tracks_3d():
+    """
+    测试 coarse_t_from_tracks_3d 函数
+    """
+    # 设置参数
+    T = 10  # 10 个时间步
+    M = 5   # 5 个点
+    true_direction = np.array([1, 0, 0])  # 真正的平移方向是 X 轴
+    true_scales = np.linspace(0, 1, T)  # 平移标量从 0 到 1
+    noise_std = 0.01  # 加噪声的标准差
+
+    # 初始化第0帧点云
+    base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标
+    
+    # 生成带噪声的点云数据
+    tracks_3d = generate_translated_points(base_points, true_direction, true_scales, noise_std)
+    
+    # 调用 coarse_t_from_tracks_3d 函数
+    avg_unit_vector, scales, est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize=False)
+    
+    # 打印优化后的平移方向和标量
+    print("优化后的平移方向:", avg_unit_vector)
+    print("优化后的平移标量:", scales)
+    
+    # 计算与真实平移方向的夹角
+    direction_error = np.arccos(np.dot(avg_unit_vector, true_direction))  # 计算两平移方向之间的夹角（弧度）
+    print(f"平移方向误差: {np.degrees(direction_error)}°")
+    
+    # 计算标量误差
+    scale_error = np.abs(scales - true_scales)  # 每一帧的标量误差
+    print(f"每帧标量误差: {scale_error}")
+    
+    # 打印估计误差
+    print(f"估计误差 (loss): {est_loss}")
+
+
 if __name__ == "__main__":
-    test_coarse_R_from_tracks_3d()
+    # test_coarse_R_from_tracks_3d()
+    # 调用测试函数
+    test_coarse_t_from_tracks_3d()
