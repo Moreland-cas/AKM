@@ -137,8 +137,8 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         angles_init.append(angle)
     angles_init = np.array(angles_init)
     
-    # TODO: 这里不光需要优化 angles, 还需要优化 axis
-    def loss_function_torch(angles):
+    def loss_function_torch(unit_vector_axis, angles):
+        unit_vector_axis = unit_vector_axis / torch.norm(unit_vector_axis)
         est_loss = 0
         for t in range(T):
             theta = angles[t]
@@ -146,31 +146,42 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
                                     [unit_vector_axis[2], 0, -unit_vector_axis[0]],
                                     [-unit_vector_axis[1], unit_vector_axis[0], 0]], device="cuda")
             R_reconstructed = torch.eye(3, device="cuda") + torch.sin(theta) * skew_v + (1 - torch.cos(theta)) * (skew_v @ skew_v)
-            reconstructed_track = (R_reconstructed @ torch.from_numpy(tracks_3d[0].T).double().cuda()).T
+            reconstructed_track = (R_reconstructed @ torch.from_numpy(tracks_3d[0].T).float().cuda()).T
             est_loss += torch.mean(torch.norm(reconstructed_track - torch.from_numpy(tracks_3d[t]).cuda(), dim=1))
         return est_loss / T
     
     # 初始化 angles 并设置优化器
-    angles = torch.from_numpy(angles_init).float().to('cuda').requires_grad_()
-    optimizer = torch.optim.Adam([angles], lr=3e-4)
+    angles = torch.from_numpy(angles_init).float().cuda().requires_grad_()
+    unit_vector_axis = torch.from_numpy(unit_vector_axis).float().cuda().requires_grad_()
+    optimizer = torch.optim.Adam([angles, unit_vector_axis], lr=1e-3)
     
     # 运行优化
-    num_iterations = 150
+    num_iterations = 100
     for _ in range(num_iterations):
         optimizer.zero_grad()
-        loss = loss_function_torch(angles)
+        loss = loss_function_torch(unit_vector_axis, angles)
+        print("coarse loss: ", loss.item())
         loss.backward()
         optimizer.step()
+        
     with torch.no_grad():
-        est_loss = loss_function_torch(angles)
+        est_loss = loss_function_torch(unit_vector_axis, angles)
     
     angles = angles.detach().cpu().numpy()
+    unit_vector_axis = unit_vector_axis.detach().cpu().numpy()
     
     if visualize:
         # 绿色代表 moving part, 红色代表 reconstructed moving part
-        colors = np.vstack((np.tile([0, 1, 0], (M, 1)), np.tile([1, 0, 0], (M, 1))))  # 2M, 3
         reconstructed_tracks = [(R.from_rotvec(angles[t] * unit_vector_axis).as_matrix() @ tracks_3d[0].T).T for t in range(T)]
-        vis_tracks3d_napari(np.concatenate([tracks_3d, np.array(reconstructed_tracks)], axis=1), colors, viewer_title="coarse Rotation estimation")
+        
+        import napari
+        viewer = napari.Viewer(ndisplay=3)
+        viewer.title = "coarse R estimation"
+        
+        viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
+        viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
+        
+        napari.run()
     
     return unit_vector_axis, angles, est_loss
     
@@ -229,19 +240,20 @@ def test_coarse_R_from_tracks_3d():
     """
     # 设置参数
     T = 10  # 10 个时间步
-    M = 5   # 5 个点
+    M = 50   # 5 个点
     true_axis = np.array([0, 0, 1])  # 真正的旋转轴是 Z 轴
     true_angles = np.linspace(0, np.pi / 4, T)  # 旋转角度从 0 到 pi/4
-    noise_std = 0.01  # 加噪声的标准差
+    noise_std = 0.05  # 加噪声的标准差
 
     # 初始化第0帧点云
     base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标
+    base_points[:, 0] = 0
     
     # 生成带噪声的点云数据
     tracks_3d = generate_rotated_points(base_points, true_axis, true_angles, noise_std)
     
     # 调用 coarse_R_from_tracks_3d 函数
-    unit_vector_axis, angles, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=False)
+    unit_vector_axis, angles, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=True)
     
     # 打印优化后的旋转轴和角度
     print("优化后的旋转轴:", unit_vector_axis)
@@ -318,6 +330,6 @@ def test_coarse_t_from_tracks_3d():
 
 
 if __name__ == "__main__":
-    # test_coarse_R_from_tracks_3d()
+    test_coarse_R_from_tracks_3d()
     # 调用测试函数
-    test_coarse_t_from_tracks_3d()
+    # test_coarse_t_from_tracks_3d()
