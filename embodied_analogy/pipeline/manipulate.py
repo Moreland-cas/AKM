@@ -127,7 +127,7 @@ class ManipulateEnv(BaseEnv):
         grasp_group = detect_grasp_anygrasp(
             start_pc_w, 
             start_color, 
-            joint_axis_out=-joint_axis_w, 
+            dir_out=joint_axis_w, 
             visualize=True
         )
         

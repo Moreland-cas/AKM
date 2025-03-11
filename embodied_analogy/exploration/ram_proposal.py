@@ -7,6 +7,7 @@ sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/RAM_code")
 
 import numpy as np
 import torch
+import time
 from PIL import Image
 from vision.featurizer.run_featurizer import transfer_affordance
 from vision.featurizer.utils.visualization import IMG_SIZE
@@ -111,7 +112,11 @@ def get_ram_proposal(
     # query_img_PIL = Image.fromarray(query_img_masked).convert('RGB')
     
     # use retrieval to get ref_path (or ref image) and ref trajectory in 2d space
+    retrieve_start = time.time()
     _, top1_retrieved_data_dict = subset_retrieve_pipeline.retrieve(instruction, query_rgb)
+    retrieve_end = time.time()
+    print(f"retrieve time: {retrieve_end - retrieve_start}")
+    
     traj = top1_retrieved_data_dict['traj']
     ref_img_np = top1_retrieved_data_dict['masked_img']
     ref_img_PIL = Image.fromarray(ref_img_np).convert('RGB')
@@ -125,15 +130,12 @@ def get_ram_proposal(
     for xy in traj:
         ref_pos_list.append((xy[0] * IMG_SIZE / ref_img_PIL.size[0], xy[1] * IMG_SIZE / ref_img_PIL.size[1]))
     
-    # transfer in 2d
-    while True:
-        try:
-            # 这里的 contact_point 的坐标是相对于 masked_query_np 的
-            contact_point, post_contact_dir = transfer_affordance(ref_img_PIL, query_img_PIL, prompt, ref_pos_list, save_root=save_root, ftype='sd')
-            break
-        except Exception as transfer_e:
-            traceback.print_exc()
-            print('[ERROR] in transfer_affordance:', transfer_e)
+    # transfer contact point
+    transfer_start = time.time()
+    # 这里的 contact_point 的坐标是相对于 masked_query_np 的
+    contact_point, post_contact_dir = transfer_affordance(ref_img_PIL, query_img_PIL, prompt, ref_pos_list, save_root=save_root, ftype='sd')
+    transfer_end = time.time()
+    print(f"transfer time: {transfer_end - transfer_start}")
 
     if visualize:
         import napari
@@ -209,8 +211,8 @@ def lift_ram_affordance(
     gg = detect_grasp_anygrasp(
         points=partial_points, 
         colors=partial_colors / 255.,
-        joint_axis_out=np.array([0, 0, -1]), 
-        visualize=False
+        dir_out=best_dir_3d, 
+        visualize=True
     ) 
         
     sorted_grasps, _ = sort_grasp_group(
@@ -230,6 +232,7 @@ def lift_ram_affordance(
 
 
 if __name__ == "__main__":
+    import sys
     query_rgb = np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/rgb.png"))
     query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
     # query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
@@ -258,6 +261,7 @@ if __name__ == "__main__":
     )
     Rw2c = Tw2c[:3, :3]
     
+    # sys.exit()
     best_grasp, best_dir_3d = lift_ram_affordance(
         K=K,
         query_rgb=query_rgb,

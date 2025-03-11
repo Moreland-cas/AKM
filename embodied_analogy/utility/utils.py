@@ -35,7 +35,7 @@ def initialize_napari():
 
         with napari.gui_qt() as app:
             viewer = napari.Viewer()
-            time_in_msec = 100
+            time_in_msec = 10
             QTimer().singleShot(time_in_msec, app.quit)
         viewer.close()
         NAPARI_INITIALIZED = True
@@ -1154,7 +1154,9 @@ def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     return indices, distances, valid_mask
 
 def rotation_matrix_between_vectors(a, b):
-    # 假设满足 R @ a = b, 求R
+    """
+    假设满足 R @ a = b, 求R
+    """
     
     # 确保 a 和 b 是单位向量
     a = a / np.linalg.norm(a)
