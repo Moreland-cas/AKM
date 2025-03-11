@@ -9,33 +9,29 @@ from embodied_analogy.utility.utils import (
     find_correspondences
 )
 
-def detect_grasp_anygrasp(points, colors, joint_axis_out, visualize=False):
+def detect_grasp_anygrasp(points, colors, dir_out, visualize=False):
     '''
-    输入世界坐标系下的点云和颜色, 返回 grasp_group
-        定义 approach 坐标系为 xy 轴平行物体表面, z 轴指向物体内部 (joint axis 的反方向)
-        定义 grasp 坐标系为 x 轴指向物体内部, y 轴指向物体的宽度
+    输入世界坐标系下的点云和颜色, 返回 grasp_group (存储了信息 Tgrasp2w)
+        函数输入的 points 是世界坐标系下的
+        网络输入的点是 app 坐标系下的, app 坐标系需要根据 dir_out 来确定 (app 的 z 轴指向 dir_out 的反方向)
+        dir_out: 需要在 points 的坐标系(一般是世界坐标系)下指定, 从物体内部指向物体外部
+        网络的输出 grasp 的坐标系由 graspnetAPI 定义, grasp 存储了信息 Tgrasp2app
         
-        points: N, 3
-        colors: N, 3
-        joint_axis: (3, ), 指向 outward 方向
-    
+        可视化是在 world 坐标系下的
     '''
-    # 传入的点是在世界坐标系下的(xy 轴平行地面, z 轴指向重力反方向)
-    # 因此首先将世界坐标系下的点转换到 app 坐标系下
+    # 首先确定 app 坐标系
     points = points.astype(np.float32)
     colors = colors.astype(np.float32)
-    points_input = points.copy() # N, 3
-    colors_input = colors.copy()
     
-    # coor_app = Rw2app @ coor_w, 也即 -joint_axis = Rw2app @ (0, 0, 1)
-    Rw2app = rotation_matrix_between_vectors(np.array([0, 0, 1]), -joint_axis_out)
-    points_input = points_input @ Rw2app.T # N, 3
+    # coor_app = Rw2app @ coor_w, 也即 (0, 0, 1) = Rw2app @ -dir_out
+    Rw2app = rotation_matrix_between_vectors(-dir_out, np.array([0, 0, 1]))
+    points_input = points @ Rw2app.T # N, 3
     points_input = points_input.astype(np.float32)
     
     from gsnet import AnyGrasp # gsnet.so
     # get a argument namespace
     cfgs = argparse.Namespace()
-    cfgs.checkpoint_path = 'assets/ckpts/checkpoint_detection.tar'
+    cfgs.checkpoint_path = '/home/zby/Programs/Embodied_Analogy/assets/ckpts/checkpoint_detection.tar'
     cfgs.max_gripper_width = 0.04
     cfgs.gripper_height = 0.03
     cfgs.top_down_grasp = False
@@ -44,9 +40,10 @@ def detect_grasp_anygrasp(points, colors, joint_axis_out, visualize=False):
     model.load_net()
     
     lims = np.array([-1, 1, -1, 1, -1, 1]) * 10
-    gg, cloud = model.get_grasp(
+    # Tgrasp2app
+    gg, _ = model.get_grasp(
         points_input,
-        colors_input, 
+        colors, 
         lims,
         apply_object_mask=True,
         dense_grasp=False,
@@ -54,17 +51,14 @@ def detect_grasp_anygrasp(points, colors, joint_axis_out, visualize=False):
     )
     print('grasp num:', len(gg))
     
-    if visualize:
-        grippers = gg.to_open3d_geometry_list()
-        o3d.visualization.draw_geometries([*grippers, cloud])
-        
-    # 此时的 gg 中的 rotation 和 translation 对应 Tgrasp2app
-    # 将预测的 app pose 从 app 坐标系转换回世界坐标系
+    # Tgrasp2w
     zero_translation = np.array([[0], [0], [0]])
     Rapp2w = Rw2app.T
     Tapp2w = np.hstack((Rapp2w, zero_translation))
     gg.transform(Tapp2w)
-    # 此时的 gg 中的 rotation 和 translation 对应 Tgrasp2w
+    
+    if visualize:
+        visualize_pc(points, colors, gg)
     return gg
 
 def find_nearest_grasp(grasp_group, contact_point):
@@ -128,5 +122,39 @@ def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=Fa
 
 
 if __name__ == '__main__':
-    pass
-    # TODO: 给 anygrasp 写一个测试函数
+    import os
+    from PIL import Image
+    from embodied_analogy.utility.utils import depth_image_to_pointcloud
+    path = "/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/"
+    colors = np.array(Image.open(os.path.join(path, 'rgb.png')), dtype=np.float32) / 255.0
+    depths = np.load(os.path.join(path, 'depth.npy'))
+    masks = np.load(os.path.join(path, 'mask.npy'))
+    
+    fx, fy = 300, 300
+    cx, cy = 400, 300
+    K = np.array([
+        [fx, 0, cx],
+        [0, fy, cy],
+        [0, 0, 1]
+    ])
+    
+    points_camera = depth_image_to_pointcloud(depths, masks, K)
+    colors = colors[masks].astype(np.float32)
+    
+    Tw2c = np.array(
+        [[-4.8380834e-01, -8.7517393e-01,  5.1781535e-07,  4.5627734e-01],
+       [-1.6098598e-01,  8.8994741e-02, -9.8293614e-01,  3.8961503e-01],
+       [ 8.6024004e-01, -4.7555280e-01, -1.8394715e-01,  8.8079178e-01],
+       [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]],
+    )
+    Rw2c = Tw2c[:3, :3]
+    Rc2w = Rw2c.T
+    points_world = points_camera @ Rc2w.T
+    
+    # visualize_pc(points_world, colors)
+    detect_grasp_anygrasp(
+        points=points_world, 
+        colors=colors,
+        dir_out=np.array([-1, 0, 0]),
+        visualize=True
+    )

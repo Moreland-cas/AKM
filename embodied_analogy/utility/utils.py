@@ -398,7 +398,48 @@ def camera_to_world(point_camera, extrinsic_matrix):
     point_world = point_camera @ Rw2c + tc2w
     
     return point_world
-        
+
+def create_cylinder(start, end, radius=0.01):
+    """创建一个圆柱体来模拟线段，给定起点、终点和半径"""
+    start = np.array(start)
+    end = np.array(end)
+    direction = end - start
+    length = np.linalg.norm(direction)
+    if length == 0:
+        return None
+
+    # 归一化方向
+    direction = direction / length
+
+    # 创建圆柱体
+    cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=radius, height=length)
+    cylinder.compute_vertex_normals()
+
+    # 计算圆柱体的旋转和位置
+    center = (start + end) / 2  # 圆柱体的中心
+    z_axis = np.array([0, 0, 1])
+
+    # 计算旋转矩阵
+    if np.allclose(direction, z_axis):
+        R = np.eye(3)  # 如果方向是Z轴，保持不变
+    elif np.allclose(direction, -z_axis):
+        # 如果方向与Z轴相反，旋转180度绕X轴
+        rotation_axis = np.array([1, 0, 0])
+        rotation_angle = np.pi
+        R = o3d.geometry.get_rotation_matrix_from_axis_angle(rotation_axis * rotation_angle)
+    else:
+        # 计算旋转轴和旋转角度
+        rotation_axis = np.cross(z_axis, direction)
+        rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)  # 归一化旋转轴
+        rotation_angle = np.arccos(np.dot(z_axis, direction))
+        R = o3d.geometry.get_rotation_matrix_from_axis_angle(rotation_axis * rotation_angle)
+
+    # 旋转和移动圆柱体
+    cylinder.rotate(R, center=cylinder.get_center())  # 绕圆柱体自身中心旋转
+    cylinder.translate(center)  # 平移到正确位置
+
+    return cylinder
+
 def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_contact_dirs=None):
     """
     visualize pointcloud
@@ -443,6 +484,27 @@ def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_conta
             line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
             line_set.paint_uniform_color([1, 0, 0])  # 红色
             geometries_to_draw.append(line_set)
+            
+    # 绘制坐标系
+    axis_length = 0.1  # 坐标轴长度
+    axes = [
+        ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]),  # X轴 (红色)
+        ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]),  # Y轴 (绿色)
+        ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]),  # Z轴 (蓝色)
+    ]
+    
+    # for start, end, color in axes:
+    #     line_set = o3d.geometry.LineSet()
+    #     line_set.points = o3d.utility.Vector3dVector([start, end])
+    #     line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
+    #     line_set.paint_uniform_color(color)  # 设置颜色
+    #     geometries_to_draw.append(line_set)
+    
+    for start, end, color in axes:
+        cylinder = create_cylinder(start, end)
+        if cylinder is not None:
+            cylinder.paint_uniform_color(color)  # 设置颜色
+            geometries_to_draw.append(cylinder)
     
     # 统一绘制所有几何对象
     o3d.visualization.draw_geometries(geometries_to_draw)

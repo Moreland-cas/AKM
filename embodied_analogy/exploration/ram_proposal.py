@@ -205,7 +205,7 @@ def lift_ram_affordance(
     
     # if visualize:
     #     visualize_pc(partial_points, partial_colors / 255., contact_point=contact_3d, post_contact_dirs=best_dir_3d[None])
-        
+    # TODO: 这里的 partial points是在相机坐标系下的, 需要修改
     gg = detect_grasp_anygrasp(
         points=partial_points, 
         colors=partial_colors / 255.,
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         instruction="open the drawer",
         # prompt="a photo of a drawer", 
         data_source="droid",
-        save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/exploration",
+        save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
         visualize=False
     )
     
@@ -249,6 +249,14 @@ if __name__ == "__main__":
         [[300.,   0., 400.],
        [  0., 300., 300.],
        [  0.,   0.,   1.]], dtype=np.float32)
+    
+    Tw2c = np.array(
+        [[-4.8380834e-01, -8.7517393e-01,  5.1781535e-07,  4.5627734e-01],
+       [-1.6098598e-01,  8.8994741e-02, -9.8293614e-01,  3.8961503e-01],
+       [ 8.6024004e-01, -4.7555280e-01, -1.8394715e-01,  8.8079178e-01],
+       [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]],
+    )
+    Rw2c = Tw2c[:3, :3]
     
     best_grasp, best_dir_3d = lift_ram_affordance(
         K=K,

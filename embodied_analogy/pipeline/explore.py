@@ -21,7 +21,7 @@ class ExploreEnv(ManipulateEnv):
         instruction,
         record_fps=30, 
         pertubation_distance=0.1,
-        save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/"
+        save_dir=None,
     ):
         super().__init__(obj_config=obj_config, instruction=instruction)
         self.record_fps = record_fps
@@ -31,10 +31,10 @@ class ExploreEnv(ManipulateEnv):
         self.explore_data = {
             "frames": []
         }
-        if save_dir is not None:
-            os.makedirs(save_dir, exist_ok=True)
-        self.save_dir = save_dir
         self.has_valid_explore = False
+        self.save_dir = save_dir
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
     
     def start_explore_loop(self, allowed_num_tries=10, visualize=False):
         """
@@ -231,7 +231,7 @@ class ExploreEnv(ManipulateEnv):
         else:
             return False
         
-    def process_explore_data(self, save=False):
+    def process_explore_data(self, visualize=False):
         """
             process rgb and depth data in self.explore_data
         """
@@ -241,19 +241,8 @@ class ExploreEnv(ManipulateEnv):
         self.depth_seq = np.stack([self.explore_data["frames"][i]["depth_np"] for i in range(num_frames)]) # T, H, W
         self.franka_seq = np.stack([self.explore_data["frames"][i]["franka_tracks2d"] for i in range(num_frames)]) # T, N, 2
         
-        # if visualize:
-        #     self.visualize_explore_data()
-            
-        if save:
-            np.savez(
-                self.save_dir + "explore_data.npz", 
-                rgb_seq=self.rgb_seq, 
-                depth_seq=self.depth_seq, 
-                franka_seq=self.franka_seq,
-                K=self.camera_intrinsic,
-                Tw2c=self.camera_extrinsic,
-                record_fps=self.record_fps,
-            )
+        if visualize:
+            self.visualize_explore_data()
             
     def visualize_explore_data(self):
         """
@@ -271,20 +260,51 @@ class ExploreEnv(ManipulateEnv):
             viewer.add_points(franka_visuailze[i::M, :], face_color="red", name=self.link_names[i])
         napari.run()
         
+    def save_explore_data(self, save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/"):
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
+            
+        np.savez(
+            os.path.join(save_dir, "explore_data.npz"), 
+            rgb_seq=self.rgb_seq, 
+            depth_seq=self.depth_seq, 
+            franka_seq=self.franka_seq,
+            K=self.camera_intrinsic,
+            Tw2c=self.camera_extrinsic,
+            record_fps=self.record_fps,
+        )
+        
     
 if __name__ == "__main__":
+    # obj_config = {
+    #     "index": 44962,
+    #     "scale": 0.8,
+    #     "pose": [1.0, 0., 0.5],
+    #     "active_link": "link_2",
+    #     "active_joint": "joint_2"
+    # }
+    
     obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
+        "index": 9288,
+        "scale": 1.0,
+        "pose": [1.0, 0., 0.7],
         "active_link": "link_2",
-        "active_joint": "joint_2"
+        "active_joint": "joint_0"
     }
+    
+    obj_index = obj_config["index"]
+    
     exploreEnv = ExploreEnv(
         obj_config=obj_config,
-        instruction="open the drawer"
+        # instruction="open the drawer"
+        instruction="open the door",
+        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
     )
     exploreEnv.start_explore_loop(visualize=False)
-    exploreEnv.process_explore_data(save=False)
-    exploreEnv.visualize_explore_data()
+    exploreEnv.process_explore_data(visualize=True)
+    
+    
+    exploreEnv.save_explore_data(
+        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
+    )
     

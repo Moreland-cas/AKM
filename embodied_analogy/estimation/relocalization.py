@@ -16,7 +16,7 @@ def relocalization(
     query_depth, 
     ref_depths, # T, H, W
     joint_type, 
-    joint_axis_unit, 
+    joint_axis_c, 
     ref_joint_states, 
     ref_dynamics,
     lr=5e-3,
@@ -44,7 +44,7 @@ def relocalization(
         query_depth, 
         ref_depths, 
         joint_type, 
-        joint_axis_unit, 
+        joint_axis_c, 
         ref_joint_states, 
         ref_dynamics,
         lr=lr,
@@ -60,7 +60,7 @@ def _relocalization(
     query_depth, 
     ref_depths, # T, H, W
     joint_type, 
-    joint_axis_unit, 
+    joint_axis_c, 
     ref_joint_states, 
     ref_dynamics,
     lr=5e-3,
@@ -104,7 +104,7 @@ def _relocalization(
         depth_seq=tmp_depths, 
         dynamic_seq=tmp_dynamics,
         joint_type=joint_type, 
-        joint_axis_unit=joint_axis_unit, 
+        joint_axis_c=joint_axis_c, 
         joint_states=tmp_joint_states,
         max_icp_iters=200, 
         optimize_joint_axis=False,
@@ -125,7 +125,7 @@ def _relocalization(
         ref_moving_pc = depth_image_to_pointcloud(ref_depths[i], ref_dynamics[i]==MOVING_LABEL, K) # N, 3
         Tref2query = joint_data_to_transform(
             joint_type=joint_type,
-            joint_axis=joint_axis_unit,
+            joint_axis=joint_axis_c,
             joint_state_ref2tgt=query_state_updated-ref_joint_states[i]
         )
         ref_moving_pc_aug = np.concatenate([ref_moving_pc, np.ones((len(ref_moving_pc), 1))], axis=1) # N, 4
@@ -189,7 +189,7 @@ if __name__ == "__main__":
             query_depth=obj_repr["depth_seq"][i], 
             ref_depths=obj_repr["depth_seq"][other_mask], 
             joint_type=obj_repr["joint_type"], 
-            joint_axis_unit=obj_repr["joint_axis_c"], 
+            joint_axis_c=obj_repr["joint_axis_c"], 
             ref_joint_states=obj_repr["joint_states"][other_mask], 
             ref_dynamics=obj_repr["dynamic_seq"][other_mask], 
             lr=1e-3, # 一次估计 1 mm

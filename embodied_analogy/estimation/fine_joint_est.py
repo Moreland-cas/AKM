@@ -131,7 +131,7 @@ def filter_dynamic_mask(
     ref_depths,  # T, H, W
     # ref_dynamics, # T, H, W
     joint_type,
-    joint_axis_unit,
+    joint_axis_c,
     query_state,
     ref_states,
     depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
@@ -144,7 +144,7 @@ def filter_dynamic_mask(
     Tquery2refs = [
         joint_data_to_transform(
             joint_type,
-            joint_axis_unit,
+            joint_axis_c,
             ref_state - query_state,
     ) for ref_state in ref_states] 
     Tquery2refs = np.array(Tquery2refs) # T, 4, 4
@@ -206,7 +206,7 @@ def filter_dynamic_seq(
     depth_seq,  # T, H, W
     dynamic_seq, # T, H, W
     joint_type,
-    joint_axis_unit,
+    joint_axis_c,
     joint_states,
     depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
     visualize=False
@@ -234,7 +234,7 @@ def filter_dynamic_seq(
             ref_depths,  # T, H, W
             # ref_dynamics, # T, H, W
             joint_type,
-            joint_axis_unit,
+            joint_axis_c,
             query_state,
             ref_states,
             depth_tolerance=depth_tolerance, 
@@ -386,7 +386,7 @@ def fine_joint_estimation_seq(
     depth_seq, 
     dynamic_seq,
     joint_type, 
-    joint_axis_unit, # unit vector here, in camera frame
+    joint_axis_c, # unit vector here, in camera frame
     joint_states,
     max_icp_iters=200, # ICP 最多迭代多少轮
     optimize_joint_axis=True,
@@ -432,7 +432,7 @@ def fine_joint_estimation_seq(
     prev_icp_loss = float('inf')
     
     # 设置待优化参数
-    axis_params = torch.from_numpy(joint_axis_unit).float().cuda().requires_grad_()
+    axis_params = torch.from_numpy(joint_axis_c).float().cuda().requires_grad_()
     axis_lr = lr if optimize_joint_axis else 0.0
     
     states_params = [torch.tensor(joint_state).float().cuda().requires_grad_() for joint_state in joint_states]
@@ -477,7 +477,7 @@ def fine_joint_estimation_seq(
                     query_dynamic=dynamic_seq[l], 
                     ref_depths=depth_seq[np.arange(T)!=l],  
                     joint_type=joint_type,
-                    joint_axis_unit=axis_params.detach().cpu().numpy(),
+                    joint_axis_c=axis_params.detach().cpu().numpy(),
                     query_state=states_params[l].detach().cpu().numpy(),
                     ref_states=ref_states,
                     depth_tolerance=0.01, 
@@ -554,7 +554,7 @@ def fine_joint_estimation_seq(
         cur_icp_loss.backward()
         optimizer.step()
 
-    joint_axis_unit_updated = (axis_params / torch.norm(axis_params)).detach().cpu().numpy()
+    joint_axis_c_updated = (axis_params / torch.norm(axis_params)).detach().cpu().numpy()
     joint_states_updated = np.array([states_param.detach().cpu().item() for states_param in states_params])
     
     if visualize:
@@ -562,7 +562,7 @@ def fine_joint_estimation_seq(
         transform_seq = [
             joint_data_to_transform(
                 joint_type,
-                joint_axis_unit,
+                joint_axis_c,
                 cur_state - joint_states[0],
         ) for cur_state in joint_states] # T, 4, 4 (Tfirst2cur)
         transform_seq = np.array(transform_seq)
@@ -578,7 +578,7 @@ def fine_joint_estimation_seq(
         transform_seq_updated = np.array([
             joint_data_to_transform(
                 joint_type,
-                joint_axis_unit_updated,
+                joint_axis_c_updated,
                 cur_state - joint_states_updated[0],
         ) for cur_state in joint_states_updated])
         transform_seq_updated = transform_seq_updated @ np.linalg.inv(transform_seq_updated[0])
@@ -596,7 +596,7 @@ def fine_joint_estimation_seq(
         viewer.title = "fine joint estimation using ICP"
         napari.run()
         
-    return joint_axis_unit_updated, joint_states_updated 
+    return joint_axis_c_updated, joint_states_updated 
 
 
 if __name__ == "__main__":

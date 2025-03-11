@@ -186,7 +186,7 @@ def reconstruct(
         depth_seq=depth_seq[kf_idx],
         dynamic_seq=dynamic_seq,
         joint_type=joint_type,
-        joint_axis_unit=joint_axis_c,
+        joint_axis_c=joint_axis_c,
         joint_states=joint_states[kf_idx],
         depth_tolerance=0.05, # 假设 coarse 阶段的误差估计在 5 cm 内
         visualize=visualize
@@ -198,7 +198,7 @@ def reconstruct(
         depth_seq=depth_seq[kf_idx], 
         dynamic_seq=dynamic_seq_updated,
         joint_type=joint_type, 
-        joint_axis_unit=joint_axis_c, 
+        joint_axis_c=joint_axis_c, 
         joint_states=joint_states[kf_idx],
         max_icp_iters=200, # ICP 最多迭代多少轮
         optimize_joint_axis=True,
@@ -261,6 +261,7 @@ def reconstruct(
         np.savez(
             save_dir + "obj_repr.npz",
             K=K,
+            Tw2c=Tw2c,
             track_type=track_type,
             rgb_seq=rgb_seq[kf_idx],
             depth_seq=depth_seq[kf_idx],
