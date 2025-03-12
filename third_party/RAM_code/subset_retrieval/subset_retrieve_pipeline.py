@@ -289,8 +289,10 @@ class SubsetRetrievePipeline:
         src_ft = extract_ft(Image.fromarray(sorted_retrieved_data_dict['masked_query']).convert("RGB"), prompt=obj_prompt, ftype='sd') # 1,c,h,w
         src_mask = sorted_retrieved_data_dict["query_mask"]
         imd_distances = []
+        sorted_retrieved_data_dict["feat"] = []
         for idx in tqdm(range(len(sorted_retrieved_data_dict["img"]))):
             tgt_ft = extract_ft(Image.fromarray(sorted_retrieved_data_dict['masked_img'][idx]).convert("RGB"), prompt=obj_prompt, ftype='sd')
+            sorted_retrieved_data_dict["feat"].append(tgt_ft)
             tgt_mask = sorted_retrieved_data_dict["mask"][idx]
             imd_distances.append(get_distance_imd(src_ft, tgt_ft, src_mask, tgt_mask))
         sorted_index = np.argsort(imd_distances) # from smaller to larger, but the smaller, the better
@@ -299,10 +301,12 @@ class SubsetRetrievePipeline:
             "query_mask": sorted_retrieved_data_dict["query_mask"],
             "masked_query": sorted_retrieved_data_dict["masked_query"],
             "query_region": sorted_retrieved_data_dict["query_region"],
+            "query_feat": src_ft,
             "img": [],
             "traj": [],
             "masked_img": [],
-            "mask": []
+            "mask": [],
+            "feat": []
         }
         for idx in range(self.topk):
             if idx >= len(sorted_index):
@@ -312,6 +316,7 @@ class SubsetRetrievePipeline:
             topk_retrieved_data_dict["traj"].append(sorted_retrieved_data_dict["traj"][curr])
             topk_retrieved_data_dict["masked_img"].append(sorted_retrieved_data_dict['masked_img'][curr])
             topk_retrieved_data_dict["mask"].append(sorted_retrieved_data_dict['mask'][curr])
+            topk_retrieved_data_dict["feat"].append(sorted_retrieved_data_dict['feat'][curr])
         return topk_retrieved_data_dict
 
     def load_retrieved_task_from_pkl(self, retrieved_task):
@@ -361,7 +366,7 @@ class SubsetRetrievePipeline:
         if log: print("<5> Geometrical retrieval...")
         topk_retrieved_data_dict = self.imd_ranking(sorted_retrieved_data_dict, obj_prompt)
         
-        if visualize:
+        if visualize and False:
             # visualize topk_retrieved_data_dict
             import napari
             viewer = napari.Viewer()

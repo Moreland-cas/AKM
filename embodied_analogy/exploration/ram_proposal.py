@@ -4,22 +4,20 @@ initialize_napari()
 import sys
 sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/RAM_code")
 
+import cv2
 import numpy as np
 import torch
 import time
 from PIL import Image
-from vision.featurizer.run_featurizer import (
-    extract_ft,
-    match_fts
-)
+from vision.featurizer.run_featurizer import match_fts
 from vision.featurizer.utils.visualization import IMG_SIZE
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
 from run_realworld.utils import crop_points, cluster_normals
 import matplotlib
-matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
-import cv2
 import matplotlib.pyplot as plt
-import open3d as o3d
+matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
+
+from embodied_analogy.exploration.affordance import Affordance_map_2d
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     seed_everything,
@@ -28,7 +26,7 @@ from embodied_analogy.utility.utils import (
     compute_normals,
     visualize_pc,
     normalize_cos_map_exp,
-    draw_points_on_image
+    draw_points_on_image,
 )
 # from embodied_analogy.perception.grounded_sam import run_grounded_sam
 
@@ -77,11 +75,10 @@ def project_normals(img, pixel, normals, visualize=False):
 
     return normals_2d_direction_normalized
     
-def get_ram_proposal(
+def get_ram_affordance_2d(
     query_rgb, # H, W, 3 in numpy
     instruction, # open the drawwer
     data_source, # droid TODO: 把 data_source 扩充一下
-    prompt=".", # a photo of a drawer
     save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
     visualize=False
 ):
@@ -106,7 +103,7 @@ def get_ram_proposal(
         current_task=instruction,
         current_obs=query_rgb,
         log=True,
-        visualize=visualize
+        visualize=False
     )
     retrieve_end = time.time()
     print(f"retrieve time: {retrieve_end - retrieve_start}")
@@ -117,46 +114,64 @@ def get_ram_proposal(
     
     # 这些 query 都是 cropped 之后的结果
     query_mask = topk_retrieved_data_dict["query_mask"][..., 0].astype(np.bool_)
-    query_img_PIL = Image.fromarray(topk_retrieved_data_dict["masked_query"]).convert('RGB')
+    query_feat = topk_retrieved_data_dict["query_feat"]
+    query_region = topk_retrieved_data_dict["query_region"]
 
-    # transfer contact point, cos_map is np.array([cropped_H, cropped_W])
-    start = time.time()
-    cos_maps = []
-    query_ft = extract_ft(query_img_PIL, prompt=prompt, ftype="sd")
-    
+    # transfer contact point, cos_map is np.array([cropped_H, cropped_W])    
+    cos_map = None
     for i, ref_img_PIL in enumerate(ref_imgs_PIL):
         xy = ref_trajs[i][0]
         # scale cropped_traj to IMG_SIZE, because diff-transfer are done are image of size IMG_SIZE
         ref_pos = (xy[0] * IMG_SIZE / ref_img_PIL.size[0], xy[1] * IMG_SIZE / ref_img_PIL.size[1])
-        # TODO: 这里改为预先为 ref 提取特征
-        ref_ft = extract_ft(ref_img_PIL, prompt=prompt, ftype="sd") # 1, 1280, 28, 28
-        cos_map = match_fts(ref_ft, query_ft, ref_pos)
-        cos_maps.append(cos_map)
-    
-    end = time.time()
-    print(f"cos_map time: {end - start}")
+        ref_ft = topk_retrieved_data_dict["feat"][i]
+        cos_map = match_fts(ref_ft, query_feat, ref_pos)
+        break
+
     # 进一步将 cos_map 转换为一个概率分布
-    # prob_map = normalize_cos_map_exp(cos_map)
+    affordance_map_2d = Affordance_map_2d(
+        rgb_img=query_rgb,
+        cos_map=cos_map,
+        cropped_mask=query_mask,
+        cropped_region=query_region,
+    )
     
-    if visualize or True:
-        import napari
-        viewer = napari.Viewer()
-        viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
-        viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
-        viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
+    if visualize:
+        # 用 napari 一直有 bug, 草拟吗
+        # import napari
+        # viewer = napari.Viewer()
+        # viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
+        # viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
+        # viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
         
-        viewer.title = "retrieved reference data by RAM"
+        # viewer.title = "retrieved reference data by RAM"
+        
+        # for i in range(len(topk_retrieved_data_dict["img"])):
+        #     viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
+        #     masked_img = topk_retrieved_data_dict["masked_img"][i]
+        #     masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
+        #     viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
+        #     viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
+        #     # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
+        # napari.run()
+        
+        Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
+        Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
+        Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
         
         for i in range(len(topk_retrieved_data_dict["img"])):
-            viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
+            Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
             masked_img = topk_retrieved_data_dict["masked_img"][i]
-            masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
-            viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
-            viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
-        napari.run()
+            masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
+            masked_img.show()
+            Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
+            # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
+            break
         
-    return cos_maps, prob_map, query_mask
-            
+    return affordance_map_2d
+
+def get_ram_affordance_3d():
+    pass
+
 def lift_ram_affordance(
     K, 
     query_rgb, 
