@@ -17,9 +17,7 @@ import torch.nn.functional as F
 import matplotlib.cm as cm
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial import cKDTree
-
 from embodied_analogy.utility.constants import *
-from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
 
 def initialize_napari():
     # there are 2 ways:
@@ -51,7 +49,7 @@ def update_image_old(screen, rgb_pil, depth_pil, mask_pil):
     width2, height2 = depth_pil.size
     width3, height3 = mask_pil.size
 
-    # 计算最终合并图像的尺寸：宽度是三个图像的宽度之和，高度取最大值
+    # 计算最终合并图像的尺寸：宽度是三个图像的宽度之和,高度取最大值
     total_width = width1 + width2 + width3
     max_height = max(height1, height2, height3)
 
@@ -94,10 +92,10 @@ def world_to_camera(world_points, Tw2c):
 
     Args:
         world_points (np.ndarray): 3D世界坐标点, 形状 (B, 3)
-        Tw2c (np.ndarray): 相机外参矩阵 (4x4)，从世界坐标系到相机坐标系的变换矩阵
+        Tw2c (np.ndarray): 相机外参矩阵 (4x4),从世界坐标系到相机坐标系的变换矩阵
 
     Returns:
-        np.ndarray: 相机坐标系中的点，形状 (B, 3)
+        np.ndarray: 相机坐标系中的点,形状 (B, 3)
     """
     # 将世界坐标点扩展为齐次坐标
     world_points_homogeneous = np.hstack((world_points, np.ones((world_points.shape[0], 1))))  # (B, 4)
@@ -112,16 +110,16 @@ def world_to_camera(world_points, Tw2c):
 
 def camera_to_image(camera_points, K, image_width=None, image_height=None, normalized_uv=False):
     """
-    将相机坐标点投影到图像平面，并归一化到 [0, 1] 范围。
+    将相机坐标点投影到图像平面,并归一化到 [0, 1] 范围。
 
     Args:
-        camera_points (np.ndarray): 相机坐标点，形状 (B, 3)
-        K (np.ndarray): 相机内参矩阵，形状 (3, 3)
+        camera_points (np.ndarray): 相机坐标点,形状 (B, 3)
+        K (np.ndarray): 相机内参矩阵,形状 (3, 3)
         image_width (int): 图像宽度
         image_height (int): 图像高度
 
     Returns:
-        np.ndarray: 归一化像素坐标，形状 (B, 2)
+        np.ndarray: 归一化像素坐标,形状 (B, 2)
     """
     # 使用内参矩阵进行投影
     projected_points = np.dot(camera_points, K.T)  # (B, 3)
@@ -145,17 +143,17 @@ def camera_to_image(camera_points, K, image_width=None, image_height=None, norma
 
 def camera_to_image_torch(camera_points, K, image_width=None, image_height=None, normalized_uv=False):
     """
-    将相机坐标点投影到图像平面，并归一化到 [0, 1] 范围。
+    将相机坐标点投影到图像平面,并归一化到 [0, 1] 范围。
 
     Args:
-        camera_points (torch.Tensor): 相机坐标点，形状 (B, 3)
-        K (torch.Tensor): 相机内参矩阵，形状 (3, 3)
+        camera_points (torch.Tensor): 相机坐标点,形状 (B, 3)
+        K (torch.Tensor): 相机内参矩阵,形状 (3, 3)
         image_width (int): 图像宽度
         image_height (int): 图像高度
 
     Returns:
-        torch.Tensor: 归一化像素坐标，形状 (B, 2)
-        torch.Tensor: 深度值，形状 (B,)
+        torch.Tensor: 归一化像素坐标,形状 (B, 2)
+        torch.Tensor: 深度值,形状 (B,)
     """
     # 使用内参矩阵进行投影
     projected_points = torch.matmul(camera_points, K.T)  # (B, 3)
@@ -184,14 +182,14 @@ def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, n
     将世界坐标点转换为归一化像素坐标 (u, v) [0, 1]。
 
     Args:
-        world_points (np.ndarray): 世界坐标点，形状 (B, 3)
-        K (np.ndarray): 相机内参矩阵，形状 (3, 3)
-        Tw2c (np.ndarray): 相机外参矩阵 (4x4)，从世界坐标系到相机坐标系的变换矩阵
+        world_points (np.ndarray): 世界坐标点,形状 (B, 3)
+        K (np.ndarray): 相机内参矩阵,形状 (3, 3)
+        Tw2c (np.ndarray): 相机外参矩阵 (4x4),从世界坐标系到相机坐标系的变换矩阵
         image_width (int): 图像宽度
         image_height (int): 图像高度
 
     Returns:
-        np.ndarray: 归一化像素坐标，形状 (B, 2)
+        np.ndarray: 归一化像素坐标,形状 (B, 2)
     """
     # 转换到相机坐标系
     camera_points = world_to_camera(world_points, Tw2c)
@@ -204,9 +202,13 @@ def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, n
 def draw_points_on_image(image, uv_list, radius=1, normalized_uv=False):
     """
     Args:
-        image: PIL.Image 对象，表示要绘制点的图像。
-        uv_list: 一个包含 (u, v) 坐标的列表，表示要绘制的点。
+        image: PIL.Image 对象, 或是一个 np.array。
+        uv_list: 一个包含 (u, v) 坐标的列表,表示要绘制的点。
+        返回一个 pil image
     """
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
+        
     # 获取图像的宽度和高度
     width, height = image.size
     image_draw = image.copy()
@@ -235,7 +237,7 @@ def pil_images_to_mp4(pil_images, output_filename, fps=30):
     Args:
         pil_images (list of PIL.Image): PIL图像对象的列表。
         output_filename (str): 输出视频文件的路径。
-        fps (int): 每秒的帧数，控制视频的帧率。
+        fps (int): 每秒的帧数,控制视频的帧率。
     """
     # 获取图像的尺寸 (假设所有图像的大小相同)
     width, height = pil_images[0].size
@@ -266,7 +268,7 @@ def add_text_to_image(image, text, position=(10, 10), font_size=30):
     Args:
         image (PIL.Image): 输入的PIL图像。
         text (str): 要添加的文本。
-        position (tuple): 文本的左上角位置（默认在左上角，坐标为(10, 10)）。
+        position (tuple): 文本的左上角位置（默认在左上角,坐标为(10, 10)）。
         font_size (int): 字体大小, default 30。
     
     Returns:
@@ -275,15 +277,15 @@ def add_text_to_image(image, text, position=(10, 10), font_size=30):
     # 创建ImageDraw对象
     draw = ImageDraw.Draw(image)
     
-    # 使用默认字体，如果需要可以提供路径
+    # 使用默认字体,如果需要可以提供路径
     font = ImageFont.load_default()  # 使用Pillow默认字体
     try:
-        font = ImageFont.truetype("arial.ttf", font_size)  # 如果有系统字体，可以选择
+        font = ImageFont.truetype("arial.ttf", font_size)  # 如果有系统字体,可以选择
     except IOError:
         print("Arial font not found, using default font.")
     
     # 在图像上绘制文本
-    draw.text(position, text, font=font, fill="black")  # fill指定文本颜色，黑色
+    draw.text(position, text, font=font, fill="black")  # fill指定文本颜色,黑色
     
     return image
 
@@ -292,14 +294,14 @@ def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalize
     将归一化的像素坐标和深度值转换为三维空间中的点（相机坐标系）。
     
     参数:
-    - uv (np.array): 形状为 (B, 2)，每个点的 [u, v] 坐标，值域为 [0, 1]。
-    - depth (np.array): 形状为 (B,)，每个点的深度值，单位：米。
-    - K (np.array): 相机内参矩阵 (3x3)，包括焦距和主点坐标。
+    - uv (np.array): 形状为 (B, 2),每个点的 [u, v] 坐标,值域为 [0, 1]。
+    - depth (np.array): 形状为 (B,),每个点的深度值,单位：米。
+    - K (np.array): 相机内参矩阵 (3x3),包括焦距和主点坐标。
     - image_width (int): 图像的宽度（单位：像素）。
     - image_height (int): 图像的高度（单位：像素）。
     
     返回:
-    - (np.array): 形状为 (B, 3) 的点云数组，每个点的三维坐标 (X, Y, Z)。
+    - (np.array): 形状为 (B, 3) 的点云数组,每个点的三维坐标 (X, Y, Z)。
     """
     # 1. 提取 uv 坐标
     u = uv[:, 0]  # 水平像素坐标
@@ -320,7 +322,7 @@ def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalize
     c_y = K[1, 2]  # 主点 y 坐标 (单位: 像素)
     
     # 4. 计算三维坐标 (X, Y, Z)
-    Z = depth  # 深度值，单位：米
+    Z = depth  # 深度值,单位：米
     X = (x_pixel - c_x) * Z / f_x
     Y = (y_pixel - c_y) * Z / f_y
     
@@ -335,12 +337,12 @@ def depth_image_to_pointcloud(depth_image, mask, K):
     将深度图像转换为相机坐标系中的点云。
 
     Args:
-    - depth_image (np.array): 深度图像，大小为 (H, W)，单位：米
-    - K (np.array): 相机内参矩阵 (3x3)，包括焦距和主点坐标
-    - mask (np.array, optional): 掩码，大小为 (H, W)，布尔类型。如果提供，只保留 mask 为 True 的点
+    - depth_image (np.array): 深度图像,大小为 (H, W),单位：米
+    - K (np.array): 相机内参矩阵 (3x3),包括焦距和主点坐标
+    - mask (np.array, optional): 掩码,大小为 (H, W),布尔类型。如果提供,只保留 mask 为 True 的点
 
     Returns:
-    - pointcloud (np.array): 点云，大小为 (N, 3)，表示每个像素点在相机坐标系下的三维坐标
+    - pointcloud (np.array): 点云,大小为 (N, 3),表示每个像素点在相机坐标系下的三维坐标
     """
     assert depth_image.ndim == 2, "depth_image must be a 2D array"
     if mask is not None:
@@ -369,7 +371,7 @@ def depth_image_to_pointcloud(depth_image, mask, K):
     # 合并为点云 (H, W, 3)
     pointcloud = np.stack((X, Y, Z), axis=-1)
 
-    # 如果提供了掩码，仅保留掩码为 True 的点
+    # 如果提供了掩码,仅保留掩码为 True 的点
     if mask is not None:
         pointcloud = pointcloud[mask]
 
@@ -400,7 +402,7 @@ def camera_to_world(point_camera, extrinsic_matrix):
     return point_world
 
 def create_cylinder(start, end, radius=0.01):
-    """创建一个圆柱体来模拟线段，给定起点、终点和半径"""
+    """创建一个圆柱体来模拟线段,给定起点、终点和半径"""
     start = np.array(start)
     end = np.array(end)
     direction = end - start
@@ -421,9 +423,9 @@ def create_cylinder(start, end, radius=0.01):
 
     # 计算旋转矩阵
     if np.allclose(direction, z_axis):
-        R = np.eye(3)  # 如果方向是Z轴，保持不变
+        R = np.eye(3)  # 如果方向是Z轴,保持不变
     elif np.allclose(direction, -z_axis):
-        # 如果方向与Z轴相反，旋转180度绕X轴
+        # 如果方向与Z轴相反,旋转180度绕X轴
         rotation_axis = np.array([1, 0, 0])
         rotation_angle = np.pi
         R = o3d.geometry.get_rotation_matrix_from_axis_angle(rotation_axis * rotation_angle)
@@ -567,7 +569,7 @@ def match_point_on_featmap(
     return:
         similarity_map (torch.Tensor): H2, W2, range [0, 1]
     """
-    # 获取左图指定点的坐标 (u, v)，并转换为像素坐标
+    # 获取左图指定点的坐标 (u, v),并转换为像素坐标
     u, v = uv_1
     h1, w1 = feat_1.shape[2], feat_1.shape[3]  # 获取高和宽
     left_pixel_x = int(u * w1)  # 对应的像素坐标
@@ -677,7 +679,7 @@ import numpy as np
 
 def reconstruct_mask(mask1: np.ndarray, mask2: np.ndarray) -> np.ndarray:
     """
-    根据初始布尔掩码 (mask1) 和筛选掩码 (mask2)，返回最终筛选后的布尔掩码。
+    根据初始布尔掩码 (mask1) 和筛选掩码 (mask2),返回最终筛选后的布尔掩码。
 
     参数:
     - mask1: np.ndarray (H, W)  -> 初始布尔掩码
@@ -690,7 +692,7 @@ def reconstruct_mask(mask1: np.ndarray, mask2: np.ndarray) -> np.ndarray:
     assert mask2.dtype == np.bool_, "mask2 必须是 bool 类型"
     
     # 获取 mask1 中为 True 的索引
-    indices = np.argwhere(mask1)  # (N, 2) 形状数组，每行是 (y, x)
+    indices = np.argwhere(mask1)  # (N, 2) 形状数组,每行是 (y, x)
     
     # 选出最终保留的 M 个像素点
     selected_indices = indices[mask2]  # (M, 2) 形状
@@ -708,7 +710,7 @@ def tracksNd_variance_torch(tracks: torch.Tensor) -> torch.Tensor:
     计算 T, M, 3 形状的 3D 轨迹数据的平均方差 (PyTorch 版本)。
 
     参数:
-        tracks (torch.Tensor): 形状为 (T, M, Nd) 的张量，表示 T 个时刻 M 个点的 2D/3D 轨迹。
+        tracks (torch.Tensor): 形状为 (T, M, Nd) 的张量,表示 T 个时刻 M 个点的 2D/3D 轨迹。
 
     返回:
         torch.Tensor: M 个点的方差均值（标量）。
@@ -729,7 +731,7 @@ def tracksNd_variance_np(tracks: np.ndarray) -> float:
     计算形状为 (T, M, Nd) 的 2D/3D 轨迹数据的平均方差 (NumPy 版本)。
 
     参数:
-        tracks (np.ndarray): 形状为 (T, M, Nd) 的数组，表示 T 个时刻 M 个点的 2D/3D 轨迹。
+        tracks (np.ndarray): 形状为 (T, M, Nd) 的数组,表示 T 个时刻 M 个点的 2D/3D 轨迹。
 
     返回:
         float: M 个点的方差均值（标量）。
@@ -747,7 +749,7 @@ def tracksNd_variance_np(tracks: np.ndarray) -> float:
 
 def farthest_scale_sampling(arr, M):
     """
-    从一维数组中选择 M 个点，确保它们之间的距离尽可能大（最大最小距离采样）。
+    从一维数组中选择 M 个点,确保它们之间的距离尽可能大（最大最小距离采样）。
     
     参数:
     arr (np.ndarray): 输入的一维数据数组。
@@ -760,9 +762,9 @@ def farthest_scale_sampling(arr, M):
     N = len(arr)
     
     if M >= N:
-        return arr  # 如果需要的点数大于等于数组长度，直接返回原数组
+        return arr  # 如果需要的点数大于等于数组长度,直接返回原数组
 
-    # 随机选择第一个点（也可以选择固定的起点，如最小值或最大值）
+    # 随机选择第一个点（也可以选择固定的起点,如最小值或最大值）
     selected_indices = [np.random.randint(0, N)]
     
     # 迭代选择剩余的点
@@ -778,14 +780,14 @@ def farthest_scale_sampling(arr, M):
         next_index = remaining_indices[np.argmax(min_distances)]
         selected_indices.append(next_index)
     
-    # 返回排序后的抽样点，方便阅读
+    # 返回排序后的抽样点,方便阅读
     # return arr[np.sort(selected_indices)]
     return np.sort(selected_indices)
 
 
 def sample_array(arr, k):
     """
-    从大小为 N x d 的数组中随机采样 k 个样本，并返回 k x d 的数组。
+    从大小为 N x d 的数组中随机采样 k 个样本,并返回 k x d 的数组。
     :param arr: 输入的 N x d 的 numpy 数组
     :param k: 需要采样的样本数量
     :return: 返回大小为 k x d 的数组
@@ -796,7 +798,7 @@ def sample_array(arr, k):
     # 随机选择 k 个索引
     indices = np.random.choice(arr.shape[0], size=k, replace=False)
     
-    # 根据索引提取行，并取前两列
+    # 根据索引提取行,并取前两列
     sampled_array = arr[indices]
     
     return sampled_array
@@ -806,13 +808,13 @@ def sample_points_within_bbox_and_mask(bbox, mask, N):
     从给定的bbox和mask中采样N个有效的(u, v)点。
     
     参数：
-    - bbox: 形状为(4,)的bbox数组，格式为[u_left, v_left, u_right, v_right]。
-    - mask: 大小为(H, W)的布尔数组，表示图像中每个像素是否有效。
+    - bbox: 形状为(4,)的bbox数组,格式为[u_left, v_left, u_right, v_right]。
+    - mask: 大小为(H, W)的布尔数组,表示图像中每个像素是否有效。
     - N: 需要采样的点数。
     
     返回：
-    - 一个形状为(N, 2)的numpy数组，表示采样的(u, v)坐标。
-      其中，N是有效采样点的数量。
+    - 一个形状为(N, 2)的numpy数组,表示采样的(u, v)坐标。
+      其中,N是有效采样点的数量。
     """
     # 获取bbox的坐标
     u_left, v_left, u_right, v_right = bbox
@@ -821,7 +823,7 @@ def sample_points_within_bbox_and_mask(bbox, mask, N):
     bbox_u_range = u_right - u_left
     bbox_v_range = v_right - v_left
 
-    # 计算步长，使得采样点的数量接近N
+    # 计算步长,使得采样点的数量接近N
     step_size_u = np.sqrt(bbox_u_range * bbox_v_range / N)
     step_size_v = step_size_u * bbox_v_range / bbox_u_range  # 保持长宽比
 
@@ -883,7 +885,7 @@ def joint_data_to_transform(
 
 def set_random_seed(seed: int):
     """
-    设置 Python, NumPy 和 PyTorch 的随机种子，确保实验的可重复性
+    设置 Python, NumPy 和 PyTorch 的随机种子,确保实验的可重复性
     :param seed: 要设置的随机种子
     """
     # 设置 Python 的随机种子
@@ -895,12 +897,12 @@ def set_random_seed(seed: int):
     # 设置 PyTorch 的随机种子
     torch.manual_seed(seed)
     
-    # 如果使用 GPU，还需要设置 CUDA 随机种子
+    # 如果使用 GPU,还需要设置 CUDA 随机种子
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)  # 设置所有 GPU 的种子
         
-    # 为了确保结果可重复，设置 cudnn 的确定性算法
+    # 为了确保结果可重复,设置 cudnn 的确定性算法
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     
@@ -1024,7 +1026,7 @@ def get_dynamic_mask(mask, moving_points, static_points, visualize=False):
     """
     H, W = mask.shape
 
-    # 构建KD树以加快最近邻搜索，确保用(v, u)坐标格式
+    # 构建KD树以加快最近邻搜索,确保用(v, u)坐标格式
     tree_A = cKDTree(moving_points[:, [1, 0]])
     tree_B = cKDTree(static_points[:, [1, 0]])
 
@@ -1101,7 +1103,7 @@ def get_depth_mask_seq(depth_seq, K, Tw2c, height=0.01):
 
 def quantile_sampling(arr, M):
     """
-    从数组中按分位数抽样，返回代表性数据点。
+    从数组中按分位数抽样,返回代表性数据点。
     
     参数:
     arr (np.ndarray): 输入的一维数据数组。
@@ -1124,9 +1126,9 @@ def quantile_sampling(arr, M):
 def compute_normals(target_pc, k_neighbors=30):
     """
     计算目标点云的法向量
-    :param target_pc: numpy 数组，形状为 (N, 3)，目标点云
+    :param target_pc: numpy 数组,形状为 (N, 3),目标点云
     :param k_neighbors: 计算法向量时的近邻数
-    :return: 法向量数组，形状为 (N, 3)
+    :return: 法向量数组,形状为 (N, 3)
     """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(target_pc)
@@ -1137,10 +1139,10 @@ def compute_normals(target_pc, k_neighbors=30):
 
 def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     """
-    使用 KD-Tree 进行最近邻搜索，找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
-    :param ref_pc: numpy 数组，形状 (M, 3)，参考点云
-    :param target_pc: numpy 数组，形状 (N, 3)，目标点云
-    :param max_distance: 最大距离，超过这个距离的点会被忽略
+    使用 KD-Tree 进行最近邻搜索,找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
+    :param ref_pc: numpy 数组,形状 (M, 3),参考点云
+    :param target_pc: numpy 数组,形状 (N, 3),目标点云
+    :param max_distance: 最大距离,超过这个距离的点会被忽略
     :return: 匹配的索引数组
     """
     # TODO: 将 leafsize 和 num_workers 再优化
@@ -1179,15 +1181,15 @@ def rotation_matrix_between_vectors(a, b):
 # 从点云中获取 bbox
 def compute_bbox_from_pc(points, offset=0):
     """
-    计算点云的边界框，并根据offset扩张bbox。
+    计算点云的边界框,并根据offset扩张bbox。
 
     参数:
-    - points: numpy数组，形状为 (N, 3)，表示点云的坐标。
-    - offset: 浮点数，表示bbox的扩张量。
+    - points: numpy数组,形状为 (N, 3),表示点云的坐标。
+    - offset: 浮点数,表示bbox的扩张量。
 
     返回:
-    - bbox_min: numpy数组，形状为 (3,)，表示bbox的最小角点。
-    - bbox_max: numpy数组，形状为 (3,)，表示bbox的最大角点。
+    - bbox_min: numpy数组,形状为 (3,),表示bbox的最小角点。
+    - bbox_max: numpy数组,形状为 (3,),表示bbox的最大角点。
     """
     bbox_min = np.min(points, axis=0) - offset
     bbox_max = np.max(points, axis=0) + offset
@@ -1198,12 +1200,12 @@ def sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples):
     在bbox的表面上采样一些点。
 
     参数:
-    - bbox_min: numpy数组，形状为 (3,)，表示bbox的最小角点。
-    - bbox_max: numpy数组，形状为 (3,)，表示bbox的最大角点。
-    - num_samples: 整数，表示要采样的点的数量。
+    - bbox_min: numpy数组,形状为 (3,),表示bbox的最小角点。
+    - bbox_max: numpy数组,形状为 (3,),表示bbox的最大角点。
+    - num_samples: 整数,表示要采样的点的数量。
 
     返回:
-    - samples: numpy数组，形状为 (num_samples, 3)，表示采样点的坐标。
+    - samples: numpy数组,形状为 (num_samples, 3),表示采样点的坐标。
     """
     # 计算bbox的尺寸
     bbox_size = bbox_max - bbox_min
@@ -1239,6 +1241,17 @@ def sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples):
     samples = np.vstack(samples)
 
     return samples
+
+def normalize_cos_map_exp(cosine_similarity_map, sharpen_factor=5):
+    """
+    对于输入的 cosine_similarity_map 进行归一化变为一个概率分布
+    sharpen_factor: 用于调整分布的相对大小, sharpen_factor 越大分布越尖锐
+    """
+    # 使用 exp(cos) 计算
+    exp_map = np.exp(cosine_similarity_map * sharpen_factor)
+    # 转换为概率图
+    probability_map = exp_map / np.sum(exp_map)
+    return probability_map
 
 
 if __name__ == "__main__":

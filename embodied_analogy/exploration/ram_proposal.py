@@ -1,4 +1,3 @@
-# 调用 RAM 的 explore 函数, 输入是一个 rgbd 点云, 输出是抓取位姿，和一小段轨迹
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 
@@ -9,11 +8,13 @@ import numpy as np
 import torch
 import time
 from PIL import Image
-from vision.featurizer.run_featurizer import transfer_affordance
+from vision.featurizer.run_featurizer import (
+    extract_ft,
+    match_fts
+)
 from vision.featurizer.utils.visualization import IMG_SIZE
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
-from run_realworld.utils import crop_points, cluster_normals, visualize_point_directions
-import traceback
+from run_realworld.utils import crop_points, cluster_normals
 import matplotlib
 matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
 import cv2
@@ -25,7 +26,9 @@ from embodied_analogy.utility.utils import (
     image_to_camera,
     depth_image_to_pointcloud,
     compute_normals,
-    visualize_pc
+    visualize_pc,
+    normalize_cos_map_exp,
+    draw_points_on_image
 )
 # from embodied_analogy.perception.grounded_sam import run_grounded_sam
 
@@ -93,66 +96,66 @@ def get_ram_proposal(
         save_root=save_root,
         lang_mode='clip',
         topk=5, 
-        crop=False, # 这里记得用 crop=False，如果用 crop=True 的话输出的 contact_point 是相对于 cropped_tgt image 的
+        crop=True, # 这里记得用 crop=False，如果用 crop=True 的话输出的 contact_point 是相对于 cropped_tgt image 的
         data_source=data_source,
     )
     
-    # get rgb mask from grounded sam
-    # _, query_mask = run_grounded_sam(
-    #     rgb_image=query_rgb,
-    #     obj_description=obj, # drawer
-    #     positive_points=None,
-    #     negative_points=None,
-    #     num_iterations=5,
-    #     acceptable_thr=0.9,
-    #     visualize=False,
-    # )
-    # query_mask = np.repeat(query_mask[..., None], 3, axis=-1).astype(np.uint8) # H, W, C (0 or 1)
-    # query_img_masked = query_rgb * query_mask + 255 * (1 - query_mask) # 0-255
-    # query_img_PIL = Image.fromarray(query_img_masked).convert('RGB')
-    
     # use retrieval to get ref_path (or ref image) and ref trajectory in 2d space
     retrieve_start = time.time()
-    _, top1_retrieved_data_dict = subset_retrieve_pipeline.retrieve(instruction, query_rgb)
+    topk_retrieved_data_dict = subset_retrieve_pipeline.retrieve(
+        current_task=instruction,
+        current_obs=query_rgb,
+        log=True,
+        visualize=visualize
+    )
     retrieve_end = time.time()
     print(f"retrieve time: {retrieve_end - retrieve_start}")
     
-    traj = top1_retrieved_data_dict['traj']
-    ref_img_np = top1_retrieved_data_dict['masked_img']
-    ref_img_PIL = Image.fromarray(ref_img_np).convert('RGB')
+    ref_trajs = topk_retrieved_data_dict['traj']
+    ref_imgs_np = topk_retrieved_data_dict['masked_img']
+    ref_imgs_PIL = [Image.fromarray(ref_img_np).convert('RGB') for ref_img_np in ref_imgs_np]
     
-    query_mask = top1_retrieved_data_dict["query_mask"][..., 0].astype(np.bool_)
-    masked_query_np = top1_retrieved_data_dict["masked_query"]
-    query_img_PIL = Image.fromarray(masked_query_np).convert('RGB')
+    # 这些 query 都是 cropped 之后的结果
+    query_mask = topk_retrieved_data_dict["query_mask"][..., 0].astype(np.bool_)
+    query_img_PIL = Image.fromarray(topk_retrieved_data_dict["masked_query"]).convert('RGB')
 
-    # scale cropped_traj to IMG_SIZE, because diff-transfer are done are image of size IMG_SIZE
-    ref_pos_list = []
-    for xy in traj:
-        ref_pos_list.append((xy[0] * IMG_SIZE / ref_img_PIL.size[0], xy[1] * IMG_SIZE / ref_img_PIL.size[1]))
+    # transfer contact point, cos_map is np.array([cropped_H, cropped_W])
+    start = time.time()
+    cos_maps = []
+    query_ft = extract_ft(query_img_PIL, prompt=prompt, ftype="sd")
     
-    # transfer contact point
-    transfer_start = time.time()
-    # 这里的 contact_point 的坐标是相对于 masked_query_np 的
-    contact_point, post_contact_dir = transfer_affordance(ref_img_PIL, query_img_PIL, prompt, ref_pos_list, save_root=save_root, ftype='sd')
-    transfer_end = time.time()
-    print(f"transfer time: {transfer_end - transfer_start}")
-
-    if visualize:
+    for i, ref_img_PIL in enumerate(ref_imgs_PIL):
+        xy = ref_trajs[i][0]
+        # scale cropped_traj to IMG_SIZE, because diff-transfer are done are image of size IMG_SIZE
+        ref_pos = (xy[0] * IMG_SIZE / ref_img_PIL.size[0], xy[1] * IMG_SIZE / ref_img_PIL.size[1])
+        # TODO: 这里改为预先为 ref 提取特征
+        ref_ft = extract_ft(ref_img_PIL, prompt=prompt, ftype="sd") # 1, 1280, 28, 28
+        cos_map = match_fts(ref_ft, query_ft, ref_pos)
+        cos_maps.append(cos_map)
+    
+    end = time.time()
+    print(f"cos_map time: {end - start}")
+    # 进一步将 cos_map 转换为一个概率分布
+    # prob_map = normalize_cos_map_exp(cos_map)
+    
+    if visualize or True:
         import napari
-        viewer = napari.Viewer(title = "RAM proposal")
-        viewer.add_image(query_rgb, name="query_img")
-        viewer.add_image(masked_query_np, name="query_img_masked")
-        viewer.add_image(ref_img_np, name="reference_img")
-        query_img_with_arrow_pil = draw_arrows_on_img(
-            img=query_rgb,
-            pixel=contact_point,
-            normals_2d_directions=[post_contact_dir]
-        )
-        query_img_with_arrow_np = np.asarray(query_img_with_arrow_pil)
-        viewer.add_image(query_img_with_arrow_np, name="query_img + arrow")
+        viewer = napari.Viewer()
+        viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
+        viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
+        viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
+        
+        viewer.title = "retrieved reference data by RAM"
+        
+        for i in range(len(topk_retrieved_data_dict["img"])):
+            viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
+            masked_img = topk_retrieved_data_dict["masked_img"][i]
+            masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
+            viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
+            viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
         napari.run()
         
-    return np.array(contact_point), post_contact_dir, query_mask
+    return cos_maps, prob_map, query_mask
             
 def lift_ram_affordance(
     K, 

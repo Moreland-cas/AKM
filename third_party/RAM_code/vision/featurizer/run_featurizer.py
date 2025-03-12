@@ -56,7 +56,14 @@ def extract_ft(img: Image.Image, prompt=None, ftype='sd'):
     )
     return ft
 
-def match_fts(src_ft, tgt_ft, pos, save_root=None):
+def match_fts(src_ft, tgt_ft, pos):
+    """
+        将 src_ft 上的 pos 上一点映射为 tgt_ft 上的一个概率分布
+        src_ft: 1, 1280, 28, 28
+        pos: (u, v) in src frame
+        return:
+            cos_map: np.array([H, W])
+    """
     num_channel = src_ft.size(1)
     src_ft = nn.Upsample(size=(IMG_SIZE, IMG_SIZE), mode='bilinear')(src_ft)
     tgt_ft = nn.Upsample(size=(IMG_SIZE, IMG_SIZE), mode='bilinear')(tgt_ft)
@@ -67,10 +74,11 @@ def match_fts(src_ft, tgt_ft, pos, save_root=None):
     y_norm = 2 * y / (IMG_SIZE - 1) - 1
     src_vec = torch.nn.functional.grid_sample(src_ft, torch.tensor([[[[x_norm, y_norm]]]]).float().cuda(), align_corners=True).squeeze(2).squeeze(2)
     tgt_vecs = tgt_ft.view(1, num_channel, -1) # 1, C, H*W
+    # F.normalize 默认在 dim=1 上进行归一化
     src_vec = F.normalize(src_vec) # 1, C
     tgt_vecs = F.normalize(tgt_vecs) # 1, C, HW
     cos_map = torch.matmul(src_vec, tgt_vecs).view(1, IMG_SIZE, IMG_SIZE).cpu().numpy() # 1, H, W
-
+    cos_map = cos_map[0] # H, W
     return cos_map
 
 def sample_highest(cos_map: np.ndarray):
@@ -183,6 +191,15 @@ def transfer_affordance(src_img_PIL, tgt_img_PIL, prompt, src_pos_list, save_roo
         visualize_max_xy_list(save_root, src_pos_inliers, max_xy_inliers, src_img_PIL, tgt_img_PIL)
         visualize_max_xy_linear(save_root, src_pos_list[0], src_best_line, contact_point, tgt_best_line, src_img_PIL, tgt_img_PIL)
     return contact_point, tgt_best_line
+
+def transfer_contact_affordance(src_img_PIL, tgt_img_PIL, prompt, src_pos, ftype='sd'):
+    """
+        返回一个相似度的分布, 不考虑箭头
+    """
+    src_ft = extract_ft(src_img_PIL, prompt=prompt, ftype=ftype) # 1, 1280, 28, 28
+    tgt_ft = extract_ft(tgt_img_PIL, prompt=prompt, ftype=ftype)
+    cos_map = match_fts(src_ft, tgt_ft, src_pos)
+    return cos_map
 
 def transfer_affordance_w_mask(src_img_PIL, tgt_img_PIL, tgt_mask, prompt, src_pos_list, save_root=None, ftype='sd'):
     mask = torch.from_numpy(tgt_mask[...,0]).cuda() # h,w

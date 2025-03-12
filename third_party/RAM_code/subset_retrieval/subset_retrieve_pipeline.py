@@ -10,7 +10,7 @@ from vision.featurizer.run_featurizer import extract_ft, match_fts, sample_highe
 from vision.featurizer.utils.correspondence import get_distance_bbnn, get_distance_imd
 from tqdm import tqdm
 # from vision.GroundedSAM.grounded_sam_utils import prepare_gsam_model, inference_one_image, crop_image
-
+from embodied_analogy.utility.utils import draw_points_on_image
 
 MAX_IMD_RANKING_NUM = 30 # change this for different levels of efficiency
 
@@ -30,12 +30,12 @@ def segment_images(frames, trajs, obj_description, visualize=False):
             acceptable_thr=0.9,
             visualize=visualize,
         )
-        
         mask = np.repeat(mask[:, :, np.newaxis], 3, axis=2).astype(np.uint8)
         
         # if no object is detected or the contact point is not in the mask, return the original image
         if mask.sum() == 0:
             mask = np.ones_like(mask)
+            
         if trajs is not None:
             cp = trajs[idx][0]
             if mask[..., 0][int(cp[1]), int(cp[0])] == 0:
@@ -44,11 +44,7 @@ def segment_images(frames, trajs, obj_description, visualize=False):
         masked_frame = frame * mask + 255 * (1 - mask)
         masked_frames.append(masked_frame)
         frame_masks.append(mask)
-
-        if False:
-            tgt_img_PIL = Image.fromarray(masked_frame).convert('RGB')
-            tgt_img_PIL.save(f"tgt_img_masked.png")
-
+        
     return masked_frames, frame_masks
 
 def concat_images_with_lines(img_list):
@@ -128,22 +124,29 @@ def crop_image(img, mask, traj=[], margin=50):
         x = x - x_min
         y = y - y_min
         cropped_traj.append((x, y))
-    return cropped_img, cropped_mask, cropped_traj
+    return cropped_img, cropped_mask, cropped_traj, (x_min, y_min, x_max, y_max)
 
 def crop_images(masked_frames, masks, trajs=None):
+    """
+        masked_frames: list of (H, W, 3)
+        masks: list of (H, W, 3)
+        trajs: list of (u, v)
+    """
     cropped_frames = []
     cropped_masks = []
     cropped_trajs = []
+    cropped_regions = []
     for idx in range(len(masked_frames)):
         masked_frame = masked_frames[idx]
         mask = masks[idx]
         traj = trajs[idx] if trajs is not None else []
-        cropped_image, cropped_mask, cropped_traj = crop_image(masked_frame, mask, traj, margin=100)
+        cropped_image, cropped_mask, cropped_traj, cropped_region = crop_image(masked_frame, mask, traj, margin=100)
         cropped_frames.append(cropped_image)
         cropped_masks.append(cropped_mask)
         cropped_trajs.append(cropped_traj)
+        cropped_regions.append(cropped_region)
         
-    return cropped_frames, cropped_masks, cropped_trajs
+    return cropped_frames, cropped_masks, cropped_trajs, cropped_regions
 
 def get_end_start_direction(trajs):
     dirs = []
@@ -208,21 +211,23 @@ class SubsetRetrievePipeline:
 
         return self.task_list[max_index]
 
-    def segment_objects(self, retrieved_data_imgs, obj_name, trajs=None):
+    def segment_objects(self, imgs, obj_name, trajs=None):
         masked_frames, masks = segment_images(
-            frames=retrieved_data_imgs,
+            frames=imgs,
             trajs=trajs,
             obj_description=obj_name,
             visualize=False
         )
-        # masked_frames, masks = segment_images(retrieved_data_imgs, trajs, obj_name, self.grounded_dino_model, self.sam_predictor)
-
+        
+        regions = []
+        for img in imgs:
+            H, W = img.shape[:2]
+            regions.append([0, 0, W, H])
+        
         if self.crop:
-            masked_frames, masks, trajs = crop_images(masked_frames, masks, trajs)
-
-        if len(masked_frames) == 1 and len(masks) == 1: # observation
-            return masked_frames[0], masks[0]
-        return masked_frames, masks, trajs
+            masked_frames, masks, trajs, regions = crop_images(masked_frames, masks, trajs)
+        
+        return masked_frames, masks, trajs, regions
     
     def clip_filtering(self, retrieved_data_dict, obj_prompt):
         query_frame = retrieved_data_dict['masked_query']
@@ -247,6 +252,7 @@ class SubsetRetrievePipeline:
             "query_img": retrieved_data_dict["query_img"],
             "query_mask": retrieved_data_dict["query_mask"],
             "masked_query": retrieved_data_dict["masked_query"],
+            "query_region": retrieved_data_dict["query_region"],
             "img": [],
             "traj": [],
             "masked_img": [],
@@ -292,6 +298,7 @@ class SubsetRetrievePipeline:
             "query_img": sorted_retrieved_data_dict["query_img"],
             "query_mask": sorted_retrieved_data_dict["query_mask"],
             "masked_query": sorted_retrieved_data_dict["masked_query"],
+            "query_region": sorted_retrieved_data_dict["query_region"],
             "img": [],
             "traj": [],
             "masked_img": [],
@@ -314,7 +321,7 @@ class SubsetRetrievePipeline:
                 retrieved_data_dict = pickle.load(f)
         return retrieved_data_dict
 
-    def retrieve(self, current_task, current_obs, log=True):
+    def retrieve(self, current_task, current_obs, log=False, visualize=False):
         """
             current_task: "open the drawer"
             current_obs: numpy rgb image
@@ -332,12 +339,16 @@ class SubsetRetrievePipeline:
         if log: print("<3> Segment out the object from our observation")
         # TODO: 这里是不是需要从 current_task 中解析出物体的名称先
         query_obj_description = current_task.split(" ")[-1]
-        query_frame, query_mask = self.segment_objects([current_obs], query_obj_description)
+        # masked_frames, masks, trajs, regions
+        query_frame, query_mask, _, query_region = self.segment_objects([current_obs], query_obj_description)
+        
         retrieved_data_dict['query_img'] = current_obs
-        retrieved_data_dict['query_mask'] = query_mask
-        retrieved_data_dict['masked_query'] = query_frame
+        retrieved_data_dict['query_mask'] = query_mask[0]
+        retrieved_data_dict['masked_query'] = query_frame[0]
+        retrieved_data_dict['query_region'] = query_region[0]
         
         if "masked_img" not in retrieved_data_dict.keys(): # not preprocessed
+            assert True and "masked_img not in retrieved_data_dict.keys()"
             if log: print("<3.5> Retrieved data are not processed, processing...")
             masked_frames, frame_masks, trajs = self.segment_objects(retrieved_data_dict["img"], obj_name, retrieved_data_dict["traj"])
             retrieved_data_dict['masked_img'] = masked_frames
@@ -350,17 +361,34 @@ class SubsetRetrievePipeline:
         if log: print("<5> Geometrical retrieval...")
         topk_retrieved_data_dict = self.imd_ranking(sorted_retrieved_data_dict, obj_prompt)
         
-        self.visualize_top5(topk_retrieved_data_dict, "imd_top5.png")
-        top1_idx = 0
-
-        top1_retrieved_data_dict = {
-            "query_img": current_obs,
-            "query_mask": query_mask,
-            "masked_query": query_frame,
-            "img": topk_retrieved_data_dict["img"][top1_idx],
-            "traj": topk_retrieved_data_dict["traj"][top1_idx], # in segmented & cropped space
-            "masked_img": topk_retrieved_data_dict["masked_img"][top1_idx],
-            "mask": topk_retrieved_data_dict["mask"][top1_idx]
-        }
+        if visualize:
+            # visualize topk_retrieved_data_dict
+            import napari
+            viewer = napari.Viewer()
+            viewer.title = "retrieved reference data by RAM"
+            viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
+            viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
+            viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
+            
+            for i in range(len(topk_retrieved_data_dict["img"])):
+                viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
+                masked_img = topk_retrieved_data_dict["masked_img"][i]
+                masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
+                viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
+                viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
+            napari.run()
         
-        return top1_idx, top1_retrieved_data_dict
+        """
+        这里的 query_mask 和 masked_query 都是 cropped 过的
+        topk_retrieved_data_dict = {
+            "query_img": sorted_retrieved_data_dict["query_img"],
+            "query_mask": sorted_retrieved_data_dict["query_mask"],
+            "masked_query": sorted_retrieved_data_dict["masked_query"],
+            "query_region": sorted_retrieved_data_dict["query_region"],
+            "img": [],
+            "traj": [],
+            "masked_img": [],
+            "mask": []
+        }
+        """
+        return topk_retrieved_data_dict
