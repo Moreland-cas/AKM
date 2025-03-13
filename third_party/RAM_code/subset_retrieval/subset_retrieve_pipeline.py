@@ -156,7 +156,7 @@ def get_end_start_direction(trajs):
     return dirs
 
 class SubsetRetrievePipeline:
-    def __init__(self, subset_dir, save_root='./', topk=5, lang_mode='clip', crop=True, data_source=None) -> None:
+    def __init__(self, subset_dir, save_root=None, topk=5, lang_mode='clip', crop=True, data_source=None) -> None:
         self.subset_dir = subset_dir
         self.save_root = save_root
         self.topk = topk

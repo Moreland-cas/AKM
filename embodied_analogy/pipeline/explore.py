@@ -36,131 +36,122 @@ class ExploreEnv(ManipulateEnv):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
     
-    def start_explore_loop(self, allowed_num_tries=10, visualize=False):
+    def explore_loop(self, allowed_num_tries=10, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
         """
+        # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
+        from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
+        
+        self.base_step()
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        
+        self.affordance_map_2d = get_ram_affordance_2d(
+            query_rgb=rgb_np,
+            instruction=self.instruction,
+            data_source="droid", # TODO
+            visualize=False
+        )
+        
         num_tries_so_far = 0
-        while (not self.explore_data_is_valid()) and (num_tries_so_far < allowed_num_tries):
+        while num_tries_so_far < allowed_num_tries:
+            # 初始化相关状态
+            self.open_gripper()
+            self.reset_franka_arm()
+            self.explore_data["frames"] = []
+            
             self.explore_once(visualize=visualize)
             num_tries_so_far += 1
             
+            if self.get_valid_explore():
+                break
+            else:
+                # 更新 affordance map
+                self.affordance_map_2d.update()
+                
         # save explore data
         if not self.has_valid_explore:
             assert "No valid exploration during explore phase!"
-            import pdb;pdb.set_trace()
     
-    def affordance_transfer(self, visualize=False):
-        """
-            进行一次 affordance transfer, 保留 transfer 的 contact distribution
-            默认使用 "droid" 作为 data_source
-        """
-        pass
-    # TODO: 假如实际执行发现失败的 explore_once 不会对物体状态造成什么变化, 那就可以把 affordance transfer 提炼出来, 进行复用
-        
     def explore_once(
         self, 
         reserved_distance=0.05,
         pertubation_distance=0.1,
-        # TODO: 后续实现一个功能, 就是每次 explore 可以复用前一步得到的 contact map, 从而大大的增加探索效率
-        contact_map=None,
         visualize=False      
     ):
         """
-            在当前状态下进行一次探索
-        """
-        self.open_gripper()
-        self.reset_franka_arm()
-        
-        # 一定要记得在每次开启新的 explore_once 前, 将 explore_data 中的 frames 清空
-        self.explore_data["frames"] = []
-        
-        from embodied_analogy.exploration.ram_proposal import get_ram_proposal, lift_ram_affordance
-        self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
-        
-        # 先进行一个 proposal 提出
-        contact_uv, contact_dir_2d, obj_mask = get_ram_proposal(
-            query_rgb=rgb_np,
-            instruction=self.instruction,
-            data_source="droid", # TODO
-            save_root=self.save_dir,
-            visualize=visualize
-        )
-        
-        # contact_3d_c = image_to_camera(
-        #     uv=contact_uv[None],
-        #     depth=np.array(depth_np[contact_uv[1], contact_uv[0]])[None],
-        #     K=self.camera_intrinsic,
-        # )[0] # 3
-        # contact_3d_w = camera_to_world(contact_3d_c[None], self.camera_extrinsic)[0]
-        # visualize_pc(pc_collision_w, contact_point=contact_3d_w, post_contact_dirs=best_dir_3d[None])
-        
-        # 这个输出的是在相机坐标系下的(Tgrasp2c), 需要转换到世界坐标系下
-        sorted_grasps_c, best_dir_3d_c = lift_ram_affordance(
-            K=self.camera_intrinsic, 
-            query_rgb=rgb_np, 
-            query_mask=obj_mask, 
-            query_depth=depth_np, 
-            contact_uv=contact_uv, 
-            contact_dir_2d=contact_dir_2d, 
-            visualize=visualize
-        )
+            在当前状态下进行一次探索, 默认此时的 franka arm 处于 rest 状态
+        """        
+        from embodied_analogy.exploration.ram_proposal import lift_ram_affordance
         
         Tw2c = self.camera_extrinsic
         Tc2w = np.linalg.inv(Tw2c)
-        sorted_grasps = sorted_grasps_c.transform(Tc2w) # Tgrasp2w
-        best_dir_3d = camera_to_world(best_dir_3d_c[None], Tw2c)[0] # 3
         
-        # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
+        self.base_step()
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        
+        obj_mask = self.affordance_map_2d.get_obj_mask(visualize=False) # H, W
+        contact_uv = self.affordance_map_2d.sample_highest(visualize=False)
+        
+        # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
+        contact_3d_c, grasps_c, dir_out_c = lift_ram_affordance(
+            K=self.camera_intrinsic, 
+            Tw2c=self.camera_extrinsic,
+            query_rgb=rgb_np,
+            query_depth=depth_np, 
+            query_mask=obj_mask,
+            contact_uv=contact_uv,
+            visualize=False
+        )
+        contact_3d_w = camera_to_world(
+            point_camera=contact_3d_c[None],
+            extrinsic_matrix=Tw2c
+        )[0]
+        
+        grasps_w = grasps_c.transform(Tc2w) # Tgrasp2w
+        dir_out_w = camera_to_world(dir_out_c[None], Tw2c)[0] # 3
+        
+        result_pre = None
         depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, Tw2c, height=0.02)
         pc_collision_c = depth_image_to_pointcloud(depth_np, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
+        pc_colors = rgb_np[obj_mask & depth_mask]
         pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
-        
-        for grasp in sorted_grasps:
-            # visualize_pc(pc_collision_w, grasp=grasp)
-            grasp = self.get_rotated_grasp(grasp, axis_out_w=best_dir_3d)
-            # visualize_pc(pc_collision_w, grasp=grasp)
+        self.planner.update_point_cloud(pc_collision_w)
             
-            Tph2w = self.anyGrasp2ph(grasp=grasp)
-            
-            result_test = self.plan_path(target_pose=Tph2w, wrt_world=True)
-            if not result_test:
-                continue
-            
+        for grasp_w in grasps_w:
+            # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
+            grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
+            Tph2w = self.anyGrasp2ph(grasp=grasp)        
             Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
-            
-            self.planner.update_point_cloud(pc_collision_w)
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-            if not result_pre:
-                continue
             
-            # visualize_pc(pc_collision_w, grasp=grasp)
-            # 实际执行到该 proposal, 并在此过程中录制数据
-            self.step = self.explore_step
-            
-            self.follow_path(result_pre)
-            print("reach pre-grasp pose")
-            
-            self.open_gripper()
-            self.clear_planner_pc()
-            self.move_forward(reserved_distance)
-            self.close_gripper()
-            
-            # 之后再根据 best_dir_3d 移动一定距离 (1dm)
-            self.move_along_axis(moving_direction=best_dir_3d, moving_distance=pertubation_distance)
-            
-            # 打开 gripper, 并返回初始位置 (这里先不设置)
-            # self.open_gripper()
-            # self.move_forward(-reserved_distance)
-            # self.reset_franka_arm()
-            
-            break
-    
+            if result_pre is not None:
+                break
+        
+        if visualize:
+            visualize_pc(
+                points=pc_collision_w, 
+                colors=pc_colors / 255,
+                grasp=grasp, 
+                contact_point=contact_3d_w, 
+                post_contact_dirs=[dir_out_w]
+            )
+        
+        # 实际执行到该 proposal, 并在此过程中录制数据
+        if result_pre is None:
+            assert "No valid pre-grasp path!"
+        
+        self.step = self.explore_step
+        
+        self.follow_path(result_pre)
+        self.open_gripper()
+        self.clear_planner_pc()
+        self.move_forward(reserved_distance)
+        self.close_gripper()
+        self.move_along_axis(moving_direction=dir_out_w, moving_distance=pertubation_distance)
+        
         # 录制完成, 开始处理
         self.step = self.base_step 
-        # while True:
-        #     self.base_step()
     
     def explore_step(self):
         # 在 base_step 的基础上, 进行数据的录制
@@ -182,7 +173,7 @@ class ExploreEnv(ManipulateEnv):
             }
             self.explore_data["frames"].append(cur_frame)
             
-    def explore_data_is_valid(self):
+    def get_valid_explore(self):
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
         if len(self.explore_data["frames"]) == 0:
             return False
@@ -273,38 +264,37 @@ class ExploreEnv(ManipulateEnv):
             Tw2c=self.camera_extrinsic,
             record_fps=self.record_fps,
         )
-        
     
 if __name__ == "__main__":
-    # obj_config = {
-    #     "index": 44962,
-    #     "scale": 0.8,
-    #     "pose": [1.0, 0., 0.5],
-    #     "active_link": "link_2",
-    #     "active_joint": "joint_2"
-    # }
-    
     obj_config = {
-        "index": 9288,
-        "scale": 1.0,
-        "pose": [1.0, 0., 0.7],
+        "index": 44962,
+        "scale": 0.8,
+        "pose": [1.0, 0., 0.5],
         "active_link": "link_2",
-        "active_joint": "joint_0"
+        # "active_joint": "joint_2"
+        "active_joint": "joint_1"
     }
+    
+    # obj_config = {
+    #     "index": 9288,
+    #     "scale": 1.0,
+    #     "pose": [1.0, 0., 0.7],
+    #     "active_link": "link_2",
+    #     "active_joint": "joint_0"
+    # }
     
     obj_index = obj_config["index"]
     
     exploreEnv = ExploreEnv(
         obj_config=obj_config,
-        # instruction="open the drawer"
-        instruction="open the door",
+        instruction="open the drawer",
+        # instruction="open the door",
         save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
     )
-    exploreEnv.start_explore_loop(visualize=False)
+    exploreEnv.explore_loop(visualize=True)
     exploreEnv.process_explore_data(visualize=True)
     
-    
-    exploreEnv.save_explore_data(
-        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
-    )
+    # exploreEnv.save_explore_data(
+    #     save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
+    # )
     

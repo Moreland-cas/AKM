@@ -81,7 +81,6 @@ def get_ram_affordance_2d(
     query_rgb, # H, W, 3 in numpy
     instruction, # open the drawwer
     data_source, # droid TODO: 把 data_source 扩充一下
-    save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
     visualize=False
 ):
     """
@@ -92,10 +91,9 @@ def get_ram_affordance_2d(
 
     subset_retrieve_pipeline = SubsetRetrievePipeline(
         subset_dir="/home/zby/Programs/RAM_code/assets/data",
-        save_root=save_root,
         lang_mode='clip',
         topk=5, 
-        crop=True, # 这里记得用 crop=False，如果用 crop=True 的话输出的 contact_point 是相对于 cropped_tgt image 的
+        crop=True, 
         data_source=data_source,
     )
     
@@ -147,24 +145,6 @@ def get_ram_affordance_2d(
         )
     
     if visualize:
-        # 用 napari 一直有 bug, 草拟吗
-        # import napari
-        # viewer = napari.Viewer()
-        # viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
-        # viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
-        # viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
-        
-        # viewer.title = "retrieved reference data by RAM"
-        
-        # for i in range(len(topk_retrieved_data_dict["img"])):
-        #     viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
-        #     masked_img = topk_retrieved_data_dict["masked_img"][i]
-        #     masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
-        #     viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
-        #     viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
-        #     # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
-        # napari.run()
-        
         Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
         Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
         Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
@@ -183,12 +163,12 @@ def get_ram_affordance_2d(
 def lift_ram_affordance(
     K, 
     Tw2c,
-    affordance_map_2d: Affordance_map_2d,
     query_rgb,
+    query_mask,
     query_depth, 
+    contact_uv,
     visualize=False
 ):
-    contact_uv = affordance_map_2d.sample_highest(visualize=False)
     contact_u = int(contact_uv[0])
     contact_v = int(contact_uv[1])
     
@@ -200,34 +180,30 @@ def lift_ram_affordance(
     
     # 找到 contact_3d 附近区域的点云
     query_depth_mask = get_depth_mask(query_depth, K, Tw2c)
-    obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
-    obj_pc_c = depth_image_to_pointcloud(query_depth, obj_mask & query_depth_mask, K) # N, 3
-    pc_colors = query_rgb[obj_mask & query_depth_mask]  # N, 3
+    obj_pc_c = depth_image_to_pointcloud(query_depth, query_mask & query_depth_mask, K) # N, 3
+    pc_colors = query_rgb[query_mask & query_depth_mask]  # N, 3
     
     # 找到 obj_pc_c 中 contact_3d 附近的点, 拟合一个平面, 返回法向量 dir_in 和 dir_out
     cropped_points = crop_nearby_points(
         point_clouds=obj_pc_c,
         contact_3d=contact_3d,
-        radius=0.2
+        radius=0.1
     )
     plane_normal = fit_plane_normal(cropped_points)
     
     if (plane_normal * np.array([0, 0, -1])).sum() > 0:
         dir_out = plane_normal
-        dir_in = -plane_normal
     else:
         dir_out = -plane_normal
-        dir_in = plane_normal
     
-    # 我可能需要测试两种方式: 一种是用 contact_3d 附近整片的点拟合一个平面, 另一种是用类似 RAM 的方式, 对于一个 contact_3d 返回多个 normal (当然需要筛选出指向物体外的)
     # 这里返回的是 Tgrasp2c 的
     gg = detect_grasp_anygrasp(
         points=obj_pc_c, 
         colors=pc_colors / 255.,
         dir_out=dir_out, 
-        visualize=True
+        visualize=False
     ) 
-        
+    # TODO 这里需要修改一下, 使得返回的 grasp 是在一定区间内的, 超出的不算
     sorted_grasps, _ = sort_grasp_group(
         grasp_group=gg,
         contact_region=contact_3d[None],
@@ -244,7 +220,7 @@ def lift_ram_affordance(
             post_contact_dirs=[dir_out]
         )
         
-    return best_grasp, dir_out
+    return contact_3d, sorted_grasps, dir_out
 
 
 if __name__ == "__main__":
@@ -261,9 +237,6 @@ if __name__ == "__main__":
     #     visualize=False
     # )
     
-    # contact_point_2d = np.array([455, 154])
-    # post_contact_dir_2d = np.array([0.64614357, 0.76321588])
-    
     K = np.array(
         [[300.,   0., 400.],
        [  0., 300., 300.],
@@ -277,8 +250,6 @@ if __name__ == "__main__":
     )
     Rw2c = Tw2c[:3, :3]
     
-    # sys.exit()
-    
     input_data = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
     # 测试一下 Affordance_map_2d
     affordance_map_2d = Affordance_map_2d(
@@ -288,11 +259,27 @@ if __name__ == "__main__":
         cropped_region=input_data["cropped_region"],
     )
     
+    obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
+    contact_uv = affordance_map_2d.sample_highest(visualize=False)
     best_grasp, dir_out = lift_ram_affordance(
         K=K, 
         Tw2c=Tw2c,
-        affordance_map_2d=affordance_map_2d,
         query_rgb=query_rgb,
         query_depth=query_depth, 
+        query_mask=obj_mask,
+        contact_uv=contact_uv,
         visualize=True
     )
+    
+    affordance_map_2d.update(contact_uv, visualize=True)
+    contact_uv = affordance_map_2d.sample_highest(visualize=False)
+    best_grasp, dir_out = lift_ram_affordance(
+        K=K, 
+        Tw2c=Tw2c,
+        query_rgb=query_rgb,
+        query_depth=query_depth, 
+        query_mask=obj_mask,
+        contact_uv=contact_uv,
+        visualize=True
+    )
+    
