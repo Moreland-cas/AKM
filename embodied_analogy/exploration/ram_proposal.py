@@ -12,7 +12,7 @@ from PIL import Image
 from vision.featurizer.run_featurizer import match_fts
 from vision.featurizer.utils.visualization import IMG_SIZE
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
-from run_realworld.utils import crop_points, cluster_normals
+# from run_realworld.utils import crop_points, cluster_normals
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
@@ -23,10 +23,12 @@ from embodied_analogy.utility.utils import (
     seed_everything,
     image_to_camera,
     depth_image_to_pointcloud,
-    compute_normals,
+    # compute_normals,
     visualize_pc,
-    normalize_cos_map_exp,
     draw_points_on_image,
+    fit_plane_normal,
+    crop_nearby_points,
+    get_depth_mask
 )
 # from embodied_analogy.perception.grounded_sam import run_grounded_sam
 
@@ -112,7 +114,7 @@ def get_ram_affordance_2d(
     ref_imgs_np = topk_retrieved_data_dict['masked_img']
     ref_imgs_PIL = [Image.fromarray(ref_img_np).convert('RGB') for ref_img_np in ref_imgs_np]
     
-    # 这些 query 都是 cropped 之后的结果
+    # Note: 这些 query 都是 cropped 之后的结果
     query_mask = topk_retrieved_data_dict["query_mask"][..., 0].astype(np.bool_)
     query_feat = topk_retrieved_data_dict["query_feat"]
     query_region = topk_retrieved_data_dict["query_region"]
@@ -135,7 +137,7 @@ def get_ram_affordance_2d(
         cropped_region=query_region,
     )
     # 保存 affordance map 2d 的输入方便后续 debug
-    if True:
+    if False:
         np.savez(
             "/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz",
             rgb_img=query_rgb,
@@ -178,67 +180,51 @@ def get_ram_affordance_2d(
         
     return affordance_map_2d
 
-def get_ram_affordance_3d():
-    pass
-
 def lift_ram_affordance(
     K, 
-    query_rgb, 
-    query_mask, # H, W
+    Tw2c,
+    affordance_map_2d: Affordance_map_2d,
+    query_rgb,
     query_depth, 
-    contact_uv, 
-    contact_dir_2d, 
     visualize=False
 ):
-    # TODO: 检查坐标系 + 写一个函数注释
-    """
-        rgb_image: numpy.array, (H, W, 3)
-        point_cloud: H*W, 3
-        contact_uv: (2, )
-        contact_dir_2d: (2, )
-        
-    """
-    H, W = query_rgb.shape[:2]
+    contact_uv = affordance_map_2d.sample_highest(visualize=False)
+    contact_u = int(contact_uv[0])
+    contact_v = int(contact_uv[1])
+    
     contact_3d = image_to_camera(
-        uv=contact_uv[None],
-        depth=np.array(query_depth[contact_uv[1], contact_uv[0]])[None],
+        uv=np.array(contact_uv)[None], # 1, 3
+        depth=np.array(query_depth[contact_v, contact_u])[None], # 1, 1
         K=K,
     )[0] # 3
     
-    # 找到 contact_uv 附近区域的点云
-    crop_radius = 100 # in pixels
-    partial_mask = np.zeros((H, W), dtype=np.bool_)
-    partial_mask[contact_uv[1] - crop_radius:contact_uv[1] + crop_radius, contact_uv[0] - crop_radius:contact_uv[0] + crop_radius] = True
-    partial_mask = partial_mask & query_mask & (query_depth > 0)
+    # 找到 contact_3d 附近区域的点云
+    query_depth_mask = get_depth_mask(query_depth, K, Tw2c)
+    obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
+    obj_pc_c = depth_image_to_pointcloud(query_depth, obj_mask & query_depth_mask, K) # N, 3
+    pc_colors = query_rgb[obj_mask & query_depth_mask]  # N, 3
     
-    partial_points = depth_image_to_pointcloud(query_depth, partial_mask, K) # N, 3
-    partial_colors = query_rgb[partial_mask]  # N, 3
+    # 找到 obj_pc_c 中 contact_3d 附近的点, 拟合一个平面, 返回法向量 dir_in 和 dir_out
+    cropped_points = crop_nearby_points(
+        point_clouds=obj_pc_c,
+        contact_3d=contact_3d,
+        radius=0.2
+    )
+    plane_normal = fit_plane_normal(cropped_points)
     
-    # 选取 post-grasp-direction, 对于 partial_point 的区域求一个 normal
-    partial_normals = compute_normals(partial_points) # N, 3
-    n_clusters = 5
-    clustered_centers = cluster_normals(partial_normals, n_clusters=n_clusters) # (2*n_clusters, 3)
-    post_contact_dirs_3d = clustered_centers # N, 3
-    post_contact_dirs_2d = project_normals(query_rgb, contact_uv, clustered_centers, visualize=False)
+    if (plane_normal * np.array([0, 0, -1])).sum() > 0:
+        dir_out = plane_normal
+        dir_in = -plane_normal
+    else:
+        dir_out = -plane_normal
+        dir_in = plane_normal
     
-    # if visualize:
-    #     visualize_pc(partial_points, partial_colors / 255., contact_point=contact_3d, post_contact_dirs=post_contact_dirs_3d)
-        
-    # find clustered_dir that best align with dir
-    best_dir_3d, best_score = None, -1
-    for i in range(post_contact_dirs_2d.shape[0]):
-        score = np.dot(post_contact_dirs_2d[i], contact_dir_2d)
-        if score > best_score:
-            best_score = score
-            best_dir_3d = post_contact_dirs_3d[i]
-    
-    # if visualize:
-    #     visualize_pc(partial_points, partial_colors / 255., contact_point=contact_3d, post_contact_dirs=best_dir_3d[None])
-    # TODO: 这里的 partial points是在相机坐标系下的, 需要修改
+    # 我可能需要测试两种方式: 一种是用 contact_3d 附近整片的点拟合一个平面, 另一种是用类似 RAM 的方式, 对于一个 contact_3d 返回多个 normal (当然需要筛选出指向物体外的)
+    # 这里返回的是 Tgrasp2c 的
     gg = detect_grasp_anygrasp(
-        points=partial_points, 
-        colors=partial_colors / 255.,
-        dir_out=best_dir_3d, 
+        points=obj_pc_c, 
+        colors=pc_colors / 255.,
+        dir_out=dir_out, 
         visualize=True
     ) 
         
@@ -247,15 +233,18 @@ def lift_ram_affordance(
         contact_region=contact_3d[None],
         # axis=np.array([0, 0, -1])
     )
-    best_grasp = gg[0]
+    best_grasp = sorted_grasps[0]
 
     if visualize:
         visualize_pc(
-            points=partial_points, colors=partial_colors / 255., grasp=best_grasp, 
-            contact_point=contact_3d, post_contact_dirs=best_dir_3d[None]
+            points=obj_pc_c, 
+            colors=pc_colors / 255,
+            grasp=best_grasp, 
+            contact_point=contact_3d, 
+            post_contact_dirs=[dir_out]
         )
         
-    return sorted_grasps, best_dir_3d
+    return best_grasp, dir_out
 
 
 if __name__ == "__main__":
@@ -263,14 +252,14 @@ if __name__ == "__main__":
     query_rgb = np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/rgb.png"))
     query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
     # query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
-    contact_point_2d, post_contact_dir_2d, query_mask = get_ram_affordance_2d(
-        query_rgb, # H, W, 3 in numpy
-        instruction="open the drawer",
-        # prompt="a photo of a drawer", 
-        data_source="droid",
-        save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
-        visualize=False
-    )
+    
+    # affordance_map_2d = get_ram_affordance_2d(
+    #     query_rgb, # H, W, 3 in numpy
+    #     instruction="open the drawer",
+    #     data_source="droid",
+    #     save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
+    #     visualize=False
+    # )
     
     # contact_point_2d = np.array([455, 154])
     # post_contact_dir_2d = np.array([0.64614357, 0.76321588])
@@ -289,12 +278,21 @@ if __name__ == "__main__":
     Rw2c = Tw2c[:3, :3]
     
     # sys.exit()
-    best_grasp, best_dir_3d = lift_ram_affordance(
-        K=K,
+    
+    input_data = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
+    # 测试一下 Affordance_map_2d
+    affordance_map_2d = Affordance_map_2d(
+        rgb_img=input_data["rgb_img"],
+        cos_map=input_data["cos_map"],
+        cropped_mask=input_data["cropped_mask"],
+        cropped_region=input_data["cropped_region"],
+    )
+    
+    best_grasp, dir_out = lift_ram_affordance(
+        K=K, 
+        Tw2c=Tw2c,
+        affordance_map_2d=affordance_map_2d,
         query_rgb=query_rgb,
-        query_mask=query_mask,
-        query_depth=query_depth,
-        contact_uv=contact_point_2d,
-        contact_dir_2d=post_contact_dir_2d,
+        query_depth=query_depth, 
         visualize=True
     )

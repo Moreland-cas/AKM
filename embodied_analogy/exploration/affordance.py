@@ -77,6 +77,15 @@ class Affordance_map_2d:
         
         return (u_rgb, v_rgb)
     
+    def get_obj_mask(self, visualize=False):
+        # 返回一个大小与 rgb_img 一样的 mask, 其中 cropped_region 区域用 cropped_mask 填充
+        obj_mask = np.zeros(self.rgb_img.shape[:2]).astype(np.bool_) # H, W
+        obj_mask[self.cropped_region[1]:self.cropped_region[3], self.cropped_region[0]:self.cropped_region[2]] = self.cropped_mask
+        
+        if visualize:
+            Image.fromarray(obj_mask).show()
+        return obj_mask
+    
     def mask_cos_map(self):
         """
             将 cos_map 中不在 cropped_mask 中的点值设置为 -1
@@ -133,44 +142,8 @@ class Affordance_map_2d:
             
             concatenate_images(image_cos, image_rgb).show()
             
-        return (u_rgb, v_rgb)
-    
-    # def update(self, neg_uv_rgb, visualize=False):
-    #     """
-    #     neg_uv_rgb: 
-    #         失败的尝试点 (u_rgb, v_rgb) 
-    #     根据 neg_uv_rgb 来更新 self.cos_map, 由于 cos_map 的值在 (-1, 1), 所以更新时要考虑这个值域
-    #     """
-    #     # 将失败的 RGB 坐标转换为 cos_map 坐标
-    #     u_cos, v_cos = self.rgb_to_cos_frame(neg_uv_rgb[0], neg_uv_rgb[1])
-
-    #     if visualize:
-    #         image_cos_old = self.get_colored_cos_map()
-    #         image_cos_old = draw_points_on_image(
-    #             image=image_cos_old,
-    #             uv_list=[(u_cos, v_cos)],
-    #             radius=5,
-    #             normalized_uv=False
-    #         )
-            
-    #     # 定义邻域大小
-    #     neighborhood_size = int(self.cos_map.shape[0] * 0.1)  # 可以根据需要调整
-        
-    #     u_min = max(0, int(u_cos) - neighborhood_size)
-    #     u_max = min(self.cos_map.shape[1] - 1, int(u_cos) + neighborhood_size)
-    #     v_min = max(0, int(v_cos) - neighborhood_size)
-    #     v_max = min(self.cos_map.shape[0] - 1, int(v_cos) + neighborhood_size)
-
-    #     # 使用切片进行向量化更新
-    #     # self.cos_map[v_min:v_max + 1, u_min:u_max + 1] -= 0.1  # 减少邻域内的值
-    #     # self.cos_map = np.clip(self.cos_map, -1, None)  # 确保不低于 -1
-    #     self.cos_map[v_min:v_max + 1, u_min:u_max + 1] = (self.cos_map[v_min:v_max + 1, u_min:u_max + 1] - 1) / 2
-
-    #     if visualize:
-    #         # 可视化更新后的 cos_map
-    #         image_cos_new = self.get_colored_cos_map()
-    #         concatenate_images(image_cos_old, image_cos_new).show()
-            
+        return (u_rgb, v_rgb)       
+       
     def update(self, neg_uv_rgb, visualize=False):
         """
         neg_uv_rgb: 
@@ -204,7 +177,7 @@ class Affordance_map_2d:
         weights = np.exp(-distances ** 2 / (2 * sigma ** 2))
 
         # 更新 cos_map，使用权重降低值
-        self.cos_map -= weights * 0.5  # 0.1 是步长
+        self.cos_map -= weights * 0.5  
         self.cos_map = np.clip(self.cos_map, -1, None)  # 确保不低于 -1
 
         if visualize:
@@ -229,8 +202,9 @@ if __name__ == "__main__":
         cropped_mask=input_data["cropped_mask"],
         cropped_region=input_data["cropped_region"],
     )
-    uv_rgb = affordance_map_2d.sample_highest(visualize=False)
-    affordance_map_2d.update(uv_rgb, visualize=False)
-    uv_rgb = affordance_map_2d.sample_highest(visualize=False)
-    affordance_map_2d.update(uv_rgb, visualize=False)
-    uv_rgb = affordance_map_2d.sample_highest(visualize=False)
+    affordance_map_2d.get_obj_mask(True)
+    # uv_rgb = affordance_map_2d.sample_highest(visualize=False)
+    # affordance_map_2d.update(uv_rgb, visualize=False)
+    # uv_rgb = affordance_map_2d.sample_highest(visualize=False)
+    # affordance_map_2d.update(uv_rgb, visualize=False)
+    # uv_rgb = affordance_map_2d.sample_highest(visualize=False)

@@ -1035,7 +1035,7 @@ def get_depth_mask(depth, K, Tw2c, height=0.02):
     """
     返回一个 mask, 标记出 depth 不为 0, 且重投影会世界坐标系不在地面上的点
     depth: np.array([H, W])
-    height: 默认高于 1 cm 的点才会保留
+    height: 默认高于 2 cm 的点才会保留
     """
     H, W = depth.shape
     pc_camera = depth_image_to_pointcloud(depth, None, K) # H*W, 3
@@ -1242,16 +1242,47 @@ def concatenate_images(image1, image2, direction='h'):
 
     return new_image
 
+def crop_nearby_points(point_clouds, contact_3d, radius=0.1):
+    '''crop pcd close to a given point'''
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(point_clouds)
+    pcd_tree = o3d.geometry.KDTreeFlann(pcd)
+    [k, idx, _] = pcd_tree.search_radius_vector_3d(contact_3d, radius)
+    cropped_points = pcd.select_by_index(idx)
+    return np.asarray(cropped_points.points)
+
+def fit_plane_normal(points):
+    """
+        输入一个点云, 用一个平面拟合它, 并返回该平面的单位法向量
+        point_cloud: np.array([N, 3])
+    """
+    # 计算点的均值
+    centroid = np.mean(points, axis=0)
+
+    # 中心化点云
+    centered_points = points - centroid
+
+    # 计算协方差矩阵
+    cov_matrix = np.cov(centered_points, rowvar=False)
+
+    # 进行特征值分解
+    _, _, vh = np.linalg.svd(cov_matrix)
+
+    # 法向量是特征值分解的最后一个特征向量
+    normal_vector = vh[-1]
+
+    # 归一化法向量
+    normalized_normal_vector = normal_vector / np.linalg.norm(normal_vector)
+
+    return normalized_normal_vector
+
 
 # 示例用法
 if __name__ == "__main__":
-    # 打开两个示例图像
-    image1 = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/dog.jpg")
-    image2 = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/fish.jpg")
-
-    # 进行水平拼接
-    concatenated_image = concatenate_images(image1, image2, direction='h')
-    concatenated_image.show()  # 显示拼接后的图像
-    # 或者保存拼接后的图像
-    # concatenated_image.save("concatenated_image.jpg")
+    # 示例用法
+    point_cloud = np.random.random([5, 3])
+    point_cloud[:, 2] = 0
+    print(point_cloud)
+    normal_vector = fit_plane_normal(point_cloud)
+    print("归一化后的法向量:", normal_vector)
 
