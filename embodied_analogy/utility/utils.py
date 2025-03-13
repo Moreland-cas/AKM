@@ -817,6 +817,7 @@ def napari_time_series_transform(original_data):
         napari_data.append(tmp_data_with_t)
     napari_data = np.concatenate(napari_data, axis=0)
     return napari_data
+
 def joint_data_to_transform(
     joint_type, # "prismatic" or "revolute"
     joint_axis, # unit vector np.array([3, ])
@@ -1206,16 +1207,51 @@ def normalize_cos_map_exp(cosine_similarity_map, sharpen_factor=5):
     probability_map = exp_map / np.sum(exp_map)
     return probability_map
 
+def concatenate_images(image1, image2, direction='h'):
+    """
+    Concatenate two PIL images either horizontally or vertically.
 
+    Parameters:
+        image1 (PIL.Image): The first image.
+        image2 (PIL.Image): The second image.
+        direction (str): 'horizontal' for horizontal concatenation, 'vertical' for vertical concatenation.
+
+    Returns:
+        PIL.Image: The concatenated image.
+    """
+
+    if direction == 'h':
+        # Create a new image with width as the sum of both images' widths and the height of the larger one
+        new_width = image1.width + image2.width
+        new_height = max(image1.height, image2.height)
+        new_image = Image.new('RGB', (new_width, new_height))
+
+        # Paste the images into the new image
+        new_image.paste(image1, (0, 0))
+        new_image.paste(image2, (image1.width, 0))
+    
+    else:  # vertical
+        # Create a new image with height as the sum of both images' heights and the width of the larger one
+        new_width = max(image1.width, image2.width)
+        new_height = image1.height + image2.height
+        new_image = Image.new('RGB', (new_width, new_height))
+
+        # Paste the images into the new image
+        new_image.paste(image1, (0, 0))
+        new_image.paste(image2, (0, image1.height))
+
+    return new_image
+
+
+# 示例用法
 if __name__ == "__main__":
-    points = np.random.rand(100, 3)  # 随机生成100个点
-    bbox_min, bbox_max = compute_bbox_from_pc(points, offset=0.1)
-    samples = sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples=3000) # M, 3
-    visualize_pc(
-        points=np.concatenate([points, samples], axis=0),
-        colors=np.concatenate([
-            np.array([[1, 0, 0]] * len(points)),
-            np.array([[0, 1, 0]] * len(samples))
-        ])
-    )
+    # 打开两个示例图像
+    image1 = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/dog.jpg")
+    image2 = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/fish.jpg")
+
+    # 进行水平拼接
+    concatenated_image = concatenate_images(image1, image2, direction='h')
+    concatenated_image.show()  # 显示拼接后的图像
+    # 或者保存拼接后的图像
+    # concatenated_image.save("concatenated_image.jpg")
 

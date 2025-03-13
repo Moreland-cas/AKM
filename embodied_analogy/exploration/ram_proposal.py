@@ -134,6 +134,15 @@ def get_ram_affordance_2d(
         cropped_mask=query_mask,
         cropped_region=query_region,
     )
+    # 保存 affordance map 2d 的输入方便后续 debug
+    if True:
+        np.savez(
+            "/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz",
+            rgb_img=query_rgb,
+            cos_map=cos_map,
+            cropped_mask=query_mask,
+            cropped_region=query_region,
+        )
     
     if visualize:
         # 用 napari 一直有 bug, 草拟吗
@@ -254,7 +263,7 @@ if __name__ == "__main__":
     query_rgb = np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/rgb.png"))
     query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
     # query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
-    contact_point_2d, post_contact_dir_2d, query_mask = get_ram_proposal(
+    contact_point_2d, post_contact_dir_2d, query_mask = get_ram_affordance_2d(
         query_rgb, # H, W, 3 in numpy
         instruction="open the drawer",
         # prompt="a photo of a drawer", 
