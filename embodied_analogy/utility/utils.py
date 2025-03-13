@@ -34,7 +34,7 @@ def initialize_napari():
 
         with napari.gui_qt() as app:
             viewer = napari.Viewer()
-            time_in_msec = 10
+            time_in_msec = 100
             QTimer().singleShot(time_in_msec, app.quit)
         viewer.close()
         NAPARI_INITIALIZED = True

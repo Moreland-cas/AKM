@@ -190,7 +190,7 @@ class ExploreEnv(ManipulateEnv):
             negative_points=first_tracks_2d,
             num_iterations=3,
             acceptable_thr=0.9,
-            visualize=True
+            visualize=False
         )
         first_mask = first_mask & (first_depth > 0)
         
@@ -204,7 +204,7 @@ class ExploreEnv(ManipulateEnv):
             negative_points=last_tracks_2d,
             num_iterations=3,
             acceptable_thr=0.9,
-            visualize=True
+            visualize=False
         )
         last_mask = last_mask & (last_depth > 0)
         

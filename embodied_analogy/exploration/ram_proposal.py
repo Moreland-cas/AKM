@@ -1,3 +1,8 @@
+# import numpy as np
+# import napari
+# napari.view_image(np.zeros([100, 100]).astype(np.bool_))
+# napari.run()
+
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 
@@ -9,10 +14,17 @@ import numpy as np
 import torch
 import time
 from PIL import Image
+
 from vision.featurizer.run_featurizer import match_fts
 from vision.featurizer.utils.visualization import IMG_SIZE
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
 # from run_realworld.utils import crop_points, cluster_normals
+
+# import napari
+# napari.view_image(np.zeros([100, 100]).astype(np.bool_))
+# napari.run()
+
+
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
@@ -145,18 +157,35 @@ def get_ram_affordance_2d(
         )
     
     if visualize:
-        Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
-        Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
-        Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
+        import napari
+        viewer = napari.Viewer()
+        viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
+        viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
+        viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
+
+        viewer.title = "retrieved reference data by RAM"
         
         for i in range(len(topk_retrieved_data_dict["img"])):
-            Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
+            viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
             masked_img = topk_retrieved_data_dict["masked_img"][i]
-            masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
-            masked_img.show()
-            Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
-            # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
-            break
+            masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
+            viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
+            viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
+            # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
+        napari.run()
+        
+        # Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
+        # Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
+        # Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
+        
+        # for i in range(len(topk_retrieved_data_dict["img"])):
+        #     Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
+        #     masked_img = topk_retrieved_data_dict["masked_img"][i]
+        #     masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
+        #     masked_img.show()
+        #     Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
+        #     Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
+        #     break
         
     return affordance_map_2d
 
@@ -229,13 +258,12 @@ if __name__ == "__main__":
     query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
     # query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
     
-    # affordance_map_2d = get_ram_affordance_2d(
-    #     query_rgb, # H, W, 3 in numpy
-    #     instruction="open the drawer",
-    #     data_source="droid",
-    #     save_root="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore",
-    #     visualize=False
-    # )
+    affordance_map_2d = get_ram_affordance_2d(
+        query_rgb, # H, W, 3 in numpy
+        instruction="open the drawer",
+        data_source="droid",
+        visualize=True
+    )
     
     K = np.array(
         [[300.,   0., 400.],
@@ -252,16 +280,16 @@ if __name__ == "__main__":
     
     input_data = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
     # 测试一下 Affordance_map_2d
-    affordance_map_2d = Affordance_map_2d(
-        rgb_img=input_data["rgb_img"],
-        cos_map=input_data["cos_map"],
-        cropped_mask=input_data["cropped_mask"],
-        cropped_region=input_data["cropped_region"],
-    )
+    # affordance_map_2d = Affordance_map_2d(
+    #     rgb_img=input_data["rgb_img"],
+    #     cos_map=input_data["cos_map"],
+    #     cropped_mask=input_data["cropped_mask"],
+    #     cropped_region=input_data["cropped_region"],
+    # )
     
     obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
     contact_uv = affordance_map_2d.sample_highest(visualize=False)
-    best_grasp, dir_out = lift_ram_affordance(
+    _, best_grasp, dir_out = lift_ram_affordance(
         K=K, 
         Tw2c=Tw2c,
         query_rgb=query_rgb,
@@ -271,15 +299,15 @@ if __name__ == "__main__":
         visualize=True
     )
     
-    affordance_map_2d.update(contact_uv, visualize=True)
+    affordance_map_2d.update(contact_uv, visualize=False)
     contact_uv = affordance_map_2d.sample_highest(visualize=False)
-    best_grasp, dir_out = lift_ram_affordance(
+    _, best_grasp, dir_out = lift_ram_affordance(
         K=K, 
         Tw2c=Tw2c,
         query_rgb=query_rgb,
         query_depth=query_depth, 
         query_mask=obj_mask,
         contact_uv=contact_uv,
-        visualize=True
+        visualize=False
     )
     
