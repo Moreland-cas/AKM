@@ -230,6 +230,7 @@ def lift_ram_affordance(
         points=obj_pc_c, 
         colors=pc_colors / 255.,
         dir_out=dir_out, 
+        augment=True,
         visualize=False
     ) 
     # TODO 这里需要修改一下, 使得返回的 grasp 是在一定区间内的, 超出的不算

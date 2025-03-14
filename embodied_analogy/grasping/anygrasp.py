@@ -10,57 +10,11 @@ from embodied_analogy.utility.utils import (
     find_correspondences
 )
 
-def detect_grasp_anygrasp(points, colors, dir_out, visualize=False):
-    '''
-    输入世界坐标系下的点云和颜色, 返回 grasp_group (存储了信息 Tgrasp2w)
-        函数输入的 points 是世界坐标系下的
-        网络输入的点是 app 坐标系下的, app 坐标系需要根据 dir_out 来确定 (app 的 z 轴指向 dir_out 的反方向)
-        dir_out: 需要在 points 的坐标系(一般是世界坐标系)下指定, 从物体内部指向物体外部
-        网络的输出 grasp 的坐标系由 graspnetAPI 定义, grasp 存储了信息 Tgrasp2app
-        
-        可视化是在 world 坐标系下的
-    '''
-    # 首先确定 app 坐标系
-    points = points.astype(np.float32)
-    colors = colors.astype(np.float32)
+def crop_grasp(grasp_group, contact_point, radius=0.1):
+    # 对于 grasp_group 进行 crop, 保留那些距离 contact_point 的距离小于 radius 的点, 如果没有返回 None
+    # TODO
+    pass
     
-    # coor_app = Rw2app @ coor_w, 也即 (0, 0, 1) = Rw2app @ -dir_out
-    Rw2app = rotation_matrix_between_vectors(-dir_out, np.array([0, 0, 1]))
-    points_input = points @ Rw2app.T # N, 3
-    points_input = points_input.astype(np.float32)
-    
-    from gsnet import AnyGrasp # gsnet.so
-    # get a argument namespace
-    cfgs = argparse.Namespace()
-    cfgs.checkpoint_path = '/home/zby/Programs/Embodied_Analogy/assets/ckpts/checkpoint_detection.tar'
-    cfgs.max_gripper_width = 0.04
-    cfgs.gripper_height = 0.03
-    cfgs.top_down_grasp = False
-    cfgs.debug = visualize
-    model = AnyGrasp(cfgs)
-    model.load_net()
-    
-    lims = np.array([-1, 1, -1, 1, -1, 1]) * 10
-    # Tgrasp2app
-    gg, _ = model.get_grasp(
-        points_input,
-        colors, 
-        lims,
-        apply_object_mask=True,
-        dense_grasp=False,
-        collision_detection=True
-    )
-    print('grasp num:', len(gg))
-    
-    # Tgrasp2w
-    zero_translation = np.array([[0], [0], [0]])
-    Rapp2w = Rw2app.T
-    Tapp2w = np.hstack((Rapp2w, zero_translation))
-    gg.transform(Tapp2w)
-    
-    if visualize:
-        visualize_pc(points, colors, gg)
-    return gg
 
 def detect_grasp_anygrasp(points, colors, dir_out, augment=True, visualize=False):
     '''
