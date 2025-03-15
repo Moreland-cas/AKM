@@ -103,6 +103,9 @@ class ExploreEnv(ManipulateEnv):
             contact_uv=contact_uv,
             visualize=False
         )
+        if grasps_c is None:
+            return False
+        
         contact_3d_w = camera_to_world(
             point_camera=contact_3d_c[None],
             extrinsic_matrix=Tw2c
@@ -152,6 +155,7 @@ class ExploreEnv(ManipulateEnv):
         
         # 录制完成, 开始处理
         self.step = self.base_step 
+        return True
     
     def explore_step(self):
         # 在 base_step 的基础上, 进行数据的录制

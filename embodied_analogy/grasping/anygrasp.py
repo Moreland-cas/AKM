@@ -5,18 +5,38 @@ from scipy.spatial.transform import Rotation as R
 from graspnetAPI.grasp import GraspGroup
 from embodied_analogy.utility.utils import (
     visualize_pc,
-    world_to_image,
     rotation_matrix_between_vectors,
     find_correspondences
 )
 
 def crop_grasp(grasp_group, contact_point, radius=0.1):
-    # 对于 grasp_group 进行 crop, 保留那些距离 contact_point 的距离小于 radius 的点, 如果没有返回 None
-    # TODO
-    pass
+    """
+    contact_point: (3, ), 假设 grasp_group 中的 transform 是 Tgrasp2w, 那么 contact_point 也需要在 world 坐标系下
+    对于 grasp_group 进行 crop, 保留那些距离 contact_point 的距离小于 radius 的点, 如果没有返回 None
+    """
+    t_grasp2w = grasp_group.translations # N, 3
     
-
-def detect_grasp_anygrasp(points, colors, dir_out, augment=True, visualize=False):
+    distances = np.linalg.norm(t_grasp2w - contact_point, axis=1) # N
+    mask = distances < radius
+    
+    if mask.sum() == 0:
+        return None
+    
+    grasp_group_ =GraspGroup()
+    grasp_group_.grasp_group_array = grasp_group.grasp_group_array[mask]
+    
+    return grasp_group_
+    
+def detect_grasp_anygrasp(
+    points, 
+    colors, 
+    dir_out, 
+    augment=True, 
+    # crop=False,
+    # crop_center=None,
+    # crop_radius=0.1,
+    visualize=False
+):
     '''
     输入世界坐标系下的点云和颜色, 返回 grasp_group (存储了信息 Tgrasp2w)
         函数输入的 points 是世界坐标系下的
@@ -28,6 +48,10 @@ def detect_grasp_anygrasp(points, colors, dir_out, augment=True, visualize=False
         
         NOTE: augment 为 True 时, 会对 dir_out 进行多个绕动, 分别预测 grasp, 然后将不同 grasp 在合并到一个坐标系下
     '''
+    # if crop:
+    #     assert crop_center is not None
+    #     assert crop_radius is not None
+    
     # load model
     from gsnet import AnyGrasp # gsnet.so
     # get a argument namespace
@@ -82,6 +106,13 @@ def detect_grasp_anygrasp(points, colors, dir_out, augment=True, visualize=False
         gg.transform(Tapp2w)
         ggs.add(gg)
     
+    # if crop:
+    #     ggs = crop_grasp(
+    #         ggs,
+    #         contact_point=crop_center,
+    #         radius=crop_radius
+    #     )
+        
     if visualize:
         visualize_pc(
             points=points,
@@ -142,8 +173,8 @@ def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=Fa
         angle_scores = np.abs(np.sum(pred_axis * axis, axis=-1)) # N
     
     # grasp_scores = pred_scores * distance_scores * angle_scores # N
-    # grasp_scores = pred_scores * distance_scores  # N
-    grasp_scores = distance_scores  # N
+    grasp_scores = pred_scores * distance_scores  # N
+    # grasp_scores = distance_scores  # N
     
     # 找到距离 contact_point 最近的 grasp
     index = np.argsort(grasp_scores)
@@ -186,12 +217,15 @@ if __name__ == '__main__':
     # visualize_pc(points_world, colors)
     import time
     start_time = time.time()
-    detect_grasp_anygrasp(
+    gg = detect_grasp_anygrasp(
         points=points_world, 
         colors=colors,
         dir_out=np.array([-1, 0, 0]),
         augment=True,
-        visualize=False
+        # crop=False,
+        # crop_center=np.array([1, -0.5, 0.7]),
+        # crop_radius=0.2,
+        visualize=True
     )
     end_time = time.time()
     print("time used:", end_time - start_time)

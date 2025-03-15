@@ -46,7 +46,8 @@ from embodied_analogy.utility.utils import (
 
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
-    sort_grasp_group
+    sort_grasp_group,
+    crop_grasp
 )
 
 def draw_arrows_on_img(img, pixel, normals_2d_directions):
@@ -201,21 +202,21 @@ def lift_ram_affordance(
     contact_u = int(contact_uv[0])
     contact_v = int(contact_uv[1])
     
-    contact_3d = image_to_camera(
+    contact_3d_c = image_to_camera(
         uv=np.array(contact_uv)[None], # 1, 3
         depth=np.array(query_depth[contact_v, contact_u])[None], # 1, 1
         K=K,
     )[0] # 3
     
-    # 找到 contact_3d 附近区域的点云
+    # 找到 contact_3d_c 附近区域的点云
     query_depth_mask = get_depth_mask(query_depth, K, Tw2c)
     obj_pc_c = depth_image_to_pointcloud(query_depth, query_mask & query_depth_mask, K) # N, 3
     pc_colors = query_rgb[query_mask & query_depth_mask]  # N, 3
     
-    # 找到 obj_pc_c 中 contact_3d 附近的点, 拟合一个平面, 返回法向量 dir_in 和 dir_out
+    # 找到 obj_pc_c 中 contact_3d_c 附近的点, 拟合一个平面, 返回法向量 dir_in 和 dir_out
     cropped_points = crop_nearby_points(
         point_clouds=obj_pc_c,
-        contact_3d=contact_3d,
+        contact_3d=contact_3d_c,
         radius=0.1
     )
     plane_normal = fit_plane_normal(cropped_points)
@@ -233,24 +234,32 @@ def lift_ram_affordance(
         augment=True,
         visualize=False
     ) 
-    # TODO 这里需要修改一下, 使得返回的 grasp 是在一定区间内的, 超出的不算
-    sorted_grasps, _ = sort_grasp_group(
+    # 使得返回的 grasp 是在一定区间内的, 超出的不算
+    cropped_gg = crop_grasp(
         grasp_group=gg,
-        contact_region=contact_3d[None],
+        contact_point=contact_3d_c,
+        radius=0.1,
+    )
+    if cropped_gg is None:
+        return contact_3d_c, None, dir_out
+
+    sorted_grasps, _ = sort_grasp_group(
+        grasp_group=cropped_gg,
+        contact_region=contact_3d_c[None],
         # axis=np.array([0, 0, -1])
     )
-    best_grasp = sorted_grasps[0]
+    # best_grasp = sorted_grasps[0]
 
     if visualize:
         visualize_pc(
             points=obj_pc_c, 
             colors=pc_colors / 255,
-            grasp=best_grasp, 
-            contact_point=contact_3d, 
+            grasp=sorted_grasps, 
+            contact_point=contact_3d_c, 
             post_contact_dirs=[dir_out]
         )
         
-    return contact_3d, sorted_grasps, dir_out
+    return contact_3d_c, sorted_grasps, dir_out
 
 
 if __name__ == "__main__":
@@ -309,6 +318,6 @@ if __name__ == "__main__":
         query_depth=query_depth, 
         query_mask=obj_mask,
         contact_uv=contact_uv,
-        visualize=False
+        visualize=True
     )
     
