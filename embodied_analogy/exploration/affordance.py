@@ -46,7 +46,7 @@ class Affordance_map_2d:
         colored_image = (colored_image * 255).astype(np.uint8)
         colored_image = Image.fromarray(colored_image, mode="RGB")
         return colored_image
-    
+        
     def visualize(self):
         image = self.get_colored_cos_map()
         image.show()
@@ -100,6 +100,56 @@ class Affordance_map_2d:
         resized_mask = resized_mask > 0
         self.cos_map[~resized_mask] = -1
         
+    def sample_prob(self, alpha=10, visualize=False):
+        """
+            首先根据 cos_map 得到 prob_map, 然后随机 sample 一个, 并且保证该点落在 cropped_mask 中
+            TODO Not working well, might need to be fixed
+        """
+        if self.cos_map.max() == -1:
+            assert False, "cos_map 中没有值"
+            
+        self.mask_cos_map() # 把 mask 外的部分的 cos sim 变为 -1
+        prob_map = (self.cos_map + 1.) / 2 # 值域变为 (0, 1)
+        prob_map_scaled = prob_map * np.exp(prob_map * alpha)
+        prob_map_normalized = prob_map_scaled / prob_map_scaled.sum()
+        self.prob_map = prob_map_normalized
+        
+        flat_prob_map = prob_map_normalized.flatten()
+        index = np.random.choice(np.arange(flat_prob_map.size), p=flat_prob_map)
+        u_cos, v_cos = divmod(index, self.cos_map.shape[1]) 
+        u_rgb, v_rgb = self.cos_to_rgb_frame(u_cos, v_cos)
+        
+        # 由于 cos_map/prob_map 的大小是经过缩放的, 和 cropped_region 的像素坐标并不严格对应, 因此从 prob_map 中采样出的点应该是经过归一化的
+        if visualize:
+            image_cos = self.get_colored_cos_map()
+            image_cos = draw_points_on_image(
+                image=image_cos,
+                uv_list=[(u_cos, v_cos)],
+                radius=5,
+                normalized_uv=False
+            )
+            # image_cos.show()
+            
+            image_rgb = draw_points_on_image(
+                image=self.rgb_img,
+                uv_list=[(u_rgb, v_rgb)],
+                radius=5,
+                normalized_uv=False
+            )
+            # image_rgb.show()
+            
+            # image_mask = draw_points_on_image(
+            #     image=Image.fromarray(self.cropped_mask * 255.).convert("RGB"),
+            #     uv_list=[(u, v)],
+            #     radius=5,
+            #     normalized_uv=True
+            # )
+            # image_mask.show()
+            
+            concatenate_images(image_cos, image_rgb).show()
+            
+        return (u_rgb, v_rgb)   
+    
     def sample_highest(self, visualize=False):
         """
             在 cos_map 上 sample 出值最大的点, 并且保证该点落在 cropped_mask 中
@@ -202,7 +252,8 @@ if __name__ == "__main__":
         cropped_mask=input_data["cropped_mask"],
         cropped_region=input_data["cropped_region"],
     )
-    affordance_map_2d.get_obj_mask(True)
+    affordance_map_2d.get_obj_mask(False)
+    uv_rgb = affordance_map_2d.sample_prob(alpha=0, visualize=True)
     # uv_rgb = affordance_map_2d.sample_highest(visualize=False)
     # affordance_map_2d.update(uv_rgb, visualize=False)
     # uv_rgb = affordance_map_2d.sample_highest(visualize=False)

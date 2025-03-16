@@ -36,9 +36,10 @@ class ExploreEnv(ManipulateEnv):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
     
-    def explore_loop(self, allowed_num_tries=10, visualize=False):
+    def explore_loop_reset(self, allowed_num_tries=10, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
+            # TODO 0
         """
         # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
         from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
@@ -73,6 +74,87 @@ class ExploreEnv(ManipulateEnv):
         if not self.has_valid_explore:
             assert "No valid exploration during explore phase!"
     
+    def explore_loop_direct_reuse(self, allowed_num_tries=10, visualize=False):
+        """
+            explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
+            # TODO 1
+        """
+        # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
+        from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
+        
+        self.base_step()
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        
+        # 只在第一次进行 contact transfer, 之后直接进行复用
+        self.affordance_map_2d = get_ram_affordance_2d(
+            query_rgb=rgb_np,
+            instruction=self.instruction,
+            data_source="droid", # TODO
+            visualize=False
+        )
+        
+        num_tries_so_far = 0
+        while num_tries_so_far < allowed_num_tries:
+            # 初始化相关状态
+            self.open_gripper()
+            self.reset_franka_arm()
+            self.explore_data["frames"] = []
+            
+            explore_ok, explore_uv = self.explore_once(visualize=visualize)
+            if not explore_ok:
+                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
+                continue
+            else:
+                num_tries_so_far += 1
+            
+            if self.get_valid_explore():
+                break
+            else:
+                # 更新 affordance map
+                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
+                
+        # save explore data
+        if not self.has_valid_explore:
+            assert "No valid exploration during explore phase!"
+            
+    def explore_loop_fusion_reuse(self, allowed_num_tries=10, visualize=False):
+        """
+            explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
+            # TODO 2
+        """
+        # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
+        from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
+        
+        self.base_step()
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        
+        num_tries_so_far = 0
+        while num_tries_so_far < allowed_num_tries:
+            # 初始化相关状态
+            self.open_gripper()
+            self.reset_franka_arm()
+            self.explore_data["frames"] = []
+            
+            self.affordance_map_2d = get_ram_affordance_2d(
+                query_rgb=rgb_np,
+                instruction=self.instruction,
+                data_source="droid", # TODO
+                visualize=False
+            )
+            
+            self.explore_once(visualize=visualize)
+            num_tries_so_far += 1
+            
+            if self.get_valid_explore():
+                break
+            else:
+                # 更新 affordance map
+                self.affordance_map_2d.update()
+                
+        # save explore data
+        if not self.has_valid_explore:
+            assert "No valid exploration during explore phase!"
+            
     def explore_once(
         self, 
         reserved_distance=0.05,
@@ -81,6 +163,9 @@ class ExploreEnv(ManipulateEnv):
     ):
         """
             在当前状态下进行一次探索, 默认此时的 franka arm 处于 rest 状态
+            返回 explore_ok, explore_uv:
+                explore_ok: bool, 代表 plan 阶段是否成功
+                explore_uv: np.array([2,]), 代表本次尝试的 contact point 的 uv
         """        
         from embodied_analogy.exploration.ram_proposal import lift_ram_affordance
         
@@ -101,10 +186,10 @@ class ExploreEnv(ManipulateEnv):
             query_depth=depth_np, 
             query_mask=obj_mask,
             contact_uv=contact_uv,
-            visualize=False
+            visualize=visualize
         )
         if grasps_c is None:
-            return False
+            return False, None
         
         contact_3d_w = camera_to_world(
             point_camera=contact_3d_c[None],
@@ -142,7 +227,7 @@ class ExploreEnv(ManipulateEnv):
         
         # 实际执行到该 proposal, 并在此过程中录制数据
         if result_pre is None:
-            assert "No valid pre-grasp path!"
+            return False, None
         
         self.step = self.explore_step
         
@@ -155,7 +240,7 @@ class ExploreEnv(ManipulateEnv):
         
         # 录制完成, 开始处理
         self.step = self.base_step 
-        return True
+        return True, contact_uv
     
     def explore_step(self):
         # 在 base_step 的基础上, 进行数据的录制
@@ -187,7 +272,7 @@ class ExploreEnv(ManipulateEnv):
         first_rgb = self.explore_data["frames"][0]["rgb_np"]
         first_depth = self.explore_data["frames"][0]["depth_np"]
         first_tracks_2d = self.explore_data["frames"][0]["franka_tracks2d"]
-        _, first_mask = run_grounded_sam(
+        _, first_obj_mask = run_grounded_sam(
             rgb_image=first_rgb,
             obj_description=self.obj_description,
             positive_points=None,  
@@ -196,12 +281,18 @@ class ExploreEnv(ManipulateEnv):
             acceptable_thr=0.9,
             visualize=False
         )
-        first_mask = first_mask & (first_depth > 0)
+        first_depth_mask = get_depth_mask(
+            depth=first_depth,
+            K=self.camera_intrinsic,
+            Tw2c=self.camera_extrinsic,
+            height=0.02
+        )
+        first_mask = first_obj_mask & first_depth_mask
         
         last_rgb = self.explore_data["frames"][-1]["rgb_np"]
         last_depth = self.explore_data["frames"][-1]["depth_np"]
         last_tracks_2d = self.explore_data["frames"][-1]["franka_tracks2d"]
-        _, last_mask = run_grounded_sam(
+        _, last_obj_mask = run_grounded_sam(
             rgb_image=last_rgb,
             obj_description=self.obj_description,
             positive_points=None,  
@@ -210,17 +301,29 @@ class ExploreEnv(ManipulateEnv):
             acceptable_thr=0.9,
             visualize=False
         )
-        last_mask = last_mask & (last_depth > 0)
+        last_depth_mask = get_depth_mask(
+            depth=last_depth,
+            K=self.camera_intrinsic,
+            Tw2c=self.camera_extrinsic,
+            height=0.02
+        )
+        last_mask = last_obj_mask & last_depth_mask
         
         # 计算前后两帧 depth_map 的差值的变化程度
         diff = np.abs(last_depth - first_depth) # H, W
         diff_masked = diff[first_mask & last_mask] # N
         
         # 将 diff_masked 进行聚类, 将变化大的一部分的平均值与 pertubation_distance 的 0.5 倍进行比较
-        diff_centroid, _, _ = cluster.k_means(diff_masked[:, None], init="k-means++", n_clusters=2)
+        # 聚类为 3, 使得对于噪声有一定的 robustness
+        diff_centroid, labels, _ = cluster.k_means(diff_masked[:, None], init="k-means++", n_clusters=3)
+        cluster_num = [(labels == i).sum() for i in range(3)]
 
+        top_indices = np.argsort(cluster_num)[-2:]  # 获取最大的两个索引
+        # 提取对应的类中心
+        top_centroids = diff_centroid[top_indices]
+        
         # 这里 0.5 是一个经验值, 因为对于旋转这个值不好解析的计算
-        if diff_centroid.max() > self.pertubation_distance * 0.5:
+        if top_centroids.max() > self.pertubation_distance * 0.5:
             self.has_valid_explore = True
             return True
         else:
@@ -295,7 +398,7 @@ if __name__ == "__main__":
         # instruction="open the door",
         save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
     )
-    exploreEnv.explore_loop(visualize=True)
+    exploreEnv.explore_loop_direct_reuse(visualize=True)
     exploreEnv.process_explore_data(visualize=True)
     
     # exploreEnv.save_explore_data(

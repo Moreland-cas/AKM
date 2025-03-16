@@ -1251,6 +1251,44 @@ def crop_nearby_points(point_clouds, contact_3d, radius=0.1):
     cropped_points = pcd.select_by_index(idx)
     return np.asarray(cropped_points.points)
 
+
+import numpy as np
+
+def fit_plane_ransac(points, threshold=0.01, max_iterations=100):
+    """
+    使用 RANSAC 算法从点云中拟合一个平面，并返回该平面的单位法向量
+    points: np.array([N, 3]) - 输入的点云
+    threshold: float - 允许的最大距离，超过该距离的点被视为离群点
+    max_iterations: int - RANSAC 的最大迭代次数
+    """
+    best_normal = None
+    best_inliers_count = 0
+    best_inliers = None
+
+    for _ in range(max_iterations):
+        # 随机选择 3 个点来定义一个平面
+        indices = np.random.choice(points.shape[0], 3, replace=False)
+        sample_points = points[indices]
+
+        # 计算平面的法向量
+        normal_vector = fit_plane_normal(sample_points)
+
+        # 计算每个点到平面的距离
+        dists = np.abs(np.dot(points - sample_points[0], normal_vector))
+
+        # 计算内点
+        inliers = points[dists < threshold]
+        inliers_count = inliers.shape[0]
+
+        # 更新最佳平面
+        if inliers_count > best_inliers_count:
+            best_inliers_count = inliers_count
+            best_normal = normal_vector
+            best_inliers = inliers
+    print("num of inliers:", best_inliers_count, " / ", len(points))
+    return best_normal
+
+
 def fit_plane_normal(points):
     """
         输入一个点云, 用一个平面拟合它, 并返回该平面的单位法向量
@@ -1280,9 +1318,12 @@ def fit_plane_normal(points):
 # 示例用法
 if __name__ == "__main__":
     # 示例用法
-    point_cloud = np.random.random([5, 3])
+    point_cloud = np.random.random([100, 3])
     point_cloud[:, 2] = 0
-    print(point_cloud)
-    normal_vector = fit_plane_normal(point_cloud)
-    print("归一化后的法向量:", normal_vector)
+    point_cloud[:30, 2] = np.random.random([30]) * 1
+    # print(point_cloud)
+    normal_vector1 = fit_plane_normal(point_cloud)
+    normal_vector2 = fit_plane_ransac(point_cloud, max_iterations=100)
+    print("归一化后的法向量:", normal_vector1)
+    print("归一化后的法向量(ransac):", normal_vector2)
 

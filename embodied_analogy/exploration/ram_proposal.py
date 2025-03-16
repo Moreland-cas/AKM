@@ -39,6 +39,7 @@ from embodied_analogy.utility.utils import (
     visualize_pc,
     draw_points_on_image,
     fit_plane_normal,
+    fit_plane_ransac,
     crop_nearby_points,
     get_depth_mask
 )
@@ -219,7 +220,12 @@ def lift_ram_affordance(
         contact_3d=contact_3d_c,
         radius=0.1
     )
-    plane_normal = fit_plane_normal(cropped_points)
+    # plane_normal = fit_plane_normal(cropped_points)
+    plane_normal = fit_plane_ransac(
+        points=cropped_points,
+        threshold=0.01, 
+        max_iterations=100
+    )
     
     if (plane_normal * np.array([0, 0, -1])).sum() > 0:
         dir_out = plane_normal
@@ -272,7 +278,7 @@ if __name__ == "__main__":
         query_rgb, # H, W, 3 in numpy
         instruction="open the drawer",
         data_source="droid",
-        visualize=True
+        visualize=False
     )
     
     K = np.array(
