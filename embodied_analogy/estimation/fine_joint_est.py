@@ -532,6 +532,7 @@ def fine_joint_estimation_seq(
                 tgt_pc[pc_tgt_mask],
                 target_normals[pc_tgt_mask],
                 loss_type="point_to_plane", # point_to_point
+                # loss_type="point_to_point", # point_to_point
                 joint_type=joint_type,
                 icp_select_range=icp_select_range
             )
@@ -589,7 +590,7 @@ def fine_joint_estimation_seq(
         
         import napari
         viewer = napari.Viewer(ndisplay=3)
-        size = 0.02
+        size = 0.01 / 2
         viewer.add_points(moving_pcs, size=size, name='moving_pc', opacity=0.8, face_color="blue")
         viewer.add_points(pc_ref_transformed, size=size, name='before icp', opacity=0.8, face_color="red")
         viewer.add_points(pc_ref_transformed_updated, size=size, name='after icp', opacity=0.8, face_color="green")

@@ -77,7 +77,6 @@ class ExploreEnv(ManipulateEnv):
     def explore_loop_direct_reuse(self, allowed_num_tries=10, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
-            # TODO 1
         """
         # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
         from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d

@@ -205,7 +205,7 @@ def reconstruct(
         optimize_state_mask=np.arange(num_key_frames)!=0,
         # 这里设置不迭代的优化 dynamic_mask
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
-        lr=1e-3, # 1 mm
+        lr=5e-3, # 5 mm
         tol=1e-9,
         icp_select_range=0.1,
         visualize=visualize
@@ -234,6 +234,7 @@ def reconstruct(
             
         # 然后判断估计出的 joint_axis 与当前  tracks3d 变化的对应关系
         moving_dir_c = (tracks_3d_moving_c - tracks_3d_moving_c[0]).reshape(-1, 3) # T*N, 3
+        # moving_dir_w 为 tracks3d 在世界坐标系下的运动方向
         moving_dir_w = camera_to_world(moving_dir_c, Tw2c) # T*N, 3
         dot_product_with_joint_axis = np.mean(moving_dir_w * joint_axis_w_updated)
             
@@ -288,9 +289,10 @@ def reconstruct(
     
 
 if __name__ == "__main__":
+    obj_idx = 44962
     reconstruct(
-        explore_data=np.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/explore_data.npz"),
+        explore_data=np.load(f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_idx}/explore_data.npz"),
         visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
-        save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/"
+        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/{obj_idx}/"
     )

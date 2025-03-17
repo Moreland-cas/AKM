@@ -239,7 +239,7 @@ def lift_ram_affordance(
         colors=pc_colors / 255.,
         dir_out=dir_out, 
         augment=True,
-        visualize=True
+        visualize=False
     ) 
     # 使得返回的 grasp 是在一定区间内的, 超出的不算
     cropped_gg = crop_grasp(

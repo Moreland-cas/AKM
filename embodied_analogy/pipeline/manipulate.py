@@ -128,7 +128,7 @@ class ManipulateEnv(BaseEnv):
             start_pc_w, 
             start_color, 
             dir_out=joint_axis_w, 
-            visualize=True
+            visualize=False
         )
         
         # 筛选出评分比较高的 grasp
