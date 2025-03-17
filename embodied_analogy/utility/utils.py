@@ -1254,7 +1254,7 @@ def crop_nearby_points(point_clouds, contact_3d, radius=0.1):
 
 import numpy as np
 
-def fit_plane_ransac(points, threshold=0.01, max_iterations=100):
+def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False):
     """
     使用 RANSAC 算法从点云中拟合一个平面，并返回该平面的单位法向量
     points: np.array([N, 3]) - 输入的点云
@@ -1262,8 +1262,8 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100):
     max_iterations: int - RANSAC 的最大迭代次数
     """
     best_normal = None
+    best_inliers_mask = None
     best_inliers_count = 0
-    best_inliers = None
 
     for _ in range(max_iterations):
         # 随机选择 3 个点来定义一个平面
@@ -1277,15 +1277,29 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100):
         dists = np.abs(np.dot(points - sample_points[0], normal_vector))
 
         # 计算内点
-        inliers = points[dists < threshold]
-        inliers_count = inliers.shape[0]
+        inliers_mask = dists < threshold
+        inliers_count = inliers_mask.sum()
 
         # 更新最佳平面
         if inliers_count > best_inliers_count:
             best_inliers_count = inliers_count
             best_normal = normal_vector
-            best_inliers = inliers
+            best_inliers_mask = inliers_mask
+
     print("num of inliers:", best_inliers_count, " / ", len(points))
+    
+    if visualize:
+        v_points = points
+        v_colors = np.zeros_like(points)
+        # inliers 用绿色, outliers 用红色
+        v_colors[best_inliers_mask, 1] = 1
+        v_colors[~best_inliers_mask, 0] = 1
+        visualize_pc(
+            points=v_points,
+            colors=v_colors,
+            contact_point=points.mean(axis=0),
+            post_contact_dirs=[best_normal]
+        )
     return best_normal
 
 
@@ -1323,7 +1337,7 @@ if __name__ == "__main__":
     point_cloud[:30, 2] = np.random.random([30]) * 1
     # print(point_cloud)
     normal_vector1 = fit_plane_normal(point_cloud)
-    normal_vector2 = fit_plane_ransac(point_cloud, max_iterations=100)
+    normal_vector2 = fit_plane_ransac(point_cloud, max_iterations=100, visualize=True)
     print("归一化后的法向量:", normal_vector1)
     print("归一化后的法向量(ransac):", normal_vector2)
 

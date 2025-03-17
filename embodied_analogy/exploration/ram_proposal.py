@@ -159,35 +159,35 @@ def get_ram_affordance_2d(
         )
     
     if visualize:
-        import napari
-        viewer = napari.Viewer()
-        viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
-        viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
-        viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
+        # import napari
+        # viewer = napari.Viewer()
+        # viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
+        # viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
+        # viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
 
-        viewer.title = "retrieved reference data by RAM"
-        
-        for i in range(len(topk_retrieved_data_dict["img"])):
-            viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
-            masked_img = topk_retrieved_data_dict["masked_img"][i]
-            masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
-            viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
-            viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
-            # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
-        napari.run()
-        
-        # Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
-        # Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
-        # Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
+        # viewer.title = "retrieved reference data by RAM"
         
         # for i in range(len(topk_retrieved_data_dict["img"])):
-        #     Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
+        #     viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
         #     masked_img = topk_retrieved_data_dict["masked_img"][i]
-        #     masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
-        #     masked_img.show()
-        #     Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
-        #     Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
-        #     break
+        #     masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
+        #     viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
+        #     viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
+        #     # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
+        # napari.run()
+        
+        Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
+        Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
+        Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
+        
+        for i in range(len(topk_retrieved_data_dict["img"])):
+            Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
+            masked_img = topk_retrieved_data_dict["masked_img"][i]
+            masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
+            masked_img.show()
+            Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
+            # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
+            break
         
     return affordance_map_2d
 
@@ -224,7 +224,8 @@ def lift_ram_affordance(
     plane_normal = fit_plane_ransac(
         points=cropped_points,
         threshold=0.01, 
-        max_iterations=100
+        max_iterations=100,
+        visualize=visualize
     )
     
     if (plane_normal * np.array([0, 0, -1])).sum() > 0:
@@ -238,7 +239,7 @@ def lift_ram_affordance(
         colors=pc_colors / 255.,
         dir_out=dir_out, 
         augment=True,
-        visualize=False
+        visualize=True
     ) 
     # 使得返回的 grasp 是在一定区间内的, 超出的不算
     cropped_gg = crop_grasp(
@@ -304,7 +305,7 @@ if __name__ == "__main__":
     # )
     
     obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
-    contact_uv = affordance_map_2d.sample_highest(visualize=False)
+    contact_uv = affordance_map_2d.sample_highest(visualize=True)
     _, best_grasp, dir_out = lift_ram_affordance(
         K=K, 
         Tw2c=Tw2c,

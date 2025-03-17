@@ -398,10 +398,10 @@ if __name__ == "__main__":
         # instruction="open the door",
         save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
     )
-    exploreEnv.explore_loop_direct_reuse(visualize=True)
+    exploreEnv.explore_loop_direct_reuse(visualize=False)
     exploreEnv.process_explore_data(visualize=True)
     
-    # exploreEnv.save_explore_data(
-    #     save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
-    # )
+    exploreEnv.save_explore_data(
+        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
+    )
     

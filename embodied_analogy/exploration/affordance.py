@@ -233,6 +233,14 @@ class Affordance_map_2d:
         if visualize:
             # 可视化更新后的 cos_map
             image_cos_new = self.get_colored_cos_map()
+            u_rgb, v_rgb = self.sample_highest()
+            u_cos, v_cos = self.rgb_to_cos_frame(u_rgb, v_rgb)
+            image_cos_new = draw_points_on_image(
+                image=image_cos_new,
+                uv_list=[(u_cos, v_cos)],
+                radius=5,
+                normalized_uv=False
+            )
             concatenate_images(image_cos_old, image_cos_new).show()
 
 class Affordance_map_3d(Affordance_map_2d):
@@ -253,9 +261,10 @@ if __name__ == "__main__":
         cropped_region=input_data["cropped_region"],
     )
     affordance_map_2d.get_obj_mask(False)
-    uv_rgb = affordance_map_2d.sample_prob(alpha=0, visualize=True)
-    # uv_rgb = affordance_map_2d.sample_highest(visualize=False)
-    # affordance_map_2d.update(uv_rgb, visualize=False)
-    # uv_rgb = affordance_map_2d.sample_highest(visualize=False)
-    # affordance_map_2d.update(uv_rgb, visualize=False)
-    # uv_rgb = affordance_map_2d.sample_highest(visualize=False)
+    # uv_rgb = affordance_map_2d.sample_prob(alpha=0, visualize=True)
+    uv_rgb = affordance_map_2d.sample_highest(visualize=True)
+    affordance_map_2d.update(uv_rgb, visualize=False)
+    uv_rgb = affordance_map_2d.sample_highest(visualize=True)
+    affordance_map_2d.update(uv_rgb, visualize=False)
+    uv_rgb = affordance_map_2d.sample_highest(visualize=True)
+    
