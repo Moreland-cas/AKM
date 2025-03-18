@@ -1,4 +1,5 @@
 import os
+import napari
 import pickle
 import numpy as np
 from embodied_analogy.utility.utils import napari_time_series_transform
@@ -15,9 +16,6 @@ class Data():
     def load(self, file_path):
         with open(file_path, "rb") as f:
             return pickle.load(f)
-        
-    def visualize(self):
-        pass
         
         
 class Frame(Data):
@@ -49,6 +47,19 @@ class Frame(Data):
         self.franka3d = franka3d
         self.franka_mask = franka_mask
     
+    def _visualize(self, viewer: napari.Viewer):
+        viewer.add_image(self.rgb, rgb=True, name="initial_frame_rgb")
+        
+        if self.contact2d is not None:
+            u, v = self.contact2d
+            viewer.add_points((v, u), face_color="red", name="contact2d")
+    
+    def visualize(self):
+        viewer = napari.Viewer()
+        viewer.title = "frame visualization"
+        self._visualize(viewer)
+        napari.run()
+    
     
 class Frames(Data):
     def __init__(
@@ -62,40 +73,43 @@ class Frames(Data):
         frame_list: list of class Frame
         """
         self.frame_list = frame_list
-        self.num_frames = len(self.frame_list)
         self.fps = fps
         self.K = K
         self.Tw2c = Tw2c
-        
+    
+    def num_frames(self):
+        return len(self.frame_list)
+    
+    def __getitem__(self, idx):
+        return self.frame_list[idx]
+    
     def clear(self):
         self.frame_list = []
-        self.num_frames = 0
         
     def append(self, frame: Frame):
         self.frame_list.append(frame)
-        self.num_frames += 1
         
     def get_rgb_seq(self):
         # T, H, W, C
-        rgb_seq = np.stack([self.frame_list[i].rgb for i in range(self.num_frames)]) 
+        rgb_seq = np.stack([self.frame_list[i].rgb for i in range(self.num_frames())]) 
         return rgb_seq
         
     def get_depth_seq(self):
         # T, H, W
-        depth_seq = np.stack([self.frame_list[i].depth for i in range(self.num_frames)]) 
+        depth_seq = np.stack([self.frame_list[i].depth for i in range(self.num_frames())]) 
         return depth_seq
         
     def get_franka2d_seq(self):
         # T, N, 2
-        franka2d_seq = np.stack([self.frame_list[i].franka2d for i in range(self.num_frames)]) 
+        franka2d_seq = np.stack([self.frame_list[i].franka2d for i in range(self.num_frames())]) 
         return franka2d_seq
     
     def get_joint_states(self):
         # T
-        joint_states = np.array([self.frame_list[i].joint_state for i in range(self.num_frames)]) 
+        joint_states = np.array([self.frame_list[i].joint_state for i in range(self.num_frames())]) 
         return joint_states
     
-    def visualize(self):
+    def _visualize(self, viewer: napari.Viewer):
         rgb_seq = self.get_rgb_seq()
         franka2d_seq = self.get_franka2d_seq()
         link_names = [
@@ -106,8 +120,7 @@ class Frames(Data):
             'panda_rightfinger', 'camera_base_link', 'camera_link'
         ]
         
-        import napari
-        viewer = napari.view_image(rgb_seq, rgb=True)
+        viewer.add_image(rgb_seq, rgb=True)
         
         franka2d_data = napari_time_series_transform(franka2d_seq) # T*M, (1+2)
         franka2d_data = franka2d_data[:, [0, 2, 1]]
@@ -115,5 +128,10 @@ class Frames(Data):
             T = len(rgb_seq)
             M = len(link_names)
             viewer.add_points(franka2d_data[i::M, :], face_color="red", name=link_names[i])
+        
+    def visualize(self):
+        viewer = napari.Viewer()
+        viewer.title = "frames visualization"
+        self._visualize(viewer)
         napari.run()
         

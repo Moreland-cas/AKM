@@ -83,7 +83,7 @@ class ExploreEnv(ManipulateEnv):
             else:
                 num_tries += 1
             
-            if self.get_valid_explore():
+            if self.check_valid():
                 # 在这里将 explore_uv 保存到 obj_repr 的 initial_frame 中
                 self.obj_repr.initial_frame.contact2d = explore_uv
                 break
@@ -169,17 +169,17 @@ class ExploreEnv(ManipulateEnv):
         if result_pre is None:
             return False, None
         
-        self.step = self.explore_step
-        
         self.follow_path(result_pre)
         self.open_gripper()
         self.clear_planner_pc()
         self.move_forward(reserved_distance)
         self.close_gripper()
-        self.move_along_axis(moving_direction=dir_out_w, moving_distance=pertubation_distance)
         
-        # 录制完成, 开始处理
+        # 在 close gripper 之后再开始录制数据
+        self.step = self.explore_step
+        self.move_along_axis(moving_direction=dir_out_w, moving_distance=pertubation_distance)
         self.step = self.base_step 
+        
         return True, contact_uv
     
     def explore_step(self):
@@ -192,26 +192,37 @@ class ExploreEnv(ManipulateEnv):
             rgb_np, depth_np, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
             
             # 在这里添加当前帧的 franka_arm 上的点的 franka_tracks3d 和 franka_tracks2d
-            franka_tracks2d, franka_tracks3d = self.get_points_on_arm()
+            franka_tracks2d, franka_tracks3d_w = self.get_points_on_arm()
             
-            cur_frame = {
-                "rgb_np": rgb_np, 
-                "depth_np": depth_np,
-                "franka_tracks2d": franka_tracks2d, 
-                "franka_tracks3d": franka_tracks3d
-            }
-            self.explore_data["frames"].append(cur_frame)
+            cur_frame = Frame(
+                rgb=rgb_np,
+                depth=depth_np,
+                K=None,
+                Tw2c=None,
+                joint_state=None,
+                obj_mask=None,
+                dynamic_mask=None,
+                contact2d=None,
+                contact3d=None,
+                franka2d=franka_tracks2d,
+                franka3d=None,
+                franka_mask=None,
+            )
+            self.obj_repr.frames.append(cur_frame)
             
-    def get_valid_explore(self):
+    def check_valid(self):
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
-        if self.frames.num_frames == 0:
+        # self.obj_repr.visualize()
+        
+        if self.obj_repr.frames.num_frames() == 0:
             return False
         
         # 判断录制的数据是否有效的使得物体状态发生了改变    
         # 判断首尾两帧的物体点云方差变化
-        first_rgb = self.explore_data["frames"][0]["rgb_np"]
-        first_depth = self.explore_data["frames"][0]["depth_np"]
-        first_tracks_2d = self.explore_data["frames"][0]["franka_tracks2d"]
+        first_rgb = self.obj_repr.frames[0].rgb
+        first_depth = self.obj_repr.frames[0].depth
+        first_tracks_2d = self.obj_repr.frames[0].franka2d
+        
         _, first_obj_mask = run_grounded_sam(
             rgb_image=first_rgb,
             obj_description=self.obj_description,
@@ -229,9 +240,9 @@ class ExploreEnv(ManipulateEnv):
         )
         first_mask = first_obj_mask & first_depth_mask
         
-        last_rgb = self.explore_data["frames"][-1]["rgb_np"]
-        last_depth = self.explore_data["frames"][-1]["depth_np"]
-        last_tracks_2d = self.explore_data["frames"][-1]["franka_tracks2d"]
+        last_rgb = self.obj_repr.frames[-1].rgb
+        last_depth = self.obj_repr.frames[-1].depth
+        last_tracks_2d = self.obj_repr.frames[-1].franka2d
         _, last_obj_mask = run_grounded_sam(
             rgb_image=last_rgb,
             obj_description=self.obj_description,
@@ -301,7 +312,5 @@ if __name__ == "__main__":
         pertubation_distance=0.1
     )
     exploreEnv.explore_loop(visualize=False)
-    exploreEnv.save(
-        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}/explore_data.pkl"
-    )
+    exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     

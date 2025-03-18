@@ -396,7 +396,8 @@ class BaseEnv():
             self.camera_intrinsic,
             self.camera_extrinsic
         ) # N, 2
-        return link_poses_2d, link_poses_3d
+        link_poses_3d_w = link_poses_3d
+        return link_poses_2d, link_poses_3d_w
     
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
