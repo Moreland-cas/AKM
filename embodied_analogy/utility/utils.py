@@ -887,14 +887,21 @@ def extract_tracked_depths(depth_seq, pred_tracks):
     depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
     return depth_tracks.cpu()
 
-def filter_tracks2d_by_visibility(pred_tracks_2d, pred_visibility):
+def filter_tracks_by_visibility(pred_visibility, threshold=0.9):
     """
-        pred_tracks_2d: torch.tensor([T, M, 2])
         pred_visibility: torch.tensor([T, M])
+        返回一个大小为 M 的布尔数组,表示每个点的可见性，如果一个点在 T * thre 的 frame 都是可见的, 则认为他是 visible 的
     """
-    always_visible_mask = pred_visibility.all(dim=0) # num_clusters
-    pred_tracks_2d = pred_tracks_2d[:, always_visible_mask, :] # T M_ 2
-    return pred_tracks_2d
+    T, M = pred_visibility.shape
+    required_visible_count = int(threshold * T)
+    
+    # Count the number of visible frames for each cluster
+    visible_count = pred_visibility.sum(dim=0)
+    
+    # Create a mask where the count is greater than or equal to the required count
+    visible_mask = visible_count >= required_visible_count
+    
+    return visible_mask
 
 def filter_tracks2d_by_depth_mask_seq(pred_tracks_2d, depthSeq_mask):
     """
@@ -915,55 +922,29 @@ def filter_tracks2d_by_depth_mask_seq(pred_tracks_2d, depthSeq_mask):
     
     return pred_tracks_2d
 
-def filter_tracks2d_by_depth_diff_seq(pred_tracks, depth_tracks, thr=1.5):
+def filter_tracks_by_consistency(tracks, threshold=0.1):
     """
-    过滤深度序列中的无效序列,基于相邻元素的相对变化率。
-    
-    参数:
-        pred_tracks (torch.Tensor): 
-            形状为 (T, N, 2),每个点的坐标形式为 [u, v],值域为 [0, W) 和 [0, H)。
-        depth_tracks (torch.Tensor): 
-            形状为 (T, N),表示 T 个时间步上的 N 个深度序列。
-        thr (float): 
-            相对变化率的阈值,超过此比率的序列会被判定为无效。
-    
-    返回:
-        torch.Tensor: 
-            筛选后的 pred_tracks, 形状为 (T, M, 2),其中 M 是筛选后的有效点数量。
+    根据 tracks 的 3d consistency 来筛选出平稳变化的 tracks
+    tracks: T, M, 3
+    return: 
+        consis_mask: (M, ), boolen
     """
-    depth_tracks += 1e-6  # 防止除零
-
-    # 转置 depth_tracks,使其形状为 (N, T)
-    depth_tracks_T = depth_tracks.T  # (N, T)
-
-    # 计算相邻元素的变化比率 (N, T-1)
-    ratios = torch.max(depth_tracks_T[:, :-1] / depth_tracks_T[:, 1:], depth_tracks_T[:, 1:] / depth_tracks_T[:, :-1])
-
-    # 检测每个序列是否存在无效的变化 (N,)
-    invalid_sequences = torch.any(ratios > thr, dim=1)  # 检查每一行是否有任何值大于阈值
-
-    # 合法序列的掩码 (N,)
-    valid_mask = ~invalid_sequences  # 合法序列为 False,其他为 True
+    # 获取时间步数 T 和轨迹数量 M
+    T, M, _ = tracks.shape
     
-    # 筛选 pred_tracks 和 depth_tracks 的合法序列
-    pred_tracks = pred_tracks[:, valid_mask, :]  # 筛选有效的 M 点,(T, M, 2)
-    depth_tracks = depth_tracks[:, valid_mask]   # 筛选有效的 M 深度,(T, M)
+    # 初始化一致性掩码
+    consis_mask = np.ones(M, dtype=bool)
     
-    return pred_tracks, depth_tracks
-
-def visualize_tracks2d_on_video(rgb_frames, pred_tracks, file_name="video_output", vis_folder="./"):
-    """
-        Args:
-            rgb_frames: np.array([T, H, W, 3])
-            pred_tracks: torch.Tensor([T, M, 2])
-    """
-    os.makedirs(vis_folder, exist_ok=True)
-    video = torch.tensor(np.stack(rgb_frames), device="cuda").permute(0, 3, 1, 2)[None]
-    vis = Visualizer(save_dir=vis_folder, pad_value=120, linewidth=1)
+    # 遍历每个轨迹
+    for m in range(M):
+        # 计算该轨迹的变化量
+        diffs = np.linalg.norm(tracks[1:T, m] - tracks[0:T-1, m], axis=1)
+        
+        # 如果有任意变化量超过阈值，则标记为不一致
+        if np.any(diffs > threshold):
+            consis_mask[m] = False
     
-    pred_tracks = pred_tracks[None] # [1, T, M, 2]
-    # pred_visibility = torch.ones((pred_tracks.shape[:3], 1), dtype=torch.bool, device="cuda")
-    vis.visualize(video, pred_tracks, filename=file_name)
+    return consis_mask
 
 
 def get_dynamic_mask(mask, moving_points, static_points, visualize=False):

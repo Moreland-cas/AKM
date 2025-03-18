@@ -79,9 +79,12 @@ def cluster_tracks_3d(tracks_3d, use_diff=True, visualize=False, viewer_title="n
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "clustring 3d tracks"
         
-        tracks_3d[..., 1] = -tracks_3d[..., 1]
+        # tracks_3d[..., 1] = -tracks_3d[..., 1]
         viewer.add_points(napari_time_series_transform(tracks_3d[:, moving_mask]), size=0.01, name='moving part', opacity=0.8, face_color="red")
         viewer.add_points(napari_time_series_transform(tracks_3d[:, static_mask]), size=0.01, name='static part', opacity=0.8, face_color="green")
+        
+        # viewer.add_points(napari_time_series_transform(tracks_3d_[:, moving_mask]), size=0.01, name='moving part', opacity=0.8, face_color="red")
+        # viewer.add_points(napari_time_series_transform(tracks_3d_[:, static_mask]), size=0.01, name='static part', opacity=0.8, face_color="green")
         
         napari.run()
         

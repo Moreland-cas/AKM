@@ -9,9 +9,9 @@ from embodied_analogy.utility.utils import (
     camera_to_world,
     sample_points_within_bbox_and_mask,
     image_to_camera,
-    filter_tracks2d_by_visibility,
+    filter_tracks_by_visibility,
     filter_tracks2d_by_depth_mask_seq,
-    filter_tracks2d_by_depth_diff_seq,
+    filter_tracks_by_consistency,
     extract_tracked_depths,
     farthest_scale_sampling,
     get_dynamic_seq,
@@ -89,36 +89,60 @@ def reconstruct(
         viewer.add_points(initial_uvs_vis, size=2, name="initial_uvs", face_color="green")
         napari.run()
     """
-        对于 initial_uvs 进行追踪得到 tracks_2d 
+        对于 initial_uvs 进行追踪得到 tracks2d 
         根据 depth filter 得到 tracks2d_filtered
     """
     # [T, M, 2], [T, M]
-    tracks_2d, pred_visibility = track_any_points(
+    tracks2d, pred_visibility = track_any_points(
         rgb_frames=rgb_seq,
         queries=initial_uvs,
         visiualize=visualize
     ) 
-    # 将 tracks_2d 进行聚类
+    # 将 tracks2d 进行聚类
     # TODO: 这个要不要转移到 filter 之后
     # TODO: 要不要对于所有的 3d track 进行聚类, 或是对于 2d filter 后的进行聚类
+    
+    # 第一种方式, 在 2d 上进行 cluster
     moving_mask_2d, static_mask_2d = cluster_tracks_2d(
         rgb_seq=rgb_seq,
-        tracks_2d=tracks_2d,
+        tracks_2d=tracks2d,
         use_diff=True,
-        visualize=visualize,
+        # visualize=visualize,
+        visualize=False,
         viewer_title="dynamic clustering tracks2d"
     )
+    
+    # 第二种方式, 在 3d 上进行 cluster
+    if True:
+        T, M, _ = tracks2d.shape
+        tracks2d_depth = extract_tracked_depths(depth_seq, tracks2d) # T, M
+        tracks3d = image_to_camera(tracks2d.reshape(T*M, -1), tracks2d_depth.reshape(-1), K)
+        tracks3d = tracks3d.reshape(T, M, 3)
+        con_mask = filter_tracks_by_consistency(tracks3d, threshold=0.02)
+        # visible_mask = filter_tracks_by_visibility(pred_visibility, threshold=0.8)
+        # tracks2d = tracks2d[:, visible_mask]
+        vis_tracks2d_napari(rgb_seq, tracks2d[:, con_mask], viewer_title="filter tracks2d by 3d consistency")
+        
+        tracks3d = tracks3d[:, con_mask]
+        moving_mask_3d, static_mask_3d = cluster_tracks_3d(
+            tracks3d, 
+            use_diff=True, 
+            visualize=True, 
+            viewer_title="other way of 3d"
+        )
+    
     # filter tracks2d by visibility
-    tracks2d_filtered = filter_tracks2d_by_visibility(tracks_2d, pred_visibility)
+    visible_mask = filter_tracks_by_visibility(pred_visibility)
+    tracks2d_filtered = tracks2d[:, visible_mask]
     if visualize:
-        vis_tracks2d_napari(rgb_seq, tracks_2d, viewer_title="filter tracks2d by visibility score")
+        vis_tracks2d_napari(rgb_seq, tracks2d_filtered, viewer_title="filter tracks2d by visibility score")
         
     # filter tracks2d by depthSeq_mask
     # TODO: 这里不应该是 depth_mask_seq, 而应该是 depth_tracks
     tracks2d_filtered = filter_tracks2d_by_depth_mask_seq(tracks2d_filtered, depth_mask_seq)
     # tracks2d_filtered = filter_tracks2d_by_depth_diff_seq(tracks2d_filtered, depth_mask_seq)
     if visualize:
-        vis_tracks2d_napari(rgb_seq, tracks_2d, viewer_title="filter tracks2d by depth diff")
+        vis_tracks2d_napari(rgb_seq, tracks2d_filtered, viewer_title="filter tracks2d by depth diff")
     """
         dynamic segment tracks3d_filtered
     """  
@@ -172,8 +196,8 @@ def reconstruct(
     """
     dynamic_seq = get_dynamic_seq(
         mask_seq=obj_mask_seq, 
-        moving_points_seq=tracks_2d[kf_idx][:, moving_mask_2d, :],
-        static_points_seq=tracks_2d[kf_idx][:, static_mask_2d, :], 
+        moving_points_seq=tracks2d[kf_idx][:, moving_mask_2d, :],
+        static_points_seq=tracks2d[kf_idx][:, static_mask_2d, :], 
         visualize=visualize
         # visualize=True
     )
@@ -292,6 +316,8 @@ if __name__ == "__main__":
     obj_idx = 44962
     reconstruct(
         explore_data=np.load(f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_idx}/explore_data.npz"),
+        num_initial_uvs=1000,
+        num_key_frames=3,
         visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
         save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/{obj_idx}/"

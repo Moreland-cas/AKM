@@ -1,5 +1,6 @@
 import os
 import math
+import pickle
 import numpy as np
 import sklearn.cluster as cluster
 from embodied_analogy.utility.utils import (
@@ -13,6 +14,9 @@ from embodied_analogy.utility.utils import (
 )
 initialize_napari()
 from embodied_analogy.pipeline.manipulate import ManipulateEnv
+from embodied_analogy.representation.basic_structure import Frame, Frames
+from embodied_analogy.representation.obj_repr import Obj_repr
+
 
 class ExploreEnv(ManipulateEnv):
     def __init__(
@@ -21,62 +25,20 @@ class ExploreEnv(ManipulateEnv):
         instruction,
         record_fps=30, 
         pertubation_distance=0.1,
-        save_dir=None,
     ):
         super().__init__(obj_config=obj_config, instruction=instruction)
         self.record_fps = record_fps
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
         self.pertubation_distance = pertubation_distance
         
-        self.explore_data = {
-            "frames": []
-        }
+        self.obj_repr = Obj_repr()
         self.has_valid_explore = False
-        self.save_dir = save_dir
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir, exist_ok=True)
     
-    def explore_loop_reset(self, allowed_num_tries=10, visualize=False):
+    def explore_loop(self, max_tries=10, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
-            # TODO 0
-        """
-        # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
-        from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
-        
-        self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
-        
-        self.affordance_map_2d = get_ram_affordance_2d(
-            query_rgb=rgb_np,
-            instruction=self.instruction,
-            data_source="droid", # TODO
-            visualize=False
-        )
-        
-        num_tries_so_far = 0
-        while num_tries_so_far < allowed_num_tries:
-            # 初始化相关状态
-            self.open_gripper()
-            self.reset_franka_arm()
-            self.explore_data["frames"] = []
-            
-            self.explore_once(visualize=visualize)
-            num_tries_so_far += 1
-            
-            if self.get_valid_explore():
-                break
-            else:
-                # 更新 affordance map
-                self.affordance_map_2d.update()
-                
-        # save explore data
-        if not self.has_valid_explore:
-            assert "No valid exploration during explore phase!"
-    
-    def explore_loop_direct_reuse(self, allowed_num_tries=10, visualize=False):
-        """
-            explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
+            NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
+            TODO
         """
         # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
         from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
@@ -91,64 +53,43 @@ class ExploreEnv(ManipulateEnv):
             data_source="droid", # TODO
             visualize=False
         )
+        # 在这里保存 first frame
+        self.obj_repr.initial_frame = Frame(
+            rgb=rgb_np,
+            depth=depth_np,
+            K=self.camera_intrinsic,
+            Tw2c=self.camera_extrinsic,
+            joint_state=None,
+            obj_mask=self.affordance_map_2d.get_obj_mask(),
+            dynamic_mask=None,
+            contact2d=None,
+            contact3d=None,
+            franka2d=None,
+            franka3d=None,
+            franka_mask=None
+        )
         
-        num_tries_so_far = 0
-        while num_tries_so_far < allowed_num_tries:
-            # 初始化相关状态
+        num_tries = 0
+        while num_tries < max_tries:
+            # 初始化相关状态, 需要把之前得到的 frames 进行清楚
             self.open_gripper()
             self.reset_franka_arm()
-            self.explore_data["frames"] = []
+            self.obj_repr.clear_frames()
             
             explore_ok, explore_uv = self.explore_once(visualize=visualize)
             if not explore_ok:
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
                 continue
             else:
-                num_tries_so_far += 1
+                num_tries += 1
             
             if self.get_valid_explore():
+                # 在这里将 explore_uv 保存到 obj_repr 的 initial_frame 中
+                self.obj_repr.initial_frame.contact2d = explore_uv
                 break
             else:
                 # 更新 affordance map
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
-                
-        # save explore data
-        if not self.has_valid_explore:
-            assert "No valid exploration during explore phase!"
-            
-    def explore_loop_fusion_reuse(self, allowed_num_tries=10, visualize=False):
-        """
-            explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
-            # TODO 2
-        """
-        # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
-        from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
-        
-        self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
-        
-        num_tries_so_far = 0
-        while num_tries_so_far < allowed_num_tries:
-            # 初始化相关状态
-            self.open_gripper()
-            self.reset_franka_arm()
-            self.explore_data["frames"] = []
-            
-            self.affordance_map_2d = get_ram_affordance_2d(
-                query_rgb=rgb_np,
-                instruction=self.instruction,
-                data_source="droid", # TODO
-                visualize=False
-            )
-            
-            self.explore_once(visualize=visualize)
-            num_tries_so_far += 1
-            
-            if self.get_valid_explore():
-                break
-            else:
-                # 更新 affordance map
-                self.affordance_map_2d.update()
                 
         # save explore data
         if not self.has_valid_explore:
@@ -178,7 +119,7 @@ class ExploreEnv(ManipulateEnv):
         contact_uv = self.affordance_map_2d.sample_highest(visualize=False)
         
         # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
-        contact_3d_c, grasps_c, dir_out_c = lift_ram_affordance(
+        contact3d_c, grasps_c, dir_out_c = lift_ram_affordance(
             K=self.camera_intrinsic, 
             Tw2c=self.camera_extrinsic,
             query_rgb=rgb_np,
@@ -190,8 +131,8 @@ class ExploreEnv(ManipulateEnv):
         if grasps_c is None:
             return False, None
         
-        contact_3d_w = camera_to_world(
-            point_camera=contact_3d_c[None],
+        contact3d_w = camera_to_world(
+            point_camera=contact3d_c[None],
             extrinsic_matrix=Tw2c
         )[0]
         
@@ -220,7 +161,7 @@ class ExploreEnv(ManipulateEnv):
                 points=pc_collision_w, 
                 colors=pc_colors / 255,
                 grasp=grasp, 
-                contact_point=contact_3d_w, 
+                contact_point=contact3d_w, 
                 post_contact_dirs=[dir_out_w]
             )
         
@@ -263,7 +204,7 @@ class ExploreEnv(ManipulateEnv):
             
     def get_valid_explore(self):
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
-        if len(self.explore_data["frames"]) == 0:
+        if self.frames.num_frames == 0:
             return False
         
         # 判断录制的数据是否有效的使得物体状态发生了改变    
@@ -328,48 +269,9 @@ class ExploreEnv(ManipulateEnv):
         else:
             return False
         
-    def process_explore_data(self, visualize=False):
-        """
-            process rgb and depth data in self.explore_data
-        """
-        assert self.has_valid_explore
-        num_frames = len(self.explore_data["frames"])
-        self.rgb_seq = np.stack([self.explore_data["frames"][i]["rgb_np"] for i in range(num_frames)]) # T, H, W, C
-        self.depth_seq = np.stack([self.explore_data["frames"][i]["depth_np"] for i in range(num_frames)]) # T, H, W
-        self.franka_seq = np.stack([self.explore_data["frames"][i]["franka_tracks2d"] for i in range(num_frames)]) # T, N, 2
+    def save(self, file_path=None):
+        self.obj_repr.save(file_path)
         
-        if visualize:
-            self.visualize_explore_data()
-            
-    def visualize_explore_data(self):
-        """
-            visualize rgb and depth data in self.explore_data
-        """
-        import napari
-        viewer = napari.view_image(self.rgb_seq, rgb=True)
-        franka_visuailze = napari_time_series_transform(self.franka_seq) # T*M, (1+2)
-        franka_visuailze = franka_visuailze[:, [0, 2, 1]]
-        self.link_names = [link.name for link in self.robot.get_links()]
-        
-        for i in range(len(self.link_names)):
-            T = len(self.rgb_seq)
-            M = len(self.link_names)
-            viewer.add_points(franka_visuailze[i::M, :], face_color="red", name=self.link_names[i])
-        napari.run()
-        
-    def save_explore_data(self, save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/"):
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir, exist_ok=True)
-            
-        np.savez(
-            os.path.join(save_dir, "explore_data.npz"), 
-            rgb_seq=self.rgb_seq, 
-            depth_seq=self.depth_seq, 
-            franka_seq=self.franka_seq,
-            K=self.camera_intrinsic,
-            Tw2c=self.camera_extrinsic,
-            record_fps=self.record_fps,
-        )
     
 if __name__ == "__main__":
     obj_config = {
@@ -395,12 +297,11 @@ if __name__ == "__main__":
         obj_config=obj_config,
         instruction="open the drawer",
         # instruction="open the door",
-        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
+        record_fps=30,
+        pertubation_distance=0.1
     )
-    exploreEnv.explore_loop_direct_reuse(visualize=False)
-    exploreEnv.process_explore_data(visualize=True)
-    
-    exploreEnv.save_explore_data(
-        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}"
+    exploreEnv.explore_loop(visualize=False)
+    exploreEnv.save(
+        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_index}/explore_data.pkl"
     )
     
