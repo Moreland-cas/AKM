@@ -463,16 +463,22 @@ class BaseEnv():
         # 传入的 target_pose 是 Tph2w
         if isinstance(target_pose, np.ndarray):
             target_pose = mplib.Pose(target_pose)
-        result = self.planner.plan_pose(
-            goal_pose=target_pose, 
-            current_qpos=self.robot.get_qpos(), 
-            time_step=self.planner_timestep, 
-            rrt_range=0.1,
-            planning_time=1,
-            wrt_world=wrt_world
-        )
+        try:
+            result = self.planner.plan_pose(
+                goal_pose=target_pose, 
+                current_qpos=self.robot.get_qpos(), 
+                time_step=self.planner_timestep, 
+                rrt_range=0.1,
+                planning_time=1,
+                wrt_world=wrt_world
+            )
+        except Exception as e:
+            print(f"An error occurred during plan_path(): {e}")
+            return None
+        
         if result['status'] != "Success":
             return None
+        
         return result
             
     def follow_path(self, result):
@@ -592,6 +598,9 @@ class BaseEnv():
         # 然后依次执行这些位姿
         for Tph2w in T_list:
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
+            if result is None:
+                print("excounter None result when moving along axis, skip!")
+                continue
             self.follow_path(result)
     
     def move_forward(self, moving_distance):

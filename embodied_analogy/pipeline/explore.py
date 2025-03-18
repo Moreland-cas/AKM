@@ -33,6 +33,9 @@ class ExploreEnv(ManipulateEnv):
         
         self.obj_repr = Obj_repr()
         self.has_valid_explore = False
+        
+        # while True:
+        #     self.base_step()
     
     def explore_loop(self, max_tries=10, visualize=False):
         """
@@ -68,6 +71,7 @@ class ExploreEnv(ManipulateEnv):
             franka3d=None,
             franka_mask=None
         )
+        # self.obj_repr.initial_frame.visualize()
         
         num_tries = 0
         while num_tries < max_tries:
@@ -77,11 +81,10 @@ class ExploreEnv(ManipulateEnv):
             self.obj_repr.clear_frames()
             
             explore_ok, explore_uv = self.explore_once(visualize=visualize)
+            num_tries += 1
             if not explore_ok:
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
                 continue
-            else:
-                num_tries += 1
             
             if self.check_valid():
                 # 在这里将 explore_uv 保存到 obj_repr 的 initial_frame 中
@@ -93,7 +96,7 @@ class ExploreEnv(ManipulateEnv):
                 
         # save explore data
         if not self.has_valid_explore:
-            assert "No valid exploration during explore phase!"
+            print("No valid exploration during explore phase!")
             
     def explore_once(
         self, 
@@ -129,7 +132,7 @@ class ExploreEnv(ManipulateEnv):
             visualize=visualize
         )
         if grasps_c is None:
-            return False, None
+            return False, contact_uv
         
         contact3d_w = camera_to_world(
             point_camera=contact3d_c[None],
@@ -152,7 +155,7 @@ class ExploreEnv(ManipulateEnv):
             Tph2w = self.anyGrasp2ph(grasp=grasp)        
             Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-            
+            # TODO 这里可能需要更改
             if result_pre is not None:
                 break
         
@@ -167,7 +170,7 @@ class ExploreEnv(ManipulateEnv):
         
         # 实际执行到该 proposal, 并在此过程中录制数据
         if result_pre is None:
-            return False, None
+            return False, contact_uv
         
         self.follow_path(result_pre)
         self.open_gripper()
@@ -285,32 +288,44 @@ class ExploreEnv(ManipulateEnv):
         
     
 if __name__ == "__main__":
-    obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
-        "active_link": "link_2",
-        # "active_joint": "joint_2"
-        "active_joint": "joint_1"
-    }
+    # drawer
+    # obj_config = {
+    #     "index": 44962,
+    #     "scale": 0.8,
+    #     "pose": [1.0, 0., 0.5],
+    #     "active_link": "link_2",
+    #     # "active_joint": "joint_2"
+    #     "active_joint": "joint_1"
+    # }
     
+    # door
     # obj_config = {
     #     "index": 9288,
     #     "scale": 1.0,
-    #     "pose": [1.0, 0., 0.7],
+    #     "pose": [0.7, 0., 0.7],
     #     "active_link": "link_2",
     #     "active_joint": "joint_0"
     # }
+    
+    # microwave
+    obj_config = {
+        "index": 7221,
+        "scale": 0.4,
+        "pose": [0.8, 0.1, 0.6],
+        "active_link": "link_0",
+        "active_joint": "joint_0"
+    }
     
     obj_index = obj_config["index"]
     
     exploreEnv = ExploreEnv(
         obj_config=obj_config,
-        instruction="open the drawer",
+        # instruction="open the drawer",
         # instruction="open the door",
+        instruction="open the microwave",
         record_fps=30,
         pertubation_distance=0.1
     )
     exploreEnv.explore_loop(visualize=False)
-    exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
+    # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     

@@ -39,6 +39,9 @@ class Obj_repr(Data):
 
 
 if __name__ == "__main__":
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
+    # drawer
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
+    # microwave
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
     obj_repr.visualize()
     

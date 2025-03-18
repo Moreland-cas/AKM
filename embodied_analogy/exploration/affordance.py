@@ -191,7 +191,8 @@ class Affordance_map_2d:
             # image_mask.show()
             
             concatenate_images(image_cos, image_rgb).show()
-            
+        if u_rgb is None:
+            pass
         return (u_rgb, v_rgb)       
        
     def update(self, neg_uv_rgb, visualize=False):
@@ -200,6 +201,7 @@ class Affordance_map_2d:
             失败的尝试点 (u_rgb, v_rgb) 
         根据 neg_uv_rgb 来更新 self.cos_map, 由于 cos_map 的值在 (-1, 1), 所以更新时要考虑这个值域
         """
+        assert neg_uv_rgb is not None, "neg_uv_rgb 不能为空"
         # 将失败的 RGB 坐标转换为 cos_map 坐标
         u_cos, v_cos = self.rgb_to_cos_frame(neg_uv_rgb[0], neg_uv_rgb[1])
 

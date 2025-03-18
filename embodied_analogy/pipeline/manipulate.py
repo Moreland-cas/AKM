@@ -86,7 +86,8 @@ class ManipulateEnv(BaseEnv):
         t_grasp2w = grasp.translation # 3
         Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
         Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
-        Tph2w = Tgrasp2w @ T_with_offset(0.03)
+        # Tph2w = Tgrasp2w @ T_with_offset(0.03)
+        Tph2w = Tgrasp2w @ T_with_offset(0.014)
         return Tph2w
     
     def manipulate(self, delta_state=0, reserved_distance=0.05, visualize=False):

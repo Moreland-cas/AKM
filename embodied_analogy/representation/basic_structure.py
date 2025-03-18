@@ -50,6 +50,9 @@ class Frame(Data):
     def _visualize(self, viewer: napari.Viewer):
         viewer.add_image(self.rgb, rgb=True, name="initial_frame_rgb")
         
+        if self.obj_mask is not None:
+            viewer.add_labels(self.obj_mask, name="obj_mask")
+            
         if self.contact2d is not None:
             u, v = self.contact2d
             viewer.add_points((v, u), face_color="red", name="contact2d")

@@ -96,7 +96,7 @@ def detect_grasp_anygrasp(
             collision_detection=True
         )
         # print('grasp num:', len(gg))
-        if gg == None:
+        if gg == None or len(gg) == 0:
             continue
         
         # Tgrasp2w

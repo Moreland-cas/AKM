@@ -10,7 +10,7 @@ def run_grounded_sam(
     acceptable_thr=0.9,
     dino_model=None,
     sam2_image_model=None,
-    post_process_mask=True,
+    post_process_mask=False,
     visualize=False,
 ):
     initial_bboxs, initial_bbox_scores = run_groundingDINO(
