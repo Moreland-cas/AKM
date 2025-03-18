@@ -1,16 +1,22 @@
 import napari
 from embodied_analogy.representation.basic_structure import Data, Frame, Frames
-from embodied_analogy.utility.utils import napari_time_series_transform
 
 
 class Obj_repr(Data):
-    def __init__(
-        self,
-    ):
-        self.initial_frame = Frame(rgb=None, depth=None)
+    def __init__(self):
+        self.initial_frame = Frame()
         self.frames = Frames()
+        self.K = None
+        self.Tw2c = None
+        
+        # 通过 reconstruct 恢复出的结果
         self.key_frames = Frames()
-
+        self.track_type = None # either "open" or "close"
+        self.joint_axis_c = None
+        self.joint_axis_w = None
+        self.joint_states = None
+        self.joint_type = None # either "prismatic" or "revolute"
+        
     def clear_frames(self):
         self.frames.clear()
         

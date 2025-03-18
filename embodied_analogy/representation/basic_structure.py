@@ -21,8 +21,8 @@ class Data():
 class Frame(Data):
     def __init__(
         self,
-        rgb,
-        depth,
+        rgb=None,
+        depth=None,
         K=None,
         Tw2c=None,
         joint_state=None,
@@ -67,7 +67,7 @@ class Frame(Data):
 class Frames(Data):
     def __init__(
         self, 
-        frame_list=np.array([], dtype=Frame), 
+        frame_list=[], 
         fps=30, 
         K=None, 
         Tw2c=None
@@ -111,6 +111,11 @@ class Frames(Data):
         # T
         joint_states = np.array([self.frame_list[i].joint_state for i in range(self.num_frames())]) 
         return joint_states
+    
+    def get_obj_mask_seq(self):
+        # T, H, W
+        obj_mask_seq = np.stack([self.frame_list[i].obj_mask for i in range(self.num_frames())]) 
+        return obj_mask_seq
     
     def _visualize(self, viewer: napari.Viewer):
         rgb_seq = self.get_rgb_seq()

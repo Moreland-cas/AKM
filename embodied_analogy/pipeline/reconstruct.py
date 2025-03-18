@@ -21,6 +21,8 @@ from embodied_analogy.utility.utils import (
 
 initialize_napari()
 
+import napari
+from embodied_analogy.representation.obj_repr import Obj_repr
 from embodied_analogy.perception.online_cotracker import track_any_points
 from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.perception.mask_obj_from_video import (
@@ -38,11 +40,11 @@ from embodied_analogy.utility.constants import *
 set_random_seed(SEED)
 
 def reconstruct(
-    explore_data,
+    obj_repr: Obj_repr,
     num_initial_uvs=1000,
     num_key_frames=5,
     obj_description="drawer",
-    save_dir="/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/",
+    file_path=None,
     gt_joint_axis=None,
     visualize=True,
 ):
@@ -50,14 +52,11 @@ def reconstruct(
         读取 exploration 阶段获取的视频数据, 进而对物体结构进行恢复
         返回一个 obj_repr, 包含物体表示和 joint 估计
     """
-    if save_dir is not None:
-        os.makedirs(save_dir, exist_ok=True)
-    
-    rgb_seq = explore_data["rgb_seq"]
-    depth_seq = explore_data["depth_seq"]
-    franka_seq = explore_data["franka_seq"]
-    K = explore_data["K"]
-    Tw2c = explore_data["Tw2c"]
+    rgb_seq = obj_repr.frames.get_rgb_seq()
+    depth_seq = obj_repr.frames.get_depth_seq()
+    franka2d_seq = obj_repr.frames.get_franka2d_seq()
+    K = obj_repr.initial_frame.K
+    Tw2c = obj_repr.initial_frame.Tw2c
         
     depth_mask_seq = get_depth_mask_seq(
         depth_seq=depth_seq,
@@ -73,7 +72,7 @@ def reconstruct(
         rgb_image=rgb_seq[0],
         obj_description=obj_description,
         positive_points=None, 
-        negative_points=franka_seq[0],
+        negative_points=franka2d_seq[0],
         num_iterations=3,
         acceptable_thr=0.9,
         visualize=visualize,
@@ -82,7 +81,6 @@ def reconstruct(
     initial_uvs = sample_points_within_bbox_and_mask(initial_bbox, initial_mask, num_initial_uvs)
 
     if visualize:
-        import napari
         viewer = napari.view_image(rgb_seq[0])
         viewer.title = "initial uvs on intial rgb"
         initial_uvs_vis = initial_uvs[:, [1, 0]]
@@ -90,7 +88,6 @@ def reconstruct(
         napari.run()
     """
         对于 initial_uvs 进行追踪得到 tracks2d 
-        根据 depth filter 得到 tracks2d_filtered
     """
     # [T, M, 2], [T, M]
     tracks2d, pred_visibility = track_any_points(
@@ -98,73 +95,36 @@ def reconstruct(
         queries=initial_uvs,
         visiualize=visualize
     ) 
-    # 将 tracks2d 进行聚类
-    # TODO: 这个要不要转移到 filter 之后
-    # TODO: 要不要对于所有的 3d track 进行聚类, 或是对于 2d filter 后的进行聚类
-    
-    # 第一种方式, 在 2d 上进行 cluster
-    moving_mask_2d, static_mask_2d = cluster_tracks_2d(
-        rgb_seq=rgb_seq,
-        tracks_2d=tracks2d,
-        use_diff=True,
-        # visualize=visualize,
-        visualize=False,
-        viewer_title="dynamic clustering tracks2d"
-    )
-    
-    # 第二种方式, 在 3d 上进行 cluster
-    if True:
-        T, M, _ = tracks2d.shape
-        tracks2d_depth = extract_tracked_depths(depth_seq, tracks2d) # T, M
-        tracks3d = image_to_camera(tracks2d.reshape(T*M, -1), tracks2d_depth.reshape(-1), K)
-        tracks3d = tracks3d.reshape(T, M, 3)
-        con_mask = filter_tracks_by_consistency(tracks3d, threshold=0.02)
-        # visible_mask = filter_tracks_by_visibility(pred_visibility, threshold=0.8)
-        # tracks2d = tracks2d[:, visible_mask]
-        vis_tracks2d_napari(rgb_seq, tracks2d[:, con_mask], viewer_title="filter tracks2d by 3d consistency")
-        
-        tracks3d = tracks3d[:, con_mask]
-        moving_mask_3d, static_mask_3d = cluster_tracks_3d(
-            tracks3d, 
-            use_diff=True, 
-            visualize=True, 
-            viewer_title="other way of 3d"
-        )
-    
-    # filter tracks2d by visibility
-    visible_mask = filter_tracks_by_visibility(pred_visibility)
-    tracks2d_filtered = tracks2d[:, visible_mask]
-    if visualize:
-        vis_tracks2d_napari(rgb_seq, tracks2d_filtered, viewer_title="filter tracks2d by visibility score")
-        
-    # filter tracks2d by depthSeq_mask
-    # TODO: 这里不应该是 depth_mask_seq, 而应该是 depth_tracks
-    tracks2d_filtered = filter_tracks2d_by_depth_mask_seq(tracks2d_filtered, depth_mask_seq)
-    # tracks2d_filtered = filter_tracks2d_by_depth_diff_seq(tracks2d_filtered, depth_mask_seq)
-    if visualize:
-        vis_tracks2d_napari(rgb_seq, tracks2d_filtered, viewer_title="filter tracks2d by depth diff")
     """
-        dynamic segment tracks3d_filtered
-    """  
-    # 根据 tracks2d 得到 tracks3d
-    T, M, _ = tracks2d_filtered.shape
-    tracks2d_depth = extract_tracked_depths(depth_seq, tracks2d_filtered) # T, M
-    tracks3d_filtered = image_to_camera(tracks2d_filtered.reshape(T*M, -1), tracks2d_depth.reshape(-1), K) # T*M, 3
-    tracks3d_filtered = tracks3d_filtered.reshape(T, M, 3) 
-    moving_mask_3d, static_mask_3d = cluster_tracks_3d(
+        将 tracks2d 升维到 tracks3d, 并在 3d 空间对 tracks 进行聚类
+    """
+    # 首先将 tracks2d 升维到 tracks3d
+    T, M, _ = tracks2d.shape
+    tracks_depth = extract_tracked_depths(depth_seq, tracks2d) # T, M
+    tracks3d = image_to_camera(tracks2d.reshape(T * M, -1), tracks_depth.reshape(-1), K) # T*M, 3
+    tracks3d = tracks3d.reshape(T, M, 3)
+    # 对于 tracks3d 进行过滤
+    # TODO: 使用 franka 的分割进行过滤 + 使用 pred_visibility 进行过滤
+    # 
+    # 使用 3d consistency 进行过滤
+    consis_mask = filter_tracks_by_consistency(tracks3d, threshold=0.02) # M
+    tracks2d_filtered = tracks2d[:, consis_mask]
+    tracks3d_filtered = tracks3d[:, consis_mask]
+    if visualize:
+        vis_tracks2d_napari(rgb_seq, tracks2d_filtered, viewer_title="filter tracks by 3d consistency")
+    # 在 3d 空间对 tracks 进行聚类
+    moving_mask, static_mask = cluster_tracks_3d(
         tracks3d_filtered, 
         use_diff=True, 
         visualize=visualize, 
-        # visualize=True,
-        viewer_title="dynamic clustering tracks3d_filtered"
+        viewer_title="clustering 3d tracks(filtered) into moving and static part"
     )
     """
         coarse joint estimation with tracks3d_filtered
     """
     joint_type, joint_axis_c, joint_states = coarse_joint_estimation(
-        tracks_3d=tracks3d_filtered[:, moving_mask_3d, :], 
+        tracks_3d=tracks3d_filtered[:, moving_mask, :], 
         visualize=visualize
-        # visualize=True
     )
     """
         根据 rgb_seq 和 tracks2d 得到 obj_mask_seq (可以用 sam 或者 sam2)
@@ -176,19 +136,10 @@ def reconstruct(
         rgb_seq=rgb_seq[kf_idx], 
         obj_description=obj_description,
         positive_tracks2d=tracks2d_filtered[kf_idx], 
-        negative_tracks2d=franka_seq[kf_idx], 
+        negative_tracks2d=franka2d_seq[kf_idx], 
         visualize=visualize
         # visualize=True
     ) 
-    # obj_mask_seq by sam2 video mode
-    # obj_mask_seq = mask_obj_from_video_with_video_sam2(
-    #     rgb_folder,
-    #     kf_idx,
-    #     tracks2d_filtered[kf_idx], 
-    #     franka_seq[kf_idx], 
-    #     visualize
-    # )
-
     # 对 obj_mask_seq 进行 depth 过滤, 可选可不选
     obj_mask_seq = obj_mask_seq & depth_mask_seq[kf_idx]
     """
@@ -196,10 +147,9 @@ def reconstruct(
     """
     dynamic_seq = get_dynamic_seq(
         mask_seq=obj_mask_seq, 
-        moving_points_seq=tracks2d[kf_idx][:, moving_mask_2d, :],
-        static_points_seq=tracks2d[kf_idx][:, static_mask_2d, :], 
+        moving_points_seq=tracks2d_filtered[kf_idx][:, moving_mask, :],
+        static_points_seq=tracks2d_filtered[kf_idx][:, static_mask, :], 
         visualize=visualize
-        # visualize=True
     )
     """
         根据 dynamic_seq 中的 moving_part, 利用 ICP 估计出精确的 joint params
@@ -242,10 +192,10 @@ def reconstruct(
     # 在这里调整 joint_axis_w_updated 的方向, 使得其指向使得物体点云方差变大的方向
     # TODO：似乎跟 joint_type 还有关系
     if joint_type == "prismatic":
-        tracks_3d_moving_c = tracks3d_filtered[:, moving_mask_3d, :] 
+        tracks_3d_moving_c = tracks3d_filtered[:, moving_mask, :] 
         moving_mean_start = tracks_3d_moving_c[0].mean(0)
         moving_mean_end = tracks_3d_moving_c[-1].mean(0)
-        tracks_3d_static_c = tracks3d_filtered[:, static_mask_3d, :]
+        tracks_3d_static_c = tracks3d_filtered[:, static_mask, :]
         static_mean_start = tracks_3d_static_c[0].mean(0)
         static_mean_end = tracks_3d_static_c[-1].mean(0)
         
@@ -265,38 +215,35 @@ def reconstruct(
         if dot_product_with_joint_axis < 0:
             # 代表估计出的 joint 方向与重建数据的变化方向相反, 此时如果重建数据的方向为 open, 则估计出的 joint 实际指向为 close 方向, 此时需要反转
             if track_type == "open":
-                joint_axis_out_w = -joint_axis_w_updated
+                joint_axis_w_updated = -joint_axis_w_updated
                 joint_axis_c = - joint_axis_c
+                joint_axis_c_updated = -joint_axis_c_updated
                 joint_states = -joint_states
                 joint_states_updated = -joint_states_updated
             else:
-                joint_axis_out_w = joint_axis_w_updated
+                joint_axis_w_updated = joint_axis_w_updated
         else:
             if track_type == "close":
-                joint_axis_out_w = -joint_axis_w_updated
+                joint_axis_w_updated = -joint_axis_w_updated
                 joint_axis_c = - joint_axis_c
+                joint_axis_c_updated = -joint_axis_c_updated
                 joint_states = -joint_states
                 joint_states_updated = -joint_states_updated
             else:
-                joint_axis_out_w = joint_axis_w_updated
+                joint_axis_w_updated = joint_axis_w_updated
     else:
         assert "revolute not implemented yet"
         
-    if save_dir is not None:
-        np.savez(
-            save_dir + "obj_repr.npz",
-            K=K,
-            Tw2c=Tw2c,
-            track_type=track_type,
-            rgb_seq=rgb_seq[kf_idx],
-            depth_seq=depth_seq[kf_idx],
-            dynamic_seq=dynamic_seq_updated,
-            joint_axis_c=joint_axis_c,
-            joint_axis_w=joint_axis_out_w,
-            joint_states=joint_states_updated,
-            joint_type=joint_type,
-            franka_seq=franka_seq[kf_idx],
-        )
+    if file_path is not None:
+        # 更新 obj_repr, 并且进行保存
+        obj_repr.key_frames = [obj_repr.frames[kf_idx_i] for kf_idx_i in kf_idx]
+        obj_repr.clear_frames()
+        obj_repr.track_type = track_type
+        obj_repr.joint_axis_c = joint_axis_c_updated
+        obj_repr.joint_axis_w = joint_axis_w_updated
+        obj_repr.joint_states = joint_states_updated
+        obj_repr.joint_type = joint_type
+        obj_repr.save(file_path)
     
     if gt_joint_axis is not None:
         print(f"\tgt axis: {gt_joint_axis}")
@@ -314,11 +261,13 @@ def reconstruct(
 
 if __name__ == "__main__":
     obj_idx = 44962
+    obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
+    
     reconstruct(
-        explore_data=np.load(f"/home/zby/Programs/Embodied_Analogy/assets/tmp/explore/{obj_idx}/explore_data.npz"),
+        obj_repr=Obj_repr.load(obj_repr_path),
         num_initial_uvs=1000,
         num_key_frames=3,
         visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
-        save_dir=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/{obj_idx}/"
+        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
     )

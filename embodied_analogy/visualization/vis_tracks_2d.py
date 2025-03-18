@@ -1,9 +1,9 @@
 """
     用于可视化 tracks_2d, 给定一系列背景图片(如 rgb_frames 或者 seg_mask)
 """
+import napari
 import torch
 import numpy as np
-
 
 def vis_tracks2d_napari(image_frames, tracks_2d, colors=None, viewer_title="napari"):
     """
@@ -16,7 +16,6 @@ def vis_tracks2d_napari(image_frames, tracks_2d, colors=None, viewer_title="napa
         tracks_2d = tracks_2d.cpu().numpy()
         
     T, M, _ = tracks_2d.shape
-    import napari
     viewer = napari.view_image(image_frames, rgb=True)
     viewer.title = viewer_title
     
