@@ -37,11 +37,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
         scale_t = np.dot(displacement, avg_unit_vector)  # 投影到单位向量上的标量
         scales.append(scale_t)
 
-    # 计算重投影误差 loss
-    # reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
-    # est_loss = np.mean(np.linalg.norm(reconstructed_tracks - tracks_3d, axis=2))  # 计算点对点 L2 误差的平均值
-    
-        # 初始化每帧的位移标量
+    # 初始化每帧的位移标量
     scales = np.array(scales)
     scales_init = torch.from_numpy(scales).cuda().requires_grad_()
     avg_unit_vector_init = torch.from_numpy(avg_unit_vector).cuda().requires_grad_()
@@ -224,28 +220,62 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     tracks_3d_mid = tracks_3d_mid.reshape(-1, 3) # N, 3
     axis_start, _, _, _ = np.linalg.lstsq(tracks_3d_flow, (tracks_3d_flow * tracks_3d_mid).sum(axis=-1), rcond=None)
     axis_start = remove_dir_component(axis_start, axis_dir)
-    print(axis_dir, axis_start)
+    # print(axis_dir, axis_start)
     
-    # 紧接着估计出每一帧对应的 angle, 这里可能需要进行一个方向的对齐
+    # 接着估计出每一帧对应的 angle, 这里可能需要进行一个方向的对齐
+    angles = np.zeros(T)  # 初始化角度数组，第一帧角度为0
+    for t in range(1, T):
+        # 计算初始帧和当前帧的点云中心
+        center_0 = tracks_3d[0].mean(axis=0)
+        center_t = tracks_3d[t].mean(axis=0)
+        
+        # 减去 axis_start 向量
+        diff_0 = center_0 - axis_start
+        diff_t = center_t - axis_start
+        
+        # 并减去 axis_dir 分量
+        diff_0 = remove_dir_component(diff_0, axis_dir)
+        diff_t = remove_dir_component(diff_t, axis_dir)
+        
+        # 进行归一化
+        diff_0 /= np.linalg.norm(diff_0)
+        diff_t /= np.linalg.norm(diff_t)
+        
+        # diff_0 * diff_t = cos(angle)
+        angle = np.arccos(np.clip(np.dot(diff_0, diff_t), -1.0, 1.0)) # [0, pi]
+        
+        # 在这里确定 angle 的方向 
+        # TODO：更准确的方式应该是用 t-1 时刻的来确定
+        if np.dot(np.cross(diff_0, diff_t), axis_dir) < 0:
+            angle = -angle
+        
+        angles[t] = angle
     
-    # 紧接着通过优化方法进一步优化估计值
-    def loss_function_torch(unit_vector_axis, angles):
-        unit_vector_axis = unit_vector_axis / torch.norm(unit_vector_axis)
+    print("before torch optimization")
+    print("joint_axis: ", axis_dir)
+    print("axis_start: ", axis_start)
+    print("joint_states: ", angles)
+    # 优化过程
+    def loss_function_torch(axis_dir, angles, axis_start):
+        axis_dir = axis_dir / torch.norm(axis_dir)
         est_loss = 0
         for t in range(T):
             theta = angles[t]
-            skew_v = torch.tensor([[0, -unit_vector_axis[2], unit_vector_axis[1]],
-                                    [unit_vector_axis[2], 0, -unit_vector_axis[0]],
-                                    [-unit_vector_axis[1], unit_vector_axis[0], 0]], device="cuda")
+            skew_v = torch.tensor([[0, -axis_dir[2], axis_dir[1]],
+                                    [axis_dir[2], 0, -axis_dir[0]],
+                                    [-axis_dir[1], axis_dir[0], 0]], device="cuda")
             R_reconstructed = torch.eye(3, device="cuda") + torch.sin(theta) * skew_v + (1 - torch.cos(theta)) * (skew_v @ skew_v)
-            reconstructed_track = (R_reconstructed @ torch.from_numpy(tracks_3d[0].T).float().cuda()).T
+            translated_initial = torch.from_numpy(tracks_3d[0]).float().cuda() - axis_start # N, 3
+            reconstructed_track = (R_reconstructed @ translated_initial.T).T + axis_start
             est_loss += torch.mean(torch.norm(reconstructed_track - torch.from_numpy(tracks_3d[t]).cuda(), dim=1))
         return est_loss / T
     
-    # 初始化 angles 并设置优化器
-    angles = torch.from_numpy(angles_init).float().cuda().requires_grad_()
-    unit_vector_axis = torch.from_numpy(unit_vector_axis).float().cuda().requires_grad_()
-    optimizer = torch.optim.Adam([angles, unit_vector_axis], lr=1e-3)
+    # 初始化 angles 和 axis_start，并设置优化器
+    angles = torch.from_numpy(angles).float().cuda().requires_grad_()
+    axis_dir = torch.from_numpy(axis_dir).float().cuda().requires_grad_()
+    axis_start = torch.from_numpy(axis_start).float().cuda().requires_grad_()
+    
+    optimizer = torch.optim.Adam([angles, axis_dir, axis_start], lr=1e-3)
     scheduler = Scheduler(
         optimizer=optimizer,
         lr_update_factor=0.5,
@@ -257,16 +287,17 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     num_iterations = 100
     for i in range(num_iterations):
         optimizer.zero_grad()
-        loss = loss_function_torch(unit_vector_axis, angles)
-        print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+        loss = loss_function_torch(axis_dir, angles, axis_start)
+        # print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
         cur_state_dict = {
             "joint_states": angles.detach().cpu().numpy(),
-            "joint_axis": (unit_vector_axis / torch.norm(unit_vector_axis)).detach().cpu().numpy(),
+            "joint_axis": (axis_dir / torch.norm(axis_dir)).detach().cpu().numpy(),
+            "axis_start": axis_start.detach().cpu().numpy(),
         }
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        print(f"\t lr:", cur_lr)
+        # print(f"\t lr:", cur_lr)
         
         if should_early_stop:
             print("EARLY STOP")
@@ -275,11 +306,18 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         loss.backward()
         optimizer.step()
         
+    print("after torch optimization")
+    print("joint_axis: ", scheduler.best_state_dict["joint_axis"])
+    print("axis_start: ", scheduler.best_state_dict["axis_start"])
+    print("joint_states: ", scheduler.best_state_dict["joint_states"])
+    
     if visualize:
         angles = angles.detach().cpu().numpy()
-        unit_vector_axis = unit_vector_axis.detach().cpu().numpy()
+        axis_dir = axis_dir.detach().cpu().numpy()
+        axis_start = axis_start.detach().cpu().numpy()
+        
         # 绿色代表 moving part, 红色代表 reconstructed moving part
-        reconstructed_tracks = [(R.from_rotvec(angles[t] * unit_vector_axis).as_matrix() @ tracks_3d[0].T).T for t in range(T)]
+        reconstructed_tracks = [(R.from_rotvec(angles[t] * axis_dir).as_matrix() @ (tracks_3d[0] - axis_start).T).T + axis_start for t in range(T)]
         
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "coarse R estimation"
@@ -288,8 +326,9 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
         
         napari.run()
-    
+        
     return scheduler.best_state_dict, scheduler.best_loss
+
 
 def coarse_joint_estimation(tracks_3d, visualize=False):
     """
@@ -357,7 +396,9 @@ def test_coarse_R_from_tracks_3d():
     noise_std = 0.01  # 加噪声的标准差
     axis_start_point = np.array([1, 1, 1])  # 旋转轴的起始点
     axis_start_point = remove_dir_component(axis_start_point, true_axis)
-    print("gt axis: ", true_axis, "gt_start: ", axis_start_point)
+    print("gt axis: ", true_axis)
+    print("gt_start: ", axis_start_point)
+    print("gt states: ", true_angles)
 
     # 初始化第0帧点云
     base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标
