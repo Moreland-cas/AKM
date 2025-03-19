@@ -20,7 +20,6 @@ def relocalization(
     ref_joint_states, 
     ref_dynamics,
     lr=5e-3,
-    tol=1e-7,
     icp_select_range=0.1,
     obj_description="object",
     negative_points=None, # N, 2
@@ -48,7 +47,6 @@ def relocalization(
         ref_joint_states, 
         ref_dynamics,
         lr=lr,
-        tol=tol,
         icp_select_range=icp_select_range,
         visualize=visualize
     )
@@ -64,7 +62,6 @@ def _relocalization(
     ref_joint_states, 
     ref_dynamics,
     lr=5e-3,
-    tol=1e-9,
     icp_select_range=0.1,
     visualize=False
 ):
@@ -112,7 +109,6 @@ def _relocalization(
         # 目前不更新 dynamic_mask
         update_dynamic_mask=np.arange(num_ref+1)==-1,
         lr=lr,
-        tol=tol,
         icp_select_range=icp_select_range,
         visualize=visualize
     )
@@ -193,7 +189,6 @@ if __name__ == "__main__":
             ref_joint_states=obj_repr["joint_states"][other_mask], 
             ref_dynamics=obj_repr["dynamic_seq"][other_mask], 
             lr=1e-3, # 一次估计 1 mm
-            tol=1e-8,
             icp_select_range=0.2,
             visualize=visualize
         )

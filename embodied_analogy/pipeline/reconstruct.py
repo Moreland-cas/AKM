@@ -182,7 +182,6 @@ def reconstruct(
         # 这里设置不迭代的优化 dynamic_mask
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
         lr=5e-3, # 5 mm
-        tol=1e-9,
         icp_select_range=0.1,
         visualize=visualize
     )
@@ -277,5 +276,6 @@ if __name__ == "__main__":
         num_key_frames=3,
         visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
-        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
+        # file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
+        file_path = None
     )

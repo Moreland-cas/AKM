@@ -388,12 +388,11 @@ def fine_joint_estimation_seq(
     joint_type, 
     joint_axis_c, # unit vector here, in camera frame
     joint_states,
-    max_icp_iters=200, # ICP 最多迭代多少轮
+    max_icp_iters=100, # ICP 最多迭代多少轮
     optimize_joint_axis=True,
     optimize_state_mask=None, # boolean mask to select which states to optimize
     update_dynamic_mask=None,
     lr=3e-4,
-    tol=1e-8,
     icp_select_range=0.03,
     visualize=False
 ):
@@ -547,14 +546,18 @@ def fine_joint_estimation_seq(
             break
         
         # 在这里进行 scheduler.step()
-        print(f"ICP iter_{k}: ", cur_icp_loss)
         cur_state_dict = {
             "joint_axis": (axis_params / torch.norm(axis_params)).detach().cpu().numpy(),
             "joint_states": np.array([states_param.detach().cpu().item() for states_param in states_params])
         }
         should_early_stop = scheduler.step(cur_icp_loss.item(), cur_state_dict)
+        
+        print(f"[{k}/{max_icp_iters}] ICP loss:", cur_icp_loss.item())
+        cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
+        print(f"\t lr:", cur_lr)
+        
         if should_early_stop:
-            print("Early stop")
+            print("EARLY STOP")
             break
         
         # otherwise 继续优化
