@@ -1,20 +1,10 @@
-"""
-Input:
-    T, M, 3 的点云轨迹
-    
-Output:
-    输出平移关节参数和误差统计
-    输出旋转关节参数和误差统计
-
-"""
+import napari
 import torch
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from embodied_analogy.visualization.vis_tracks_3d import (
-    vis_tracks3d_napari,
-    vis_pointcloud_series_napari
-)
+
 from embodied_analogy.utility.utils import napari_time_series_transform
+from embodied_analogy.estimation.scheduler import Scheduler
 
 def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     """
@@ -65,36 +55,48 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
 
     # 设置优化器
     optimizer = torch.optim.Adam([scales_init, avg_unit_vector_init], lr=1e-2) # 1 cm
+    scheduler = Scheduler(
+        optimizer=optimizer,
+        lr_update_factor=0.5,
+        lr_scheduler_patience=3,
+        early_stop_patience=10,
+    )
 
     # 运行优化
     num_iterations = 100
-    for _ in range(num_iterations):
+    for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(scales_init, avg_unit_vector_init)
-        print("coarse loss: ", loss.item())
+        print(f"[{i}/{num_iterations}] coarse t loss: ", loss.item())
+        cur_state_dict = {
+            "joint_states": scales_init.detach().cpu().numpy(),
+            "joint_axis": (avg_unit_vector_init / torch.norm(avg_unit_vector_init)).detach().cpu().numpy(),
+        }
+        should_early_stop = scheduler.step(loss.item(), cur_state_dict)
+        
+        cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
+        print(f"\t lr:", cur_lr)
+        
+        if should_early_stop:
+            print("EARLY STOP")
+            break
+        
         loss.backward()
         optimizer.step()
 
-    with torch.no_grad():
-        est_loss = loss_function_torch(scales_init, avg_unit_vector_init)
-
-    scales = scales_init.detach().cpu().numpy()
-    avg_unit_vector_init = avg_unit_vector_init / torch.norm(avg_unit_vector_init)
-    avg_unit_vector = avg_unit_vector_init.detach().cpu().numpy()
-    
     if visualize:
         reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(scales, avg_unit_vector).reshape(T, 1, 3) # T, M, 3
         
-        import napari
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "coarse translation estimation"
         
         viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
         viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
-        
+
         napari.run()
         
-    return avg_unit_vector, scales, est_loss
+    return scheduler.best_state_dict, scheduler.best_loss
+
 
 def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     """
@@ -102,7 +104,6 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     :param tracks_3d: 形状为 (T, M, 3) 的 numpy 数组, T 是时间步数, M 是点的数量
     :return: 旋转轴的单位向量 (3,), 每帧的旋转角度数组 (T,), 以及估计误差 est_loss
     """
-    # TODO: 改得更简单一些
     if isinstance(tracks_3d, torch.Tensor):
         tracks_3d = tracks_3d.cpu().numpy()
     
@@ -154,27 +155,41 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     angles = torch.from_numpy(angles_init).float().cuda().requires_grad_()
     unit_vector_axis = torch.from_numpy(unit_vector_axis).float().cuda().requires_grad_()
     optimizer = torch.optim.Adam([angles, unit_vector_axis], lr=1e-3)
+    scheduler = Scheduler(
+        optimizer=optimizer,
+        lr_update_factor=0.5,
+        lr_scheduler_patience=3,
+        early_stop_patience=10,
+    )
     
     # 运行优化
     num_iterations = 100
-    for _ in range(num_iterations):
+    for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(unit_vector_axis, angles)
-        print("coarse loss: ", loss.item())
+        print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+        cur_state_dict = {
+            "joint_states": angles.detach().cpu().numpy(),
+            "joint_axis": (unit_vector_axis / torch.norm(unit_vector_axis)).detach().cpu().numpy(),
+        }
+        should_early_stop = scheduler.step(loss.item(), cur_state_dict)
+        
+        cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
+        print(f"\t lr:", cur_lr)
+        
+        if should_early_stop:
+            print("EARLY STOP")
+            break
+        
         loss.backward()
         optimizer.step()
         
-    with torch.no_grad():
-        est_loss = loss_function_torch(unit_vector_axis, angles)
-    
-    angles = angles.detach().cpu().numpy()
-    unit_vector_axis = unit_vector_axis.detach().cpu().numpy()
-    
     if visualize:
+        angles = angles.detach().cpu().numpy()
+        unit_vector_axis = unit_vector_axis.detach().cpu().numpy()
         # 绿色代表 moving part, 红色代表 reconstructed moving part
         reconstructed_tracks = [(R.from_rotvec(angles[t] * unit_vector_axis).as_matrix() @ tracks_3d[0].T).T for t in range(T)]
         
-        import napari
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "coarse R estimation"
         
@@ -183,26 +198,28 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         
         napari.run()
     
-    return unit_vector_axis, angles, est_loss
+    return scheduler.best_state_dict, scheduler.best_loss
     
     
 def coarse_joint_estimation(tracks_3d, visualize=False):
     """
     tracks_3d: (T, M, 3)
     """
-    t_axis, t_states, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
+    t_state_dict, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
     # R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
-    R_axis, R_states, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
+    R_state_dict, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
     
     print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
     if t_est_loss < R_est_loss:
         joint_type = "prismatic"
-        joint_axis = t_axis
-        joint_states = t_states
+        print("select as prismatic joint")
+        joint_axis = t_state_dict["joint_axis"]
+        joint_states = t_state_dict["joint_states"]
     else:
         joint_type = "revolute"
-        joint_axis = R_axis
-        joint_states = R_states
+        print("select as revolute joint")
+        joint_axis = R_state_dict["joint_axis"]
+        joint_states = R_state_dict["joint_states"]
         
     return joint_type, joint_axis, joint_states
 
@@ -252,7 +269,8 @@ def test_coarse_R_from_tracks_3d():
     tracks_3d = generate_rotated_points(base_points, true_axis, true_angles, noise_std)
     
     # 调用 coarse_R_from_tracks_3d 函数
-    unit_vector_axis, angles, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=True)
+    best_state, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=True)
+    unit_vector_axis, angles = best_state["joint_axis"], best_state["joint_states"]
     
     # 打印优化后的旋转轴和角度
     print("优化后的旋转轴:", unit_vector_axis)
@@ -301,7 +319,7 @@ def test_coarse_t_from_tracks_3d():
     M = 50   # 5 个点
     true_direction = np.array([1, 0, 0])  # 真正的平移方向是 X 轴
     true_scales = np.linspace(0, 1, T)  # 平移标量从 0 到 1
-    noise_std = 0.1  # 加噪声的标准差
+    noise_std = 0.01  # 加噪声的标准差
 
     # 初始化第0帧点云
     base_points = np.random.rand(M, 3)  # 随机生成 5 个点的 3D 坐标
@@ -310,7 +328,8 @@ def test_coarse_t_from_tracks_3d():
     tracks_3d = generate_translated_points(base_points, true_direction, true_scales, noise_std)
     
     # 调用 coarse_t_from_tracks_3d 函数
-    avg_unit_vector, scales, est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize=True)
+    best_state, est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize=True)
+    avg_unit_vector, scales = best_state["joint_axis"], best_state["joint_states"]
     
     # 打印优化后的平移方向和标量
     print("优化后的平移方向:", avg_unit_vector)
@@ -329,6 +348,6 @@ def test_coarse_t_from_tracks_3d():
 
 
 if __name__ == "__main__":
-    test_coarse_R_from_tracks_3d()
+    # test_coarse_R_from_tracks_3d()
     # 调用测试函数
-    # test_coarse_t_from_tracks_3d()
+    test_coarse_t_from_tracks_3d()
