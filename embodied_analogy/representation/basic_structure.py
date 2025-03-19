@@ -47,15 +47,15 @@ class Frame(Data):
         self.franka3d = franka3d
         self.franka_mask = franka_mask
     
-    def _visualize(self, viewer: napari.Viewer):
-        viewer.add_image(self.rgb, rgb=True, name="initial_frame_rgb")
+    def _visualize(self, viewer: napari.Viewer, prefix=""):
+        viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
         
         if self.obj_mask is not None:
-            viewer.add_labels(self.obj_mask, name="obj_mask")
+            viewer.add_labels(self.obj_mask, name=f"{prefix}_obj_mask")
             
         if self.contact2d is not None:
             u, v = self.contact2d
-            viewer.add_points((v, u), face_color="red", name="contact2d")
+            viewer.add_points((v, u), face_color="red", name=f"{prefix}_contact2d")
     
     def visualize(self):
         viewer = napari.Viewer()
@@ -85,6 +85,9 @@ class Frames(Data):
     
     def __getitem__(self, idx):
         return self.frame_list[idx]
+    
+    def __len__(self):
+        return len(self.frame_list)
     
     def clear(self):
         self.frame_list = []
@@ -117,25 +120,39 @@ class Frames(Data):
         obj_mask_seq = np.stack([self.frame_list[i].obj_mask for i in range(self.num_frames())]) 
         return obj_mask_seq
     
-    def _visualize(self, viewer: napari.Viewer):
+    def get_dynamic_mask_seq(self):
+        # T, H, W
+        dynamic_mask_seq = np.stack([self.frame_list[i].dynamic_mask for i in range(self.num_frames())]) 
+        return dynamic_mask_seq
+    
+    def _visualize(self, viewer: napari.Viewer, prefix="", visualize_franka2d=False):
         rgb_seq = self.get_rgb_seq()
-        franka2d_seq = self.get_franka2d_seq()
-        link_names = [
-            'panda_link0', 'panda_link1', 'panda_link2', 
-            'panda_link3', 'panda_link4', 'panda_link5', 
-            'panda_link6', 'panda_link7', 'panda_link8', 
-            'panda_hand', 'panda_hand_tcp', 'panda_leftfinger', 
-            'panda_rightfinger', 'camera_base_link', 'camera_link'
-        ]
-        
         viewer.add_image(rgb_seq, rgb=True)
         
-        franka2d_data = napari_time_series_transform(franka2d_seq) # T*M, (1+2)
-        franka2d_data = franka2d_data[:, [0, 2, 1]]
-        for i in range(len(link_names)):
-            T = len(rgb_seq)
-            M = len(link_names)
-            viewer.add_points(franka2d_data[i::M, :], face_color="red", name=link_names[i])
+        # 添加绘制 mask
+        if self.frame_list[0].obj_mask is not None:
+            obj_mask_seq = self.get_obj_mask_seq()
+            viewer.add_labels(obj_mask_seq, name=f"{prefix}_obj_mask_seq")
+        
+        if self.frame_list[0].dynamic_mask is not None:
+            dynamic_mask_seq = self.get_dynamic_mask_seq()
+            viewer.add_labels(dynamic_mask_seq.astype(np.int32), name=f"{prefix}_dynamic_mask_seq")
+        
+        if visualize_franka2d:
+            franka2d_seq = self.get_franka2d_seq()
+            link_names = [
+                'panda_link0', 'panda_link1', 'panda_link2', 
+                'panda_link3', 'panda_link4', 'panda_link5', 
+                'panda_link6', 'panda_link7', 'panda_link8', 
+                'panda_hand', 'panda_hand_tcp', 'panda_leftfinger', 
+                'panda_rightfinger', 'camera_base_link', 'camera_link'
+            ]
+            franka2d_data = napari_time_series_transform(franka2d_seq) # T*M, (1+2)
+            franka2d_data = franka2d_data[:, [0, 2, 1]]
+            for i in range(len(link_names)):
+                T = len(rgb_seq)
+                M = len(link_names)
+                viewer.add_points(franka2d_data[i::M, :], face_color="red", name=f"{prefix}_{link_names[i]}")
         
     def visualize(self):
         viewer = napari.Viewer()

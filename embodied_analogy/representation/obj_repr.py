@@ -32,14 +32,17 @@ class Obj_repr(Data):
     def reloc(self, frame: Frame):
         pass
     
-    def _visualize(self, viewer: napari.Viewer):
+    def _visualize(self, viewer: napari.Viewer, prefix=""):
         pass
     
     def visualize(self):
         viewer = napari.Viewer()
         viewer.title = "object representation"
-        self.initial_frame._visualize(viewer)
-        self.frames._visualize(viewer)
+        self.initial_frame._visualize(viewer, prefix="initial")
+        if len(self.frames) > 0:
+            self.frames._visualize(viewer, prefix="frames")
+        if len(self.key_frames) > 0:
+            self.key_frames._visualize(viewer, prefix="kframes")
         self._visualize(viewer)
         napari.run()
 
@@ -47,7 +50,8 @@ class Obj_repr(Data):
 if __name__ == "__main__":
     # drawer
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
     # microwave
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
     obj_repr.visualize()
     

@@ -22,7 +22,9 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 
 import napari
+from embodied_analogy.representation.basic_structure import Frames
 from embodied_analogy.representation.obj_repr import Obj_repr
+
 from embodied_analogy.perception.online_cotracker import track_any_points
 from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.perception.mask_obj_from_video import (
@@ -236,7 +238,13 @@ def reconstruct(
         
     if file_path is not None:
         # 更新 obj_repr, 并且进行保存
-        obj_repr.key_frames = [obj_repr.frames[kf_idx_i] for kf_idx_i in kf_idx]
+        _key_frames = [obj_repr.frames[kf_idx_i] for kf_idx_i in kf_idx]
+        # 将 obj_mask 和 dynamic_mask 更新到 key_frames 中
+        for i, frame in enumerate(_key_frames):
+            frame.obj_mask = obj_mask_seq[i]
+            frame.dynamic_mask = dynamic_seq_updated[i]
+            
+        obj_repr.key_frames = Frames(frame_list=_key_frames)
         obj_repr.clear_frames()
         obj_repr.track_type = track_type
         obj_repr.joint_axis_c = joint_axis_c_updated
