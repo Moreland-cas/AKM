@@ -14,6 +14,7 @@ from embodied_analogy.utility.utils import (
     compute_normals
 )
 from embodied_analogy.utility.constants import *
+from embodied_analogy.estimation.scheduler import Scheduler
 
 ###################### deprecated ######################
 def segment_ref_obj_mask(
@@ -24,7 +25,6 @@ def segment_ref_obj_mask(
     alpha=0.1,
     visualize=False
 ):
-    # TODO: 摆清你的位置, 你就是个 refine mask 的小函数, 改为 refine mask
     """
     对 obj_mask_ref 中的像素进行分类, 分为 static, moving 和 unknown 三类
     Args:
@@ -451,8 +451,12 @@ def fine_joint_estimation_seq(
         {'params': axis_params, 'lr': axis_lr}, 
         *state_params_to_optimize
     ])
-    
-    # TODO：在这里加一个动态调整学习率的功能
+    scheduler = Scheduler(
+        optimizer, 
+        lr_update_factor=0.5, 
+        lr_scheduler_patience=3, 
+        early_stop_patience=10
+    )
     
     # 生成 (i, j) 对，根据 state_mask 和是否优化 joint_axis 来决定
     ij_pairs = []
@@ -538,16 +542,19 @@ def fine_joint_estimation_seq(
             )
         
         if cur_icp_loss.item() == 0:
-            # 如果等于 0, 说明就根本没有有效的数据 pair, 这时候选择更改 icp_range 的参数, 或者直接退出
+            # TODO 如果等于 0, 说明就根本没有有效的数据 pair, 这时候选择更改 icp_range 的参数, 或者直接退出
             print("No valid data pair, exit ICP loop")
             break
-            
-        # 计算损失变化
-        loss_change = abs(cur_icp_loss.item() - prev_icp_loss)
-        prev_icp_loss = cur_icp_loss.item()
-        print(f"ICP iter_{k}: ", prev_icp_loss)
-        # print(f"current estimate state: {states_params[0].detach().cpu().item()}")
-        if loss_change < tol:
+        
+        # 在这里进行 scheduler.step()
+        print(f"ICP iter_{k}: ", cur_icp_loss)
+        cur_state_dict = {
+            "joint_axis": (axis_params / torch.norm(axis_params)).detach().cpu().numpy(),
+            "joint_states": np.array([states_param.detach().cpu().item() for states_param in states_params])
+        }
+        should_early_stop = scheduler.step(cur_icp_loss.item(), cur_state_dict)
+        if should_early_stop:
+            print("Early stop")
             break
         
         # otherwise 继续优化
@@ -555,9 +562,9 @@ def fine_joint_estimation_seq(
         cur_icp_loss.backward()
         optimizer.step()
 
-    joint_axis_c_updated = (axis_params / torch.norm(axis_params)).detach().cpu().numpy()
-    joint_states_updated = np.array([states_param.detach().cpu().item() for states_param in states_params])
-    
+    joint_axis_c_updated = scheduler.best_state_dict["joint_axis"]
+    joint_states_updated = scheduler.best_state_dict["joint_states"]
+        
     if visualize:
         # 获取 transform_seq
         transform_seq = [
