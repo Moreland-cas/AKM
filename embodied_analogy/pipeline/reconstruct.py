@@ -27,11 +27,8 @@ from embodied_analogy.representation.obj_repr import Obj_repr
 
 from embodied_analogy.perception.online_cotracker import track_any_points
 from embodied_analogy.perception.grounded_sam import run_grounded_sam
-from embodied_analogy.perception.mask_obj_from_video import (
-    mask_obj_from_video_with_image_sam2,
-    # mask_obj_from_video_with_video_sam2
-)
-from embodied_analogy.estimation.clustering import cluster_tracks_2d, cluster_tracks_3d
+from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
+from embodied_analogy.estimation.clustering import cluster_tracks_3d
 from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
 from embodied_analogy.estimation.fine_joint_est import (
     fine_joint_estimation_seq,
@@ -267,14 +264,14 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    obj_idx = 44962
+    obj_idx = 7221
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     
     reconstruct(
         obj_repr=Obj_repr.load(obj_repr_path),
         num_initial_uvs=1000,
         num_key_frames=3,
-        visualize=False,
+        visualize=True,
         gt_joint_axis=np.array([-1, 0, 0]),
         # file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
         file_path = None

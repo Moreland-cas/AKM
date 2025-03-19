@@ -1232,8 +1232,31 @@ def crop_nearby_points(point_clouds, contact_3d, radius=0.1):
     cropped_points = pcd.select_by_index(idx)
     return np.asarray(cropped_points.points)
 
+def fit_plane_normal(points):
+    """
+        输入一个点云, 用一个平面拟合它, 并返回该平面的单位法向量
+        point_cloud: np.array([N, 3])
+    """
+    # 计算点的均值
+    centroid = np.mean(points, axis=0)
 
-import numpy as np
+    # 中心化点云
+    centered_points = points - centroid
+
+    # 计算协方差矩阵
+    cov_matrix = np.cov(centered_points, rowvar=False)
+
+    # 进行特征值分解
+    _, _, vh = np.linalg.svd(cov_matrix)
+
+    # 法向量是特征值分解的最后一个特征向量
+    normal_vector = vh[-1]
+
+    # 归一化法向量
+    normalized_normal_vector = normal_vector / np.linalg.norm(normal_vector)
+
+    return centroid, normalized_normal_vector
+
 
 def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False):
     """
@@ -1252,7 +1275,7 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
         sample_points = points[indices]
 
         # 计算平面的法向量
-        normal_vector = fit_plane_normal(sample_points)
+        _, normal_vector = fit_plane_normal(sample_points)
 
         # 计算每个点到平面的距离
         dists = np.abs(np.dot(points - sample_points[0], normal_vector))
@@ -1284,32 +1307,25 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
     return best_normal
 
 
-def fit_plane_normal(points):
+def remove_dir_component(vector, direction):
     """
-        输入一个点云, 用一个平面拟合它, 并返回该平面的单位法向量
-        point_cloud: np.array([N, 3])
+        返回去除掉 direction 上分量后的 vector
+        vector: np.array([3, ])
+        direction: np.array([3, ])
     """
-    # 计算点的均值
-    centroid = np.mean(points, axis=0)
+    # 计算方向的单位向量
+    direction_unit = direction / np.linalg.norm(direction)
+    
+    # 计算原始向量在方向上的投影
+    projection_length = np.dot(vector, direction_unit)
+    projection = projection_length * direction_unit
+    
+    # 去除方向上的分量
+    result_vector = vector - projection
+    
+    return result_vector
 
-    # 中心化点云
-    centered_points = points - centroid
-
-    # 计算协方差矩阵
-    cov_matrix = np.cov(centered_points, rowvar=False)
-
-    # 进行特征值分解
-    _, _, vh = np.linalg.svd(cov_matrix)
-
-    # 法向量是特征值分解的最后一个特征向量
-    normal_vector = vh[-1]
-
-    # 归一化法向量
-    normalized_normal_vector = normal_vector / np.linalg.norm(normal_vector)
-
-    return normalized_normal_vector
-
-
+    
 # 示例用法
 if __name__ == "__main__":
     # 示例用法
