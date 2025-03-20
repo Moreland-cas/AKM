@@ -197,7 +197,7 @@ def coarse_R_from_tracks_3d_deprecated(tracks_3d, visualize=False):
     return scheduler.best_state_dict, scheduler.best_loss
     
 
-def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
+def coarse_R_from_tracks_3d_deprecated2(tracks_3d, visualize=False):
     """
     通过所有时间帧的点轨迹估计旋转轴，并通过优化方法求解每帧的旋转角度
     :param tracks_3d: 形状为 (T, M, 3) 的 numpy 数组, T 是时间步数, M 是点的数量
@@ -245,7 +245,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         angle = np.arccos(np.clip(np.dot(diff_0, diff_t), -1.0, 1.0)) # [0, pi]
         
         # 在这里确定 angle 的方向 
-        # TODO：更准确的方式应该是用 t-1 时刻的来确定
+        # TODO：更准确的方式应该是用 t-1 时刻的来确定 应该是小于0
         if np.dot(np.cross(diff_0, diff_t), axis_dir) < 0:
             angle = -angle
         
@@ -325,10 +325,177 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
         viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
         
+        # 绘制一下 joint start 和 joint axis
+        viewer.add_shapes(
+            data=np.array([joint_start, joint_start + axis_dir * 0.2]),
+            name="revolute joint",
+            shape_type="line",
+            edge_width=0.005,
+            edge_color="blue",
+            face_color="blue",
+        )
+        viewer.add_points(
+            data=joint_start,
+            name="joint start",
+            size=0.02,
+            face_color="blue",
+            edge_color="red",
+        )
         napari.run()
         
     return scheduler.best_state_dict, scheduler.best_loss
 
+
+def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
+    # 使用一个 frame 的点云估计一整个 normal
+    # TODO 还可以挑选出变化明显的一些 diff
+    """
+    通过所有时间帧的点轨迹估计旋转轴，并通过优化方法求解每帧的旋转角度
+    :param tracks_3d: 形状为 (T, M, 3) 的 numpy 数组, T 是时间步数, M 是点的数量
+    :return: 旋转轴的单位向量 (3,), 每帧的旋转角度数组 (T,), 以及估计误差 est_loss
+    """
+    if isinstance(tracks_3d, torch.Tensor):
+        tracks_3d = tracks_3d.cpu().numpy()
+    
+    T, M, _ = tracks_3d.shape
+    tracks_3d_mean = tracks_3d.mean(axis=1) # T, 1, 3
+    
+    # 注意 axis_dir 应该满足垂直于所有 tracks_3d_diff 的方向, 因此可以复用 fit_normal 函数来求解
+    tracks_3d_diff = tracks_3d_mean[1:, ...] - tracks_3d_mean[:-1, ...] # (T-1), M, 3
+    tracks_3d_flow = tracks_3d_diff.reshape(-1, 3) # N, 3
+    _, axis_dir = fit_plane_normal(tracks_3d_flow)
+    
+    # 对于 joint_start 应该满足 (joint_start - tracks_3d_mid) 垂直于 tracks_3d_diff
+    # 可以通过最小二乘对 joint_start 直接求解， 即 (joint_start - tracks_3d_mid) * tracks_3d_diff = 0
+    # 即 tracks_3d_diff @ joint_start = (tracks_3d_mid * tracks_3d_diff).sum(axis=-1)
+    tracks_3d_mid = (tracks_3d_mean[1:, ...] + tracks_3d_mean[:-1, ...]) / 2.0
+    tracks_3d_mid = tracks_3d_mid.reshape(-1, 3) # N, 3
+    joint_start, _, _, _ = np.linalg.lstsq(tracks_3d_flow, (tracks_3d_flow * tracks_3d_mid).sum(axis=-1), rcond=None)
+    joint_start = remove_dir_component(joint_start, axis_dir)
+    # print(axis_dir, joint_start)
+    
+    # 接着估计出每一帧对应的 angle, 这里可能需要进行一个方向的对齐
+    angles = np.zeros(T)  # 初始化角度数组，第一帧角度为0
+    for t in range(1, T):
+        # 计算初始帧和当前帧的点云中心
+        center_0 = tracks_3d[0].mean(axis=0)
+        center_t = tracks_3d[t].mean(axis=0)
+        
+        # 减去 joint_start 向量
+        diff_0 = center_0 - joint_start
+        diff_t = center_t - joint_start
+        
+        # 并减去 axis_dir 分量
+        diff_0 = remove_dir_component(diff_0, axis_dir)
+        diff_t = remove_dir_component(diff_t, axis_dir)
+        
+        # 进行归一化
+        diff_0 /= np.linalg.norm(diff_0)
+        diff_t /= np.linalg.norm(diff_t)
+        
+        # diff_0 * diff_t = cos(angle)
+        angle = np.arccos(np.clip(np.dot(diff_0, diff_t), -1.0, 1.0)) # [0, pi]
+        
+        # 在这里确定 angle 的方向 
+        # TODO：更准确的方式应该是用 t-1 时刻的来确定 应该是小于0
+        if np.dot(np.cross(diff_0, diff_t), axis_dir) < 0:
+            angle = -angle
+        
+        angles[t] = angle
+    
+    print("before torch optimization")
+    print("joint_axis: ", axis_dir)
+    print("joint_start: ", joint_start)
+    print("joint_states: ", angles)
+    # 优化过程
+    def loss_function_torch(axis_dir, angles, joint_start):
+        axis_dir = axis_dir / torch.norm(axis_dir)
+        est_loss = 0
+        for t in range(T):
+            theta = angles[t]
+            skew_v = torch.tensor([[0, -axis_dir[2], axis_dir[1]],
+                                    [axis_dir[2], 0, -axis_dir[0]],
+                                    [-axis_dir[1], axis_dir[0], 0]], device="cuda")
+            R_reconstructed = torch.eye(3, device="cuda") + torch.sin(theta) * skew_v + (1 - torch.cos(theta)) * (skew_v @ skew_v)
+            translated_initial = torch.from_numpy(tracks_3d[0]).float().cuda() - joint_start # N, 3
+            reconstructed_track = (R_reconstructed @ translated_initial.T).T + joint_start
+            est_loss += torch.mean(torch.norm(reconstructed_track - torch.from_numpy(tracks_3d[t]).cuda(), dim=1))
+        return est_loss / T
+    
+    # 初始化 angles 和 joint_start，并设置优化器
+    angles = torch.from_numpy(angles).float().cuda().requires_grad_()
+    axis_dir = torch.from_numpy(axis_dir).float().cuda().requires_grad_()
+    joint_start = torch.from_numpy(joint_start).float().cuda().requires_grad_()
+    
+    optimizer = torch.optim.Adam([angles, axis_dir, joint_start], lr=1e-2)
+    scheduler = Scheduler(
+        optimizer=optimizer,
+        lr_update_factor=0.5,
+        lr_scheduler_patience=3,
+        early_stop_patience=10,
+    )
+    
+    # 运行优化
+    num_iterations = 1000
+    for i in range(num_iterations):
+        optimizer.zero_grad()
+        loss = loss_function_torch(axis_dir, angles, joint_start)
+        print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+        cur_state_dict = {
+            "joint_states": angles.detach().cpu().numpy(),
+            "joint_axis": (axis_dir / torch.norm(axis_dir)).detach().cpu().numpy(),
+            "joint_start": joint_start.detach().cpu().numpy(),
+        }
+        should_early_stop = scheduler.step(loss.item(), cur_state_dict)
+        
+        cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
+        print(f"\t lr:", cur_lr)
+        
+        if should_early_stop:
+            print("EARLY STOP")
+            break
+        
+        loss.backward()
+        optimizer.step()
+        
+    print("after torch optimization")
+    print("joint_axis: ", scheduler.best_state_dict["joint_axis"])
+    print("joint_start: ", scheduler.best_state_dict["joint_start"])
+    print("joint_states: ", scheduler.best_state_dict["joint_states"])
+    
+    if visualize:
+        angles = angles.detach().cpu().numpy()
+        axis_dir = axis_dir.detach().cpu().numpy()
+        joint_start = joint_start.detach().cpu().numpy()
+        
+        # 绿色代表 moving part, 红色代表 reconstructed moving part
+        reconstructed_tracks = [(R.from_rotvec(angles[t] * axis_dir).as_matrix() @ (tracks_3d[0] - joint_start).T).T + joint_start for t in range(T)]
+        
+        viewer = napari.Viewer(ndisplay=3)
+        viewer.title = "coarse R estimation"
+        
+        viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
+        viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
+        
+        # 绘制一下 joint start 和 joint axis
+        viewer.add_shapes(
+            data=np.array([joint_start, joint_start + axis_dir * 0.2]),
+            name="revolute joint",
+            shape_type="line",
+            edge_width=0.005,
+            edge_color="blue",
+            face_color="blue",
+        )
+        viewer.add_points(
+            data=joint_start,
+            name="joint start",
+            size=0.02,
+            face_color="blue",
+            edge_color="red",
+        )
+        napari.run()
+        
+    return scheduler.best_state_dict, scheduler.best_loss
 
 def coarse_joint_estimation(tracks_3d, visualize=False):
     """
@@ -390,10 +557,10 @@ def test_coarse_R_from_tracks_3d():
     测试 coarse_R_from_tracks_3d 函数
     """
     # 设置参数
-    T = 10  # 10 个时间步
-    M = 2000   # 5 个点
+    T = 100  # 10 个时间步
+    M = 1000   # 5 个点
     true_axis = np.array([0.6, 0.8, 0.])  # 真正的旋转轴是 Z 轴
-    true_angles = np.linspace(0, np.pi / 3, T)  # 旋转角度从 0 到 pi/4
+    true_angles = np.linspace(0, np.pi / 5, T)  # 旋转角度从 0 到 pi/4
     noise_std = 0.01  # 加噪声的标准差
     joint_start_point = np.array([1, 1, 1])  # 旋转轴的起始点
     joint_start_point = remove_dir_component(joint_start_point, true_axis)
