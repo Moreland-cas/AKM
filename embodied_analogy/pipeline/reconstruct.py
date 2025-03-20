@@ -123,8 +123,8 @@ def reconstruct(
     """
     joint_type, joint_axis_c, joint_start_c, joint_states = coarse_joint_estimation(
         tracks_3d=tracks3d_filtered[:, moving_mask, :], 
-        # visualize=visualize
-        visualize=True
+        visualize=visualize
+        # visualize=True
     )
     """
         根据 rgb_seq 和 tracks2d 得到 obj_mask_seq (可以用 sam 或者 sam2)
@@ -181,7 +181,8 @@ def reconstruct(
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
         lr=5e-3, # 5 mm
         icp_select_range=0.1,
-        visualize=visualize
+        # visualize=visualize
+        visualize=True
     )
 
     Rc2w = Tw2c[:3, :3].T # 3, 3
@@ -266,6 +267,7 @@ def reconstruct(
 
 if __name__ == "__main__":
     obj_idx = 7221
+    # obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     
     reconstruct(
