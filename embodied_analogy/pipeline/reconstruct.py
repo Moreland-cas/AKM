@@ -121,9 +121,10 @@ def reconstruct(
     """
         coarse joint estimation with tracks3d_filtered
     """
-    joint_type, joint_axis_c, joint_states = coarse_joint_estimation(
+    joint_type, joint_axis_c, joint_start_c, joint_states = coarse_joint_estimation(
         tracks_3d=tracks3d_filtered[:, moving_mask, :], 
-        visualize=visualize
+        # visualize=visualize
+        visualize=True
     )
     """
         根据 rgb_seq 和 tracks2d 得到 obj_mask_seq (可以用 sam 或者 sam2)
@@ -271,7 +272,7 @@ if __name__ == "__main__":
         obj_repr=Obj_repr.load(obj_repr_path),
         num_initial_uvs=1000,
         num_key_frames=3,
-        visualize=True,
+        visualize=False,
         gt_joint_axis=np.array([-1, 0, 0]),
         # file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
         file_path = None
