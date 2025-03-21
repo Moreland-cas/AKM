@@ -103,7 +103,7 @@ class ManipulateEnv(BaseEnv):
             query_depth=depth_np, 
             ref_depths=self.obj_repr["depth_seq"], 
             joint_type=self.obj_repr["joint_type"], 
-            joint_axis_c=self.obj_repr["joint_axis_c"], 
+            joint_dir=self.obj_repr["joint_dir_c"], 
             ref_joint_states=self.obj_repr["joint_states"], 
             ref_dynamics=self.obj_repr["dynamic_seq"],
             lr=1e-3,
@@ -121,13 +121,13 @@ class ManipulateEnv(BaseEnv):
         start_pc_c = depth_image_to_pointcloud(depth_np, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
         start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
         
-        joint_axis_w = self.obj_repr["joint_axis_w"]
+        joint_dir_w = self.obj_repr["joint_dir_w"]
         start_color = rgb_np[obj_mask] / 256.
         
         grasp_group = detect_grasp_anygrasp(
             start_pc_w, 
             start_color, 
-            dir_out=joint_axis_w, 
+            dir_out=joint_dir_w, 
             visualize=False
         )
         
@@ -137,7 +137,7 @@ class ManipulateEnv(BaseEnv):
         sorted_grasps, _ = sort_grasp_group(
             grasp_group=grasp_group, 
             contact_region=contact_region_w, 
-            axis=joint_axis_w, 
+            axis=joint_dir_w, 
             grasp_pre_filter=False
         )
 
@@ -152,7 +152,7 @@ class ManipulateEnv(BaseEnv):
         for grasp in sorted_grasps:
             
             # 旋转 grasp 使得其尽肯能平行于 joint axis
-            grasp = self.get_rotated_grasp(grasp, axis_out_w=joint_axis_w)
+            grasp = self.get_rotated_grasp(grasp, axis_out_w=joint_dir_w)
             Tph2w = self.anyGrasp2ph(grasp)
             
             # visualize_pc(start_pc_w, start_color, grasp)
@@ -178,7 +178,7 @@ class ManipulateEnv(BaseEnv):
             self.move_forward(reserved_distance)
             self.close_gripper()
             
-            self.move_along_axis(joint_axis_w, delta_state)
+            self.move_along_axis(joint_dir_w, delta_state)
             break
         
         # 在这里进行一个状态估计, 输出算法 predict 的当前状态
@@ -191,7 +191,7 @@ class ManipulateEnv(BaseEnv):
             query_depth=depth_np, 
             ref_depths=self.obj_repr["depth_seq"], 
             joint_type=self.obj_repr["joint_type"], 
-            joint_axis_c=self.obj_repr["joint_axis_c"], 
+            joint_dir=self.obj_repr["joint_dir"], 
             ref_joint_states=self.obj_repr["joint_states"], 
             ref_dynamics=self.obj_repr["dynamic_seq"],
             lr=5e-3,

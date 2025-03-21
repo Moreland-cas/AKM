@@ -818,24 +818,54 @@ def napari_time_series_transform(original_data):
     napari_data = np.concatenate(napari_data, axis=0)
     return napari_data
 
-def joint_data_to_transform(
+def joint_data_to_transform_np(
     joint_type, # "prismatic" or "revolute"
-    joint_axis, # unit vector np.array([3, ])
+    joint_dir, # unit vector np.array([3, ])
+    joint_start,
     joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
 ):
-    # 根据 joint_type 和 joint_axis 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
+    # 根据 joint_type 和 joint_dir 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
     T_ref2tgt = np.eye(4)
     if joint_type == "prismatic":
-        # coor_tgt = coor_ref + joint_axis * (joint_state_tgt - joint_state_ref)
-        T_ref2tgt[:3, 3] = joint_axis * joint_state_ref2tgt
+        # coor_tgt = coor_ref + joint_dir * (joint_state_tgt - joint_state_ref)
+        T_ref2tgt[:3, 3] = joint_dir * joint_state_ref2tgt
     elif joint_type == "revolute":
-        # coor_tgt = coor_ref @ Rref2tgt.T
-        Rref2tgt = R.from_rotvec(joint_axis * joint_state_ref2tgt).as_matrix()
+        # coor_tgt = (coor_ref - joint_start) @ Rref2tgt.T + joint_start
+        Rref2tgt = R.from_rotvec(joint_dir * joint_state_ref2tgt).as_matrix()
         T_ref2tgt[:3, :3] = Rref2tgt
+        T_ref2tgt[:3, 3] = joint_start @ (np.eye(3) - Rref2tgt.T) 
     else:
         assert False, "joint_type must be either prismatic or revolute"
     return T_ref2tgt
 
+
+def joint_data_to_transform_torch(
+    joint_type, # "prismatic" or "revolute"
+    joint_dir, # unit vector torch.array([3, ])
+    joint_start,
+    joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
+):
+    # 根据 joint_type 和 joint_dir 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
+    T_ref2tgt = torch.eye(4, device=joint_dir.device)
+    joint_dir = joint_dir / torch.norm(joint_dir)
+    
+    if joint_type == "prismatic":
+        # coor_tgt = coor_ref + joint_dir * (joint_state_tgt - joint_state_ref)
+        T_ref2tgt[:3, 3] = joint_dir * joint_state_ref2tgt
+    elif joint_type == "revolute":
+        # coor_tgt = (coor_ref - joint_start) @ Rref2tgt.T + joint_start
+        _K = torch.tensor([
+            [0, -joint_dir[2], joint_dir[1]],
+            [joint_dir[2], 0, -joint_dir[0]],
+            [-joint_dir[1], joint_dir[0], 0]
+        ], device=joint_dir.device)
+        theta = joint_state_ref2tgt  
+        Rref2tgt = torch.eye(3, device=joint_dir.device) + torch.sin(theta) * _K + (1 - torch.cos(theta)) * (_K @ _K)
+        T_ref2tgt[:3, :3] = Rref2tgt
+        T_ref2tgt[:3, 3] = joint_start @ (torch.eye(3, device=joint_dir.device) - Rref2tgt.T) 
+    else:
+        assert False, "joint_type must be either prismatic or revolute"
+    return T_ref2tgt
 
 def set_random_seed(seed: int):
     """
