@@ -16,7 +16,8 @@ from embodied_analogy.utility.utils import (
     farthest_scale_sampling,
     get_dynamic_seq,
     get_depth_mask_seq,
-    visualize_pc
+    visualize_pc,
+    classify_open_close
 )
 
 initialize_napari()
@@ -182,10 +183,9 @@ def reconstruct(
         opti_joint_states_mask=np.arange(num_key_frames)!=0,
         # 这里设置不迭代的优化 dynamic_mask
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
-        lr=5e-3, # 5 mm
+        lr=1e-3, # 1 cm
         icp_select_range=0.1,
-        # visualize=visualize
-        visualize=True
+        visualize=visualize
     )
     joint_dir_c_updated = updated_state_dict["joint_dir"]
     joint_start_c_updated = updated_state_dict["joint_start"]
@@ -194,25 +194,17 @@ def reconstruct(
     Rc2w = Tw2c[:3, :3].T # 3, 3
     joint_dir_w = Rc2w @ joint_dir_c
     joint_dir_w_updated = Rc2w @ joint_dir_c_updated # 3
+    joint_start_w = Rc2w @ joint_dir_c
+    joint_start_w_updated = Rc2w @ joint_dir_c_updated
     
-    # 在这里调整 joint_dir_w_updated 的方向, 使得其指向使得物体点云方差变大的方向
-    # TODO：似乎跟 joint_type 还有关系
+    # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
+    track_type = classify_open_close(tracks3d=tracks3d_filtered, moving_mask=moving_mask)
+    
+    # 接下来主要是看看：
+    # 1) 点云实际运行的方向和估计出的方向是否一致
+    
     if joint_type == "prismatic":
-        tracks_3d_moving_c = tracks3d_filtered[:, moving_mask, :] 
-        moving_mean_start = tracks_3d_moving_c[0].mean(0)
-        moving_mean_end = tracks_3d_moving_c[-1].mean(0)
-        tracks_3d_static_c = tracks3d_filtered[:, static_mask, :]
-        static_mean_start = tracks_3d_static_c[0].mean(0)
-        static_mean_end = tracks_3d_static_c[-1].mean(0)
-        
-        # 首先根据 tracks3d_moving 和 tracks3d_static 类中心的方差判断当前 track 随着时间是 open 还是 close
-        # if np.var(tracks3d_filtered[0]) > np.var(tracks3d_filtered[-1]):
-        if np.linalg.norm(moving_mean_start - static_mean_start) > np.linalg.norm(moving_mean_end - static_mean_end):
-            track_type = "close"
-        else:
-            track_type = "open"
-            
-        # 然后判断估计出的 joint_dir 与当前  tracks3d 变化的对应关系
+        tracks_3d_moving_c = tracks3d_filtered[:, moving_mask, :]
         moving_dir_c = (tracks_3d_moving_c - tracks_3d_moving_c[0]).reshape(-1, 3) # T*N, 3
         # moving_dir_w 为 tracks3d 在世界坐标系下的运动方向
         moving_dir_w = camera_to_world(moving_dir_c, Tw2c) # T*N, 3
@@ -273,8 +265,8 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    obj_idx = 7221
-    # obj_idx = 44962
+    # obj_idx = 7221
+    obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     
     reconstruct(

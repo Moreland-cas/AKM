@@ -306,15 +306,6 @@ def fine_joint_estimation_seq(
         
     如果 optimize_state_mask 或者 update_dynamic_mask 为 None, 则视为全部优化
     """
-    # 可视化输入
-    if visualize and False:
-        import napari 
-        viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
-        viewer.title = "visualize input of function fine_joint_estimation_seq"
-        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels(dynamic_seq.astype(np.int32), name='0-query other-ref')
-        napari.run()
-        
     T = depth_seq.shape[0]
     assert T >= 2
     
@@ -324,13 +315,11 @@ def fine_joint_estimation_seq(
         update_dynamic_mask = np.ones(T, dtype=np.bool_)
     
     # 准备 moving mask 数据, 点云数据 和 normal 数据
-    pass
     moving_masks = [dynamic_seq[i] == MOVING_LABEL for i in range(T)]
     moving_pcs = [depth_image_to_pointcloud(depth_seq[i], moving_masks[i], K) for i in range(T)] #  [(N, 3), ...], len=T
     normals = [compute_normals(moving_pcs[i]) for i in range(T)]
     
     # 进入 ICP 迭代
-    # 设置待优化参数
     dir_params = torch.from_numpy(joint_dir).float().cuda().requires_grad_()
     start_params = torch.from_numpy(joint_start).float().cuda().requires_grad_()
     dir_lr = lr if opti_joint_dir else 0.0
@@ -514,6 +503,22 @@ def fine_joint_estimation_seq(
         viewer.add_points(pc_ref_transformed, size=size, name='before icp', opacity=0.8, face_color="red")
         viewer.add_points(pc_ref_transformed_updated, size=size, name='after icp', opacity=0.8, face_color="green")
         viewer.title = "fine joint estimation using ICP"
+        
+        viewer.add_shapes(
+            data=np.array([joint_start_updated, joint_start_updated + joint_dir_updated * 0.2]),
+            name="revolute joint",
+            shape_type="line",
+            edge_width=0.005,
+            edge_color="blue",
+            face_color="blue",
+        )
+        viewer.add_points(
+            data=joint_start_updated,
+            name="joint start",
+            size=0.02,
+            face_color="blue",
+            edge_color="red",
+        )
         napari.run()
         
     return scheduler.best_state_dict

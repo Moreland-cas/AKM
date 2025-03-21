@@ -1355,10 +1355,27 @@ def remove_dir_component(vector, direction):
     
     return result_vector
 
+
+def classify_open_close(tracks3d, moving_mask):
+    """
+    判断输入轨迹到底是打开物体还是关闭物体
+    tracks3d: T, N, 3, 来自于 filter 过后的 tracks3d
+    moving_mask: N
+    """
+    static_mask = ~moving_mask
+    tracks_3d_moving_c, tracks_3d_static_c = tracks3d[:, moving_mask, :], tracks3d[:, static_mask, :]
+    moving_mean_start, moving_mean_end = tracks_3d_moving_c[0].mean(0), tracks_3d_moving_c[-1].mean(0)
+    static_mean_start, static_mean_end = tracks_3d_static_c[0].mean(0), tracks_3d_static_c[-1].mean(0)
     
-# 示例用法
+    # 首先根据 tracks3d_moving 和 tracks3d_static 类中心的方差判断当前 track 随着时间是 open 还是 close
+    if np.linalg.norm(moving_mean_start - static_mean_start) > np.linalg.norm(moving_mean_end - static_mean_end):
+        track_type = "close"
+    else:
+        track_type = "open"
+    
+    return track_type
+    
 if __name__ == "__main__":
-    # 示例用法
     point_cloud = np.random.random([100, 3])
     point_cloud[:, 2] = 0
     point_cloud[:30, 2] = np.random.random([30]) * 1

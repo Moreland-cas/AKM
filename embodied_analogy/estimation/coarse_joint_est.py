@@ -163,17 +163,16 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         
         # diff_0 * diff_t = cos(angle)
         angle = np.arccos(np.clip(np.dot(diff_0, diff_t), -1.0, 1.0)) # [0, pi]
-        
-        # 在这里确定 angle 的方向 
-        if np.dot(np.cross(diff_0, diff_t), joint_dir) < 0:
-            angle = -angle
-        
         joint_states[t] = angle
-    
-    # print("before torch optimization")
-    # print("joint_dir: ", joint_dir)
-    # print("joint_start: ", joint_start)
-    # print("joint_states: ", joint_states)
+        
+        if t == T-1:
+            if np.dot(np.cross(diff_0, diff_t), joint_dir) < 0:
+                joint_dir = -joint_dir
+        
+    print("before torch optimization")
+    print("joint_dir: ", joint_dir)
+    print("joint_start: ", joint_start)
+    print("joint_states: ", joint_states)
     
     # 初始化 joint_states 和 joint_start，并设置优化器
     joint_states = torch.from_numpy(joint_states[1:]).float().cuda().requires_grad_() # T-1
@@ -236,21 +235,28 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         loss.backward()
         optimizer.step()
         
-    # print("after torch optimization")
-    # print("joint_dir: ", scheduler.best_state_dict["joint_dir"])
-    # print("joint_start: ", scheduler.best_state_dict["joint_start"])
-    # print("joint_states: ", scheduler.best_state_dict["joint_states"])
+    print("after torch optimization")
+    print("joint_dir: ", scheduler.best_state_dict["joint_dir"])
+    print("joint_start: ", scheduler.best_state_dict["joint_start"])
+    print("joint_states: ", scheduler.best_state_dict["joint_states"])
     
     if visualize:
+        # NOTE: 由于 napari 的显示是左手坐标系, 因此需要把所有三维数据的 z 轴乘 -1
         joint_states = scheduler.best_state_dict["joint_states"]
         joint_dir = scheduler.best_state_dict["joint_dir"]
         joint_start = scheduler.best_state_dict["joint_start"]
         
         # 绿色代表 moving part, 红色代表 reconstructed moving part
         reconstructed_tracks = [(R.from_rotvec(joint_states[t] * joint_dir).as_matrix() @ (tracks_3d[0] - joint_start).T).T + joint_start for t in range(T)]
+        reconstructed_tracks = np.array(reconstructed_tracks)
         
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "coarse R estimation"
+        
+        joint_dir[-1] = -joint_dir[-1]
+        joint_start[-1] = -joint_start[-1]
+        tracks_3d[..., -1] = -tracks_3d[..., -1]
+        reconstructed_tracks[..., -1] = -reconstructed_tracks[..., -1]
         
         viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
         viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
@@ -259,6 +265,30 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         viewer.add_shapes(
             data=np.array([joint_start, joint_start + joint_dir * 0.2]),
             name="revolute joint",
+            shape_type="line",
+            edge_width=0.005,
+            edge_color="blue",
+            face_color="blue",
+        )
+        viewer.add_shapes(
+            data=0.1 + np.array([np.array([0, 0, 0]), np.array([1, 0, 0]) * 0.2]),
+            name="origin_x",
+            shape_type="line",
+            edge_width=0.005,
+            edge_color="red",
+            face_color="red",
+        )
+        viewer.add_shapes(
+            data=0.1 + np.array([np.array([0, 0, 0]), np.array([0, 1, 0]) * 0.2]),
+            name="origin_y",
+            shape_type="line",
+            edge_width=0.005,
+            edge_color="green",
+            face_color="green",
+        )
+        viewer.add_shapes(
+            data=0.1 + np.array([np.array([0, 0, 0]), np.array([0, 0, -1]) * 0.2]),
+            name="origin_z",
             shape_type="line",
             edge_width=0.005,
             edge_color="blue",
@@ -278,6 +308,8 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
 
 def coarse_joint_estimation(tracks_3d, visualize=False):
     """
+    根据 tracks3d 估计出初始的 joint 状态, 要求 joint_state 的初始值是0, 且随着轨迹增加
+    (如果是旋转的话需要满足右手定则)
     tracks_3d: (T, M, 3)
     """
     t_state_dict, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
@@ -337,10 +369,10 @@ def test_coarse_R_from_tracks_3d():
     测试 coarse_R_from_tracks_3d 函数
     """
     # 设置参数
-    T = 100  # 10 个时间步
+    T = 10  # 10 个时间步
     M = 1000   # 5 个点
     true_axis = np.array([0.6, 0.8, 0.])  # 真正的旋转轴是 Z 轴
-    true_angles = np.linspace(0, np.pi / 5, T)  # 旋转角度从 0 到 pi/4
+    true_angles = np.linspace(0, np.pi / 3, T)  # 旋转角度从 0 到 pi/4
     noise_std = 0.00  # 加噪声的标准差
     joint_start_point = np.array([1, 1, 1])  # 旋转轴的起始点
     joint_start_point = remove_dir_component(joint_start_point, true_axis)
