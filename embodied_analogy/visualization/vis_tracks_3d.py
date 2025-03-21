@@ -4,33 +4,6 @@
 import torch
 import numpy as np
 
-
-def vis_tracks3d_napari(tracks_3d, colors=None, viewer_title="napari"):
-    """
-    Args:
-        tracks_3d: np.array of shape (T, M, 3)
-        colors: np.array of shape (M, 3)
-    """
-    # 首先将输入的 tracks_3d 转换为 napari 支持的格式, 即 T * M, (1t+3d) 的形式
-    if isinstance(tracks_3d, torch.Tensor):
-        tracks_3d = tracks_3d.cpu().numpy()
-        
-    T, M, _ = tracks_3d.shape
-    napari_data = np.zeros((T * M, 1 + 3))
-    for i in range(T):
-        napari_data[i * M: (i + 1) * M, 0] = i
-        napari_data[i * M: (i + 1) * M, 1:] = tracks_3d[i]
-    import napari
-    viewer = napari.Viewer(ndisplay=3)
-    viewer.title = viewer_title
-    
-    if colors is None:
-        colors = np.random.rand(M, 3)
-        # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
-    colors = np.tile(colors, (T, 1))
-        
-    viewer.add_points(napari_data, size=0.01, name='tracks_3d', opacity=0.8, face_color=colors)
-    napari.run()
     
 def vis_pointcloud_series_napari(pc_series, colors=None):
     """

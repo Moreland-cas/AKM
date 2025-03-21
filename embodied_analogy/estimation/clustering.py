@@ -1,3 +1,4 @@
+import napari
 import numpy as np
 import sklearn.cluster as cluster
 from embodied_analogy.utility.utils import (
@@ -8,7 +9,6 @@ from embodied_analogy.utility.utils import (
     napari_time_series_transform
 )
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
-from embodied_analogy.visualization.vis_tracks_3d import vis_tracks3d_napari
 
 def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=False, viewer_title="napari"):
     """
@@ -50,6 +50,7 @@ def cluster_tracks_3d(tracks_3d, use_diff=True, visualize=False, viewer_title="n
         tracks_3d: np.array([T, M, Nd])
         将 tracks_3d 进行聚类，得到两个部分，分别代表移动和静止的轨迹, 返回两个 mask
     """
+    tracks_3d = np.copy(tracks_3d)
     tracks_3d_ = np.copy(tracks_3d)
     T, M, _ = tracks_3d_.shape
     
@@ -75,11 +76,12 @@ def cluster_tracks_3d(tracks_3d, use_diff=True, visualize=False, viewer_title="n
         # if Tw2c is not None:
         #     tracks_3d = camera_to_world(tracks_3d, Tw2c)
         # visualize_pc(tracks_3d[-1])
-        import napari
+        
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "clustring 3d tracks"
         
-        # tracks_3d[..., 1] = -tracks_3d[..., 1]
+        # 解决 napari 坐标系显示
+        tracks_3d[..., -1] *= -1
         viewer.add_points(napari_time_series_transform(tracks_3d[:, moving_mask]), size=0.01, name='moving part', opacity=0.8, face_color="red")
         viewer.add_points(napari_time_series_transform(tracks_3d[:, static_mask]), size=0.01, name='static part', opacity=0.8, face_color="green")
         

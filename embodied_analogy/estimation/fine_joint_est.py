@@ -1,5 +1,6 @@
 import os
 import torch
+import napari 
 import numpy as np
 from PIL import Image
 from embodied_analogy.estimation.icp_loss import icp_loss_torch
@@ -87,15 +88,11 @@ def filter_dynamic_mask(
     query_dynamic_updated[y[valid_idx][unknown_mask], x[valid_idx][unknown_mask]] = UNKNOWN_LABEL
     
     if visualize:
-        import napari 
         viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
         viewer.title = "filter current dynamic mask using other frames"
         # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
         viewer.add_labels(query_dynamic.astype(np.int32), name='before filtering')
         viewer.add_labels(query_dynamic_updated.astype(np.int32), name='after filtering')
-        
-        # 可视化 ref frames
-        # viewer.add_labels()
         napari.run()
     
     return query_dynamic_updated  
@@ -461,9 +458,13 @@ def fine_joint_estimation_seq(
         optimizer.step()
         
     if visualize:
-        joint_dir_updated = scheduler.best_state_dict["joint_dir"]
-        joint_states_updated = scheduler.best_state_dict["joint_states"]
-        joint_start_updated = scheduler.best_state_dict["joint_start"]
+        joint_dir = np.copy(joint_dir)
+        joint_states = np.copy(joint_states)
+        joint_start = np.copy(joint_start)
+        
+        joint_dir_updated = np.copy(scheduler.best_state_dict["joint_dir"])
+        joint_states_updated = np.copy(scheduler.best_state_dict["joint_states"])
+        joint_start_updated = np.copy(scheduler.best_state_dict["joint_start"])
     
         # 获取 transform_seq
         transform_seq = [
@@ -491,13 +492,21 @@ def fine_joint_estimation_seq(
                 joint_state_ref2tgt=cur_state - joint_states_updated[0],
         ) for cur_state in joint_states_updated])
         transform_seq_updated = transform_seq_updated @ np.linalg.inv(transform_seq_updated[0])
+        
         pc_ref_transformed_updated = np.einsum('tij,jk->tik', transform_seq_updated, pc_ref_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
         pc_ref_transformed_updated = napari_time_series_transform(pc_ref_transformed_updated) # T*N, d
         
         moving_pcs = napari_time_series_transform(moving_pcs) # T*N, d
         
-        import napari
         viewer = napari.Viewer(ndisplay=3)
+        
+        # 调整坐标系
+        moving_pcs[..., -1] *= -1
+        pc_ref_transformed[..., -1] *= -1
+        pc_ref_transformed_updated[..., -1] *= -1
+        joint_start_updated[-1] *= -1
+        joint_dir_updated[-1] *= -1
+        
         size = 0.01 / 2
         viewer.add_points(moving_pcs, size=size, name='moving_pc', opacity=0.8, face_color="blue")
         viewer.add_points(pc_ref_transformed, size=size, name='before icp', opacity=0.8, face_color="red")

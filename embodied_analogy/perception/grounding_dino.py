@@ -1,4 +1,5 @@
 import os
+import napari
 import numpy as np
 import cv2
 import torch
@@ -60,7 +61,7 @@ def run_groundingDINO(
         annotated_frame_BGR = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
         annotated_frame_RGB = cv2.cvtColor(annotated_frame_BGR, cv2.COLOR_BGR2RGB)
         # Image.fromarray(annotated_frame_RGB).show()
-        import napari
+        
         viewer = napari.view_image(annotated_frame_RGB, rgb=True)
         viewer.title = "groundingDINO"
         napari.run()

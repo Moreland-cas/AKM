@@ -1,8 +1,3 @@
-# import numpy as np
-# import napari
-# napari.view_image(np.zeros([100, 100]).astype(np.bool_))
-# napari.run()
-
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 
@@ -18,12 +13,6 @@ from PIL import Image
 from vision.featurizer.run_featurizer import match_fts
 from vision.featurizer.utils.visualization import IMG_SIZE
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
-# from run_realworld.utils import crop_points, cluster_normals
-
-# import napari
-# napari.view_image(np.zeros([100, 100]).astype(np.bool_))
-# napari.run()
-
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -159,7 +148,6 @@ def get_ram_affordance_2d(
         )
     
     if visualize:
-        # import napari
         # viewer = napari.Viewer()
         # viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
         # viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")

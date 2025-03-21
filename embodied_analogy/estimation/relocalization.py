@@ -1,4 +1,5 @@
 import torch
+import napari 
 import numpy as np
 
 from embodied_analogy.utility.utils import (
@@ -138,7 +139,6 @@ def _relocalization(
     
     if visualize:
         # 展示 dynamic query 的变化
-        import napari 
         viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
         viewer.title = "relocalization"
         viewer.add_labels(query_dynamic.astype(np.int32), name='initial query dynamic')

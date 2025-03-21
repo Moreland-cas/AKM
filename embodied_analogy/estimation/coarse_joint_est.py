@@ -14,7 +14,8 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     """
     if isinstance(tracks_3d, torch.Tensor):
         tracks_3d = tracks_3d.cpu().numpy()
-        
+    
+    tracks_3d = np.copy(tracks_3d)
     T, M, _ = tracks_3d.shape
     
     joint_dir = None
@@ -82,14 +83,19 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
         optimizer.step()
 
     if visualize:
-        joint_states = scheduler.best_state_dict["joint_states"]
-        joint_dir = scheduler.best_state_dict["joint_dir"]
-        joint_start = scheduler.best_state_dict["joint_start"]
-        
+        joint_states = np.copy(scheduler.best_state_dict["joint_states"])
+        joint_dir = np.copy(scheduler.best_state_dict["joint_dir"])
+        joint_start = np.copy(scheduler.best_state_dict["joint_start"])
         reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(joint_states, joint_dir).reshape(T, 1, 3) # T, M, 3
         
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "coarse translation estimation"
+        
+        # 改变坐标系
+        joint_start[-1] *= -1
+        joint_dir[-1] *= -1
+        tracks_3d[..., -1] *= -1
+        reconstructed_tracks[..., -1] *= -1
         
         viewer.add_points(napari_time_series_transform(tracks_3d), size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
         viewer.add_points(napari_time_series_transform(reconstructed_tracks), size=0.01, name='renconstructed tracks 3d', opacity=0.8, face_color="red")
@@ -125,6 +131,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     if isinstance(tracks_3d, torch.Tensor):
         tracks_3d = tracks_3d.cpu().numpy()
     
+    tracks_3d = np.copy(tracks_3d)
     T, M, _ = tracks_3d.shape
     tracks_3d_mean = tracks_3d.mean(axis=1) # T, 1, 3
     
@@ -242,9 +249,9 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     
     if visualize:
         # NOTE: 由于 napari 的显示是左手坐标系, 因此需要把所有三维数据的 z 轴乘 -1
-        joint_states = scheduler.best_state_dict["joint_states"]
-        joint_dir = scheduler.best_state_dict["joint_dir"]
-        joint_start = scheduler.best_state_dict["joint_start"]
+        joint_states = np.copy(scheduler.best_state_dict["joint_states"])
+        joint_dir = np.copy(scheduler.best_state_dict["joint_dir"])
+        joint_start = np.copy(scheduler.best_state_dict["joint_start"])
         
         # 绿色代表 moving part, 红色代表 reconstructed moving part
         reconstructed_tracks = [(R.from_rotvec(joint_states[t] * joint_dir).as_matrix() @ (tracks_3d[0] - joint_start).T).T + joint_start for t in range(T)]
@@ -316,20 +323,15 @@ def coarse_joint_estimation(tracks_3d, visualize=False):
     R_state_dict, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
     
     print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
+    
     if t_est_loss < R_est_loss:
-        joint_type = "prismatic"
         print("select as prismatic joint")
-        joint_dir = t_state_dict["joint_dir"]
-        joint_states = t_state_dict["joint_states"]
-        joint_start = np.array([0, 0, 0])
+        t_state_dict["joint_type"] = "prismatic"
+        return t_state_dict
     else:
-        joint_type = "revolute"
         print("select as revolute joint")
-        joint_dir = R_state_dict["joint_dir"]
-        joint_states = R_state_dict["joint_states"]
-        joint_start = R_state_dict["joint_start"]
-        
-    return joint_type, joint_dir, joint_start, joint_states
+        t_state_dict["joint_type"] = "revolute"
+        return R_state_dict
 
 
 def generate_rotated_points(base_points, axis, angles, joint_start_point, noise_std=0.01):
