@@ -1,5 +1,6 @@
 import os
 import time
+import copy
 import numpy as np
 
 from embodied_analogy.utility.utils import (
@@ -17,7 +18,8 @@ from embodied_analogy.utility.utils import (
     get_dynamic_seq,
     get_depth_mask_seq,
     visualize_pc,
-    classify_open_close
+    classify_open_close,
+    reverse_joint_dict
 )
 
 initialize_napari()
@@ -122,11 +124,14 @@ def reconstruct(
     """
         coarse joint estimation with tracks3d_filtered
     """
-    joint_type, joint_dir_c, joint_start_c, joint_states = coarse_joint_estimation(
+    coarse_state_dict = coarse_joint_estimation(
         tracks_3d=tracks3d_filtered[:, moving_mask, :], 
         visualize=visualize
-        # visualize=True
     )
+    joint_type = coarse_state_dict["joint_type"]
+    joint_dir_c = coarse_state_dict["joint_dir"]
+    joint_start_c = coarse_state_dict["joint_start"]
+    joint_states = coarse_state_dict["joint_states"]
     """
         根据 rgb_seq 和 tracks2d 得到 obj_mask_seq (可以用 sam 或者 sam2)
     """
@@ -169,14 +174,14 @@ def reconstruct(
         # visualize=True
     ) 
     # fine estimation
-    updated_state_dict = fine_joint_estimation_seq(
+    init_fine_state_dict = copy.deepcopy(coarse_state_dict)
+    init_fine_state_dict["joint_states"] = joint_states[kf_idx]
+    
+    fine_state_dict = fine_joint_estimation_seq(
         K=K,
         depth_seq=depth_seq[kf_idx], 
         dynamic_seq=dynamic_seq_updated,
-        joint_type=joint_type, 
-        joint_dir=joint_dir_c, 
-        joint_start=joint_start_c,
-        joint_states=joint_states[kf_idx],
+        joint_dict=init_fine_state_dict,
         max_icp_iters=200, # ICP 最多迭代多少轮
         opti_joint_dir=True,
         opti_joint_start=(joint_type=="revolute"),
@@ -187,50 +192,13 @@ def reconstruct(
         icp_select_range=0.1,
         visualize=visualize
     )
-    joint_dir_c_updated = updated_state_dict["joint_dir"]
-    joint_start_c_updated = updated_state_dict["joint_start"]
-    joint_states_updated = updated_state_dict["joint_states"]
-    
-    Rc2w = Tw2c[:3, :3].T # 3, 3
-    joint_dir_w = Rc2w @ joint_dir_c
-    joint_dir_w_updated = Rc2w @ joint_dir_c_updated # 3
-    joint_start_w = Rc2w @ joint_dir_c
-    joint_start_w_updated = Rc2w @ joint_dir_c_updated
-    
     # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
     track_type = classify_open_close(tracks3d=tracks3d_filtered, moving_mask=moving_mask)
     
-    # 接下来主要是看看：
-    # 1) 点云实际运行的方向和估计出的方向是否一致
-    
-    if joint_type == "prismatic":
-        tracks_3d_moving_c = tracks3d_filtered[:, moving_mask, :]
-        moving_dir_c = (tracks_3d_moving_c - tracks_3d_moving_c[0]).reshape(-1, 3) # T*N, 3
-        # moving_dir_w 为 tracks3d 在世界坐标系下的运动方向
-        moving_dir_w = camera_to_world(moving_dir_c, Tw2c) # T*N, 3
-        dot_product_with_joint_dir = np.mean(moving_dir_w * joint_dir_w_updated)
-            
-        if dot_product_with_joint_dir < 0:
-            # 代表估计出的 joint 方向与重建数据的变化方向相反, 此时如果重建数据的方向为 open, 则估计出的 joint 实际指向为 close 方向, 此时需要反转
-            if track_type == "open":
-                joint_dir_w_updated = -joint_dir_w_updated
-                joint_dir_c = - joint_dir_c
-                joint_dir_c_updated = -joint_dir_c_updated
-                joint_states = -joint_states
-                joint_states_updated = -joint_states_updated
-            else:
-                joint_dir_w_updated = joint_dir_w_updated
-        else:
-            if track_type == "close":
-                joint_dir_w_updated = -joint_dir_w_updated
-                joint_dir_c = - joint_dir_c
-                joint_dir_c_updated = -joint_dir_c_updated
-                joint_states = -joint_states
-                joint_states_updated = -joint_states_updated
-            else:
-                joint_dir_w_updated = joint_dir_w_updated
-    else:
-        assert "revolute not implemented yet"
+    # 看下当前的 joint_dir 到底对应 open 还是 close, 如果对应 close, 需要将 joint 进行翻转
+    if track_type == "close":
+        reverse_joint_dict(coarse_state_dict)
+        reverse_joint_dict(fine_state_dict)
         
     if file_path is not None:
         # 更新 obj_repr, 并且进行保存
@@ -243,10 +211,7 @@ def reconstruct(
         obj_repr.key_frames = Frames(frame_list=_key_frames)
         obj_repr.clear_frames()
         obj_repr.track_type = track_type
-        obj_repr.joint_dir_c = joint_dir_c_updated
-        obj_repr.joint_dir_w = joint_dir_w_updated
-        obj_repr.joint_states = joint_states_updated
-        obj_repr.joint_type = joint_type
+        obj_repr.joint_dict = fine_state_dict
         obj_repr.save(file_path)
     
     if gt_joint_dir is not None:
@@ -265,17 +230,19 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    # obj_idx = 7221
-    obj_idx = 44962
+    obj_idx = 7221
+    # obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
+    obj_repr_data = Obj_repr.load(obj_repr_path)
+    # obj_repr_data.frames.frame_list.reverse()
     
     reconstruct(
-        obj_repr=Obj_repr.load(obj_repr_path),
+        obj_repr=obj_repr_data,
         num_initial_uvs=1000,
         num_key_frames=5,
-        visualize=False,
+        visualize=True,
         # gt_joint_dir=np.array([-1, 0, 0]),
-        gt_joint_dir=np.array([0, 0, -1]),
+        gt_joint_dir=np.array([0, 0, 1]),
         # file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
         file_path = None
     )

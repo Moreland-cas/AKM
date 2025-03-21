@@ -1374,6 +1374,14 @@ def classify_open_close(tracks3d, moving_mask):
         track_type = "open"
     
     return track_type
+
+def reverse_joint_dict(joint_dict):
+    """
+    将 joint_dict 中存储的 joint_dir 进行反转，并同步更改 joint_states
+    """
+    joint_dict["joint_dir"] = -joint_dict["joint_dir"]
+    joint_dict["joint_states"] = -joint_dict["joint_states"]
+    
     
 if __name__ == "__main__":
     point_cloud = np.random.random([100, 3])

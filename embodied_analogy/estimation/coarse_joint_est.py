@@ -330,7 +330,7 @@ def coarse_joint_estimation(tracks_3d, visualize=False):
         return t_state_dict
     else:
         print("select as revolute joint")
-        t_state_dict["joint_type"] = "revolute"
+        R_state_dict["joint_type"] = "revolute"
         return R_state_dict
 
 

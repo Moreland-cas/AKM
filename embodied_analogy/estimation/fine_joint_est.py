@@ -282,10 +282,7 @@ def fine_joint_estimation_seq(
     K,
     depth_seq, 
     dynamic_seq,
-    joint_type, 
-    joint_dir, # unit vector here, in camera frame
-    joint_start,
-    joint_states,
+    joint_dict,
     max_icp_iters=100, # ICP 最多迭代多少轮
     opti_joint_dir=True,
     opti_joint_start=True,
@@ -305,6 +302,12 @@ def fine_joint_estimation_seq(
     """
     T = depth_seq.shape[0]
     assert T >= 2
+    
+    # 读取数据
+    joint_type = joint_dict["joint_type"]
+    joint_dir = joint_dict["joint_dir"]
+    joint_start = joint_dict["joint_start"]
+    joint_states = joint_dict["joint_states"]
     
     if opti_joint_states_mask is None:
         opti_joint_states_mask = np.ones(T, dtype=np.bool_)
@@ -378,13 +381,13 @@ def fine_joint_estimation_seq(
                     visualize=visualize
                 )
                 
-                if visualize:
-                    import napari 
-                    viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
-                    viewer.title = "after first round of dynamic refinement"
-                    # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-                    viewer.add_labels(dynamic_seq.astype(np.int32), name='0-query other-ref')
-                    napari.run()
+                # if visualize:
+                #     import napari 
+                #     viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
+                #     viewer.title = "after first round of dynamic refinement"
+                #     # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+                #     viewer.add_labels(dynamic_seq.astype(np.int32), name='0-query other-ref')
+                #     napari.run()
                     
                 # 还需要更新对应 frame 的 moving_masks 等信息
                 moving_masks[l] = dynamic_seq[l] == MOVING_LABEL
@@ -438,6 +441,7 @@ def fine_joint_estimation_seq(
         
         # 在这里进行 scheduler.step()
         cur_state_dict = {
+            "joint_type": joint_type,
             "joint_dir": (dir_params / torch.norm(dir_params)).detach().cpu().numpy(),
             "joint_start": start_params.detach().cpu().numpy(),
             "joint_states": np.array([states_param.detach().cpu().item() for states_param in states_params])

@@ -12,10 +12,7 @@ class Obj_repr(Data):
         # 通过 reconstruct 恢复出的结果
         self.key_frames = Frames()
         self.track_type = None # either "open" or "close"
-        self.joint_dir_c = None
-        self.joint_dir_w = None
-        self.joint_states = None
-        self.joint_type = None # either "prismatic" or "revolute"
+        self.joint_dict = None
         
     def clear_frames(self):
         self.frames.clear()
