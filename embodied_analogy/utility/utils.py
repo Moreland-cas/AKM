@@ -854,11 +854,14 @@ def joint_data_to_transform_torch(
         T_ref2tgt[:3, 3] = joint_dir * joint_state_ref2tgt
     elif joint_type == "revolute":
         # coor_tgt = (coor_ref - joint_start) @ Rref2tgt.T + joint_start
-        _K = torch.tensor([
-            [0, -joint_dir[2], joint_dir[1]],
-            [joint_dir[2], 0, -joint_dir[0]],
-            [-joint_dir[1], joint_dir[0], 0]
-        ], device=joint_dir.device)
+        _K = torch.zeros((3, 3), device=joint_dir.device)
+        _K[0, 1] = -joint_dir[2]
+        _K[0, 2] = joint_dir[1]
+        _K[1, 0] = joint_dir[2]
+        _K[1, 2] = -joint_dir[0]
+        _K[2, 0] = -joint_dir[1]
+        _K[2, 1] = joint_dir[0]
+        
         theta = joint_state_ref2tgt  
         Rref2tgt = torch.eye(3, device=joint_dir.device) + torch.sin(theta) * _K + (1 - torch.cos(theta)) * (_K @ _K)
         T_ref2tgt[:3, :3] = Rref2tgt

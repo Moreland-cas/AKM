@@ -54,7 +54,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     )
 
     # 运行优化
-    num_iterations = 100
+    num_iterations = 300
     for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(joint_states, joint_dir)
@@ -176,10 +176,10 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
             if np.dot(np.cross(diff_0, diff_t), joint_dir) < 0:
                 joint_dir = -joint_dir
         
-    print("before torch optimization")
-    print("joint_dir: ", joint_dir)
-    print("joint_start: ", joint_start)
-    print("joint_states: ", joint_states)
+    # print("before torch optimization")
+    # print("joint_dir: ", joint_dir)
+    # print("joint_start: ", joint_start)
+    # print("joint_states: ", joint_states)
     
     # 初始化 joint_states 和 joint_start，并设置优化器
     joint_states = torch.from_numpy(joint_states[1:]).float().cuda().requires_grad_() # T-1
@@ -209,13 +209,17 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         est_loss = torch.mean(torch.norm(reconstructed_track - torch.from_numpy(tracks_3d[1:]).cuda(), dim=2))  # (T-1, N)
         return est_loss 
 
-    optimizer = torch.optim.Adam(
-        params=[
-            {'params': joint_states, 'lr': 1e-2},
-            {'params': joint_dir, 'lr': 3e-2},
-            {'params': joint_start, 'lr': 1e-2}
-        ]
-    )
+    optimizer = torch.optim.Adam([joint_states, joint_dir, joint_start], lr=1e-2) # 1 cm
+    
+    # lr = 1e-2
+    # dir_lr = 1e-2
+    # optimizer = torch.optim.Adam(
+    #     params=[
+    #         {'params': joint_states, 'lr': lr},
+    #         {'params': joint_dir, 'lr': dir_lr},
+    #         {'params': joint_start, 'lr': lr}
+    #     ]
+    # )
     scheduler = Scheduler(
         optimizer=optimizer,
         lr_update_factor=0.5,
@@ -224,11 +228,11 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     )
     
     # 运行优化
-    num_iterations = 3000
+    num_iterations = 300
     for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(joint_dir, joint_states, joint_start)
-        # print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+        print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
         joint_states_tmp = np.insert(joint_states_tmp, 0, 0)
@@ -243,7 +247,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        # print(f"\t lr:", cur_lr)
+        print(f"\t lr:", cur_lr)
         
         if should_early_stop:
             print("EARLY STOP")
@@ -252,10 +256,10 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         loss.backward()
         optimizer.step()
         
-    print("after torch optimization")
-    print("joint_dir: ", scheduler.best_state_dict["joint_dir"])
-    print("joint_start: ", scheduler.best_state_dict["joint_start"])
-    print("joint_states: ", scheduler.best_state_dict["joint_states"])
+    # print("after torch optimization")
+    # print("joint_dir: ", scheduler.best_state_dict["joint_dir"])
+    # print("joint_start: ", scheduler.best_state_dict["joint_start"])
+    # print("joint_states: ", scheduler.best_state_dict["joint_states"])
     
     if visualize:
         # NOTE: 由于 napari 的显示是左手坐标系, 因此需要把所有三维数据的 z 轴乘 -1
