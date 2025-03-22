@@ -190,9 +190,13 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         # 归一化 joint_dir
         joint_dir = joint_dir / torch.norm(joint_dir)
         # 创建 skew_v 矩阵
-        skew_v = torch.tensor([[0, -joint_dir[2], joint_dir[1]],
-                            [joint_dir[2], 0, -joint_dir[0]],
-                            [-joint_dir[1], joint_dir[0], 0]], device="cuda")
+        skew_v = torch.zeros((3, 3), device="cuda")
+        skew_v[0, 1] = -joint_dir[2]
+        skew_v[0, 2] = joint_dir[1]
+        skew_v[1, 0] = joint_dir[2]
+        skew_v[1, 2] = -joint_dir[0]
+        skew_v[2, 0] = -joint_dir[1]
+        skew_v[2, 1] = joint_dir[0]
         # 计算 R_reconstructed 矩阵
         theta = joint_states.unsqueeze(-1).unsqueeze(-1)  # 将 theta 扩展为 (T-1, 1, 1) 形状
         # (T-1, 3, 3)
@@ -205,7 +209,13 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         est_loss = torch.mean(torch.norm(reconstructed_track - torch.from_numpy(tracks_3d[1:]).cuda(), dim=2))  # (T-1, N)
         return est_loss 
 
-    optimizer = torch.optim.Adam([joint_states, joint_dir, joint_start], lr=1e-2)
+    optimizer = torch.optim.Adam(
+        params=[
+            {'params': joint_states, 'lr': 1e-2},
+            {'params': joint_dir, 'lr': 3e-2},
+            {'params': joint_start, 'lr': 1e-2}
+        ]
+    )
     scheduler = Scheduler(
         optimizer=optimizer,
         lr_update_factor=0.5,
@@ -214,11 +224,11 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     )
     
     # 运行优化
-    num_iterations = 200
+    num_iterations = 3000
     for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(joint_dir, joint_states, joint_start)
-        print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+        # print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
         joint_states_tmp = np.insert(joint_states_tmp, 0, 0)
@@ -233,7 +243,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        print(f"\t lr:", cur_lr)
+        # print(f"\t lr:", cur_lr)
         
         if should_early_stop:
             print("EARLY STOP")
@@ -471,14 +481,15 @@ def test_coarse_t_from_tracks_3d():
 
 
 def test_coarse_R():
-    tracks_3d = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/reconstruct/rotate_track.npy")
-    
+    # tracks_3d = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/reconstruct/rotate_track_open.npy")
+    # tracks_3d = tracks_3d[::-1, ...]
+    tracks_3d = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/reconstruct/rotate_track_close.npy")
     # 调用 coarse_R_from_tracks_3d 函数
     best_state, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=True)
     
     
 if __name__ == "__main__":
-    test_coarse_R_from_tracks_3d()
-    # test_coarse_R()
+    # test_coarse_R_from_tracks_3d()
+    test_coarse_R()
     # test_coarse_t_from_tracks_3d()
     

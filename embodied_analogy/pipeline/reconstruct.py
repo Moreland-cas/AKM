@@ -126,7 +126,8 @@ def reconstruct(
     """
     coarse_state_dict = coarse_joint_estimation(
         tracks_3d=tracks3d_filtered[:, moving_mask, :], 
-        visualize=visualize
+        # visualize=visualize
+        visualize=True
     )
     joint_type = coarse_state_dict["joint_type"]
     joint_dir_c = coarse_state_dict["joint_dir"]
@@ -234,13 +235,13 @@ if __name__ == "__main__":
     # obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     obj_repr_data = Obj_repr.load(obj_repr_path)
-    # obj_repr_data.frames.frame_list.reverse()
+    obj_repr_data.frames.frame_list.reverse()
     
     reconstruct(
         obj_repr=obj_repr_data,
         num_initial_uvs=1000,
         num_key_frames=5,
-        visualize=True,
+        visualize=False,
         # gt_joint_dir=np.array([-1, 0, 0]),
         gt_joint_dir=np.array([0, 0, 1]),
         # file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
