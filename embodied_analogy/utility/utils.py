@@ -1,4 +1,5 @@
 import os
+import napari
 import pygame
 import torch
 import random
@@ -1359,7 +1360,7 @@ def remove_dir_component(vector, direction):
     return result_vector
 
 
-def classify_open_close(tracks3d, moving_mask):
+def classify_open_close(tracks3d, moving_mask, visualize=False):
     """
     判断输入轨迹到底是打开物体还是关闭物体
     tracks3d: T, N, 3, 来自于 filter 过后的 tracks3d
@@ -1375,6 +1376,24 @@ def classify_open_close(tracks3d, moving_mask):
         track_type = "close"
     else:
         track_type = "open"
+        
+    if visualize:
+        viewer = napari.Viewer(title="open_close_classification", ndisplay=3)
+        napari_tracks3d = np.copy(tracks3d)
+        napari_tracks3d[..., 2] *= -1
+        viewer.add_points(napari_tracks3d[0, moving_mask], name="moving_start", size=0.01, face_color="red")
+        viewer.add_points(napari_tracks3d[0, static_mask], name="static_start", size=0.01, face_color="green")
+        
+        viewer.add_points(napari_tracks3d[0, moving_mask].mean(0), name="moving_mean_start", size=0.01, face_color="blue")
+        viewer.add_points(napari_tracks3d[0, static_mask].mean(0), name="static_mean_start", size=0.01, face_color="blue")
+        
+        viewer.add_points(napari_tracks3d[-1, moving_mask], name="moving_end", size=0.01, face_color="red")
+        viewer.add_points(napari_tracks3d[-1, static_mask], name="static_end", size=0.01, face_color="green")
+        
+        viewer.add_points(napari_tracks3d[-1, moving_mask].mean(0), name="moving_mean_end", size=0.01, face_color="blue")
+        viewer.add_points(napari_tracks3d[-1, static_mask].mean(0), name="static_mean_end", size=0.01, face_color="blue")
+        
+        napari.run()
     
     return track_type
 

@@ -522,7 +522,7 @@ def fine_joint_estimation_seq(
             name="revolute joint",
             shape_type="line",
             edge_width=0.005,
-            edge_color="blue",
+            border_color="blue",
             face_color="blue",
         )
         viewer.add_points(
@@ -530,7 +530,7 @@ def fine_joint_estimation_seq(
             name="joint start",
             size=0.02,
             face_color="blue",
-            edge_color="red",
+            border_color="red",
         )
         napari.run()
         

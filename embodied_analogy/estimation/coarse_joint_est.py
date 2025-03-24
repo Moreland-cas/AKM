@@ -106,7 +106,6 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
             name="prismatic joint",
             shape_type="line",
             edge_width=0.005,
-            edge_color="blue",
             face_color="blue",
         )
         viewer.add_points(
@@ -114,7 +113,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
             name="joint start",
             size=0.02,
             face_color="blue",
-            edge_color="red",
+            border_color="red",
         )
         napari.run()
         
@@ -320,7 +319,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
             name="joint start",
             size=0.02,
             face_color="blue",
-            edge_color="red",
+            border_color="red",
         )
         napari.run()
         

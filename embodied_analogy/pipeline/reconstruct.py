@@ -31,7 +31,8 @@ from embodied_analogy.representation.obj_repr import Obj_repr
 from embodied_analogy.perception.online_cotracker import track_any_points
 from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
-from embodied_analogy.estimation.clustering import cluster_tracks_3d
+# from embodied_analogy.estimation.clustering import cluster_tracks_3d_kmeans as cluster_tracks_3d
+from embodied_analogy.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
 from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
 from embodied_analogy.estimation.fine_joint_est import (
     fine_joint_estimation_seq,
@@ -117,9 +118,8 @@ def reconstruct(
     # 在 3d 空间对 tracks 进行聚类
     moving_mask, static_mask = cluster_tracks_3d(
         tracks3d_filtered, 
-        use_diff=True, 
+        feat_type="diff",
         visualize=visualize, 
-        viewer_title="clustering 3d tracks(filtered) into moving and static part"
     )
     """
         coarse joint estimation with tracks3d_filtered
@@ -192,14 +192,22 @@ def reconstruct(
         lr=1e-3, # 1 cm
         icp_select_range=0.1,
         visualize=visualize
+        # visualize=True
     )
+    track_type = "open"
+    
+    # 底下估计 open/close 的这一部分并不是很 robust, 因此删除, 并且默认 explore 阶段得到的都是 open 的轨迹
     # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
-    track_type = classify_open_close(tracks3d=tracks3d_filtered, moving_mask=moving_mask)
+    # track_type = classify_open_close(
+    #     tracks3d=tracks3d_filtered,
+    #     moving_mask=moving_mask,
+    #     visualize=visualize
+    # )
     
     # 看下当前的 joint_dir 到底对应 open 还是 close, 如果对应 close, 需要将 joint 进行翻转
-    if track_type == "close":
-        reverse_joint_dict(coarse_state_dict)
-        reverse_joint_dict(fine_state_dict)
+    # if track_type == "close":
+    #     reverse_joint_dict(coarse_state_dict)
+    #     reverse_joint_dict(fine_state_dict)
         
     if file_path is not None:
         # 更新 obj_repr, 并且进行保存
@@ -231,11 +239,11 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    obj_idx = 7221
-    # obj_idx = 44962
+    # obj_idx = 7221
+    obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     obj_repr_data = Obj_repr.load(obj_repr_path)
-    obj_repr_data.frames.frame_list.reverse()
+    # obj_repr_data.frames.frame_list.reverse()
     
     reconstruct(
         obj_repr=obj_repr_data,
