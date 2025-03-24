@@ -115,12 +115,17 @@ class Frames(Data):
         joint_states = np.array([self.frame_list[i].joint_state for i in range(self.num_frames())]) 
         return joint_states
     
+    def write_joint_states(self, joint_states):
+        assert len(joint_states) == self.num_frames()
+        for i, joint_state in enumerate(joint_states):
+            self.frame_list[i].joint_state = joint_state
+        
     def get_obj_mask_seq(self):
         # T, H, W
         obj_mask_seq = np.stack([self.frame_list[i].obj_mask for i in range(self.num_frames())]) 
         return obj_mask_seq
     
-    def get_dynamic_mask_seq(self):
+    def get_dynamic_seq(self):
         # T, H, W
         dynamic_mask_seq = np.stack([self.frame_list[i].dynamic_mask for i in range(self.num_frames())]) 
         return dynamic_mask_seq
@@ -135,7 +140,7 @@ class Frames(Data):
             viewer.add_labels(obj_mask_seq, name=f"{prefix}_obj_mask_seq")
         
         if self.frame_list[0].dynamic_mask is not None:
-            dynamic_mask_seq = self.get_dynamic_mask_seq()
+            dynamic_mask_seq = self.get_dynamic_seq()
             viewer.add_labels(dynamic_mask_seq.astype(np.int32), name=f"{prefix}_dynamic_mask_seq")
         
         if visualize_franka2d:

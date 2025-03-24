@@ -260,7 +260,7 @@ def sam2_on_image(
             viewer.add_shapes(
                 bbox_rect[None], # should be of shape 1, 4, 2
                 face_color="transparent",
-                border_color="green",
+                edge_color="green",
                 edge_width=5,
                 name="positive bbox prompt"
             )

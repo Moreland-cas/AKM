@@ -7,8 +7,10 @@ from embodied_analogy.utility.utils import (
     joint_data_to_transform_np,
     camera_to_image
 )
-from embodied_analogy.estimation.fine_joint_est import fine_joint_estimation_seq
+from embodied_analogy.estimation.fine_joint_est import fine_estimation
 from embodied_analogy.perception.grounded_sam import run_grounded_sam
+from embodied_analogy.representation.basic_structure import Frame, Frames
+from embodied_analogy.representation.obj_repr import Obj_repr
 from embodied_analogy.utility.constants import *
 
 def relocalization(
@@ -37,7 +39,8 @@ def relocalization(
         visualize=visualize
     )
     query_dynamic = obj_mask.astype(np.int32) * MOVING_LABEL
-        
+    
+    # TODO
     query_state_updated, query_dynamic_updated = _relocalization(
         K, 
         query_dynamic,
@@ -54,23 +57,30 @@ def relocalization(
     return query_state_updated, obj_mask, query_dynamic_updated
 
 def _relocalization(
-    K, 
-    query_dynamic,
-    query_depth, 
-    ref_depths, # T, H, W
-    joint_type, 
-    joint_dir, 
-    ref_joint_states, 
-    ref_dynamics,
-    lr=5e-3,
-    icp_select_range=0.1,
+    obj_repr: Obj_repr,
+    query_frame: Frame,
     visualize=False
 ):
-    if query_dynamic is None:
-        query_dynamic = (query_depth > 0).astype(np.int32) * MOVING_LABEL
+    """
+    根据 articulated object representation 对 query frame 进行 relocalization
+    query_frame:
+        需包含 query_depth, query_dynamic
+    obj_repr:
+        需包含 K, ref_depths, joint_type, joint_dir, ref_joint_states, ref_dynamics
+    """
+    if query_frame.dynamic_mask is None:
+        query_frame.dynamic_mask = (query_frame.depth > 0).astype(np.int32) * MOVING_LABEL
+    
+    # 从 obj_repr 中读取必要的数据
+    query_dynamic = query_frame.dynamic_mask
+    query_depth = query_frame.depth
+    ref_depths = obj_repr.key_frames.get_depth_seq()
+    ref_dynamics = obj_repr.key_frames.get_dynamic_seq()
+    ref_joint_states = obj_repr.joint_dict["joint_states"]
+    assert len(ref_joint_states) == len(obj_repr.key_frames)
         
     # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
-    num_ref = len(ref_joint_states)
+    num_ref = len(obj_repr.key_frames)
     
     # 初始化状态, 通过 rgb 或者 depth 找到最近的图像, 我觉得可以先通过 depth
     best_err = 1e10
@@ -97,20 +107,19 @@ def _relocalization(
     tmp_joint_states = np.insert(ref_joint_states, 0, query_state)
     tmp_dynamics = np.concatenate([query_dynamic[None], ref_dynamics], axis=0)
     
-    _, updated_states = fine_joint_estimation_seq(
-        K=K,
+    _, updated_states = fine_estimation(
+        K=obj_repr.K,
         depth_seq=tmp_depths, 
         dynamic_seq=tmp_dynamics,
-        joint_type=joint_type, 
-        joint_dir=joint_dir, 
+        joint_dict=obj_repr.joint_dict,
         joint_states=tmp_joint_states,
         max_icp_iters=200, 
         optimize_joint_dir=False,
         optimize_state_mask=np.arange(num_ref+1)==0,
         # 目前不更新 dynamic_mask
         update_dynamic_mask=np.arange(num_ref+1)==-1,
-        lr=lr,
-        icp_select_range=icp_select_range,
+        lr=1e-2,
+        icp_select_range=0.1,
         visualize=visualize
     )
     query_state_updated = updated_states[0]

@@ -107,6 +107,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
             shape_type="line",
             edge_width=0.005,
             face_color="blue",
+            edge_color="blue"
         )
         viewer.add_points(
             data=joint_start,
@@ -326,7 +327,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     return scheduler.best_state_dict, scheduler.best_loss
 
 
-def coarse_joint_estimation(tracks_3d, visualize=False):
+def coarse_estimation(tracks_3d, visualize=False):
     """
     根据 tracks3d 估计出初始的 joint 状态, 要求 joint_state 的初始值是0, 且随着轨迹增加
     (如果是旋转的话需要满足右手定则)

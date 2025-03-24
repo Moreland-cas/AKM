@@ -25,7 +25,7 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 
 import napari
-from embodied_analogy.representation.basic_structure import Frames
+from embodied_analogy.representation.basic_structure import Frame, Frames
 from embodied_analogy.representation.obj_repr import Obj_repr
 
 from embodied_analogy.perception.online_cotracker import track_any_points
@@ -33,9 +33,9 @@ from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
 # from embodied_analogy.estimation.clustering import cluster_tracks_3d_kmeans as cluster_tracks_3d
 from embodied_analogy.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
-from embodied_analogy.estimation.coarse_joint_est import coarse_joint_estimation
+from embodied_analogy.estimation.coarse_joint_est import coarse_estimation
 from embodied_analogy.estimation.fine_joint_est import (
-    fine_joint_estimation_seq,
+    fine_estimation,
     filter_dynamic_seq
 )
 from embodied_analogy.visualization.vis_tracks_2d import vis_tracks2d_napari
@@ -60,6 +60,10 @@ def reconstruct(
     franka2d_seq = obj_repr.frames.get_franka2d_seq()
     K = obj_repr.initial_frame.K
     Tw2c = obj_repr.initial_frame.Tw2c
+    
+    # for tmp fix
+    obj_repr.K = K
+    obj_repr.Tw2c = Tw2c
         
     depth_mask_seq = get_depth_mask_seq(
         depth_seq=depth_seq,
@@ -124,38 +128,40 @@ def reconstruct(
     """
         coarse joint estimation with tracks3d_filtered
     """
-    coarse_state_dict = coarse_joint_estimation(
+    coarse_state_dict = coarse_estimation(
         tracks_3d=tracks3d_filtered[:, moving_mask, :], 
-        # visualize=visualize
-        visualize=True
+        visualize=visualize
     )
     joint_type = coarse_state_dict["joint_type"]
     joint_dir_c = coarse_state_dict["joint_dir"]
     joint_start_c = coarse_state_dict["joint_start"]
     joint_states = coarse_state_dict["joint_states"]
+    # 将 coarse estimation 阶段计算的数据写回 obj_repr
+    obj_repr.frames.write_joint_states(joint_states)
+    coarse_state_dict.pop("joint_states")
+    obj_repr.joint_dict = coarse_state_dict
     """
         根据 rgb_seq 和 tracks2d 得到 obj_mask_seq (可以用 sam 或者 sam2)
     """
     # 根据 coarse joint estimation 挑选出有信息量的一些帧, 进行 fine joint estimation
-    kf_idx = farthest_scale_sampling(joint_states, M=num_key_frames)
+    kf_idxs = farthest_scale_sampling(joint_states, M=num_key_frames)
     # obj_mask_seq by sam2 image mode
     obj_mask_seq = mask_obj_from_video_with_image_sam2(
-        rgb_seq=rgb_seq[kf_idx], 
+        rgb_seq=rgb_seq[kf_idxs], 
         obj_description=obj_description,
-        positive_tracks2d=tracks2d_filtered[kf_idx], 
-        negative_tracks2d=franka2d_seq[kf_idx], 
+        positive_tracks2d=tracks2d_filtered[kf_idxs], 
+        negative_tracks2d=franka2d_seq[kf_idxs], 
         visualize=visualize
-        # visualize=True
     ) 
     # 对 obj_mask_seq 进行 depth 过滤, 可选可不选
-    obj_mask_seq = obj_mask_seq & depth_mask_seq[kf_idx]
+    obj_mask_seq = obj_mask_seq & depth_mask_seq[kf_idxs]
     """
         根据 tracks2d 和 obj_mask_seq 得到 dynamic_seq
     """
     dynamic_seq = get_dynamic_seq(
         mask_seq=obj_mask_seq, 
-        moving_points_seq=tracks2d_filtered[kf_idx][:, moving_mask, :],
-        static_points_seq=tracks2d_filtered[kf_idx][:, static_mask, :], 
+        moving_points_seq=tracks2d_filtered[kf_idxs][:, moving_mask, :],
+        static_points_seq=tracks2d_filtered[kf_idxs][:, static_mask, :], 
         visualize=visualize
     )
     """
@@ -164,37 +170,37 @@ def reconstruct(
     # filter dynamic mask seq
     dynamic_seq_updated = filter_dynamic_seq(
         K=K,
-        depth_seq=depth_seq[kf_idx],
+        depth_seq=depth_seq[kf_idxs],
         dynamic_seq=dynamic_seq,
         joint_type=joint_type,
         joint_dir=joint_dir_c,
         joint_start=joint_start_c,
-        joint_states=joint_states[kf_idx],
+        joint_states=joint_states[kf_idxs],
         depth_tolerance=0.05, # 假设 coarse 阶段的误差估计在 5 cm 内
         visualize=visualize
-        # visualize=True
     ) 
-    # fine estimation
-    init_fine_state_dict = copy.deepcopy(coarse_state_dict)
-    init_fine_state_dict["joint_states"] = joint_states[kf_idx]
+    # fine estimation, 将初始数据写入 obj_repr.key_frames
+    obj_repr.clear_key_frames()
+    for i, kf_idx in enumerate(kf_idxs):
+        tmp_frame = copy.deepcopy(obj_repr.frames[kf_idx])
+        tmp_frame.obj_mask = obj_mask_seq[i]
+        tmp_frame.dynamic_mask = dynamic_seq_updated[i]
+        obj_repr.key_frames.append(tmp_frame)
+                
+    obj_repr.clear_frames()
     
-    fine_state_dict = fine_joint_estimation_seq(
-        K=K,
-        depth_seq=depth_seq[kf_idx], 
-        dynamic_seq=dynamic_seq_updated,
-        joint_dict=init_fine_state_dict,
-        max_icp_iters=200, # ICP 最多迭代多少轮
+    fine_estimation(
+        obj_repr=obj_repr,
         opti_joint_dir=True,
         opti_joint_start=(joint_type=="revolute"),
+        # 第一帧的 joint state 不优化, 从而保证有一个 fixed 的 landmark
         opti_joint_states_mask=np.arange(num_key_frames)!=0,
         # 这里设置不迭代的优化 dynamic_mask
         update_dynamic_mask=np.zeros(num_key_frames).astype(np.bool_),
-        lr=1e-3, # 1 cm
-        icp_select_range=0.1,
         visualize=visualize
-        # visualize=True
     )
     track_type = "open"
+    obj_repr.track_type = track_type
     
     # 底下估计 open/close 的这一部分并不是很 robust, 因此删除, 并且默认 explore 阶段得到的都是 open 的轨迹
     # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
@@ -210,17 +216,6 @@ def reconstruct(
     #     reverse_joint_dict(fine_state_dict)
         
     if file_path is not None:
-        # 更新 obj_repr, 并且进行保存
-        _key_frames = [obj_repr.frames[kf_idx_i] for kf_idx_i in kf_idx]
-        # 将 obj_mask 和 dynamic_mask 更新到 key_frames 中
-        for i, frame in enumerate(_key_frames):
-            frame.obj_mask = obj_mask_seq[i]
-            frame.dynamic_mask = dynamic_seq_updated[i]
-            
-        obj_repr.key_frames = Frames(frame_list=_key_frames)
-        obj_repr.clear_frames()
-        obj_repr.track_type = track_type
-        obj_repr.joint_dict = fine_state_dict
         obj_repr.save(file_path)
     
     if gt_joint_dir is not None:
@@ -239,8 +234,8 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    # obj_idx = 7221
-    obj_idx = 44962
+    obj_idx = 7221
+    # obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     obj_repr_data = Obj_repr.load(obj_repr_path)
     # obj_repr_data.frames.frame_list.reverse()

@@ -17,6 +17,7 @@ from embodied_analogy.utility.utils import (
 )
 from embodied_analogy.utility.constants import *
 from embodied_analogy.estimation.scheduler import Scheduler
+from embodied_analogy.representation.obj_repr import Obj_repr
 
 def classify_unknown():
     # 如果按照深度验证这个必要条件, Tmoving满足但是Tstatic不满足, 那就可以 classify 到 moving, 反之也是
@@ -278,36 +279,28 @@ def moving_ij_intersection_torch(
     return pc_ref_mask.cpu().numpy(), pc_tgt_mask.cpu().numpy()
 
 
-def fine_joint_estimation_seq(
-    K,
-    depth_seq, 
-    dynamic_seq,
-    joint_dict,
-    max_icp_iters=100, # ICP 最多迭代多少轮
+def fine_estimation(
+    obj_repr: Obj_repr,
     opti_joint_dir=True,
     opti_joint_start=True,
     opti_joint_states_mask=None, # boolean mask to select which states to optimize
     update_dynamic_mask=None,
-    lr=3e-4,
-    icp_select_range=0.03,
     visualize=False
 ):
     """
-    主要是计算损失函数的逻辑, 优化没啥难的
-    计算损失函数：
-        损失函数为所有 (frame_i, frame_j) 的 point-to-plane ICP loss + point-to-point ICP loss
-        frame_i 和 frame_j 间的 pc_i 和 pc_j 需要使用验证对齐
-        
-    如果 optimize_state_mask 或者 update_dynamic_mask 为 None, 则视为全部优化
+    对于 obj_repr 的 joint_dict 和 keyframe 中的 joint states 进行优化, 可根据 opti_xxx 有选择的优化部分值
+    损失函数为所有 (frame_i, frame_j) 的 point-to-point/plane ICP loss 
     """
-    T = depth_seq.shape[0]
-    assert T >= 2
-    
     # 读取数据
-    joint_type = joint_dict["joint_type"]
-    joint_dir = joint_dict["joint_dir"]
-    joint_start = joint_dict["joint_start"]
-    joint_states = joint_dict["joint_states"]
+    T = len(obj_repr.key_frames)
+    assert T >= 2
+    K = obj_repr.K
+    joint_type = obj_repr.joint_dict["joint_type"]
+    joint_dir = obj_repr.joint_dict["joint_dir"]
+    joint_start = obj_repr.joint_dict["joint_start"]
+    joint_states = obj_repr.key_frames.get_joint_states()
+    depth_seq = obj_repr.key_frames.get_depth_seq()
+    dynamic_seq = obj_repr.key_frames.get_dynamic_seq()
     
     if opti_joint_states_mask is None:
         opti_joint_states_mask = np.ones(T, dtype=np.bool_)
@@ -322,6 +315,7 @@ def fine_joint_estimation_seq(
     # 进入 ICP 迭代
     dir_params = torch.from_numpy(joint_dir).float().cuda().requires_grad_()
     start_params = torch.from_numpy(joint_start).float().cuda().requires_grad_()
+    lr = 1e-3 # 1mm
     dir_lr = lr if opti_joint_dir else 0.0
     start_lr = lr if opti_joint_start else 0.0
     
@@ -359,7 +353,8 @@ def fine_joint_estimation_seq(
             if (not opti_joint_dir) and (not opti_joint_start) and (not opti_joint_states_mask[i]) and (not opti_joint_states_mask[j]):
                 continue
             ij_pairs.append((i, j))
-                    
+    
+    max_icp_iters = 200                    
     for k in range(max_icp_iters):
         # 如果要 update dynamic mask, 就在这里进行
         for l, need_update in enumerate(update_dynamic_mask):
@@ -431,7 +426,7 @@ def fine_joint_estimation_seq(
                 target_normals=target_normals[pc_tgt_mask],
                 loss_type="point_to_plane", # point_to_point
                 # loss_type="point_to_point", # point_to_point
-                icp_select_range=icp_select_range
+                icp_select_range=0.1
             )
         
         if cur_icp_loss.item() == 0:
@@ -522,7 +517,7 @@ def fine_joint_estimation_seq(
             name="revolute joint",
             shape_type="line",
             edge_width=0.005,
-            border_color="blue",
+            edge_color="blue",
             face_color="blue",
         )
         viewer.add_points(
@@ -533,8 +528,12 @@ def fine_joint_estimation_seq(
             border_color="red",
         )
         napari.run()
-        
-    return scheduler.best_state_dict
+    
+    # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
+    obj_repr.key_frames.write_joint_states(scheduler.best_state_dict["joint_states"])
+    scheduler.best_state_dict.pop("joint_states")
+    obj_repr.joint_dict = scheduler.best_state_dict
+    # return scheduler.best_state_dict
 
 
 if __name__ == "__main__":

@@ -12,10 +12,17 @@ class Obj_repr(Data):
         # 通过 reconstruct 恢复出的结果
         self.key_frames = Frames()
         self.track_type = None # either "open" or "close"
-        self.joint_dict = None
+        self.joint_dict = {
+            "joint_type": None,
+            "joint_dir": None,
+            "joint_start": None,
+        }
         
     def clear_frames(self):
         self.frames.clear()
+        
+    def clear_key_frames(self):
+        self.key_frames.clear()
         
     def get_key_frames(self):
         pass
