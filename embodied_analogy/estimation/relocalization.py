@@ -110,7 +110,7 @@ def relocalization(
             joint_start=obj_repr.joint_dict["joint_start"],
             joint_state_ref2tgt=query_frame.joint_state-obj_repr.initial_frame.joint_state
         )
-        contact_3d_query = Tinit2query[:3, :3] @ obj_repr.initial_frame.contact3d.squeeze() + Tinit2query[:3, 3] # 3
+        contact_3d_query = Tinit2query[:3, :3] @ obj_repr.initial_frame.contact3d + Tinit2query[:3, 3] # 3
         query_frame.contact_3d = contact_3d_query
         query_frame.contact2d = camera_to_image(contact_3d_query[None], K)[0]
     

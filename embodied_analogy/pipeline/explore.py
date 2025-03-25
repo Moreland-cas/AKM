@@ -95,7 +95,7 @@ class ExploreEnv(ManipulateEnv):
                 uv_depth = self.obj_repr.initial_frame.depth[int(explore_uv[1]), int(explore_uv[0])]
                 self.obj_repr.initial_frame.contact3d = image_to_camera(
                     uv=explore_uv[None], 
-                    depth=np.array([uv_depth])[None], 
+                    depth=np.array([uv_depth]), 
                     K=self.camera_intrinsic, 
                 )[0]
                 break

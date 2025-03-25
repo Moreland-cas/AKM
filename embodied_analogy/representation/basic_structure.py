@@ -60,7 +60,7 @@ class Frame(Data):
             viewer.add_labels(self.dynamic_mask.astype(np.uint32), name=f"{prefix}_dynamic_mask")
             
         if self.contact2d is not None:
-            u, v = self.contact2d.squeeze()
+            u, v = self.contact2d
             viewer.add_points((v, u), face_color="red", name=f"{prefix}_contact2d")
     
     def visualize(self):
