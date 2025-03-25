@@ -577,12 +577,15 @@ class BaseEnv():
         return grasp_
     
     
-    def move_along_axis(self, joint_type, joint_axis, moving_distance, num_interp=10):
+    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance, num_interp=10):
         """
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
         joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
         """
         assert joint_type in ["prismatic", "revolute"]
+        if joint_type == "revolute" and joint_start is None:
+            assert "joint_start cannot be None when joint_type is revolute"
+            
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
         Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
@@ -602,8 +605,9 @@ class BaseEnv():
                 R_delta = R.from_rotvec(delta * axis).as_matrix()  # 计算旋转矩阵
                 
                 Tph2w = np.eye(4)
-                Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转
-                Tph2w[:3, 3] = R_delta @ ee_pose  # 保持末端执行器的位置不变
+                Tph2w[:3, :3] = (R_delta @ Rph2w.T).T
+                # Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转
+                Tph2w[:3, 3] = R_delta @ (ee_pose - joint_start) + joint_start  # 保持末端执行器的位置不变
                 return Tph2w
         
         # 先得到连续的插值位姿
@@ -627,6 +631,7 @@ class BaseEnv():
         self.move_along_axis(
             joint_type="prismatic",
             joint_axis=moving_direction,
+            joint_start=None,
             moving_distance=moving_distance
         )
             

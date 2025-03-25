@@ -196,6 +196,7 @@ class ExploreEnv(ManipulateEnv):
         self.move_along_axis(
             joint_type="prismatic",
             joint_axis=dir_out_w,
+            joint_start=None,
             moving_distance=pertubation_distance
         )
         self.step = self.base_step 

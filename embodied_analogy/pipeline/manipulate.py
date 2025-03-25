@@ -193,9 +193,14 @@ class ManipulateEnv(BaseEnv):
         self.close_gripper()
         
         # 在 close gripper 之后再开始录制数据
+        joint_dir_c = self.obj_repr.joint_dict["joint_dir"]
+        joint_start_c = self.obj_repr.joint_dict["joint_start"]
+        joint_dir_w = Tc2w[:3, :3] @ joint_dir_c
+        joint_start_w = Tc2w[:3, :3] @ joint_start_c + Tc2w[:3, 3]
         self.move_along_axis(
             joint_type=self.obj_repr.joint_dict["joint_type"],
-            joint_axis=self.obj_repr.joint_dict["joint_dir"],
+            joint_axis=joint_dir_w,
+            joint_start=joint_start_w,
             moving_distance=self.target_state-cur_state
         )
         
@@ -251,8 +256,8 @@ if __name__ == '__main__':
     )
     demo.manipulate(
         # delta_state=0.1,
-        delta_state=np.deg2rad(30),
-        visualize=False
+        delta_state=np.deg2rad(15),
+        visualize=True
     )
     
     while True:
