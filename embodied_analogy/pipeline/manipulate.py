@@ -193,7 +193,11 @@ class ManipulateEnv(BaseEnv):
         self.close_gripper()
         
         # 在 close gripper 之后再开始录制数据
-        self.move_along_axis(moving_direction=dir_out_w, moving_distance=self.target_state - cur_state)
+        self.move_along_axis(
+            joint_type=self.obj_repr.joint_dict["joint_type"],
+            joint_axis=self.obj_repr.joint_dict["joint_dir"],
+            moving_distance=self.target_state-cur_state
+        )
         
         # TODO: 在这里进行一个状态估计, 输出算法 predict 的当前状态 (改为一个 close-loop 的状态)
         pass
@@ -218,27 +222,27 @@ class ManipulateEnv(BaseEnv):
 
 if __name__ == '__main__':
     # drawer
-    obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
-        "active_link": "link_2",
-        # "active_joint": "joint_2"
-        "active_joint": "joint_1"
-    }
-    
-    # microwave
     # obj_config = {
-    #     "index": 7221,
-    #     "scale": 0.4,
-    #     "pose": [0.8, 0.1, 0.6],
-    #     "active_link": "link_0",
-    #     "active_joint": "joint_0"
+    #     "index": 44962,
+    #     "scale": 0.8,
+    #     "pose": [1.0, 0., 0.5],
+    #     "active_link": "link_2",
+    #     # "active_joint": "joint_2"
+    #     "active_joint": "joint_1"
     # }
     
+    # microwave
+    obj_config = {
+        "index": 7221,
+        "scale": 0.4,
+        "pose": [0.8, 0.1, 0.6],
+        "active_link": "link_0",
+        "active_joint": "joint_0"
+    }
+    
     obj_index = obj_config["index"]
-    instruction="open the drawer"
-    # instruction="open the microwave"
+    # instruction="open the drawer"
+    instruction="open the microwave"
     
     demo = ManipulateEnv(
         obj_config=obj_config,
@@ -246,7 +250,8 @@ if __name__ == '__main__':
         instruction=instruction
     )
     demo.manipulate(
-        delta_state=0.1,
+        # delta_state=0.1,
+        delta_state=np.deg2rad(30),
         visualize=False
     )
     

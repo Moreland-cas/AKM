@@ -192,7 +192,12 @@ class ExploreEnv(ManipulateEnv):
         
         # 在 close gripper 之后再开始录制数据
         self.step = self.explore_step
-        self.move_along_axis(moving_direction=dir_out_w, moving_distance=pertubation_distance)
+        # NOTE: 在 explore 阶段, 不管是什么关节, 做的扰动都是直线移动
+        self.move_along_axis(
+            joint_type="prismatic",
+            joint_axis=dir_out_w,
+            moving_distance=pertubation_distance
+        )
         self.step = self.base_step 
         
         return True, contact_uv

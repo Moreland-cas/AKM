@@ -577,22 +577,37 @@ class BaseEnv():
         return grasp_
     
     
-    def move_along_axis(self, moving_direction, moving_distance, num_interpolation=10):
-        # moving_direction 是在世界坐标系下的方向
-        # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
+    def move_along_axis(self, joint_type, joint_axis, moving_distance, num_interp=10):
+        """
+        控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
+        joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
+        """
+        assert joint_type in ["prismatic", "revolute"]
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
         Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
-        
-        def T_with_delta(delta):
-            Tph2w = np.eye(4)
-            Tph2w[:3, :3] = Rph2w
-            # 对于 panda_hand 来说, z-axis 的正方向是向前
-            Tph2w[:3, 3] = ee_pose[:3] + delta * moving_direction
-            return Tph2w
+            
+        if joint_type == "prismatic":
+            def T_with_delta(delta):
+                Tph2w = np.eye(4)
+                Tph2w[:3, :3] = Rph2w
+                # 对于 panda_hand 来说, z-axis 的正方向是向前
+                Tph2w[:3, 3] = ee_pose + delta * joint_axis
+                return Tph2w
+            
+        elif joint_type == "revolute":
+            def T_with_delta(delta):
+                # 计算旋转矩阵，delta为旋转角度
+                axis = joint_axis / np.linalg.norm(joint_axis)  # 确保轴是单位向量
+                R_delta = R.from_rotvec(delta * axis).as_matrix()  # 计算旋转矩阵
+                
+                Tph2w = np.eye(4)
+                Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转
+                Tph2w[:3, 3] = R_delta @ ee_pose  # 保持末端执行器的位置不变
+                return Tph2w
         
         # 先得到连续的插值位姿
-        deltas = np.linspace(0, moving_distance, num_interpolation)
+        deltas = np.linspace(0, moving_distance, num_interp)
         T_list = [T_with_delta(delta) for delta in deltas]
         
         # 然后依次执行这些位姿
@@ -609,10 +624,18 @@ class BaseEnv():
         # scalar_first means quat in (w, x, y, z) order
         Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
         moving_direction = Rph2w @ np.array([0, 0, 1]) # 3
-        self.move_along_axis(moving_direction, moving_distance)
+        self.move_along_axis(
+            joint_type="prismatic",
+            joint_axis=moving_direction,
+            moving_distance=moving_distance
+        )
             
     def get_ee_pose(self):
-        # 获取ee_pos和ee_quat
+        """
+        获取 end-effector (panda_hand) 的 ee_pos 和 ee_quat (Tph2w)
+        ee_pos: np.array([3, ])
+        ee_quat: np.array([4, ]), scalar_first=True, in (w, x, y, z) order
+        """
         ee_link = self.robot.get_links()[9] # panda_hand
         # print(ee_link.name)
         ee_pos = ee_link.get_pose().p
