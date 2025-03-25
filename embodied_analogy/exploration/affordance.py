@@ -191,9 +191,7 @@ class Affordance_map_2d:
             # image_mask.show()
             
             concatenate_images(image_cos, image_rgb).show()
-        if u_rgb is None:
-            pass
-        return (u_rgb, v_rgb)       
+        return np.array([u_rgb, v_rgb])  
        
     def update(self, neg_uv_rgb, visualize=False):
         """

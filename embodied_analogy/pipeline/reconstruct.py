@@ -58,13 +58,9 @@ def reconstruct(
     rgb_seq = obj_repr.frames.get_rgb_seq()
     depth_seq = obj_repr.frames.get_depth_seq()
     franka2d_seq = obj_repr.frames.get_franka2d_seq()
-    K = obj_repr.initial_frame.K
-    Tw2c = obj_repr.initial_frame.Tw2c
+    K = obj_repr.K
+    Tw2c = obj_repr.Tw2c
     
-    # for tmp fix
-    obj_repr.K = K
-    obj_repr.Tw2c = Tw2c
-        
     depth_mask_seq = get_depth_mask_seq(
         depth_seq=depth_seq,
         K=K,
@@ -216,6 +212,7 @@ def reconstruct(
     #     reverse_joint_dict(fine_state_dict)
         
     if file_path is not None:
+        obj_repr.visualize()
         obj_repr.save(file_path)
     
     if gt_joint_dir is not None:
@@ -234,8 +231,8 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    obj_idx = 7221
-    # obj_idx = 44962
+    # obj_idx = 7221
+    obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     obj_repr_data = Obj_repr.load(obj_repr_path)
     # obj_repr_data.frames.frame_list.reverse()
@@ -246,7 +243,8 @@ if __name__ == "__main__":
         num_key_frames=5,
         visualize=False,
         # gt_joint_dir=np.array([-1, 0, 0]),
-        gt_joint_dir=np.array([0, 0, 1]),
-        # file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
-        file_path = None
+        # gt_joint_dir=np.array([0, 0, 1]),
+        gt_joint_dir=None,
+        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
+        # file_path = None
     )

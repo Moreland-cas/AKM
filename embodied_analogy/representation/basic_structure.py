@@ -34,6 +34,9 @@ class Frame(Data):
         franka3d=None,
         franka_mask=None,
     ):
+        """
+            NOTE: contact3d 在相机坐标系下, franka3d 在世界坐标系下
+        """ 
         self.rgb = rgb
         self.depth = depth
         self.K = K
@@ -52,9 +55,12 @@ class Frame(Data):
         
         if self.obj_mask is not None:
             viewer.add_labels(self.obj_mask, name=f"{prefix}_obj_mask")
+        
+        if self.dynamic_mask is not None:
+            viewer.add_labels(self.dynamic_mask.astype(np.uint32), name=f"{prefix}_dynamic_mask")
             
         if self.contact2d is not None:
-            u, v = self.contact2d
+            u, v = self.contact2d.squeeze()
             viewer.add_points((v, u), face_color="red", name=f"{prefix}_contact2d")
     
     def visualize(self):

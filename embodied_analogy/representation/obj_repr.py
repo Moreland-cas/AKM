@@ -4,6 +4,7 @@ from embodied_analogy.representation.basic_structure import Data, Frame, Frames
 
 class Obj_repr(Data):
     def __init__(self):
+        self.obj_description = None
         self.initial_frame = Frame()
         self.frames = Frames()
         self.K = None
@@ -12,6 +13,9 @@ class Obj_repr(Data):
         # 通过 reconstruct 恢复出的结果
         self.key_frames = Frames()
         self.track_type = None # either "open" or "close"
+        """
+        NOTE: 这里的 joint_dir 和 joint_start 均在相机坐标系下
+        """
         self.joint_dict = {
             "joint_type": None,
             "joint_dir": None,
@@ -53,8 +57,8 @@ class Obj_repr(Data):
 
 if __name__ == "__main__":
     # drawer
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
     # microwave
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
     obj_repr.visualize()

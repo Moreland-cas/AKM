@@ -825,6 +825,9 @@ def joint_data_to_transform_np(
     joint_start,
     joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
 ):
+    """
+    计算 ref_frame 和 tgt_frame 上的对应点在 camera 坐标系下坐标的转换矩阵
+    """
     # 根据 joint_type 和 joint_dir 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
     T_ref2tgt = np.eye(4)
     if joint_type == "prismatic":

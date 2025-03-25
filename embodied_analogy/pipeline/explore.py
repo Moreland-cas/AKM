@@ -57,6 +57,9 @@ class ExploreEnv(ManipulateEnv):
             visualize=False
         )
         # 在这里保存 first frame
+        self.obj_repr.obj_description = self.obj_description
+        self.obj_repr.K = self.camera_intrinsic
+        self.obj_repr.Tw2c = self.camera_extrinsic
         self.obj_repr.initial_frame = Frame(
             rgb=rgb_np,
             depth=depth_np,
@@ -89,6 +92,12 @@ class ExploreEnv(ManipulateEnv):
             if self.check_valid():
                 # 在这里将 explore_uv 保存到 obj_repr 的 initial_frame 中
                 self.obj_repr.initial_frame.contact2d = explore_uv
+                uv_depth = self.obj_repr.initial_frame.depth[int(explore_uv[1]), int(explore_uv[0])]
+                self.obj_repr.initial_frame.contact3d = image_to_camera(
+                    uv=explore_uv[None], 
+                    depth=np.array([uv_depth])[None], 
+                    K=self.camera_intrinsic, 
+                )[0]
                 break
             else:
                 # 更新 affordance map
@@ -283,20 +292,22 @@ class ExploreEnv(ManipulateEnv):
         else:
             return False
         
-    def save(self, file_path=None):
+    def save(self, file_path=None, visualize=False):
+        if visualize:
+            self.obj_repr.visualize()
         self.obj_repr.save(file_path)
         
     
 if __name__ == "__main__":
     # drawer
-    # obj_config = {
-    #     "index": 44962,
-    #     "scale": 0.8,
-    #     "pose": [1.0, 0., 0.5],
-    #     "active_link": "link_2",
-    #     # "active_joint": "joint_2"
-    #     "active_joint": "joint_1"
-    # }
+    obj_config = {
+        "index": 44962,
+        "scale": 0.8,
+        "pose": [1.0, 0., 0.5],
+        "active_link": "link_2",
+        # "active_joint": "joint_2"
+        "active_joint": "joint_1"
+    }
     
     # door
     # obj_config = {
@@ -308,24 +319,23 @@ if __name__ == "__main__":
     # }
     
     # microwave
-    obj_config = {
-        "index": 7221,
-        "scale": 0.4,
-        "pose": [0.8, 0.1, 0.6],
-        "active_link": "link_0",
-        "active_joint": "joint_0"
-    }
+    # obj_config = {
+    #     "index": 7221,
+    #     "scale": 0.4,
+    #     "pose": [0.8, 0.1, 0.6],
+    #     "active_link": "link_0",
+    #     "active_joint": "joint_0"
+    # }
     
     obj_index = obj_config["index"]
     
     exploreEnv = ExploreEnv(
         obj_config=obj_config,
-        # instruction="open the drawer",
-        # instruction="open the door",
-        instruction="open the microwave",
+        instruction="open the drawer",
+        # instruction="open the microwave",
         record_fps=30,
         pertubation_distance=0.1
     )
     exploreEnv.explore_loop(visualize=False)
-    # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
+    exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     
