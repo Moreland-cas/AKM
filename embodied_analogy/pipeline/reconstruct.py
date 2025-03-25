@@ -231,8 +231,8 @@ def reconstruct(
     
 
 if __name__ == "__main__":
-    # obj_idx = 7221
-    obj_idx = 44962
+    obj_idx = 7221
+    # obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
     obj_repr_data = Obj_repr.load(obj_repr_path)
     # obj_repr_data.frames.frame_list.reverse()

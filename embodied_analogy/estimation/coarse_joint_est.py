@@ -337,7 +337,7 @@ def coarse_estimation(tracks_3d, visualize=False):
     R_state_dict, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
     
     print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
-    
+    torch.cuda.empty_cache()
     if t_est_loss < R_est_loss:
         print("select as prismatic joint")
         t_state_dict["joint_type"] = "prismatic"

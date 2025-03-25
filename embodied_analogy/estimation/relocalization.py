@@ -112,7 +112,7 @@ def relocalization(
         )
         contact_3d_query = Tinit2query[:3, :3] @ obj_repr.initial_frame.contact3d + Tinit2query[:3, 3] # 3
         query_frame.contact_3d = contact_3d_query
-        query_frame.contact2d = camera_to_image(contact_3d_query[None], K)[0]
+        query_frame.contact2d = camera_to_image(contact_3d_query[None], K)[0][0]
     
     # 也就是说把 ref_frame 的 moving part 投影到 query frame 上, 对 query_dynamic 进行一个更新 (其余部分设置为 unknown)
     if update_query_dynamic:
@@ -155,7 +155,8 @@ def relocalization(
 
 if __name__ == "__main__":
     # 读取数据
-    obj_index = 44962
+    # obj_index = 44962
+    obj_index = 7221
     obj_file_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/reconstruct/recon_data.pkl"
     obj_repr = Obj_repr.load(obj_file_path)
     

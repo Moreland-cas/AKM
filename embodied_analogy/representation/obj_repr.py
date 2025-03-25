@@ -61,5 +61,7 @@ if __name__ == "__main__":
     obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
     # microwave
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/reconstruct/recon_data.pkl")
     obj_repr.visualize()
     
+    # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)

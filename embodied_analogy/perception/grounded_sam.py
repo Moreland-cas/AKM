@@ -1,6 +1,8 @@
+import torch
 from embodied_analogy.perception.image_sam2 import sam2_on_image, load_sam2_image_model
 from embodied_analogy.perception.grounding_dino import run_groundingDINO, load_groundingDINO_model
 
+@torch.no_grad()
 def run_grounded_sam(
     rgb_image,
     obj_description,
@@ -34,6 +36,7 @@ def run_grounded_sam(
         post_process=post_process_mask,
         visualize=visualize
     )
+    torch.cuda.empty_cache()
     return initial_bbox, initial_mask
 
 if __name__ == "__main__":

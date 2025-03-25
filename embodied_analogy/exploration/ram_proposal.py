@@ -33,7 +33,7 @@ from embodied_analogy.utility.utils import (
     get_depth_mask
 )
 # from embodied_analogy.perception.grounded_sam import run_grounded_sam
-
+from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
     sort_grasp_group,
@@ -80,6 +80,7 @@ def project_normals(img, pixel, normals, visualize=False):
 
     return normals_2d_direction_normalized
     
+@torch.no_grad()
 def get_ram_affordance_2d(
     query_rgb, # H, W, 3 in numpy
     instruction, # open the drawwer
@@ -176,18 +177,27 @@ def get_ram_affordance_2d(
             Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
             # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
             break
-        
+    torch.cuda.empty_cache()
     return affordance_map_2d
 
-def lift_ram_affordance(
-    K, 
-    Tw2c,
-    query_rgb,
-    query_mask,
-    query_depth, 
-    contact_uv,
+def lift_affordance(
+    cur_frame: Frame,
     visualize=False
 ):
+    """
+    根据当前的 rgbd_frame 进行一个 grasp detection, 并返回 camera 坐标系下的所有 grasp
+    TODO 
+        如果提供了 dir_out 则直接用, 否则利用 contact3d 附近的区域估计出一个 dir_out
+        对于 prismatic joint: dir_out 等于 joint_dir
+        对于 revolute joint: 首先估计出局部的 dir_out, 但是需要减去 joint_dir 方向上的分量
+    """
+    K = cur_frame.K
+    Tw2c = cur_frame.Tw2c
+    query_rgb = cur_frame.rgb
+    query_mask = cur_frame.obj_mask
+    query_depth = cur_frame.depth
+    contact_uv = cur_frame.contact2d
+    
     contact_u = int(contact_uv[0])
     contact_v = int(contact_uv[1])
     
@@ -294,7 +304,7 @@ if __name__ == "__main__":
     
     obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
     contact_uv = affordance_map_2d.sample_highest(visualize=True)
-    _, best_grasp, dir_out = lift_ram_affordance(
+    _, best_grasp, dir_out = lift_affordance(
         K=K, 
         Tw2c=Tw2c,
         query_rgb=query_rgb,
@@ -306,7 +316,7 @@ if __name__ == "__main__":
     
     affordance_map_2d.update(contact_uv, visualize=False)
     contact_uv = affordance_map_2d.sample_highest(visualize=False)
-    _, best_grasp, dir_out = lift_ram_affordance(
+    _, best_grasp, dir_out = lift_affordance(
         K=K, 
         Tw2c=Tw2c,
         query_rgb=query_rgb,

@@ -533,6 +533,7 @@ def fine_estimation(
     obj_repr.key_frames.write_joint_states(scheduler.best_state_dict["joint_states"])
     scheduler.best_state_dict.pop("joint_states")
     obj_repr.joint_dict = scheduler.best_state_dict
+    torch.cuda.empty_cache()
     # return scheduler.best_state_dict
 
 

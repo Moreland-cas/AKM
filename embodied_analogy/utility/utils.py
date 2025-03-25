@@ -1344,7 +1344,7 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
     return best_normal
 
 
-def remove_dir_component(vector, direction):
+def remove_dir_component(vector, direction, return_normalized=False):
     """
         返回去除掉 direction 上分量后的 vector
         vector: np.array([3, ])
@@ -1359,6 +1359,9 @@ def remove_dir_component(vector, direction):
     
     # 去除方向上的分量
     result_vector = vector - projection
+    
+    if return_normalized:
+        result_vector = result_vector / np.linalg.norm(result_vector)
     
     return result_vector
 

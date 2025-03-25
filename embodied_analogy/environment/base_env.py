@@ -454,7 +454,7 @@ class BaseEnv():
 
     def reset_franka_arm(self):
         # reset实现为让 panda hand移动到最开始的位置，并关闭夹爪
-        # self.open_gripper()
+        self.open_gripper()
         init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
         self.close_gripper()

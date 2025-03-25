@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import argparse
 import open3d as o3d
@@ -27,6 +28,7 @@ def crop_grasp(grasp_group, contact_point, radius=0.1):
     
     return grasp_group_
     
+@torch.no_grad()
 def detect_grasp_anygrasp(
     points, 
     colors, 
@@ -63,7 +65,6 @@ def detect_grasp_anygrasp(
     cfgs.debug = visualize
     model = AnyGrasp(cfgs)
     model.load_net()
-    
     
     dir_out = dir_out / np.linalg.norm(dir_out)
     # 接下来生成多个 dir_out
@@ -105,6 +106,7 @@ def detect_grasp_anygrasp(
         Tapp2w = np.hstack((Rapp2w, zero_translation))
         gg.transform(Tapp2w)
         ggs.add(gg)
+        torch.cuda.empty_cache()
     
     # if crop:
     #     ggs = crop_grasp(
@@ -112,7 +114,7 @@ def detect_grasp_anygrasp(
     #         contact_point=crop_center,
     #         radius=crop_radius
     #     )
-        
+    
     if visualize:
         visualize_pc(
             points=points,
@@ -121,7 +123,7 @@ def detect_grasp_anygrasp(
             contact_point=np.array([0, 0, 0]),
             post_contact_dirs=dir_outs
         )
-        
+    
     return ggs
 
 def find_nearest_grasp(grasp_group, contact_point):

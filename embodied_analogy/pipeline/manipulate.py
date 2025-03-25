@@ -17,9 +17,12 @@ from embodied_analogy.utility.utils import (
     compute_bbox_from_pc,
     sample_points_on_bbox_surface,
     visualize_pc,
-    get_depth_mask
+    get_depth_mask,
+    remove_dir_component
 )
 initialize_napari()
+from embodied_analogy.representation.basic_structure import Frame
+from embodied_analogy.representation.obj_repr import Obj_repr
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
     sort_grasp_group
@@ -60,13 +63,8 @@ class ManipulateEnv(BaseEnv):
     
         # load obj representation
         if obj_repr_path is not None:
-            self.load_obj_repr(obj_repr_path)
+            self.obj_repr = Obj_repr.load(obj_repr_path)
     
-    def load_obj_repr(self, obj_repr_path, visualize=False):
-        self.obj_repr = np.load(obj_repr_path)
-        if visualize:
-            pass
-        
     def anyGrasp2ph(self, grasp):
         """
             从 anygrasp 输出的 grasp 中提取出 Tph2w, 也就是做一个 Tgrasp2w 到 Tph2w 的转换
@@ -92,115 +90,113 @@ class ManipulateEnv(BaseEnv):
     
     def manipulate(self, delta_state=0, reserved_distance=0.05, visualize=False):
         from embodied_analogy.estimation.relocalization import relocalization
+        from embodied_analogy.exploration.ram_proposal import lift_affordance
         
-        # 1) 首先估计出当前的 joint state
+        Tw2c = self.camera_extrinsic
+        Tc2w = np.linalg.inv(self.camera_extrinsic)
+        
+        # 首先进行机械手的 reset, 因为当前可能还处在 explore 阶段末尾的抓取阶段
+        # 此时并不需要点云
+        self.reset_franka_arm()
+        
+        # 然后估计出 initial_frame 的 joint_state, 并根据 delta_state 计算出 target_state
+        initial_frame_update = relocalization(
+            obj_repr=self.obj_repr,
+            query_frame=self.obj_repr.initial_frame,
+            # 这里可以 update 一下 initial_frame 的 dynamic mask (当然也可以不 update)
+            update_query_dynamic=True, 
+            # 但是不要 update contact2d 和 3d
+            update_query_contact=False,
+            visualize=visualize
+        )
+        self.obj_repr.initial_frame = initial_frame_update
+        self.target_state = initial_frame_update.joint_state + delta_state
+        
+        # 然后估计出 cur_state
         self.base_step()
         rgb_np, depth_np, _, _ = self.capture_rgbd()
+        cur_frame = Frame(
+            rgb=rgb_np,
+            depth=depth_np,
+            K=self.camera_intrinsic,
+            Tw2c=self.camera_extrinsic,
+            franka2d=self.get_points_on_arm()[0],
+            franka_mask=None
+        )
+        cur_frame = relocalization(
+            obj_repr=self.obj_repr,
+            query_frame=cur_frame,
+            update_query_dynamic=True,
+            update_query_contact=True,
+            visualize=visualize
+        )
+        cur_state = cur_frame.joint_state
         
-        start_state, obj_mask, query_dynamic = relocalization(
-            K=self.camera_intrinsic, 
-            query_rgb=rgb_np,
-            query_depth=depth_np, 
-            ref_depths=self.obj_repr["depth_seq"], 
-            joint_type=self.obj_repr["joint_type"], 
-            joint_dir=self.obj_repr["joint_dir_c"], 
-            ref_joint_states=self.obj_repr["joint_states"], 
-            ref_dynamics=self.obj_repr["dynamic_seq"],
-            lr=1e-3,
-            icp_select_range=0.1,
-            obj_description=self.obj_description,
-            negative_points=self.get_points_on_arm()[0],
+        # 根据 cur_frame 中的 contact3d 选择抓取位姿, 并沿着 joint_dir 进行移动 （仿照 explore_once 函数）
+        contact3d_c, grasps_c, dir_out_c = lift_affordance(
+            cur_frame=cur_frame,
             visualize=False
         )
-        print("start state: ", start_state)      
+        # 对于 dir_out_c 进行定制化修改
+        joint_dir = self.obj_repr.joint_dict["joint_dir"]
+        if self.obj_repr.joint_dict["joint_type"] == "prismatic":
+            dir_out_c = joint_dir
+        elif self.obj_repr.joint_dict["joint_type"] == "revolute":
+            dir_out_c = remove_dir_component(dir_out_c, joint_dir, return_normalized=True)
+        dir_out_w = Tc2w[:3, :3] @ dir_out_c # 3
         
-        # 根据当前的 depth 找到一些能 grasp 的地方, 要求最好是落在 moving part 中, 且方向垂直于 moving part
-        # TODO: 在这里进行一个 depth_np 的进一步过滤
+        if grasps_c is None:
+            assert "detected grasp is None"
+            import pdb;pdb.set_trace()
         
-        depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, self.camera_extrinsic, height=0.02)
-        start_pc_c = depth_image_to_pointcloud(depth_np, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
-        start_pc_w = camera_to_world(start_pc_c, self.camera_extrinsic)
+        grasps_w = grasps_c.transform(Tc2w) # Tgrasp2w
         
-        joint_dir_w = self.obj_repr["joint_dir_w"]
-        start_color = rgb_np[obj_mask] / 256.
+        result_pre = None
+        depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, Tw2c, height=0.02)
+        pc_collision_c = depth_image_to_pointcloud(depth_np, cur_frame.obj_mask & depth_mask, self.camera_intrinsic) # N, 3
+        pc_colors = rgb_np[cur_frame.obj_mask & depth_mask]
+        pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
+        self.planner.update_point_cloud(pc_collision_w)
+            
+        for grasp_w in grasps_w:
+            # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
+            grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
+            Tph2w = self.anyGrasp2ph(grasp=grasp)        
+            Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
+            result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
+            # TODO 这里可能需要更改
+            if result_pre is not None:
+                break
         
-        grasp_group = detect_grasp_anygrasp(
-            start_pc_w, 
-            start_color, 
-            dir_out=joint_dir_w, 
-            visualize=False
-        )
-        
-        # 筛选出评分比较高的 grasp
-        contact_region_c = depth_image_to_pointcloud(depth_np, query_dynamic == MOVING_LABEL, self.camera_intrinsic)
-        contact_region_w = camera_to_world(contact_region_c, self.camera_extrinsic)
-        sorted_grasps, _ = sort_grasp_group(
-            grasp_group=grasp_group, 
-            contact_region=contact_region_w, 
-            axis=joint_dir_w, 
-            grasp_pre_filter=False
-        )
-
-        if False:
+        if visualize:
+            contact3d_w = camera_to_world(
+                point_camera=contact3d_c[None],
+                extrinsic_matrix=Tw2c
+            )[0]
             visualize_pc(
-                np.concatenate([start_pc_w, contact_region_w + 0.02], axis=0), 
-                np.concatenate([start_color, np.array([[1, 0, 0]] * len(contact_region_w))], axis=0),
-                sorted_grasps[:10]
+                points=pc_collision_w, 
+                colors=pc_colors / 255,
+                grasp=grasp, 
+                contact_point=contact3d_w, 
+                post_contact_dirs=[dir_out_w]
             )
         
-        # 将抓取姿势从 Tgrasp2w 转换到 Tph2w, 从而可以移动 panda_hand
-        for grasp in sorted_grasps:
-            
-            # 旋转 grasp 使得其尽肯能平行于 joint axis
-            grasp = self.get_rotated_grasp(grasp, axis_out_w=joint_dir_w)
-            Tph2w = self.anyGrasp2ph(grasp)
-            
-            # visualize_pc(start_pc_w, start_color, grasp)
-            
-            result_test = self.plan_path(target_pose=Tph2w, wrt_world=True)
-            if not result_test:
-                continue
-            
-            Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
-            # visualize_pc(start_pc_w, start_color, grasp)
-            
-            # 先移动到 pre_grasp_pose
-            self.planner.update_point_cloud(start_pc_w)
-            result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-            if not result_pre:
-                continue
-            
-            # visualize_pc(start_pc_w, start_color, grasp)
-            self.follow_path(result_pre)
-            
-            self.open_gripper()
-            self.clear_planner_pc()
-            self.move_forward(reserved_distance)
-            self.close_gripper()
-            
-            self.move_along_axis(joint_dir_w, delta_state)
-            break
+        # 实际执行到该 proposal, 并在此过程中录制数据
+        if result_pre is None:
+            print("result_pre is None")
+            import pdb;pdb.set_trace()
         
-        # 在这里进行一个状态估计, 输出算法 predict 的当前状态
-        self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        self.follow_path(result_pre)
+        self.open_gripper()
+        self.clear_planner_pc()
+        self.move_forward(reserved_distance)
+        self.close_gripper()
         
-        end_state, _, _ = relocalization(
-            K=self.camera_intrinsic, 
-            query_rgb=rgb_np,
-            query_depth=depth_np, 
-            ref_depths=self.obj_repr["depth_seq"], 
-            joint_type=self.obj_repr["joint_type"], 
-            joint_dir=self.obj_repr["joint_dir"], 
-            ref_joint_states=self.obj_repr["joint_states"], 
-            ref_dynamics=self.obj_repr["dynamic_seq"],
-            lr=5e-3,
-            icp_select_range=0.1,
-            obj_description="drawer",
-            negative_points=self.get_points_on_arm()[0],
-            visualize=True
-        )
-        print("predicted delta: ", end_state - start_state)   
+        # 在 close gripper 之后再开始录制数据
+        self.move_along_axis(moving_direction=dir_out_w, moving_distance=self.target_state - cur_state)
+        
+        # TODO: 在这里进行一个状态估计, 输出算法 predict 的当前状态 (改为一个 close-loop 的状态)
+        pass
         
         while True:
             self.step()
@@ -219,23 +215,41 @@ class ManipulateEnv(BaseEnv):
         # 从环境中获取当前的 joint state
         pass
     
-    
 
 if __name__ == '__main__':
+    # drawer
     obj_config = {
         "index": 44962,
         "scale": 0.8,
         "pose": [1.0, 0., 0.5],
         "active_link": "link_2",
-        "active_joint": "joint_2"
+        # "active_joint": "joint_2"
+        "active_joint": "joint_1"
     }
+    
+    # microwave
+    # obj_config = {
+    #     "index": 7221,
+    #     "scale": 0.4,
+    #     "pose": [0.8, 0.1, 0.6],
+    #     "active_link": "link_0",
+    #     "active_joint": "joint_0"
+    # }
+    
+    obj_index = obj_config["index"]
+    instruction="open the drawer"
+    # instruction="open the microwave"
+    
     demo = ManipulateEnv(
         obj_config=obj_config,
-        obj_repr_path="/home/zby/Programs/Embodied_Analogy/assets/tmp/reconstruct/obj_repr.npz",
-        instruction="open the drawer"
+        obj_repr_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/reconstruct/recon_data.pkl",
+        instruction=instruction
     )
-    demo.manipulate(delta_state=0.1)
+    demo.manipulate(
+        delta_state=0.1,
+        visualize=False
+    )
     
-    # while True:
-    #     demo.step()
+    while True:
+        demo.base_step()
     
