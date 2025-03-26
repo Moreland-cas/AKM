@@ -249,7 +249,7 @@ if __name__ == '__main__':
     )
     demo.manipulate(
         # delta_state=0.1,
-        delta_state=np.deg2rad(15),
+        delta_state=np.deg2rad(30),
         visualize=False
     )
     

@@ -583,8 +583,8 @@ class BaseEnv():
         joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
         """
         assert joint_type in ["prismatic", "revolute"]
-        if joint_type == "revolute" and joint_start is None:
-            assert "joint_start cannot be None when joint_type is revolute"
+        if joint_type == "revolute":
+            assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
             
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
@@ -592,22 +592,23 @@ class BaseEnv():
             
         if joint_type == "prismatic":
             def T_with_delta(delta):
+                axis = joint_axis / np.linalg.norm(joint_axis)  # 确保轴是单位向量
                 Tph2w = np.eye(4)
                 Tph2w[:3, :3] = Rph2w
                 # 对于 panda_hand 来说, z-axis 的正方向是向前
-                Tph2w[:3, 3] = ee_pose + delta * joint_axis
+                Tph2w[:3, 3] = ee_pose + delta * axis
                 return Tph2w
             
         elif joint_type == "revolute":
             def T_with_delta(delta):
                 # 计算旋转矩阵，delta为旋转角度
                 axis = joint_axis / np.linalg.norm(joint_axis)  # 确保轴是单位向量
-                # R_delta = Rphs2phe
                 R_delta = R.from_rotvec(delta * axis).as_matrix()  # 计算旋转矩阵
                 # 已知 Tphs2w, 要求 T
                 Tph2w = np.eye(4)
-                Tph2w[:3, :3] = (R_delta @ Rph2w.T).T
-                # Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转
+                # Tph2w[:3, :3] = (R_delta @ Rph2w.T).T (这句代码是错误的!!)
+                # NOTE: 注意 R_delta 是在世界坐标系下的一个旋转, 并不是两个坐标系之间的一个对应关系的旋转
+                Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转
                 Tph2w[:3, 3] = R_delta @ (ee_pose - joint_start) + joint_start  # 保持末端执行器的位置不变
                 return Tph2w
         
