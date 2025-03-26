@@ -53,6 +53,9 @@ class Frame(Data):
     def _visualize(self, viewer: napari.Viewer, prefix=""):
         viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
         
+        if self.franka_mask is not None:
+            viewer.add_labels(self.franka_mask, name=f"{prefix}_robot_mask")
+            
         if self.obj_mask is not None:
             viewer.add_labels(self.obj_mask, name=f"{prefix}_obj_mask")
         

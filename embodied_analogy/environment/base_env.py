@@ -6,6 +6,7 @@ from sapien.utils.viewer import Viewer
 from PIL import Image, ImageColor
 import transforms3d as t3d
 from scipy.spatial.transform import Rotation as R
+from embodied_analogy.representation.basic_structure import Frame
 
 from embodied_analogy.utility.utils import (
     visualize_pc,
@@ -124,6 +125,11 @@ class BaseEnv():
         # init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
         self.setup_planner()
         self.reset_robot()
+        
+        # set id for getting mask
+        for link in self.robot.get_links():
+            for s in link.get_visual_bodies():
+                s.set_visual_id(255)
         
     def setup_camera(self):
         # camera config
@@ -293,7 +299,36 @@ class BaseEnv():
         mesh_pil = Image.fromarray(color_palette[mesh_np])
         actor_pil = Image.fromarray(color_palette[actor_np])
         return actor_np # [H, W]
+    
+    def capture_robot_mask(self):
+        camera = self.camera
+        camera.take_picture()
+        # visual_id is the unique id of each visual shape
+        seg_labels = camera.get_uint32_texture('Segmentation')  # [H, W, 4]
+        mesh_np = seg_labels[..., 0].astype(np.uint8)  # mesh-level [H, W]
+        actor_np = seg_labels[..., 1].astype(np.uint8)  # actor-level [H, W]
         
+        # Or you can use aliases below
+        # label0_image = camera.get_visual_segmentation()
+        # label1_image = camera.get_actor_segmentation()
+        
+        return mesh_np == 255
+    
+    def capture_frame(self) -> Frame:
+        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        franka_mask = self.capture_robot_mask()
+        
+        frame = Frame(
+            rgb=rgb_np,
+            depth=depth_np,
+            K=self.camera_intrinsic,
+            Tw2c=self.camera_extrinsic,
+            franka2d=self.get_points_on_arm()[0],
+            franka_mask=franka_mask
+        )
+        frame.visualize()
+        return frame
+    
     def load_object(self, obj_config):
         index = obj_config["index"]
         scale = obj_config["scale"]
@@ -500,7 +535,7 @@ class BaseEnv():
             # num_repeat = int(self.time_step / self.phy_timestep)
             num_repeat = math.ceil(self.planner_timestep / self.phy_timestep)
             for _ in range(num_repeat): 
-                qf = self.robot.compute_passive_force(gravity=True, coriolis_and_centrifugal=True)
+                qf = self.robot.compute_passive_force(gravity=True, coriolis_and_centrifugal=True, external=False)
                 self.robot.set_qf(qf)
                 
                 for j in range(7):
@@ -663,11 +698,16 @@ if __name__ == "__main__":
     env.setup_camera()
     # env.load_object()
     
+    env.step()
+    env.capture_frame()
+    
     env.open_gripper()
     env.move_forward(0.1)
     env.close_gripper()
     env.move_forward(-0.1)
     env.open_gripper()
+    
+    
     
     # for i in range(100):
     while True:
