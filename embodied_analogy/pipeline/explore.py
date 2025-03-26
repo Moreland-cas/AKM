@@ -31,9 +31,6 @@ class ExploreEnv(ManipulateEnv):
         self.obj_repr = Obj_repr()
         self.has_valid_explore = False
         
-        # while True:
-        #     self.base_step()
-    
     def explore_loop(self, max_tries=10, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
@@ -77,7 +74,7 @@ class ExploreEnv(ManipulateEnv):
         while num_tries < max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
             self.open_gripper()
-            self.reset_franka_arm()
+            self.reset_robot()
             self.obj_repr.clear_frames()
             
             explore_ok, explore_uv = self.explore_once(visualize=visualize)

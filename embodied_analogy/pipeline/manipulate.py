@@ -86,7 +86,7 @@ class ManipulateEnv(BaseEnv):
         
         # 首先进行机械手的 reset, 因为当前可能还处在 explore 阶段末尾的抓取阶段
         # 此时并不需要点云
-        self.reset_franka_arm()
+        self.reset_robot()
         
         # 然后估计出 initial_frame 的 joint_state, 并根据 delta_state 计算出 target_state
         initial_frame_update = relocalization(
@@ -202,13 +202,13 @@ class ManipulateEnv(BaseEnv):
         
         while True:
             self.step()
-    def reset_franka_arm_with_pc(self, pc):        
+    def reset_robot_with_pc(self, pc):        
         # 先打开 gripper, 再撤退一段距离
         self.move_forward(-0.05) # 向后撤退 5 cm
         
         # 读取一帧 rgbd， 经过 sam 得到 pc， 对 pc 进行处理
         self.planner.update_point_cloud(pc)
-        self.reset_franka_arm()
+        self.reset_robot()
 
         # 重置 point cloud
         self.clear_planner_pc()

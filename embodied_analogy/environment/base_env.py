@@ -79,7 +79,7 @@ class BaseEnv():
     def clear_planner_pc(self):
         self.planner.update_point_cloud(np.array([[0, 0, -1]]))
         
-    def load_robot(self, dof_value=None):
+    def load_robot(self):
         # Robot config
         urdf_config = dict(
             _materials=dict(
@@ -106,10 +106,9 @@ class BaseEnv():
         self.arm_q_lower = self.arm_qlimit[:, 0]
         self.arm_q_higher = self.arm_qlimit[:, 1]
 
-        init_qpos = dof_value
-        if dof_value is None :
-            init_qpos = (self.arm_q_higher + self.arm_q_lower) / 2
-            # init_qpos = self.arm_q_lower
+        # init_qpos = (self.arm_q_higher + self.arm_q_lower) / 2
+        # init_qpos[5] = 0.278
+        # self.init_qpos = init_qpos
         
         # Setup control properties 
         self.active_joints = self.robot.get_active_joints()
@@ -123,29 +122,8 @@ class BaseEnv():
             
         # Set initial joint positions
         # init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
-        self.robot.set_qpos(init_qpos)
-        self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
-        self.robot.set_qvel(np.zeros(self.robot.dof))
-        self.robot.set_qf(np.zeros(self.robot.dof))
-        self.robot.set_qacc(np.zeros(self.robot.dof))
-        
-        self.robot_init_qpos = init_qpos
-                    
-        # set joints property to enable pd control
-        # self.active_joints = self.robot.get_active_joints()
-        # for joint in self.active_joints:
-        #     joint.set_drive_property(stiffness=1000, damping=200)
-
-        # disable joints gravity
-        # for link in self.robot.get_links():
-        #     link.disable_gravity = True
-        
-        # 让机械手臂复原
-        # TODO: 这里改为用 cur_qpos 和 init_state 的差值来判断是不是应该停止
-        for i in range(200):
-            self.step()
-            
         self.setup_planner()
+        self.reset_robot()
         
     def setup_camera(self):
         # camera config
@@ -427,37 +405,68 @@ class BaseEnv():
         self.viewer.render()
         self.cur_steps += 1
             
-    def open_gripper(self):
-        for i in range(50):
-            self.step()
+    def open_gripper(self, target=0.03):
+        """
+        这里用 self.step() 是可能在 record 中录制 open/close 的动作, 那时候 self.step 实际对应的是 self.record_step 函数
+        """
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.03)
-        for i in range(100): 
-            qf = self.robot.compute_passive_force(
-                gravity=True, 
-                coriolis_and_centrifugal=True)
-            self.robot.set_qf(qf)
+            joint.set_drive_target(target)
+        
+        # NOTE: 与 reset 中的 self.step 一致, 可以在那里查看详细的解释
+        self.step()
+        
+        while True:
+            vel_norm = np.linalg.norm(self.robot.get_qvel())
+            if vel_norm < 1e-3:
+                break
             self.step()
 
-    def close_gripper(self):
-        for i in range(50):
-            self.step()
+    def close_gripper(self, target=0.):
         for joint in self.active_joints[-2:]:
-            joint.set_drive_target(0.0)
-        for i in range(100):  
-            qf = self.robot.compute_passive_force(
-                gravity=True, 
-                coriolis_and_centrifugal=True)
-            self.robot.set_qf(qf)
+            joint.set_drive_target(target)
+            
+        # NOTE: 与 reset 中的 self.step 一致, 可以在那里查看详细的解释
+        self.step()
+        
+        while True:
+            vel_norm = np.linalg.norm(self.robot.get_qvel())
+            if vel_norm < 1e-3:
+                break
             self.step()
-        # self.after_try_to_close = 1
 
-    def reset_franka_arm(self):
-        # reset实现为让 panda hand移动到最开始的位置，并关闭夹爪
-        self.open_gripper()
-        init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(90), axes="syxz"))
+    def reset_robot(self):
+        """
+        reset_robot 不控制 gripper 的 open/close 状态, 只把其他关节进行 reset
+        """
+        init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
-        self.close_gripper()
+        
+        # NOTE: 这里一定要进行一步 step, 因为现在是通过 cur_qpos 和 target_qpos 的差值来判断是否要结束同步的
+        # 但是在 self.robot.set_qpos() 后的第一个 step 时的 cur_qpos 是等于 target_qpos 的, 后续才会变为实际值
+        # 所以如果不 step 一下会导致同步失效, 直接退出
+        self.base_step()
+        
+        steps = []
+        delta_qpos = []
+        vel_norm = []
+        acc_norm = []
+        
+        while True:
+            vel = self.robot.get_qvel()
+            # 这里选用 vel_norm 作为 reset 进行同步的终止条件, 因为 vel 相对于 qpos 和 qacc 更加稳定
+            # qpos 不知道要设置什么值, qacc 经常会突变
+            if np.linalg.norm(vel) < 2e-3: # 基本 vel 在 mm/s 的量级就是可以的
+                break
+            self.base_step()
+        
+        if False:
+            import matplotlib.pyplot as plt
+            plt.figure(figsize=(10, 6))
+            plt.scatter(steps, delta_qpos, label='delta_qpos 1', color='r', alpha=0.6)
+            plt.scatter(steps, vel_norm, label='vel_norm 2', color='g', alpha=0.6)
+            plt.scatter(steps, acc_norm, label='acc_norm 3', color='b', alpha=0.6)
+            plt.grid()
+            plt.show()
         
     def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w
@@ -491,11 +500,9 @@ class BaseEnv():
             # num_repeat = int(self.time_step / self.phy_timestep)
             num_repeat = math.ceil(self.planner_timestep / self.phy_timestep)
             for _ in range(num_repeat): 
-                qf = self.robot.compute_passive_force(
-                    gravity=True, 
-                    coriolis_and_centrifugal=True
-                )
+                qf = self.robot.compute_passive_force(gravity=True, coriolis_and_centrifugal=True)
                 self.robot.set_qf(qf)
+                
                 for j in range(7):
                     self.active_joints[j].set_drive_target(position_target[j])
                     self.active_joints[j].set_drive_velocity_target(velocity_target[j])
@@ -655,6 +662,12 @@ if __name__ == "__main__":
     env.load_robot()
     env.setup_camera()
     # env.load_object()
+    
+    env.open_gripper()
+    env.move_forward(0.1)
+    env.close_gripper()
+    env.move_forward(-0.1)
+    env.open_gripper()
     
     # for i in range(100):
     while True:
