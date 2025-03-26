@@ -1,9 +1,3 @@
-"""
-    应该说给定一个物体表示（由重建算法得到）
-    然后给定物体的初始状态, 和要达到的状态
-    控制机器人将物体操作到指定状态, 并进行评估
-
-"""
 import numpy as np
 from graspnetAPI import Grasp
 from scipy.spatial.transform import Rotation as R
@@ -14,8 +8,6 @@ from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
     camera_to_world,
     initialize_napari,
-    compute_bbox_from_pc,
-    sample_points_on_bbox_surface,
     visualize_pc,
     get_depth_mask,
     remove_dir_component
@@ -23,10 +15,6 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.representation.obj_repr import Obj_repr
-from embodied_analogy.grasping.anygrasp import (
-    detect_grasp_anygrasp,
-    sort_grasp_group
-)
 
 class ManipulateEnv(BaseEnv):
     def __init__(
@@ -85,6 +73,7 @@ class ManipulateEnv(BaseEnv):
         Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
         Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
         # Tph2w = Tgrasp2w @ T_with_offset(0.03)
+        # Tph2w = Tgrasp2w @ T_with_offset(0.02)
         Tph2w = Tgrasp2w @ T_with_offset(0.014)
         return Tph2w
     
@@ -135,7 +124,7 @@ class ManipulateEnv(BaseEnv):
         # 根据 cur_frame 中的 contact3d 选择抓取位姿, 并沿着 joint_dir 进行移动 （仿照 explore_once 函数）
         contact3d_c, grasps_c, dir_out_c = lift_affordance(
             cur_frame=cur_frame,
-            visualize=False
+            visualize=True
         )
         # 对于 dir_out_c 进行定制化修改
         joint_dir = self.obj_repr.joint_dict["joint_dir"]
@@ -163,12 +152,20 @@ class ManipulateEnv(BaseEnv):
             grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
             Tph2w = self.anyGrasp2ph(grasp=grasp)        
             Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
+            
+            # result = self.plan_path(target_pose=Tph2w, wrt_world=True)
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-            # TODO 这里可能需要更改
-            if result_pre is not None:
+            
+            # if (result is not None) and (result_pre is not None):
+            if (result_pre is not None):
                 break
         
-        if visualize:
+        if result_pre is None:
+            print("result_pre is None")
+            import pdb;pdb.set_trace()
+            
+        # if visualize:
+        if True:
             contact3d_w = camera_to_world(
                 point_camera=contact3d_c[None],
                 extrinsic_matrix=Tw2c
@@ -181,11 +178,7 @@ class ManipulateEnv(BaseEnv):
                 post_contact_dirs=[dir_out_w]
             )
         
-        # 实际执行到该 proposal, 并在此过程中录制数据
-        if result_pre is None:
-            print("result_pre is None")
-            import pdb;pdb.set_trace()
-        
+        # 实际执行
         self.follow_path(result_pre)
         self.open_gripper()
         self.clear_planner_pc()
@@ -257,7 +250,7 @@ if __name__ == '__main__':
     demo.manipulate(
         # delta_state=0.1,
         delta_state=np.deg2rad(15),
-        visualize=True
+        visualize=False
     )
     
     while True:

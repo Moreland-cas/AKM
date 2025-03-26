@@ -251,7 +251,8 @@ def lift_affordance(
     sorted_grasps, _ = sort_grasp_group(
         grasp_group=cropped_gg,
         contact_region=contact_3d_c[None],
-        # axis=np.array([0, 0, -1])
+        dir_out=dir_out,
+        grasp_pre_filter=True
     )
     # best_grasp = sorted_grasps[0]
 

@@ -577,7 +577,7 @@ class BaseEnv():
         return grasp_
     
     
-    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance, num_interp=10):
+    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance, num_interp=20):
         """
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
         joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
@@ -602,8 +602,9 @@ class BaseEnv():
             def T_with_delta(delta):
                 # 计算旋转矩阵，delta为旋转角度
                 axis = joint_axis / np.linalg.norm(joint_axis)  # 确保轴是单位向量
+                # R_delta = Rphs2phe
                 R_delta = R.from_rotvec(delta * axis).as_matrix()  # 计算旋转矩阵
-                
+                # 已知 Tphs2w, 要求 T
                 Tph2w = np.eye(4)
                 Tph2w[:3, :3] = (R_delta @ Rph2w.T).T
                 # Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转

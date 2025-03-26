@@ -143,11 +143,13 @@ def find_nearest_grasp(grasp_group, contact_point):
     nearest_index = int(nearest_index)
     return grasp_group[nearest_index]
 
-def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=False):
+def sort_grasp_group(grasp_group, contact_region, dir_out=None, grasp_pre_filter=False):
     '''
-        找到离 contact region 中点最近的 grasp, 且越是垂直于 axis 越好
-        grasp_group: from graspnetAPI 
+        找到离 contact region 中点最近的 grasp, 且 grasp_fram 的 -x 轴越是平行于 dir_out 越好
+        grasp_group: Tgrasp2c
+        dir_out: (3, )
         contact_region: (N, 3), 也即是 moving part
+        NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
     if grasp_pre_filter: # 保留前 50 的 grasp
         grasp_group = grasp_group.nms().sort_by_score()
@@ -160,23 +162,17 @@ def sort_grasp_group(grasp_group, contact_region, axis=None, grasp_pre_filter=Fa
     distance_scores = np.exp(-2 * distances) 
     # distance_scores = (distances < 0.05).astype(np.float32)
     
-    R_grasp2w = grasp_group.rotation_matrices # N, 3, 3
-    def R2unitAxis(rotation_matrix):
-        rotation = R.from_matrix(rotation_matrix)
-        axis_angle = rotation.as_rotvec()
-        rotation_axis = axis_angle / np.linalg.norm(axis_angle)
-        return rotation_axis
+    Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
+    neg_x_axis = -Rgrasp2c[:, 0, :] # N, 3
     
-    pred_axis = np.array([R2unitAxis(R_grasp2w[i]) for i in range(len(R_grasp2w))]) # N, 3
-    
-    angle_scores = 1.
-    if axis is not None:
-        # TODO: 这里需要 debug, 似乎需要的不是 grasp 的 rotation matrix 对应的 axis 平行于 axis， 而是 z 轴也平行于 axis
-        angle_scores = np.abs(np.sum(pred_axis * axis, axis=-1)) # N
+    angle_scores = 1
+    if dir_out is not None:
+        # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
+        angle_scores = np.sum(neg_x_axis * dir_out, axis=-1) # N
     
     # grasp_scores = pred_scores * distance_scores * angle_scores # N
     grasp_scores = pred_scores * distance_scores  # N
-    # grasp_scores = distance_scores  # N
+    # grasp_scores = angle_scores  # N
     
     # 找到距离 contact_point 最近的 grasp
     index = np.argsort(grasp_scores)
