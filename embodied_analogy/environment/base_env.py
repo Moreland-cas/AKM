@@ -619,7 +619,7 @@ class BaseEnv():
         return grasp_
     
     
-    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance, num_interp=20):
+    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance):
         """
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
         joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
@@ -627,6 +627,12 @@ class BaseEnv():
         assert joint_type in ["prismatic", "revolute"]
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
+            # 根据 moving distance 的大小计算出有多少个插值点
+            # 对于平移关节时每次移动 3 cm
+            num_interp = max(3, int(moving_distance / 0.03))
+        else:
+            # 对于旋转关节时每次移动 5 degree
+            num_interp = max(3, int(moving_distance / np.deg2rad(5)))
             
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
