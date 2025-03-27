@@ -129,9 +129,9 @@ class ExploreEnv(ManipulateEnv):
         dir_out_w = Tc2w[:3, :3] @ dir_out_c # 3
         
         result_pre = None
-        depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, Tw2c, height=0.02)
-        pc_collision_c = depth_image_to_pointcloud(depth_np, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
-        pc_colors = rgb_np[obj_mask & depth_mask]
+        depth_mask = get_depth_mask(cur_frame.depth, self.camera_intrinsic, Tw2c, height=0.02)
+        pc_collision_c = depth_image_to_pointcloud(cur_frame.depth, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
+        pc_colors = cur_frame.rgb[obj_mask & depth_mask]
         pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
         self.planner.update_point_cloud(pc_collision_w)
             
