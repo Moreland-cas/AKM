@@ -309,7 +309,7 @@ class BaseEnv():
         # 这里之所以是 255 是因为在 load robot arm 的时候设置了其 visual_id 为 255
         return mesh_np == 255
     
-    def capture_frame(self) -> Frame:
+    def capture_frame(self, visualize=False) -> Frame:
         rgb_np, depth_np, _, _ = self.capture_rgbd()
         robot_mask = self.capture_robot_mask()
         
@@ -321,7 +321,8 @@ class BaseEnv():
             robot2d=self.get_points_on_arm()[0],
             robot_mask=robot_mask
         )
-        frame.visualize()
+        if visualize:
+            frame.visualize()
         return frame
     
     def load_object(self, obj_config):
@@ -445,11 +446,13 @@ class BaseEnv():
         # NOTE: 与 reset 中的 self.step 一致, 可以在那里查看详细的解释
         self.step()
         
-        while True:
+        count = 0
+        while True and count < 100:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
             if vel_norm < 1e-3:
                 break
             self.step()
+            count += 1
 
     def close_gripper(self, target=0.):
         for joint in self.active_joints[-2:]:
@@ -458,11 +461,13 @@ class BaseEnv():
         # NOTE: 与 reset 中的 self.step 一致, 可以在那里查看详细的解释
         self.step()
         
-        while True:
+        count = 0
+        while True and count < 100:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
             if vel_norm < 1e-3:
                 break
             self.step()
+            count += 1
 
     def reset_robot(self):
         """
@@ -476,27 +481,15 @@ class BaseEnv():
         # 所以如果不 step 一下会导致同步失效, 直接退出
         self.base_step()
         
-        steps = []
-        delta_qpos = []
-        vel_norm = []
-        acc_norm = []
-        
-        while True:
+        count = 0
+        while True and count < 1250:
             vel = self.robot.get_qvel()
             # 这里选用 vel_norm 作为 reset 进行同步的终止条件, 因为 vel 相对于 qpos 和 qacc 更加稳定
             # qpos 不知道要设置什么值, qacc 经常会突变
             if np.linalg.norm(vel) < 2e-3: # 基本 vel 在 mm/s 的量级就是可以的
                 break
             self.base_step()
-        
-        if False:
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(10, 6))
-            plt.scatter(steps, delta_qpos, label='delta_qpos 1', color='r', alpha=0.6)
-            plt.scatter(steps, vel_norm, label='vel_norm 2', color='g', alpha=0.6)
-            plt.scatter(steps, acc_norm, label='acc_norm 3', color='b', alpha=0.6)
-            plt.grid()
-            plt.show()
+            count += 1
         
     def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w

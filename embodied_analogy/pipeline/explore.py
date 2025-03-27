@@ -206,26 +206,7 @@ class ExploreEnv(ManipulateEnv):
         
         self.cur_steps = self.cur_steps % self.record_interval
         if self.cur_steps == 0:
-            # record rgb image and display to pygame screen
-            rgb_np, depth_np, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
-            
-            # 在这里添加当前帧的 robot_arm 上的点的 robot_tracks3d 和 robot_tracks2d
-            robot_tracks2d, robot_tracks3d_w = self.get_points_on_arm()
-            
-            cur_frame = Frame(
-                rgb=rgb_np,
-                depth=depth_np,
-                K=None,
-                Tw2c=None,
-                joint_state=None,
-                obj_mask=None,
-                dynamic_mask=None,
-                contact2d=None,
-                contact3d=None,
-                robot2d=robot_tracks2d,
-                robot3d=None,
-                robot_mask=None,
-            )
+            cur_frame = self.capture_frame()
             self.obj_repr.frames.append(cur_frame)
             
     def check_valid(self):
@@ -240,6 +221,7 @@ class ExploreEnv(ManipulateEnv):
         first_rgb = self.obj_repr.frames[0].rgb
         first_depth = self.obj_repr.frames[0].depth
         first_tracks_2d = self.obj_repr.frames[0].robot2d
+        first_robot_mask = self.obj_repr.frames[0].robot_mask
         
         _, first_obj_mask = run_grounded_sam(
             rgb_image=first_rgb,
@@ -256,11 +238,12 @@ class ExploreEnv(ManipulateEnv):
             Tw2c=self.camera_extrinsic,
             height=0.02
         )
-        first_mask = first_obj_mask & first_depth_mask
+        first_mask = first_obj_mask & first_depth_mask & (~first_robot_mask)
         
         last_rgb = self.obj_repr.frames[-1].rgb
         last_depth = self.obj_repr.frames[-1].depth
         last_tracks_2d = self.obj_repr.frames[-1].robot2d
+        last_robot_mask = self.obj_repr.frames[-1].robot_mask
         _, last_obj_mask = run_grounded_sam(
             rgb_image=last_rgb,
             obj_description=self.obj_description,
@@ -276,23 +259,17 @@ class ExploreEnv(ManipulateEnv):
             Tw2c=self.camera_extrinsic,
             height=0.02
         )
-        last_mask = last_obj_mask & last_depth_mask
+        last_mask = last_obj_mask & last_depth_mask & (~last_robot_mask)
         
         # 计算前后两帧 depth_map 的差值的变化程度
         diff = np.abs(last_depth - first_depth) # H, W
         diff_masked = diff[first_mask & last_mask] # N
         
         # 将 diff_masked 进行聚类, 将变化大的一部分的平均值与 pertubation_distance 的 0.5 倍进行比较
-        # 聚类为 3, 使得对于噪声有一定的 robustness
-        diff_centroid, labels, _ = cluster.k_means(diff_masked[:, None], init="k-means++", n_clusters=3)
-        cluster_num = [(labels == i).sum() for i in range(3)]
-
-        top_indices = np.argsort(cluster_num)[-2:]  # 获取最大的两个索引
-        # 提取对应的类中心
-        top_centroids = diff_centroid[top_indices]
+        diff_centroid, labels, _ = cluster.k_means(diff_masked[:, None], init="k-means++", n_clusters=2)
         
         # 这里 0.5 是一个经验值, 因为对于旋转这个值不好解析的计算
-        if top_centroids.max() > self.pertubation_distance * 0.5:
+        if diff_centroid.max() > self.pertubation_distance * 0.5:
             self.has_valid_explore = True
             return True
         else:
@@ -306,14 +283,14 @@ class ExploreEnv(ManipulateEnv):
     
 if __name__ == "__main__":
     # drawer
-    # obj_config = {
-    #     "index": 44962,
-    #     "scale": 0.8,
-    #     "pose": [1.0, 0., 0.5],
-    #     "active_link": "link_2",
-    #     # "active_joint": "joint_2"
-    #     "active_joint": "joint_1"
-    # }
+    obj_config = {
+        "index": 44962,
+        "scale": 0.8,
+        "pose": [1.0, 0., 0.5],
+        "active_link": "link_2",
+        # "active_joint": "joint_2"
+        "active_joint": "joint_1"
+    }
     
     # door
     # obj_config = {
@@ -325,23 +302,23 @@ if __name__ == "__main__":
     # }
     
     # microwave
-    obj_config = {
-        "index": 7221,
-        "scale": 0.4,
-        "pose": [0.8, 0.1, 0.6],
-        "active_link": "link_0",
-        "active_joint": "joint_0"
-    }
+    # obj_config = {
+    #     "index": 7221,
+    #     "scale": 0.4,
+    #     "pose": [0.8, 0.1, 0.6],
+    #     "active_link": "link_0",
+    #     "active_joint": "joint_0"
+    # }a
     
     obj_index = obj_config["index"]
     
     exploreEnv = ExploreEnv(
         obj_config=obj_config,
-        # instruction="open the drawer",
-        instruction="open the microwave",
+        instruction="open the drawer",
+        # instruction="open the microwave",
         record_fps=30,
         pertubation_distance=0.1
     )
     exploreEnv.explore_loop(visualize=False)
-    exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
+    # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     
