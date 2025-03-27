@@ -103,15 +103,7 @@ class ManipulateEnv(BaseEnv):
         
         # 然后估计出 cur_state
         self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
-        cur_frame = Frame(
-            rgb=rgb_np,
-            depth=depth_np,
-            K=self.camera_intrinsic,
-            Tw2c=self.camera_extrinsic,
-            robot2d=self.get_points_on_arm()[0],
-            robot_mask=None
-        )
+        cur_frame = self.capture_frame()
         cur_frame = relocalization(
             obj_repr=self.obj_repr,
             query_frame=cur_frame,

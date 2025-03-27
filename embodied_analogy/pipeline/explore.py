@@ -35,17 +35,16 @@ class ExploreEnv(ManipulateEnv):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
             NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
-            TODO
         """
         # 首先得到 affordance_map_2d, 然后开始不断的探索和修改 affordance_map_2d
         from embodied_analogy.exploration.ram_proposal import get_ram_affordance_2d
         
         self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        initial_frame = self.capture_frame()
         
         # 只在第一次进行 contact transfer, 之后直接进行复用
         self.affordance_map_2d = get_ram_affordance_2d(
-            query_rgb=rgb_np,
+            query_rgb=initial_frame.rgb,
             instruction=self.instruction,
             data_source="droid", # TODO
             visualize=False
@@ -54,21 +53,7 @@ class ExploreEnv(ManipulateEnv):
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
         self.obj_repr.Tw2c = self.camera_extrinsic
-        self.obj_repr.initial_frame = Frame(
-            rgb=rgb_np,
-            depth=depth_np,
-            K=self.camera_intrinsic,
-            Tw2c=self.camera_extrinsic,
-            joint_state=None,
-            obj_mask=self.affordance_map_2d.get_obj_mask(),
-            dynamic_mask=None,
-            contact2d=None,
-            contact3d=None,
-            robot2d=None,
-            robot3d=None,
-            robot_mask=None
-        )
-        # self.obj_repr.initial_frame.visualize()
+        self.obj_repr.initial_frame = initial_frame
         
         num_tries = 0
         while num_tries < max_tries:
@@ -119,21 +104,13 @@ class ExploreEnv(ManipulateEnv):
         Tc2w = np.linalg.inv(Tw2c)
         
         self.base_step()
-        rgb_np, depth_np, _, _ = self.capture_rgbd()
+        cur_frame = self.capture_frame()
         
         obj_mask = self.affordance_map_2d.get_obj_mask(visualize=False) # H, W
         contact_uv = self.affordance_map_2d.sample_highest(visualize=False)
         
-        cur_frame = Frame(
-            rgb=rgb_np,
-            depth=depth_np,
-            K=self.camera_intrinsic,
-            Tw2c=self.camera_extrinsic,
-            obj_mask=obj_mask,
-            contact2d=contact_uv,
-            robot2d=self.get_points_on_arm()[0],
-            robot_mask=None
-        )
+        cur_frame.obj_mask = obj_mask
+        cur_frame.contact2d = contact_uv
         
         # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
         contact3d_c, grasps_c, dir_out_c = lift_affordance(
