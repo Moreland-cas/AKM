@@ -109,8 +109,8 @@ class ManipulateEnv(BaseEnv):
             depth=depth_np,
             K=self.camera_intrinsic,
             Tw2c=self.camera_extrinsic,
-            franka2d=self.get_points_on_arm()[0],
-            franka_mask=None
+            robot2d=self.get_points_on_arm()[0],
+            robot_mask=None
         )
         cur_frame = relocalization(
             obj_repr=self.obj_repr,

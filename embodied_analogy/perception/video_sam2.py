@@ -143,24 +143,4 @@ def run_sam2_whole(
 
 
 if __name__ == "__main__":
-    from embodied_analogy.pipeline.process_recorded_data import RecordDataReader
-    record_path_prefix = "/home/zby/Programs/Embodied_Analogy/assets/recorded_data"
-    file_name = "/2025-01-07_18-06-10.npz"
-    dr = RecordDataReader(record_path_prefix, file_name)
-    dr.process_data()
-
-    rgb_seq = dr.rgb # T H W C
-    articulated_obj_id = 666
-    video_segments = run_sam2_whole(
-        rgb_seq, # np.array([T, H, W, 3], uint8)
-        tmp_folder = "/home/zby/Programs/Embodied_Analogy/embodied_analogy/tmp/",
-        articulated_obj_id=articulated_obj_id, 
-        articulated_points=np.array([[380, 360]]), # np.array([N, 2], float32)
-        franka_arm_id=888,
-        save_intermediate_mask=True
-    )
-    
-    from embodied_analogy.visualization.vis_sam2_mask import visualize_sam2_mask
-    masks = [video_segments[i][articulated_obj_id] for i in range(len(video_segments))]
-    masks = np.stack(masks, axis=0) # T, H, W
-    visualize_sam2_mask(rgb_seq, masks)
+    pass

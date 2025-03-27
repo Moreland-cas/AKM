@@ -306,25 +306,20 @@ class BaseEnv():
         # visual_id is the unique id of each visual shape
         seg_labels = camera.get_uint32_texture('Segmentation')  # [H, W, 4]
         mesh_np = seg_labels[..., 0].astype(np.uint8)  # mesh-level [H, W]
-        actor_np = seg_labels[..., 1].astype(np.uint8)  # actor-level [H, W]
-        
-        # Or you can use aliases below
-        # label0_image = camera.get_visual_segmentation()
-        # label1_image = camera.get_actor_segmentation()
-        
+        # 这里之所以是 255 是因为在 load robot arm 的时候设置了其 visual_id 为 255
         return mesh_np == 255
     
     def capture_frame(self) -> Frame:
         rgb_np, depth_np, _, _ = self.capture_rgbd()
-        franka_mask = self.capture_robot_mask()
+        robot_mask = self.capture_robot_mask()
         
         frame = Frame(
             rgb=rgb_np,
             depth=depth_np,
             K=self.camera_intrinsic,
             Tw2c=self.camera_extrinsic,
-            franka2d=self.get_points_on_arm()[0],
-            franka_mask=franka_mask
+            robot2d=self.get_points_on_arm()[0],
+            robot_mask=robot_mask
         )
         frame.visualize()
         return frame
@@ -396,7 +391,7 @@ class BaseEnv():
         return self.asset
     
     def get_points_on_arm(self):
-        # 获取 franka arm 上的一些点的 2d 和 3d 的坐标（目前是 link_pose）
+        # 获取 robot arm 上的一些点的 2d 和 3d 的坐标（目前是 link_pose）
         link_poses_3d = []
         for link in self.robot.get_links():
             link_pos = link.get_pose().p # np.array(3)

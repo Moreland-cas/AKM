@@ -57,7 +57,7 @@ def reconstruct(
     """
     rgb_seq = obj_repr.frames.get_rgb_seq()
     depth_seq = obj_repr.frames.get_depth_seq()
-    franka2d_seq = obj_repr.frames.get_franka2d_seq()
+    robot2d_seq = obj_repr.frames.get_robot2d_seq()
     K = obj_repr.K
     Tw2c = obj_repr.Tw2c
     
@@ -75,7 +75,7 @@ def reconstruct(
         rgb_image=rgb_seq[0],
         obj_description=obj_description,
         positive_points=None, 
-        negative_points=franka2d_seq[0],
+        negative_points=robot2d_seq[0],
         num_iterations=3,
         acceptable_thr=0.9,
         visualize=visualize,
@@ -107,7 +107,7 @@ def reconstruct(
     tracks3d = image_to_camera(tracks2d.reshape(T * M, -1), tracks_depth.reshape(-1), K) # T*M, 3
     tracks3d = tracks3d.reshape(T, M, 3)
     # 对于 tracks3d 进行过滤
-    # TODO: 使用 franka 的分割进行过滤 + 使用 pred_visibility 进行过滤
+    # TODO: 使用 robot 的分割进行过滤 + 使用 pred_visibility 进行过滤
     # 
     # 使用 3d consistency 进行过滤
     consis_mask = filter_tracks_by_consistency(tracks3d, threshold=0.02) # M
@@ -146,7 +146,7 @@ def reconstruct(
         rgb_seq=rgb_seq[kf_idxs], 
         obj_description=obj_description,
         positive_tracks2d=tracks2d_filtered[kf_idxs], 
-        negative_tracks2d=franka2d_seq[kf_idxs], 
+        negative_tracks2d=robot2d_seq[kf_idxs], 
         visualize=visualize
     ) 
     # 对 obj_mask_seq 进行 depth 过滤, 可选可不选

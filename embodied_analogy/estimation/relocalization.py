@@ -34,7 +34,7 @@ def relocalization(
             rgb_image=query_frame.rgb,
             obj_description=obj_repr.obj_description,
             positive_points=None, 
-            negative_points=query_frame.franka2d, # N, 2
+            negative_points=query_frame.robot2d, # N, 2
             num_iterations=3,
             acceptable_thr=0.9,
             visualize=visualize

@@ -64,9 +64,9 @@ class ExploreEnv(ManipulateEnv):
             dynamic_mask=None,
             contact2d=None,
             contact3d=None,
-            franka2d=None,
-            franka3d=None,
-            franka_mask=None
+            robot2d=None,
+            robot3d=None,
+            robot_mask=None
         )
         # self.obj_repr.initial_frame.visualize()
         
@@ -108,7 +108,7 @@ class ExploreEnv(ManipulateEnv):
         visualize=False      
     ):
         """
-            在当前状态下进行一次探索, 默认此时的 franka arm 处于 rest 状态
+            在当前状态下进行一次探索, 默认此时的 robot arm 处于 rest 状态
             返回 explore_ok, explore_uv:
                 explore_ok: bool, 代表 plan 阶段是否成功
                 explore_uv: np.array([2,]), 代表本次尝试的 contact point 的 uv
@@ -131,8 +131,8 @@ class ExploreEnv(ManipulateEnv):
             Tw2c=self.camera_extrinsic,
             obj_mask=obj_mask,
             contact2d=contact_uv,
-            franka2d=self.get_points_on_arm()[0],
-            franka_mask=None
+            robot2d=self.get_points_on_arm()[0],
+            robot_mask=None
         )
         
         # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
@@ -209,8 +209,8 @@ class ExploreEnv(ManipulateEnv):
             # record rgb image and display to pygame screen
             rgb_np, depth_np, _, _ = self.capture_rgbd(return_pc=False, visualize=False)
             
-            # 在这里添加当前帧的 franka_arm 上的点的 franka_tracks3d 和 franka_tracks2d
-            franka_tracks2d, franka_tracks3d_w = self.get_points_on_arm()
+            # 在这里添加当前帧的 robot_arm 上的点的 robot_tracks3d 和 robot_tracks2d
+            robot_tracks2d, robot_tracks3d_w = self.get_points_on_arm()
             
             cur_frame = Frame(
                 rgb=rgb_np,
@@ -222,9 +222,9 @@ class ExploreEnv(ManipulateEnv):
                 dynamic_mask=None,
                 contact2d=None,
                 contact3d=None,
-                franka2d=franka_tracks2d,
-                franka3d=None,
-                franka_mask=None,
+                robot2d=robot_tracks2d,
+                robot3d=None,
+                robot_mask=None,
             )
             self.obj_repr.frames.append(cur_frame)
             
@@ -239,7 +239,7 @@ class ExploreEnv(ManipulateEnv):
         # 判断首尾两帧的物体点云方差变化
         first_rgb = self.obj_repr.frames[0].rgb
         first_depth = self.obj_repr.frames[0].depth
-        first_tracks_2d = self.obj_repr.frames[0].franka2d
+        first_tracks_2d = self.obj_repr.frames[0].robot2d
         
         _, first_obj_mask = run_grounded_sam(
             rgb_image=first_rgb,
@@ -260,7 +260,7 @@ class ExploreEnv(ManipulateEnv):
         
         last_rgb = self.obj_repr.frames[-1].rgb
         last_depth = self.obj_repr.frames[-1].depth
-        last_tracks_2d = self.obj_repr.frames[-1].franka2d
+        last_tracks_2d = self.obj_repr.frames[-1].robot2d
         _, last_obj_mask = run_grounded_sam(
             rgb_image=last_rgb,
             obj_description=self.obj_description,
