@@ -463,6 +463,7 @@ class BaseEnv():
         
         count = 0
         while True and count < 100:
+        # while True and count < 3000:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
             if vel_norm < 1e-3:
                 break

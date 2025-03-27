@@ -34,9 +34,6 @@ def detect_grasp_anygrasp(
     colors, 
     dir_out, 
     augment=True, 
-    # crop=False,
-    # crop_center=None,
-    # crop_radius=0.1,
     visualize=False
 ):
     '''
@@ -50,10 +47,6 @@ def detect_grasp_anygrasp(
         
         NOTE: augment 为 True 时, 会对 dir_out 进行多个绕动, 分别预测 grasp, 然后将不同 grasp 在合并到一个坐标系下
     '''
-    # if crop:
-    #     assert crop_center is not None
-    #     assert crop_radius is not None
-    
     # load model
     from gsnet import AnyGrasp # gsnet.so
     # get a argument namespace
@@ -107,13 +100,6 @@ def detect_grasp_anygrasp(
         gg.transform(Tapp2w)
         ggs.add(gg)
         torch.cuda.empty_cache()
-    
-    # if crop:
-    #     ggs = crop_grasp(
-    #         ggs,
-    #         contact_point=crop_center,
-    #         radius=crop_radius
-    #     )
     
     if visualize:
         visualize_pc(
@@ -182,6 +168,34 @@ def sort_grasp_group(grasp_group, contact_region, dir_out=None, grasp_pre_filter
     return grasp_group, grasp_scores[index]
 
 
+def filter_grasp_group(
+    grasp_group, 
+    dir_out=None,
+):
+    '''
+        找到离 contact region 中点最近的 grasp, 且 grasp_fram 的 -x 轴越是平行于 dir_out 越好
+        grasp_group: Tgrasp2c
+        dir_out: (3, )
+        contact_region: (N, 3), 也即是 moving part
+        NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
+    '''
+    if False: # 保留前 50 的 grasp
+        grasp_group = grasp_group.nms().sort_by_score()
+        grasp_group = grasp_group[0:50]
+    
+    Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
+    neg_x_axis = -Rgrasp2c[:, 0, :] # N, 3
+    
+    # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
+    product = np.sum(neg_x_axis * dir_out, axis=-1) # N
+    product = product / (np.linalg.norm(neg_x_axis, axis=-1) * np.linalg.norm(dir_out))
+    angles = np.arccos(product) # N
+    index = angles < np.deg2rad(30)
+    grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
+    
+    return grasp_group
+
+
 if __name__ == '__main__':
     import os
     from PIL import Image
@@ -220,17 +234,20 @@ if __name__ == '__main__':
         colors=colors,
         dir_out=np.array([-1, 0, 0]),
         augment=True,
-        # crop=False,
-        # crop_center=np.array([1, -0.5, 0.7]),
-        # crop_radius=0.2,
-        visualize=True
+        visualize=False
     )
     end_time = time.time()
     print("time used:", end_time - start_time)
     
-    # augment = False, consume 0.734
-    # augment = True, consume 1.79
-    # x + y = 0.73 x + 15y = 1.79(15) -> 2.5(20)
-    # y = 0.075
-    # x = 0.657
+    ggs_filtered = filter_grasp_group(
+        grasp_group=gg,
+        dir_out=np.array([-1, 0, 0]),
+    )
     
+    visualize_pc(
+        points=points_world,
+        colors=colors,
+        grasp=ggs_filtered,
+        contact_point=None,
+        post_contact_dirs=np.array([-1, 0, 0])
+    )
