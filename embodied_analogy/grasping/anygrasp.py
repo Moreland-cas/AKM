@@ -10,6 +10,7 @@ from embodied_analogy.utility.utils import (
     find_correspondences
 )
 
+
 def crop_grasp(grasp_group, contact_point, radius=0.1):
     """
     contact_point: (3, ), 假设 grasp_group 中的 transform 是 Tgrasp2w, 那么 contact_point 也需要在 world 坐标系下
@@ -28,6 +29,7 @@ def crop_grasp(grasp_group, contact_point, radius=0.1):
     
     return grasp_group_
     
+    
 @torch.no_grad()
 def detect_grasp_anygrasp(
     points, 
@@ -37,15 +39,11 @@ def detect_grasp_anygrasp(
     visualize=False
 ):
     '''
-    输入世界坐标系下的点云和颜色, 返回 grasp_group (存储了信息 Tgrasp2w)
-        函数输入的 points 是世界坐标系下的
-        网络输入的点是 app 坐标系下的, app 坐标系需要根据 dir_out 来确定 (app 的 z 轴指向 dir_out 的反方向)
-        dir_out: 需要在 points 的坐标系(一般是世界坐标系)下指定, 从物体内部指向物体外部
-        网络的输出 grasp 的坐标系由 graspnetAPI 定义, grasp 存储了信息 Tgrasp2app
-        
-        可视化是在 world 坐标系下的
-        
-        NOTE: augment 为 True 时, 会对 dir_out 进行多个绕动, 分别预测 grasp, 然后将不同 grasp 在合并到一个坐标系下
+    输入 a 坐标系下的 points 和 dir_out, 输出用 anygrasp 检测出的 grasp_group, 其中包含信息 Tgrasp2a
+        points: (N, 3), in a coordinate
+        colors: (N, 3), in range [0-1]
+        dir_out: (3, ), in a coordinate, 用于将 a 坐标系下的点进行变换, 以模拟 grasp detector network 所需的格式 (相机方向指向点云内部)
+        augment: if True, 对 dir_out 进行多个绕动, 分别预测 grasp, 然后将不同 grasp 在合并到一个坐标系下返回
     '''
     # load model
     from gsnet import AnyGrasp # gsnet.so
@@ -112,6 +110,7 @@ def detect_grasp_anygrasp(
     
     return ggs
 
+
 def find_nearest_grasp(grasp_group, contact_point):
     '''
         grasp_group: graspnetAPI 
@@ -129,7 +128,8 @@ def find_nearest_grasp(grasp_group, contact_point):
     nearest_index = int(nearest_index)
     return grasp_group[nearest_index]
 
-def sort_grasp_group(grasp_group, contact_region, dir_out=None, grasp_pre_filter=False):
+
+def sort_grasp_group(grasp_group, contact_region, pre_filter=False):
     '''
         找到离 contact region 中点最近的 grasp, 且 grasp_fram 的 -x 轴越是平行于 dir_out 越好
         grasp_group: Tgrasp2c
@@ -137,7 +137,7 @@ def sort_grasp_group(grasp_group, contact_region, dir_out=None, grasp_pre_filter
         contact_region: (N, 3), 也即是 moving part
         NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
-    if grasp_pre_filter: # 保留前 50 的 grasp
+    if pre_filter: # 保留前 50 的 grasp
         grasp_group = grasp_group.nms().sort_by_score()
         grasp_group = grasp_group[0:50]
         
@@ -146,21 +146,8 @@ def sort_grasp_group(grasp_group, contact_region, dir_out=None, grasp_pre_filter
     
     _, distances, _ = find_correspondences(t_grasp2w, contact_region) # N
     distance_scores = np.exp(-2 * distances) 
-    # distance_scores = (distances < 0.05).astype(np.float32)
     
-    Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
-    neg_x_axis = -Rgrasp2c[:, 0, :] # N, 3
-    
-    angle_scores = 1
-    if dir_out is not None:
-        # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
-        angle_scores = np.sum(neg_x_axis * dir_out, axis=-1) # N
-    
-    # grasp_scores = pred_scores * distance_scores * angle_scores # N
     grasp_scores = pred_scores * distance_scores  # N
-    # grasp_scores = angle_scores  # N
-    
-    # 找到距离 contact_point 最近的 grasp
     index = np.argsort(grasp_scores)
     index = index[::-1]
     grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
@@ -170,19 +157,16 @@ def sort_grasp_group(grasp_group, contact_region, dir_out=None, grasp_pre_filter
 
 def filter_grasp_group(
     grasp_group, 
+    degree_thre=30,
     dir_out=None,
 ):
     '''
-        找到离 contact region 中点最近的 grasp, 且 grasp_fram 的 -x 轴越是平行于 dir_out 越好
+        找到离 contact region 中点最近的 grasp, 且 grasp_frame 的 -x 轴越是平行于 dir_out 越好
         grasp_group: Tgrasp2c
         dir_out: (3, )
         contact_region: (N, 3), 也即是 moving part
         NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
-    if False: # 保留前 50 的 grasp
-        grasp_group = grasp_group.nms().sort_by_score()
-        grasp_group = grasp_group[0:50]
-    
     Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
     neg_x_axis = -Rgrasp2c[:, 0, :] # N, 3
     
@@ -190,7 +174,7 @@ def filter_grasp_group(
     product = np.sum(neg_x_axis * dir_out, axis=-1) # N
     product = product / (np.linalg.norm(neg_x_axis, axis=-1) * np.linalg.norm(dir_out))
     angles = np.arccos(product) # N
-    index = angles < np.deg2rad(30)
+    index = angles < np.deg2rad(degree_thre)
     grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
     
     return grasp_group

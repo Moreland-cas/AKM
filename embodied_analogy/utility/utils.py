@@ -1260,14 +1260,19 @@ def concatenate_images(image1, image2, direction='h'):
 
     return new_image
 
-def crop_nearby_points(point_clouds, contact_3d, radius=0.1):
-    '''crop pcd close to a given point'''
+def crop_nearby_points(point_clouds, contact3d, radius=0.1):
+    '''Return a boolean mask indicating points close to a given point.'''
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(point_clouds)
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)
-    [k, idx, _] = pcd_tree.search_radius_vector_3d(contact_3d, radius)
-    cropped_points = pcd.select_by_index(idx)
-    return np.asarray(cropped_points.points)
+    # 通过KDTree搜索找到在给定半径内的点
+    [k, idx, _] = pcd_tree.search_radius_vector_3d(contact3d, radius)
+    
+    # 创建一个布尔掩码，初始化为全False
+    mask = np.zeros(len(point_clouds), dtype=bool)
+    # 将在给定半径内的点对应的索引位置设为True
+    mask[idx] = True
+    return mask
 
 def fit_plane_normal(points):
     """

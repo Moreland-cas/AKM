@@ -2,7 +2,21 @@ import os
 import napari
 import pickle
 import numpy as np
-from embodied_analogy.utility.utils import napari_time_series_transform
+from graspnetAPI import GraspGroup
+from embodied_analogy.utility.utils import (
+    napari_time_series_transform,
+    image_to_camera,
+    get_depth_mask,
+    depth_image_to_pointcloud,
+    crop_nearby_points,
+    fit_plane_ransac,
+    visualize_pc
+)
+from embodied_analogy.grasping.anygrasp import (
+    detect_grasp_anygrasp,
+    filter_grasp_group,
+    sort_grasp_group
+)
 
 class Data():
     def save(self, file_path):
@@ -30,6 +44,8 @@ class Frame(Data):
         dynamic_mask=None,
         contact2d=None,
         contact3d=None,
+        dir_out=None,
+        grasp_group: GraspGroup = None,
         robot2d=None,
         robot3d=None,
         robot_mask=None,
@@ -41,11 +57,16 @@ class Frame(Data):
         self.depth = depth
         self.K = K
         self.Tw2c = Tw2c
-        self.joint_state = joint_state
+        
         self.obj_mask = obj_mask
         self.dynamic_mask = dynamic_mask
+        self.joint_state = joint_state
+        
         self.contact2d = contact2d
         self.contact3d = contact3d
+        self.dir_out = dir_out
+        self.grasp_group = grasp_group
+        
         self.robot2d = robot2d
         self.robot3d = robot3d
         self.robot_mask = robot_mask
@@ -66,6 +87,82 @@ class Frame(Data):
             u, v = self.contact2d
             viewer.add_points((v, u), face_color="red", name=f"{prefix}_contact2d")
     
+    def detect_grasp(self, visualize=False) -> GraspGroup:
+        """
+        返回当前 frame 的点云上 contact2d 附近的一个 graspGroup
+        """
+        assert (self.contact2d is not None) and (self.obj_mask is not None)
+        c2d_int = self.contact2d.astype(np.int32)
+        if self.contact3d is None:
+            contact3d = image_to_camera(
+                uv=self.contact2d[None], # 1, 3
+                depth=np.array(self.depth[c2d_int[1], c2d_int[0]])[None], # 1, 1
+                K=self.K,
+            )[0]
+            self.contact3d = contact3d
+        contact3d = self.contact3d
+        
+        # 找到 contact3d 附近的点
+        depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c)
+        obj_pc = depth_image_to_pointcloud(
+            deprh_image=self.depth,
+            mask = self.obj_mask & depth_mask,
+            K=self.K
+        )
+        pc_colors = self.rgb[self.obj_mask & depth_mask]
+        
+        crop_mask = crop_nearby_points(
+            point_clouds=obj_pc,
+            contact3d=self.contact3d,
+            radius=0.1
+        )
+        cropped_pc = obj_pc[crop_mask]
+        cropped_colors = pc_colors[crop_mask]
+        
+        # fit 一个局部的 normal 做为 grasp 的方向
+        plane_normal = fit_plane_ransac(
+            points=cropped_pc,
+            threshold=0.01, 
+            max_iterations=100,
+        )
+        if (plane_normal * np.array([0, 0, -1])).sum() > 0:
+            dir_out = plane_normal
+        else:
+            dir_out = -plane_normal
+        
+        # 在 crop 出的点云上检测 grasp
+        gg = detect_grasp_anygrasp(
+            points=cropped_pc, 
+            colors=cropped_colors / 255.,
+            dir_out=dir_out, 
+            augment=True,
+            visualize=False
+        )  
+
+        # 先用 dir_out 进行一个 hard filter, 保留角度在 30度 内的 grasp
+        gg_filtered = filter_grasp_group(
+            grasp_group=gg,
+            degree_thre=30,
+            dir_out=dir_out,
+        )
+
+        # 再用距离 contact3d 的距离和 detector 本身预测的分数做一个排序
+        gg_sorted, _ = sort_grasp_group(
+            grasp_group=gg_filtered,
+            contact_region=self.contact3d[None],
+            pre_filter=False
+        )
+        self.grasp_group = gg_sorted
+        
+        if visualize:
+            visualize_pc(
+                points=obj_pc, 
+                colors=pc_colors / 255,
+                grasp=gg_sorted, 
+                contact_point=self.contact3d, 
+                post_contact_dirs=self.contact3d
+            )
+
     def visualize(self):
         viewer = napari.Viewer()
         viewer.title = "frame visualization"
