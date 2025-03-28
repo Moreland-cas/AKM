@@ -39,7 +39,7 @@ class ManipulateEnv(BaseEnv):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
                 # initial_state.append(0.1)
-                initial_state.append(np.deg2rad(10))
+                initial_state.append(np.deg2rad(0))
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     )
     demo.manipulate(
         # delta_state=-0.1,
-        delta_state=np.deg2rad(+20),
+        delta_state=np.deg2rad(+30),
         visualize=False
     )
     

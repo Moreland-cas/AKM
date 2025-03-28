@@ -10,7 +10,8 @@ from embodied_analogy.utility.utils import (
     depth_image_to_pointcloud,
     crop_nearby_points,
     fit_plane_ransac,
-    visualize_pc
+    visualize_pc,
+    make_bbox
 )
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
@@ -18,6 +19,8 @@ from embodied_analogy.grasping.anygrasp import (
     sort_grasp_group,
     crop_grasp
 )
+
+
 
 class Data():
     def save(self, file_path):
@@ -41,6 +44,7 @@ class Frame(Data):
         K=None,
         Tw2c=None,
         joint_state=None,
+        obj_bbox=None,
         obj_mask=None,
         dynamic_mask=None,
         contact2d=None,
@@ -59,6 +63,7 @@ class Frame(Data):
         self.K = K
         self.Tw2c = Tw2c
         
+        self.obj_bbox = obj_bbox
         self.obj_mask = obj_mask
         self.dynamic_mask = dynamic_mask
         self.joint_state = joint_state
@@ -87,6 +92,21 @@ class Frame(Data):
         if self.contact2d is not None:
             u, v = self.contact2d
             viewer.add_points((v, u), face_color="red", name=f"{prefix}_contact2d")
+            
+        if self.obj_bbox is not None:
+            # obj_bbox in order [u_left, v_left, u_right, v_right]
+            #  [min_row, min_column, max_row, max_column]
+            tmp = np.array([self.obj_bbox[1], self.obj_bbox[0], self.obj_bbox[3], self.obj_bbox[2]])[:, None]
+            bbox_rect = make_bbox(tmp)
+            viewer.add_shapes(
+                bbox_rect,
+                face_color='transparent',
+                edge_color='green',
+                edge_width=5,
+                # features=features,
+                text="bbox",
+                name=f"{prefix}_bbox",
+            )
     
     def detect_grasp(self, visualize=False) -> GraspGroup:
         """
@@ -179,6 +199,38 @@ class Frame(Data):
                 post_contact_dirs=[self.dir_out]
             )
 
+
+    def segment_obj(
+        self, 
+        obj_description=None,
+        post_process_mask=True,
+        remove_robot=True,
+        visualize=False
+    ):
+        from embodied_analogy.perception.grounded_sam import run_grounded_sam
+        obj_bbox, obj_mask = run_grounded_sam(
+            rgb_image=self.rgb,
+            obj_description=obj_description,
+            positive_points=None,  
+            negative_points=None,
+            num_iterations=3,
+            acceptable_thr=0.9,
+            dino_model=None,
+            sam2_image_model=None,
+            post_process_mask=post_process_mask,
+            visualize=False,
+        )
+        self.obj_bbox = obj_bbox
+        
+        if remove_robot:
+            assert self.robot_mask is not None
+            obj_mask = obj_mask & (~self.robot_mask)
+        
+        self.obj_mask = obj_mask
+            
+        if visualize:
+            self.visualize()
+    
     def visualize(self):
         viewer = napari.Viewer()
         viewer.title = "frame visualization"
@@ -252,7 +304,14 @@ class Frames(Data):
         dynamic_mask_seq = np.stack([self.frame_list[i].dynamic_mask for i in range(self.num_frames())]) 
         return dynamic_mask_seq
     
-    def _visualize(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
+    def _visualize_f(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
+        rgb_seq = self.get_rgb_seq()
+        viewer.add_image(rgb_seq, rgb=True)
+        
+        self.frame_list[0]._visualize(viewer, prefix="start_frame")
+        self.frame_list[-1]._visualize(viewer, prefix="end_frame")
+    
+    def _visualize_kf(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()
         viewer.add_image(rgb_seq, rgb=True)
         
@@ -280,16 +339,21 @@ class Frames(Data):
                 T = len(rgb_seq)
                 M = len(link_names)
                 viewer.add_points(robot2d_data[i::M, :], face_color="red", name=f"{prefix}_{link_names[i]}")
-        
-    def visualize(self):
+                
+    def visualize(self, is_k=False):
         viewer = napari.Viewer()
-        viewer.title = "frames visualization"
-        self._visualize(viewer)
+        if is_k:
+            viewer.title = "kframes visualization"
+            self._visualize_kf(viewer)
+        else:
+            viewer.title = "frames visualization"
+            self._visualize_f(viewer)
         napari.run()
 
 
 if __name__ == "__main__":
     frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
     # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_micro.npy")
-    frame.detect_grasp(True)
+    # frame.detect_grasp(True)
+    frame.segment_obj(obj_description="drawer", visualize=True, remove_robot=False)
     pass

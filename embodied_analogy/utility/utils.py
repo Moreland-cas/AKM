@@ -1419,7 +1419,36 @@ def reverse_joint_dict(joint_dict):
     joint_dict["joint_dir"] = -joint_dict["joint_dir"]
     joint_dict["joint_states"] = -joint_dict["joint_states"]
     
-    
+
+def make_bbox(bbox_extents):
+    """Get the coordinates of the corners of a
+    bounding box from the extents
+
+    Parameters
+    ----------
+    bbox_extents : list (4xN)
+        List of the extents of the bounding boxes for each of the N regions.
+        Should be ordered: [min_row, min_column, max_row, max_column]
+
+    Returns
+    -------
+    bbox_rect : np.ndarray
+        The corners of the bounding box. Can be input directly into a
+        napari Shapes layer.
+    """
+    minr = bbox_extents[0]
+    minc = bbox_extents[1]
+    maxr = bbox_extents[2]
+    maxc = bbox_extents[3]
+
+    bbox_rect = np.array(
+        [[minr, minc], [maxr, minc], [maxr, maxc], [minr, maxc]]
+    )
+    bbox_rect = np.moveaxis(bbox_rect, 2, 0)
+
+    return bbox_rect
+
+
 if __name__ == "__main__":
     point_cloud = np.random.random([100, 3])
     point_cloud[:, 2] = 0

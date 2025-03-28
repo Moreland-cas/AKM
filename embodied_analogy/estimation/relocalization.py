@@ -9,7 +9,6 @@ from embodied_analogy.utility.utils import (
     get_depth_mask
 )
 from embodied_analogy.estimation.fine_joint_est import fine_estimation
-from embodied_analogy.perception.grounded_sam import run_grounded_sam
 from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.representation.obj_repr import Obj_repr
 from embodied_analogy.utility.constants import *
@@ -30,16 +29,7 @@ def relocalization(
     """
     if query_frame.obj_mask is None:
         print("obj_mask of query_frame is None, run grounded sam first..")
-        _, obj_mask = run_grounded_sam(
-            rgb_image=query_frame.rgb,
-            obj_description=obj_repr.obj_description,
-            positive_points=None, 
-            negative_points=query_frame.robot2d, # N, 2
-            num_iterations=3,
-            acceptable_thr=0.9,
-            visualize=visualize
-        )
-        query_frame.obj_mask = obj_mask
+        query_frame.segment_obj(obj_description=obj_repr.obj_description)
     
     if query_frame.dynamic_mask is None:
         print("dynamic_mask of query_frame is None, initializing using obj_mask..")
