@@ -238,7 +238,7 @@ def sam2_on_image(
     # 在这里对于输出的 mask 进行一个 post-processing
     if post_process:
         cur_best_mask = morphology.binary_closing(cur_best_mask, morphology.disk(5))
-        # cur_best_mask = ndimage.binary_fill_holes(cur_best_mask)   
+        cur_best_mask = ndimage.binary_fill_holes(cur_best_mask)   
         
     if visualize:
         viewer.add_labels(cur_best_mask.astype(np.int32), name='cur best mask')

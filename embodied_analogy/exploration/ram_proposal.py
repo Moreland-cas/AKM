@@ -22,22 +22,7 @@ from embodied_analogy.exploration.affordance import Affordance_map_2d
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     seed_everything,
-    image_to_camera,
-    depth_image_to_pointcloud,
-    # compute_normals,
-    visualize_pc,
     draw_points_on_image,
-    fit_plane_normal,
-    fit_plane_ransac,
-    crop_nearby_points,
-    get_depth_mask
-)
-# from embodied_analogy.perception.grounded_sam import run_grounded_sam
-from embodied_analogy.representation.basic_structure import Frame
-from embodied_analogy.grasping.anygrasp import (
-    detect_grasp_anygrasp,
-    sort_grasp_group,
-    crop_grasp
 )
 
 def draw_arrows_on_img(img, pixel, normals_2d_directions):
@@ -180,93 +165,6 @@ def get_ram_affordance_2d(
     torch.cuda.empty_cache()
     return affordance_map_2d
 
-def lift_affordance(
-    cur_frame: Frame,
-    visualize=False
-):
-    """
-    根据当前的 rgbd_frame 进行一个 grasp detection, 并返回 camera 坐标系下的所有 grasp
-    TODO 
-        如果提供了 dir_out 则直接用, 否则利用 contact3d 附近的区域估计出一个 dir_out
-        对于 prismatic joint: dir_out 等于 joint_dir
-        对于 revolute joint: 首先估计出局部的 dir_out, 但是需要减去 joint_dir 方向上的分量
-    """
-    K = cur_frame.K
-    Tw2c = cur_frame.Tw2c
-    query_rgb = cur_frame.rgb
-    query_mask = cur_frame.obj_mask
-    query_depth = cur_frame.depth
-    contact_uv = cur_frame.contact2d
-    
-    contact_u = int(contact_uv[0])
-    contact_v = int(contact_uv[1])
-    
-    contact_3d_c = image_to_camera(
-        uv=np.array(contact_uv)[None], # 1, 3
-        depth=np.array(query_depth[contact_v, contact_u])[None], # 1, 1
-        K=K,
-    )[0] # 3
-    
-    # 找到 contact_3d_c 附近区域的点云
-    query_depth_mask = get_depth_mask(query_depth, K, Tw2c)
-    obj_pc_c = depth_image_to_pointcloud(query_depth, query_mask & query_depth_mask, K) # N, 3
-    pc_colors = query_rgb[query_mask & query_depth_mask]  # N, 3
-    
-    # 找到 obj_pc_c 中 contact_3d_c 附近的点, 拟合一个平面, 返回法向量 dir_in 和 dir_out
-    cropped_points = crop_nearby_points(
-        point_clouds=obj_pc_c,
-        contact_3d=contact_3d_c,
-        radius=0.1
-    )
-    # plane_normal = fit_plane_normal(cropped_points)
-    plane_normal = fit_plane_ransac(
-        points=cropped_points,
-        threshold=0.01, 
-        max_iterations=100,
-        visualize=visualize
-    )
-    
-    if (plane_normal * np.array([0, 0, -1])).sum() > 0:
-        dir_out = plane_normal
-    else:
-        dir_out = -plane_normal
-    
-    # 这里返回的是 Tgrasp2c 的
-    gg = detect_grasp_anygrasp(
-        points=obj_pc_c, 
-        colors=pc_colors / 255.,
-        dir_out=dir_out, 
-        augment=True,
-        visualize=False
-    ) 
-    # 使得返回的 grasp 是在一定区间内的, 超出的不算
-    cropped_gg = crop_grasp(
-        grasp_group=gg,
-        contact_point=contact_3d_c,
-        radius=0.1,
-    )
-    if cropped_gg is None:
-        return contact_3d_c, None, dir_out
-
-    sorted_grasps, _ = sort_grasp_group(
-        grasp_group=cropped_gg,
-        contact_region=contact_3d_c[None],
-        dir_out=dir_out,
-        grasp_pre_filter=True
-    )
-    # best_grasp = sorted_grasps[0]
-
-    if visualize:
-        visualize_pc(
-            points=obj_pc_c, 
-            colors=pc_colors / 255,
-            grasp=sorted_grasps, 
-            contact_point=contact_3d_c, 
-            post_contact_dirs=[dir_out]
-        )
-        
-    return contact_3d_c, sorted_grasps, dir_out
-
 
 if __name__ == "__main__":
     import sys
@@ -305,25 +203,4 @@ if __name__ == "__main__":
     
     obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
     contact_uv = affordance_map_2d.sample_highest(visualize=True)
-    _, best_grasp, dir_out = lift_affordance(
-        K=K, 
-        Tw2c=Tw2c,
-        query_rgb=query_rgb,
-        query_depth=query_depth, 
-        query_mask=obj_mask,
-        contact_uv=contact_uv,
-        visualize=True
-    )
-    
-    affordance_map_2d.update(contact_uv, visualize=False)
-    contact_uv = affordance_map_2d.sample_highest(visualize=False)
-    _, best_grasp, dir_out = lift_affordance(
-        K=K, 
-        Tw2c=Tw2c,
-        query_rgb=query_rgb,
-        query_depth=query_depth, 
-        query_mask=obj_mask,
-        contact_uv=contact_uv,
-        visualize=True
-    )
     

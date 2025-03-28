@@ -137,6 +137,9 @@ def sort_grasp_group(grasp_group, contact_region, pre_filter=False):
         contact_region: (N, 3), 也即是 moving part
         NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
+    if grasp_group is None:
+        return None
+    
     if pre_filter: # 保留前 50 的 grasp
         grasp_group = grasp_group.nms().sort_by_score()
         grasp_group = grasp_group[0:50]
@@ -152,7 +155,7 @@ def sort_grasp_group(grasp_group, contact_region, pre_filter=False):
     index = index[::-1]
     grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
     
-    return grasp_group, grasp_scores[index]
+    return grasp_group
 
 
 def filter_grasp_group(
@@ -167,6 +170,9 @@ def filter_grasp_group(
         contact_region: (N, 3), 也即是 moving part
         NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
+    if grasp_group is None:
+        return None
+    
     Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
     neg_x_axis = -Rgrasp2c[:, :, 0] # N, 3
     

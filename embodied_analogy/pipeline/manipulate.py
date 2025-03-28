@@ -13,7 +13,6 @@ from embodied_analogy.utility.utils import (
     remove_dir_component
 )
 initialize_napari()
-from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.representation.obj_repr import Obj_repr
 
 class ManipulateEnv(BaseEnv):
@@ -40,7 +39,7 @@ class ManipulateEnv(BaseEnv):
             if joint_name == obj_config["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
                 # initial_state.append(0.1)
-                initial_state.append(0.0)
+                initial_state.append(np.deg2rad(10))
             else:
                 initial_state.append(cur_joint_state[i])
         self.asset.set_qpos(initial_state)
@@ -79,7 +78,6 @@ class ManipulateEnv(BaseEnv):
     
     def manipulate(self, delta_state=0, reserved_distance=0.05, visualize=False):
         from embodied_analogy.estimation.relocalization import relocalization
-        from embodied_analogy.exploration.ram_proposal import lift_affordance
         
         Tw2c = self.camera_extrinsic
         Tc2w = np.linalg.inv(self.camera_extrinsic)
@@ -114,28 +112,26 @@ class ManipulateEnv(BaseEnv):
         cur_state = cur_frame.joint_state
         
         # 根据 cur_frame 中的 contact3d 选择抓取位姿, 并沿着 joint_dir 进行移动 （仿照 explore_once 函数）
-        contact3d_c, grasps_c, dir_out_c = lift_affordance(
-            cur_frame=cur_frame,
-            visualize=True
-        )
+        cur_frame.detect_grasp(visualize=True)
+        
         # 对于 dir_out_c 进行定制化修改
         joint_dir = self.obj_repr.joint_dict["joint_dir"]
         if self.obj_repr.joint_dict["joint_type"] == "prismatic":
             dir_out_c = joint_dir
         elif self.obj_repr.joint_dict["joint_type"] == "revolute":
-            dir_out_c = remove_dir_component(dir_out_c, joint_dir, return_normalized=True)
+            dir_out_c = remove_dir_component(cur_frame.dir_out, joint_dir, return_normalized=True)
         dir_out_w = Tc2w[:3, :3] @ dir_out_c # 3
         
-        if grasps_c is None:
+        if cur_frame.grasp_group is None:
             assert "detected grasp is None"
             import pdb;pdb.set_trace()
         
-        grasps_w = grasps_c.transform(Tc2w) # Tgrasp2w
+        grasps_w = cur_frame.grasp_group.transform(Tc2w) # Tgrasp2w
         
         result_pre = None
-        depth_mask = get_depth_mask(depth_np, self.camera_intrinsic, Tw2c, height=0.02)
-        pc_collision_c = depth_image_to_pointcloud(depth_np, cur_frame.obj_mask & depth_mask, self.camera_intrinsic) # N, 3
-        pc_colors = rgb_np[cur_frame.obj_mask & depth_mask]
+        depth_mask = get_depth_mask(cur_frame.depth, self.camera_intrinsic, Tw2c, height=0.02)
+        pc_collision_c = depth_image_to_pointcloud(cur_frame.depth, cur_frame.obj_mask & depth_mask, self.camera_intrinsic) # N, 3
+        pc_colors = cur_frame.rgb[cur_frame.obj_mask & depth_mask]
         pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
         self.planner.update_point_cloud(pc_collision_w)
             
@@ -159,7 +155,7 @@ class ManipulateEnv(BaseEnv):
         # if visualize:
         if True:
             contact3d_w = camera_to_world(
-                point_camera=contact3d_c[None],
+                point_camera=cur_frame.contact3d[None],
                 extrinsic_matrix=Tw2c
             )[0]
             visualize_pc(
@@ -217,8 +213,7 @@ if __name__ == '__main__':
     #     "scale": 0.8,
     #     "pose": [1.0, 0., 0.5],
     #     "active_link": "link_2",
-    #     # "active_joint": "joint_2"
-    #     "active_joint": "joint_1"
+    #     "active_joint": "joint_2"
     # }
     
     # microwave
@@ -240,8 +235,8 @@ if __name__ == '__main__':
         instruction=instruction
     )
     demo.manipulate(
-        # delta_state=0.1,
-        delta_state=np.deg2rad(30),
+        # delta_state=-0.1,
+        delta_state=np.deg2rad(+20),
         visualize=False
     )
     

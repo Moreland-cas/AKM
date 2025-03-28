@@ -123,8 +123,9 @@ class Frame(Data):
         # fit 一个局部的 normal 做为 grasp 的方向
         plane_normal = fit_plane_ransac(
             points=cropped_pc,
-            threshold=0.01, 
+            threshold=0.005, 
             max_iterations=100,
+            visualize=visualize
         )
         if (plane_normal * np.array([0, 0, -1])).sum() > 0:
             dir_out = plane_normal
@@ -146,7 +147,7 @@ class Frame(Data):
             colors=pc_colors / 255.,
             dir_out=dir_out, 
             augment=True,
-            visualize=False
+            visualize=visualize
         )  
         gg = crop_grasp(
             grasp_group=gg,
@@ -162,7 +163,7 @@ class Frame(Data):
         )
 
         # 再用距离 contact3d 的距离和 detector 本身预测的分数做一个排序
-        gg_sorted, _ = sort_grasp_group(
+        gg_sorted = sort_grasp_group(
             grasp_group=gg_filtered,
             contact_region=self.contact3d[None],
             pre_filter=False

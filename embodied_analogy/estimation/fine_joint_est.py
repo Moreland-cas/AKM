@@ -285,6 +285,7 @@ def fine_estimation(
     opti_joint_start=True,
     opti_joint_states_mask=None, # boolean mask to select which states to optimize
     update_dynamic_mask=None,
+    lr = 1e-3, # 1mm
     visualize=False
 ):
     """
@@ -315,7 +316,7 @@ def fine_estimation(
     # 进入 ICP 迭代
     dir_params = torch.from_numpy(joint_dir).float().cuda().requires_grad_()
     start_params = torch.from_numpy(joint_start).float().cuda().requires_grad_()
-    lr = 1e-3 # 1mm
+    
     dir_lr = lr if opti_joint_dir else 0.0
     start_lr = lr if opti_joint_start else 0.0
     

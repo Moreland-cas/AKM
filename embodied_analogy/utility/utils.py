@@ -1307,6 +1307,10 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
     threshold: float - 允许的最大距离，超过该距离的点被视为离群点
     max_iterations: int - RANSAC 的最大迭代次数
     """
+    if len(points) < 3:
+        print("Less than 3 points in fit_plane_ransac")
+        return np.array([0, 0, 1])
+    
     best_normal = None
     best_inliers_mask = None
     best_inliers_count = 0

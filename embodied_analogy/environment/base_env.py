@@ -447,7 +447,7 @@ class BaseEnv():
         self.step()
         
         count = 0
-        while True and count < 100:
+        while count < 100:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
             if vel_norm < 1e-3:
                 break
@@ -462,8 +462,7 @@ class BaseEnv():
         self.step()
         
         count = 0
-        while True and count < 100:
-        # while True and count < 3000:
+        while count < 100:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
             if vel_norm < 1e-3:
                 break
@@ -483,7 +482,7 @@ class BaseEnv():
         self.base_step()
         
         count = 0
-        while True and count < 1250:
+        while count < 100:
             vel = self.robot.get_qvel()
             # 这里选用 vel_norm 作为 reset 进行同步的终止条件, 因为 vel 相对于 qpos 和 qacc 更加稳定
             # qpos 不知道要设置什么值, qacc 经常会突变
@@ -618,7 +617,7 @@ class BaseEnv():
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
             # 根据 moving distance 的大小计算出有多少个插值点
             # 对于平移关节时每次移动 3 cm
-            num_interp = max(3, int(moving_distance / 0.03))
+            num_interp = max(3, int(moving_distance / 0.02))
         else:
             # 对于旋转关节时每次移动 5 degree
             num_interp = max(3, int(moving_distance / np.deg2rad(5)))

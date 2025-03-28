@@ -86,6 +86,7 @@ def relocalization(
         opti_joint_states_mask=np.arange(num_ref+1)==0,
         # 目前不更新 dynamic_mask
         update_dynamic_mask=np.arange(num_ref+1)==-1,
+        lr=3e-3,
         visualize=False
     )
     # 然后在这里把 query_frame 从 keyframes 中吐出来
@@ -111,7 +112,7 @@ def relocalization(
             joint_state_ref2tgt=query_frame.joint_state-obj_repr.initial_frame.joint_state
         )
         contact_3d_query = Tinit2query[:3, :3] @ obj_repr.initial_frame.contact3d + Tinit2query[:3, 3] # 3
-        query_frame.contact_3d = contact_3d_query
+        query_frame.contact3d = contact_3d_query
         query_frame.contact2d = camera_to_image(contact_3d_query[None], K)[0][0]
     
     # 也就是说把 ref_frame 的 moving part 投影到 query frame 上, 对 query_dynamic 进行一个更新 (其余部分设置为 unknown)
@@ -173,7 +174,7 @@ if __name__ == "__main__":
             query_frame,
             update_query_dynamic=True,
             update_query_contact=True,
-            visualize=True
+            visualize=False
         )
         reloc_states.append(query_frame.joint_state)
     joint_states = obj_repr.key_frames.get_joint_states()

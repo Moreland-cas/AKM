@@ -98,8 +98,6 @@ class ExploreEnv(ManipulateEnv):
                 explore_ok: bool, 代表 plan 阶段是否成功
                 explore_uv: np.array([2,]), 代表本次尝试的 contact point 的 uv
         """        
-        from embodied_analogy.exploration.ram_proposal import lift_affordance
-        
         Tw2c = self.camera_extrinsic
         Tc2w = np.linalg.inv(Tw2c)
         
@@ -113,20 +111,18 @@ class ExploreEnv(ManipulateEnv):
         cur_frame.contact2d = contact_uv
         
         # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
-        contact3d_c, grasps_c, dir_out_c = lift_affordance(
-            cur_frame=cur_frame,
-            visualize=visualize
-        )
-        if grasps_c is None:
+        cur_frame.detect_grasp(visualize=visualize)
+        
+        if cur_frame.grasp_group is None:
             return False, contact_uv
         
         contact3d_w = camera_to_world(
-            point_camera=contact3d_c[None],
+            point_camera=cur_frame.contact3d[None],
             extrinsic_matrix=Tw2c
         )[0]
         
-        grasps_w = grasps_c.transform(Tc2w) # Tgrasp2w
-        dir_out_w = Tc2w[:3, :3] @ dir_out_c # 3
+        grasps_w = cur_frame.grasp_group.transform(Tc2w) # Tgrasp2w
+        dir_out_w = Tc2w[:3, :3] @ cur_frame.dir_out # 3
         
         result_pre = None
         depth_mask = get_depth_mask(cur_frame.depth, self.camera_intrinsic, Tw2c, height=0.02)
@@ -260,14 +256,14 @@ class ExploreEnv(ManipulateEnv):
     
 if __name__ == "__main__":
     # drawer
-    obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
-        "active_link": "link_2",
-        # "active_joint": "joint_2"
-        "active_joint": "joint_1"
-    }
+    # obj_config = {
+    #     "index": 44962,
+    #     "scale": 0.8,
+    #     "pose": [1.0, 0., 0.5],
+    #     "active_link": "link_2",
+    #     # "active_joint": "joint_2"
+    #     "active_joint": "joint_1"
+    # }
     
     # door
     # obj_config = {
@@ -279,20 +275,20 @@ if __name__ == "__main__":
     # }
     
     # microwave
-    # obj_config = {
-    #     "index": 7221,
-    #     "scale": 0.4,
-    #     "pose": [0.8, 0.1, 0.6],
-    #     "active_link": "link_0",
-    #     "active_joint": "joint_0"
-    # }a
+    obj_config = {
+        "index": 7221,
+        "scale": 0.4,
+        "pose": [0.8, 0.1, 0.6],
+        "active_link": "link_0",
+        "active_joint": "joint_0"
+    }
     
     obj_index = obj_config["index"]
     
     exploreEnv = ExploreEnv(
         obj_config=obj_config,
-        instruction="open the drawer",
-        # instruction="open the microwave",
+        # instruction="open the drawer",
+        instruction="open the microwave",
         record_fps=30,
         pertubation_distance=0.1
     )
