@@ -168,7 +168,7 @@ def filter_grasp_group(
         NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
     Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
-    neg_x_axis = -Rgrasp2c[:, 0, :] # N, 3
+    neg_x_axis = -Rgrasp2c[:, :, 0] # N, 3
     
     # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
     product = np.sum(neg_x_axis * dir_out, axis=-1) # N

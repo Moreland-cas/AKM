@@ -138,7 +138,7 @@ class Frame(Data):
         #     colors=cropped_colors / 255.,
         #     dir_out=dir_out, 
         #     augment=True,
-        #     visualize=True
+        #     visualize=False
         # )  
         # 2) 在完整的点云上检测 grasp
         gg = detect_grasp_anygrasp(
@@ -146,7 +146,7 @@ class Frame(Data):
             colors=pc_colors / 255.,
             dir_out=dir_out, 
             augment=True,
-            visualize=True
+            visualize=False
         )  
         gg = crop_grasp(
             grasp_group=gg,
@@ -157,7 +157,7 @@ class Frame(Data):
         # 先用 dir_out 进行一个 hard filter, 保留角度在 30度 内的 grasp
         gg_filtered = filter_grasp_group(
             grasp_group=gg,
-            degree_thre=45,
+            degree_thre=30,
             dir_out=dir_out,
         )
 
@@ -288,7 +288,7 @@ class Frames(Data):
 
 
 if __name__ == "__main__":
-    # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
-    frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_micro.npy")
+    frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
+    # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_micro.npy")
     frame.detect_grasp(True)
     pass
