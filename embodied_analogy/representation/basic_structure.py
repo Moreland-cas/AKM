@@ -15,7 +15,8 @@ from embodied_analogy.utility.utils import (
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
     filter_grasp_group,
-    sort_grasp_group
+    sort_grasp_group,
+    crop_grasp
 )
 
 class Data():
@@ -105,7 +106,7 @@ class Frame(Data):
         # 找到 contact3d 附近的点
         depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c)
         obj_pc = depth_image_to_pointcloud(
-            deprh_image=self.depth,
+            depth_image=self.depth,
             mask = self.obj_mask & depth_mask,
             K=self.K
         )
@@ -129,20 +130,34 @@ class Frame(Data):
             dir_out = plane_normal
         else:
             dir_out = -plane_normal
+        self.dir_out = dir_out
         
-        # 在 crop 出的点云上检测 grasp
+        # 1) 在 crop 出的点云上检测 grasp
+        # gg = detect_grasp_anygrasp(
+        #     points=cropped_pc, 
+        #     colors=cropped_colors / 255.,
+        #     dir_out=dir_out, 
+        #     augment=True,
+        #     visualize=True
+        # )  
+        # 2) 在完整的点云上检测 grasp
         gg = detect_grasp_anygrasp(
-            points=cropped_pc, 
-            colors=cropped_colors / 255.,
+            points=obj_pc, 
+            colors=pc_colors / 255.,
             dir_out=dir_out, 
             augment=True,
-            visualize=False
+            visualize=True
         )  
+        gg = crop_grasp(
+            grasp_group=gg,
+            contact_point=self.contact3d,
+            radius=0.1,
+        )
 
         # 先用 dir_out 进行一个 hard filter, 保留角度在 30度 内的 grasp
         gg_filtered = filter_grasp_group(
             grasp_group=gg,
-            degree_thre=30,
+            degree_thre=45,
             dir_out=dir_out,
         )
 
@@ -160,7 +175,7 @@ class Frame(Data):
                 colors=pc_colors / 255,
                 grasp=gg_sorted, 
                 contact_point=self.contact3d, 
-                post_contact_dirs=self.contact3d
+                post_contact_dirs=[self.dir_out]
             )
 
     def visualize(self):
@@ -270,4 +285,10 @@ class Frames(Data):
         viewer.title = "frames visualization"
         self._visualize(viewer)
         napari.run()
-        
+
+
+if __name__ == "__main__":
+    # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
+    frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_micro.npy")
+    frame.detect_grasp(True)
+    pass

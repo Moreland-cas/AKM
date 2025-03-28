@@ -161,7 +161,7 @@ def filter_grasp_group(
     dir_out=None,
 ):
     '''
-        找到离 contact region 中点最近的 grasp, 且 grasp_frame 的 -x 轴越是平行于 dir_out 越好
+        filter grasp_group, 使得保留的 grasp 的 appro_vector 的负方向与 dir_out 尽可能平行
         grasp_group: Tgrasp2c
         dir_out: (3, )
         contact_region: (N, 3), 也即是 moving part
@@ -173,8 +173,7 @@ def filter_grasp_group(
     # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
     product = np.sum(neg_x_axis * dir_out, axis=-1) # N
     product = product / (np.linalg.norm(neg_x_axis, axis=-1) * np.linalg.norm(dir_out))
-    angles = np.arccos(product) # N
-    index = angles < np.deg2rad(degree_thre)
+    index = product > np.cos(np.deg2rad(degree_thre))
     grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
     
     return grasp_group
