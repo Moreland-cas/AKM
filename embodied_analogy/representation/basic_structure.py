@@ -20,10 +20,10 @@ from embodied_analogy.utility.utils import (
     filter_tracks_by_consistency,
     filter_dynamic
 )
-from embodied_analogy.perception.online_cotracker import track_any_points
+from embodied_analogy.utility.perception.online_cotracker import track_any_points
 
-from embodied_analogy.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
-from embodied_analogy.grasping.anygrasp import (
+from embodied_analogy.utility.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
+from embodied_analogy.utility.grasp.anygrasp import (
     detect_grasp_anygrasp,
     filter_grasp_group,
     sort_grasp_group,
@@ -216,7 +216,7 @@ class Frame(Data):
         filter=True,
         visualize=False
     ):
-        from embodied_analogy.perception.grounded_sam import run_grounded_sam
+        from embodied_analogy.utility.perception.grounded_sam import run_grounded_sam
         obj_bbox, obj_mask = run_grounded_sam(
             rgb_image=self.rgb,
             obj_description=obj_description,
@@ -400,7 +400,7 @@ class Frames(Data):
         self.static_mask = static_mask
     
     def segment_obj(self, obj_description=None, filter=True, visualize=False):
-        from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
+        from embodied_analogy.utility.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
         # 对于所有 frames 进行物体分割
         obj_mask_seq = mask_obj_from_video_with_image_sam2(
             rgb_seq=self.get_rgb_seq(), 

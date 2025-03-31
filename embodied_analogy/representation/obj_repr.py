@@ -2,9 +2,17 @@ import copy
 import numpy as np
 import napari
 from embodied_analogy.representation.basic_structure import Data, Frame, Frames
-from embodied_analogy.estimation.coarse_joint_est import coarse_estimation
-from embodied_analogy.estimation.fine_joint_est import fine_estimation
-from embodied_analogy.utility.utils import farthest_scale_sampling
+from embodied_analogy.utility.estimation.coarse_joint_est import coarse_estimation
+from embodied_analogy.utility.estimation.fine_joint_est import fine_estimation
+
+from embodied_analogy.utility.utils import (
+    initialize_napari,   
+    farthest_scale_sampling,
+    set_random_seed,
+)
+initialize_napari()
+from embodied_analogy.utility.constants import *
+set_random_seed(SEED)
 
 
 class Obj_repr(Data):
@@ -100,11 +108,60 @@ class Obj_repr(Data):
         #     reverse_joint_dict(coarse_state_dict)
         #     reverse_joint_dict(fine_state_dict)
         
-    def reconstruct(self):
+    def reconstruct(
+        self,
+        num_initial_pts=1000,
+        num_kframes=5,
+        obj_description="drawer",
+        file_path=None,
+        gt_joint_dir_w=None,
+        visualize=True,
+    ):
         """
             从 initial_frame 和 frames 中恢复出 joint axis 和 joint states
         """
-        pass
+        self.frames[0].segment_obj(
+        obj_description=obj_description,
+        post_process_mask=True,
+        filter=True,
+        visualize=visualize
+    )
+        self.frames[0].sample_points(num_points=num_initial_pts, visualize=visualize)
+        self.frames.track_points(visualize=visualize)
+        self.frames.track2d_to_3d(visualize=visualize)
+        self.frames.cluster_track3d(visualize=visualize)
+        self.coarse_joint_estimation(visualize=visualize)
+        self.initialize_kframes(num_kframes=num_kframes, save_memory=True)
+        self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
+        self.kframes.classify_dynamics(
+            filter=True,
+            joint_dict=self.coarse_joint_dict,
+            visualize=visualize
+        )
+        self.fine_joint_estimation(lr=1e-3, visualize=True)
+            
+        if file_path is not None:
+            self.visualize()
+            self.save(file_path)
+        
+        if gt_joint_dir_w is not None:
+            print(f"\tgt axis: {gt_joint_dir_w}")
+
+            coarse_dir_c = self.coarse_joint_dict["joint_dir"] 
+            coarse_dir_w = self.Tw2c[:3, :3].T @ coarse_dir_c
+            dot_before = np.dot(gt_joint_dir_w, coarse_dir_w)
+            print(f"\tbefore: {np.degrees(np.arccos(dot_before))}")
+            print("\tjoint axis: ", coarse_dir_w)
+            
+            print("\tjoint states: ", self.coarse_joint_dict["joint_states"][self.kf_idxs])
+
+            fine_dir_c = self.fine_joint_dict["joint_dir"] 
+            fine_dir_w = self.Tw2c[:3, :3].T @ fine_dir_c
+            dot_after = np.dot(gt_joint_dir_w, fine_dir_w)
+            print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
+            print("\tjoint axis: ", fine_dir_w)
+            
+            print("\tjoint states: ", self.fine_joint_dict["joint_states"])
     
     def reloc(self, frame: Frame):
         pass
@@ -126,11 +183,28 @@ class Obj_repr(Data):
 
 if __name__ == "__main__":
     # drawer
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
     # microwave
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/reconstruct/recon_data.pkl")
-    obj_repr.visualize()
+    # obj_repr.visualize()
     
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
+    
+    # obj_idx = 7221
+    obj_idx = 44962
+    obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
+    obj_repr_data = Obj_repr.load(obj_repr_path)
+    # obj_repr_data.frames.frame_list.reverse()
+    
+    obj_repr_data.reconstruct(
+        num_initial_pts=1000,
+        num_kframes=5,
+        visualize=False,
+        gt_joint_dir_w=np.array([-1, 0, 0]),
+        # gt_joint_dir_w=np.array([0, 0, 1]),
+        # gt_joint_dir_w=None,
+        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
+        # file_path = None
+    )
