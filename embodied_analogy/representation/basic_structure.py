@@ -3,11 +3,12 @@ import napari
 import pickle
 import numpy as np
 from graspnetAPI import GraspGroup
+from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     napari_time_series_transform,
     image_to_camera,
     get_depth_mask,
-    get_dynamic_seq,
+    classify_dynamic,
     get_depth_mask_seq,
     depth_image_to_pointcloud,
     crop_nearby_points,
@@ -17,9 +18,10 @@ from embodied_analogy.utility.utils import (
     sample_points_within_bbox_and_mask,
     extract_tracked_depths,
     filter_tracks_by_consistency,
+    filter_dynamic
 )
 from embodied_analogy.perception.online_cotracker import track_any_points
-from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
+
 from embodied_analogy.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
@@ -329,31 +331,11 @@ class Frames(Data):
         assert len(joint_states) == self.num_frames()
         for i, joint_state in enumerate(joint_states):
             self.frame_list[i].joint_state = joint_state
-        
-    def get_obj_mask_seq(self):
-        # T, H, W
-        obj_mask_seq = np.stack([self.frame_list[i].obj_mask for i in range(self.num_frames())]) 
-        return obj_mask_seq
-    
-    def set_obj_mask_seq(self, obj_mask_seq):
-        # T, H, W
-        for i in range(self.num_frames()):
-            self.frame_list[i].obj_mask = obj_mask_seq[i]
     
     def get_robot_mask_seq(self):
         # T, H, W
         robot_mask_seq = np.stack([self.frame_list[i].robot_mask for i in range(self.num_frames())]) 
         return robot_mask_seq
-    
-    def get_track2d_seq(self):
-        # T, M, 2
-        track2d_seq = np.stack([self.frame_list[i].track2d for i in range(self.num_frames())])
-        return track2d_seq
-    
-    def get_track3d_seq(self):
-        # T, M, 3
-        track3d_seq = np.stack([self.frame_list[i].track3d for i in range(self.num_frames())])
-        return track3d_seq
     
     def track_points(self, visualize=False):
         """
@@ -370,7 +352,7 @@ class Frames(Data):
     
     def track2d_to_3d(self, filter=True, visualize=False):
         # T, M, 2
-        track2d_seq = self.get_track2d_seq()
+        track2d_seq = self.track2d_seq
         T, M, _ = track2d_seq.shape
         # T, M
         track_depths = extract_tracked_depths(
@@ -404,6 +386,7 @@ class Frames(Data):
         self.static_mask = static_mask
     
     def segment_obj(self, obj_description=None, filter=True, visualize=False):
+        from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
         # 对于所有 frames 进行物体分割
         obj_mask_seq = mask_obj_from_video_with_image_sam2(
             rgb_seq=self.get_rgb_seq(), 
@@ -426,48 +409,93 @@ class Frames(Data):
             robot_mask_seq = self.get_robot_mask_seq()
             obj_mask_seq = obj_mask_seq & (~robot_mask_seq)
         
-        # self.set_obj_mask_seq(obj_mask_seq)
         self.obj_mask_seq = obj_mask_seq
     
-    def initialize_dynamic(self, filter=False, visualize=False):
+    def filter_dynamics(self, depth_tolerance=0.05, joint_dict=None, visualize=False):
+        """
+        K, # 相机内参
+        depth_seq,  # T, H, W
+        dynamic_seq, # T, H, W
+        joint_type,
+        joint_dir,
+        joint_start,
+        joint_states,
+        depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
+        visualize=False
+        """
+        depth_seq = self.get_depth_seq()
+        joint_states = self.get_joint_states()
+        T = self.num_frames()
+        
+        dynamic_seq_updated = self.dynamic_seq.copy()
+        
+        for i in range(T):
+            query_depth = depth_seq[i]
+            query_dynamic = self.dynamic_seq[i]
+            query_state = joint_states[i]
+            
+            other_mask = np.arange(T) != i
+            ref_depths = depth_seq[other_mask]
+            ref_states = joint_states[other_mask]
+            
+            query_dynamic_updated = filter_dynamic(
+                K=self.K, # 相机内参
+                query_depth=query_depth, # H, W
+                query_dynamic=query_dynamic, # H, W
+                ref_depths=ref_depths,  # T, H, W
+                joint_type=joint_dict["joint_type"],
+                joint_dir=joint_dict["joint_dir"],
+                joint_start=joint_dict["joint_start"],
+                query_state=query_state,
+                ref_states=ref_states,
+                depth_tolerance=depth_tolerance, 
+                visualize=False
+            )
+            dynamic_seq_updated[i] = query_dynamic_updated
+        
+        if visualize:
+            import napari 
+            viewer = napari.view_image((self.dynamic_seq != 0).astype(np.int32), rgb=False)
+            viewer.title = "filter dynamic seq (moving part)"
+            # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+            viewer.add_labels(self.dynamic_seq.astype(np.int32), name='before filtering')
+            viewer.add_labels(dynamic_seq_updated.astype(np.int32), name='after filtering')
+            napari.run()
+        
+        self.dynamic_seq =  dynamic_seq_updated  # (T, H, W), composed of 1, 2, 3
+        
+    def classify_dynamics(self, filter=False, joint_dict=None, visualize=False):
         dynamic_seq = []
         
         for i in range(self.num_frames()):
-            dynamic = initialize_dynamic_mask(
-                self.obj_mask_seq[i], 
-                self.track2d_seq[i, self.moving_mask], 
-                self.track2d_seq[i, self.static_mask],
+            dynamic = classify_dynamic(
+                mask=self.obj_mask_seq[i], 
+                moving_points=self.track2d_seq[i, self.moving_mask], 
+                static_points=self.track2d_seq[i, self.static_mask],
             )
             dynamic_seq.append(dynamic)
         
         self.dynamic_seq = np.array(dynamic_seq)
         
-        if visualize:
-            import napari 
-            viewer = napari.view_image(self.obj_mask_seq, rgb=False)
-            viewer.title = "dynamic segment video mask by tracks2d"
-            # viewer.add_labels(self.obj_mask_seq.astype(np.int32), name='articulated objects')
-            viewer.add_labels((dynamic_seq == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
-            viewer.add_labels((dynamic_seq == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
-            napari.run()
-        
         if filter:
-            dynamic_seq_updated = filter_dynamic_seq(
-                K=K,
-                depth_seq=depth_seq[kf_idxs],
-                dynamic_seq=dynamic_seq,
-                joint_type=joint_type,
-                joint_dir=joint_dir_c,
-                joint_start=joint_start_c,
-                joint_states=joint_states[kf_idxs],
-                depth_tolerance=0.05, # 假设 coarse 阶段的误差估计在 5 cm 内
+            self.filter_dynamics(
+                depth_tolerance=0.03, # 假设 coarse 阶段的误差估计在 5 cm 内
+                joint_dict=joint_dict,
                 visualize=visualize
             ) 
         
-        for i in range(self.num_frames()):
-            self.frame_list[i].obj_mask = self.obj_mask_seq[i]
-            self.frame_list[i].dynamic_mask = dynamic_seq_updated[i]
-                    
+        # for i in range(self.num_frames()):
+        #     self.frame_list[i].obj_mask = self.obj_mask_seq[i]
+        #     self.frame_list[i].dynamic_mask = dynamic_seq_updated[i]
+    
+    # 底下估计 open/close 的这一部分并不是很 robust, 因此删除, 并且默认 explore 阶段得到的都是 open 的轨迹
+    # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
+    # track_type = classify_open_close(
+    #     tracks3d=tracks3d_filtered,
+    #     moving_mask=moving_mask,
+    #     visualize=visualize
+    # )
+           
     def _visualize_f(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()
         viewer.add_image(rgb_seq, rgb=True)
@@ -480,13 +508,11 @@ class Frames(Data):
         viewer.add_image(rgb_seq, rgb=True)
         
         # 添加绘制 mask
-        if self.frame_list[0].obj_mask is not None:
-            obj_mask_seq = self.get_obj_mask_seq()
-            viewer.add_labels(obj_mask_seq, name=f"{prefix}_obj_mask_seq")
+        if self.obj_mask_seq is not None:
+            viewer.add_labels(self.obj_mask_seq, name=f"{prefix}_obj_mask_seq")
         
-        if self.frame_list[0].dynamic_mask is not None:
-            dynamic_mask_seq = self.get_dynamic_seq()
-            viewer.add_labels(dynamic_mask_seq.astype(np.int32), name=f"{prefix}_dynamic_mask_seq")
+        if self.dynamic_seq is not None:
+            viewer.add_labels(self.dynamic_seq.astype(np.int32), name=f"{prefix}_dynamic_mask_seq")
         
         if visualize_robot2d:
             robot2d_seq = self.get_robot2d_seq()

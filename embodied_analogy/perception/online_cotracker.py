@@ -125,7 +125,7 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False):
     # 去除 batch 维度, 并转移到 cpu 上去
     pred_tracks, pred_visibility = pred_tracks[0].cpu(), pred_visibility[0].cpu()
     
-    if visiualize:
+    if visualize:
         vis_tracks2d_napari(rgb_frames, pred_tracks, viewer_title="Cotracker returned tracks2d")
         
     return pred_tracks, pred_visibility

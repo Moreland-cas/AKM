@@ -52,6 +52,8 @@ class ExploreEnv(ManipulateEnv):
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
         self.obj_repr.Tw2c = self.camera_extrinsic
+        self.obj_repr.frames.K = self.camera_intrinsic
+        self.obj_repr.frames.Tw2c = self.camera_extrinsic
         self.obj_repr.initial_frame = initial_frame
         
         num_tries = 0

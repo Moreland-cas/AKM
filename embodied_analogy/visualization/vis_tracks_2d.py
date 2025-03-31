@@ -34,7 +34,7 @@ def vis_tracks2d_napari(image_frames, tracks_2d, colors=None, viewer_title="napa
         # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
     colors = np.tile(colors, (T, 1))
         
-    viewer.add_points(napari_data, size=1, name='tracks_2d', opacity=1., face_color=colors)
+    viewer.add_points(napari_data, size=3, name='tracks_2d', opacity=1., face_color=colors)
     
     napari.run()
 

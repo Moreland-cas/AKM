@@ -17,139 +17,11 @@ from embodied_analogy.utility.utils import (
 )
 from embodied_analogy.utility.constants import *
 from embodied_analogy.estimation.scheduler import Scheduler
-from embodied_analogy.representation.obj_repr import Obj_repr
 
 def classify_unknown():
     # 如果按照深度验证这个必要条件, Tmoving满足但是Tstatic不满足, 那就可以 classify 到 moving, 反之也是
     pass
 
-def filter_dynamic_mask(
-    K, # 相机内参
-    query_depth, # H, W
-    query_dynamic, # H, W
-    ref_depths,  # T, H, W
-    # ref_dynamics, # T, H, W
-    joint_type,
-    joint_dir,
-    joint_start,
-    query_state,
-    ref_states,
-    depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
-    visualize=False
-):
-    """
-        根据当前的 joint state
-        验证所有的 moving points, 把不确定的 points 标记为 unknown
-    """
-    Tquery2refs = [
-        joint_data_to_transform_np(
-            joint_type=joint_type,
-            joint_dir=joint_dir,
-            joint_start=joint_start,
-            joint_state_ref2tgt=ref_state - query_state,
-    ) for ref_state in ref_states] 
-    Tquery2refs = np.array(Tquery2refs) # T, 4, 4
-        
-    T, H, W = ref_depths.shape
-    query_dynamic_updated = query_dynamic.copy()
-    
-    # 获取当前帧 MOVING_LABEL 的像素坐标
-    moving_mask = query_dynamic == MOVING_LABEL
-    if not np.any(moving_mask):
-        return query_dynamic_updated        
-
-    y, x = np.where(moving_mask) # N
-    pc_moving = depth_image_to_pointcloud(query_depth, moving_mask, K)  # (N, 3)
-    pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
-    
-    # 批量计算 moving_pc 在其他帧的 3d 坐标
-    pc_pred = np.einsum('tij,jk->tik', Tquery2refs, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
-    
-    # 投影到所有帧
-    uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K) # T*N, 2
-    uv_pred_int = np.floor(uv_pred.reshape(T, len(pc_moving), 2)).astype(int) # T, N, 2
-    depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
-    
-    # 在这里进行一个筛选, 把那些得不到有效 depth_obs 的 moving point 也标记为 Unknown TODO: 这里会不会过于严格
-    valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
-                (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H) # T, N
-    # 且只有一个时间帧观测不到就认为得不到有效观测
-    valid_idx = valid_idx.all(axis=0) # N
-    uv_pred_int = uv_pred_int[:, valid_idx] # T, M, 2
-    depth_pred = depth_pred[:, valid_idx] # T, M
-    
-    # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
-    # TODO：获取目标帧的真实深度, 是不是要考虑 depth_ref 等于 0 的情况是否需要拒绝
-    
-    T_idx = np.arange(T)[:, None]
-    depth_obs = ref_depths[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
-    
-    # 计算误差并更新 dynamic_mask， M, 只要有一帧拒绝，则置为 UNKNOWN
-    unknown_mask = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  # M
-    query_dynamic_updated[y[valid_idx][unknown_mask], x[valid_idx][unknown_mask]] = UNKNOWN_LABEL
-    
-    if visualize:
-        viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
-        viewer.title = "filter current dynamic mask using other frames"
-        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels(query_dynamic.astype(np.int32), name='before filtering')
-        viewer.add_labels(query_dynamic_updated.astype(np.int32), name='after filtering')
-        napari.run()
-    
-    return query_dynamic_updated  
-
-def filter_dynamic_seq(
-    K, # 相机内参
-    depth_seq,  # T, H, W
-    dynamic_seq, # T, H, W
-    joint_type,
-    joint_dir,
-    joint_start,
-    joint_states,
-    depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
-    visualize=False
-):
-    """
-        根据当前的 joint state
-        验证所有的 moving points, 把不确定的 points 标记为 unknown
-    """
-    T, H, W = depth_seq.shape
-    dynamic_seq_updated = dynamic_seq.copy()
-    
-    for i in range(T):
-        query_depth = depth_seq[i]
-        query_dynamic = dynamic_seq[i]
-        query_state = joint_states[i]
-        
-        other_mask = np.arange(T) != i
-        ref_depths = depth_seq[other_mask]
-        ref_states = joint_states[other_mask]
-        
-        query_dynamic_updated = filter_dynamic_mask(
-            K=K, # 相机内参
-            query_depth=query_depth, # H, W
-            query_dynamic=query_dynamic, # H, W
-            ref_depths=ref_depths,  # T, H, W
-            joint_type=joint_type,
-            joint_dir=joint_dir,
-            joint_start=joint_start,
-            query_state=query_state,
-            ref_states=ref_states,
-            depth_tolerance=depth_tolerance, 
-            visualize=False
-        )
-        dynamic_seq_updated[i] = query_dynamic_updated
-    
-    if visualize:
-        import napari 
-        viewer = napari.view_image((dynamic_seq != 0).astype(np.int32), rgb=False)
-        viewer.title = "filter dynamic mask seq (moving part)"
-        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels(dynamic_seq.astype(np.int32), name='before filtering')
-        viewer.add_labels(dynamic_seq_updated.astype(np.int32), name='after filtering')
-        napari.run()
-    
-    return dynamic_seq_updated  # (T, H, W), composed of 1, 2, 3
 
 def moving_ij_intersection(
     K, # 相机内参
@@ -280,11 +152,11 @@ def moving_ij_intersection_torch(
 
 
 def fine_estimation(
-    obj_repr: Obj_repr,
+    obj_repr,
     opti_joint_dir=True,
     opti_joint_start=True,
     opti_joint_states_mask=None, # boolean mask to select which states to optimize
-    update_dynamic_mask=None,
+    # update_dynamic_mask=None,
     lr = 1e-3, # 1mm
     visualize=False
 ):
@@ -296,17 +168,17 @@ def fine_estimation(
     T = len(obj_repr.kframes)
     assert T >= 2
     K = obj_repr.K
-    joint_type = obj_repr.joint_dict["joint_type"]
-    joint_dir = obj_repr.joint_dict["joint_dir"]
-    joint_start = obj_repr.joint_dict["joint_start"]
+    joint_type = obj_repr.coarse_joint_dict["joint_type"]
+    joint_dir = obj_repr.coarse_joint_dict["joint_dir"]
+    joint_start = obj_repr.coarse_joint_dict["joint_start"]
     joint_states = obj_repr.kframes.get_joint_states()
     depth_seq = obj_repr.kframes.get_depth_seq()
     dynamic_seq = obj_repr.kframes.dynamic_seq
     
     if opti_joint_states_mask is None:
         opti_joint_states_mask = np.ones(T, dtype=np.bool_)
-    if update_dynamic_mask is None:
-        update_dynamic_mask = np.ones(T, dtype=np.bool_)
+    # if update_dynamic_mask is None:
+    #     update_dynamic_mask = np.ones(T, dtype=np.bool_)
     
     # 准备 moving mask 数据, 点云数据 和 normal 数据
     moving_masks = [dynamic_seq[i] == MOVING_LABEL for i in range(T)]
@@ -355,27 +227,27 @@ def fine_estimation(
                 continue
             ij_pairs.append((i, j))
     
-    max_icp_iters = 200                    
+    max_icp_iters = 300                    
     for k in range(max_icp_iters):
         # 如果要 update dynamic mask, 就在这里进行
-        for l, need_update in enumerate(update_dynamic_mask):
+        # for l, need_update in enumerate(update_dynamic_mask):
             # 没啥卵用啊我草？？ 如果 initial state 太不准那 filter 出来的结果会很 bug
-            if need_update:
-                ref_states = np.array([states_param.detach().cpu().item() for states_param in states_params])
-                ref_states = ref_states[np.arange(T)!=l]
-                dynamic_seq[l] = filter_dynamic_mask(
-                    K=K, 
-                    query_depth=depth_seq[l], 
-                    query_dynamic=dynamic_seq[l], 
-                    ref_depths=depth_seq[np.arange(T)!=l],  
-                    joint_type=joint_type,
-                    joint_dir=dir_params.detach().cpu().numpy(),
-                    joint_start=start_params.detach().cpu().numpy(),
-                    query_state=states_params[l].detach().cpu().numpy(),
-                    ref_states=ref_states,
-                    depth_tolerance=0.01, 
-                    visualize=visualize
-                )
+            # if need_update:
+            #     ref_states = np.array([states_param.detach().cpu().item() for states_param in states_params])
+            #     ref_states = ref_states[np.arange(T)!=l]
+            #     dynamic_seq[l] = filter_dynamic_mask(
+            #         K=K, 
+            #         query_depth=depth_seq[l], 
+            #         query_dynamic=dynamic_seq[l], 
+            #         ref_depths=depth_seq[np.arange(T)!=l],  
+            #         joint_type=joint_type,
+            #         joint_dir=dir_params.detach().cpu().numpy(),
+            #         joint_start=start_params.detach().cpu().numpy(),
+            #         query_state=states_params[l].detach().cpu().numpy(),
+            #         ref_states=ref_states,
+            #         depth_tolerance=0.01, 
+            #         visualize=visualize
+            #     )
                 
                 # if visualize:
                 #     import napari 
@@ -386,9 +258,9 @@ def fine_estimation(
                 #     napari.run()
                     
                 # 还需要更新对应 frame 的 moving_masks 等信息
-                moving_masks[l] = dynamic_seq[l] == MOVING_LABEL
-                moving_pcs[l] = depth_image_to_pointcloud(depth_seq[l], moving_masks[l], K)
-                normals[l] = compute_normals(moving_pcs[l])
+                # moving_masks[l] = dynamic_seq[l] == MOVING_LABEL
+                # moving_pcs[l] = depth_image_to_pointcloud(depth_seq[l], moving_masks[l], K)
+                # normals[l] = compute_normals(moving_pcs[l])
         
         # 在这里计算 cur_icp_loss
         cur_icp_loss = 0.0
@@ -530,12 +402,8 @@ def fine_estimation(
         )
         napari.run()
     
-    # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
-    obj_repr.kframes.write_joint_states(scheduler.best_state_dict["joint_states"])
-    scheduler.best_state_dict.pop("joint_states")
-    obj_repr.joint_dict = scheduler.best_state_dict
     torch.cuda.empty_cache()
-    # return scheduler.best_state_dict
+    return scheduler.best_state_dict
 
 
 if __name__ == "__main__":

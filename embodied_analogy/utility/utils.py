@@ -984,17 +984,17 @@ def filter_tracks_by_consistency(tracks, threshold=0.1):
     return consis_mask
 
 
-def initialize_dynamic_mask(mask, moving_points, static_points, visualize=False):
+def classify_dynamic(mask, moving_points, static_points):
     """
     根据A和B点集的最近邻分类让mask中为True的点分类。
 
     参数:
         mask (np.ndarray): 大小为(H, W)的应用匹配网络,mask=True的点需要分类
-        points_A (np.ndarray): 大小为(M, 2)的A类点集,具有(u, v)坐标
-        points_B (np.ndarray): 大小为(N, 2)的B类点集,具有(u, v)坐标
+        moving_points (np.ndarray): 大小为(M, 2)的A类点集,具有(u, v)坐标
+        static_points (np.ndarray): 大小为(N, 2)的B类点集,具有(u, v)坐标
 
     返回:
-        dynamic_mask (np.ndarray): 大小为(H, W)的分类结果, A类标记1, B类标记2
+        dynamic_mask (np.ndarray): 大小为(H, W)的分类结果
     """
     H, W = mask.shape
 
@@ -1020,13 +1020,6 @@ def initialize_dynamic_mask(mask, moving_points, static_points, visualize=False)
     dynamic_mask[mask_indices[A_closer, 0], mask_indices[A_closer, 1]] = MOVING_LABEL
     dynamic_mask[mask_indices[B_closer, 0], mask_indices[B_closer, 1]] = STATIC_LABEL
 
-    if visualize:
-        import napari 
-        viewer = napari.view_image(mask, rgb=True)
-        viewer.add_labels(mask.astype(np.int32), name='articulated objects')
-        viewer.add_labels((dynamic_mask == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
-        viewer.add_labels((dynamic_mask == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
-        napari.run()
     return dynamic_mask
 
 def get_depth_mask(depth, K, Tw2c, height=0.02):
@@ -1427,6 +1420,81 @@ def make_bbox(bbox_extents):
     bbox_rect = np.moveaxis(bbox_rect, 2, 0)
 
     return bbox_rect
+
+def filter_dynamic(
+    K, # 相机内参
+    query_depth, # H, W
+    query_dynamic, # H, W
+    ref_depths,  # T, H, W
+    # ref_dynamics, # T, H, W
+    joint_type,
+    joint_dir,
+    joint_start,
+    query_state,
+    ref_states,
+    depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
+    visualize=False
+):
+    """
+        根据当前的 joint state
+        验证所有的 moving points, 把不确定的 points 标记为 unknown
+    """
+    Tquery2refs = [
+        joint_data_to_transform_np(
+            joint_type=joint_type,
+            joint_dir=joint_dir,
+            joint_start=joint_start,
+            joint_state_ref2tgt=ref_state - query_state,
+    ) for ref_state in ref_states] 
+    Tquery2refs = np.array(Tquery2refs) # T, 4, 4
+        
+    T, H, W = ref_depths.shape
+    query_dynamic_updated = query_dynamic.copy()
+    
+    # 获取当前帧 MOVING_LABEL 的像素坐标
+    moving_mask = query_dynamic == MOVING_LABEL
+    if not np.any(moving_mask):
+        return query_dynamic_updated        
+
+    y, x = np.where(moving_mask) # N
+    pc_moving = depth_image_to_pointcloud(query_depth, moving_mask, K)  # (N, 3)
+    pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
+    
+    # 批量计算 moving_pc 在其他帧的 3d 坐标
+    pc_pred = np.einsum('tij,jk->tik', Tquery2refs, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+    
+    # 投影到所有帧
+    uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K) # T*N, 2
+    uv_pred_int = np.floor(uv_pred.reshape(T, len(pc_moving), 2)).astype(int) # T, N, 2
+    depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
+    
+    # 在这里进行一个筛选, 把那些得不到有效 depth_obs 的 moving point 也标记为 Unknown TODO: 这里会不会过于严格
+    valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
+                (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H) # T, N
+    # 且只有一个时间帧观测不到就认为得不到有效观测
+    valid_idx = valid_idx.all(axis=0) # N
+    uv_pred_int = uv_pred_int[:, valid_idx] # T, M, 2
+    depth_pred = depth_pred[:, valid_idx] # T, M
+    
+    # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
+    # TODO：获取目标帧的真实深度, 是不是要考虑 depth_ref 等于 0 的情况是否需要拒绝
+    
+    T_idx = np.arange(T)[:, None]
+    depth_obs = ref_depths[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
+    
+    # 计算误差并更新 dynamic_mask， M, 只要有一帧拒绝，则置为 UNKNOWN
+    unknown_mask = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  # M
+    query_dynamic_updated[y[valid_idx][unknown_mask], x[valid_idx][unknown_mask]] = UNKNOWN_LABEL
+    
+    if visualize:
+        viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
+        viewer.title = "filter current dynamic mask using other frames"
+        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
+        viewer.add_labels(query_dynamic.astype(np.int32), name='before filtering')
+        viewer.add_labels(query_dynamic_updated.astype(np.int32), name='after filtering')
+        napari.run()
+    
+    return query_dynamic_updated  
 
 
 if __name__ == "__main__":

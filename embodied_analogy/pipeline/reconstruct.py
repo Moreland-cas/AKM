@@ -1,27 +1,16 @@
-import copy
 import numpy as np
 
 from embodied_analogy.utility.utils import (
     initialize_napari,   
     set_random_seed,
-    farthest_scale_sampling,
-    get_dynamic_seq,
-    get_depth_mask_seq,
 )
 
 initialize_napari()
-from embodied_analogy.representation.obj_repr import Obj_repr
-from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
-from embodied_analogy.estimation.coarse_joint_est import coarse_estimation
-from embodied_analogy.estimation.fine_joint_est import (
-    fine_estimation,
-    filter_dynamic_seq
-)
 from embodied_analogy.utility.constants import *
 set_random_seed(SEED)
 
 def reconstruct(
-    obj_repr: Obj_repr,
+    obj_repr,
     num_initial_pts=1000,
     num_kframes=5,
     obj_description="drawer",
@@ -37,7 +26,7 @@ def reconstruct(
     obj_repr.frames[0].segment_obj(
         obj_description=obj_description,
         post_process_mask=True,
-        remove_robot=True,
+        filter=True,
         visualize=visualize
     )
     # 在 initial_bbox 内均匀采样
@@ -58,7 +47,7 @@ def reconstruct(
     """
     obj_repr.coarse_joint_estimation(visualize=visualize)
     # 初始化 kframes
-    obj_repr.initialize_kframes()
+    obj_repr.initialize_kframes(num_kframes=num_kframes, save_memory=True)
     """
         对 kframes 进行完整的 sam2 
     """
@@ -66,35 +55,15 @@ def reconstruct(
     """
         根据 tracks2d 和 obj_mask_seq 得到 dynamic_seq
     """
-    obj_repr.kframes.initialize_dynamic(filter=True, visualize=visualize)
+    obj_repr.kframes.classify_dynamics(
+        filter=True,
+        joint_dict=obj_repr.coarse_joint_dict,
+        visualize=visualize
+    )
     """
         根据 dynamic_seq 中的 moving_part, 利用 ICP 估计出精确的 joint params
     """
-    fine_estimation(
-        obj_repr=obj_repr,
-        opti_joint_dir=True,
-        opti_joint_start=(joint_type=="revolute"),
-        # 第一帧的 joint state 不优化, 从而保证有一个 fixed 的 landmark
-        opti_joint_states_mask=np.arange(num_kframes)!=0,
-        # 这里设置不迭代的优化 dynamic_mask
-        update_dynamic_mask=np.zeros(num_kframes).astype(np.bool_),
-        visualize=visualize
-    )
-    track_type = "open"
-    obj_repr.track_type = track_type
-    
-    # 底下估计 open/close 的这一部分并不是很 robust, 因此删除, 并且默认 explore 阶段得到的都是 open 的轨迹
-    # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
-    # track_type = classify_open_close(
-    #     tracks3d=tracks3d_filtered,
-    #     moving_mask=moving_mask,
-    #     visualize=visualize
-    # )
-    
-    # 看下当前的 joint_dir 到底对应 open 还是 close, 如果对应 close, 需要将 joint 进行翻转
-    # if track_type == "close":
-    #     reverse_joint_dict(coarse_state_dict)
-    #     reverse_joint_dict(fine_state_dict)
+    obj_repr.fine_joint_estimation(lr=1e-3, visualize=visualize)
         
     if file_path is not None:
         obj_repr.visualize()
@@ -116,6 +85,7 @@ def reconstruct(
     
 
 if __name__ == "__main__":
+    from embodied_analogy.representation.obj_repr import Obj_repr
     # obj_idx = 7221
     obj_idx = 44962
     obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
@@ -126,7 +96,7 @@ if __name__ == "__main__":
         obj_repr=obj_repr_data,
         num_initial_pts=1000,
         num_kframes=5,
-        visualize=True,
+        visualize=False,
         # gt_joint_dir=np.array([-1, 0, 0]),
         # gt_joint_dir=np.array([0, 0, 1]),
         gt_joint_dir=None,

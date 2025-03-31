@@ -1,32 +1,20 @@
 import copy
+import numpy as np
 import napari
 from embodied_analogy.representation.basic_structure import Data, Frame, Frames
 from embodied_analogy.estimation.coarse_joint_est import coarse_estimation
-from embodied_analogy.estimation.fine_joint_est import (
-    fine_estimation,
-    filter_dynamic_seq
-)
-from embodied_analogy.utility.utils import (
-    initialize_napari,   
-    set_random_seed,
-    farthest_scale_sampling,
-    get_dynamic_seq,
-    get_depth_mask_seq,
-)
+from embodied_analogy.estimation.fine_joint_est import fine_estimation
+from embodied_analogy.utility.utils import farthest_scale_sampling
 
 
 class Obj_repr(Data):
-    def __init__(
-        self,
-        num_kframes=5,
-    ):
+    def __init__(self):
+        
         self.obj_description = None
         self.initial_frame = Frame()
         self.frames = Frames()
         self.K = None
         self.Tw2c = None
-        
-        self.num_kframes = num_kframes
         
         # 通过 reconstruct 恢复出的结果
         self.kframes = Frames()
@@ -53,15 +41,23 @@ class Obj_repr(Data):
     def clear_kframes(self):
         self.kframes.clear()
         
-    def initialize_kframes(self, save_memory=False):
-        kf_idxs = farthest_scale_sampling(self.coarse_joint_dict["joint_states"], num_kframes=self.num_kframes)
+    def initialize_kframes(self, num_kframes, save_memory=True):
+        self.kframes.fps = self.frames.fps
+        self.kframes.K = self.frames.K
+        self.kframes.Tw2c = self.frames.Tw2c
+        
+        self.kframes.moving_mask = self.frames.moving_mask
+        self.kframes.static_mask = self.frames.static_mask
+        
+        kf_idxs = farthest_scale_sampling(self.coarse_joint_dict["joint_states"], num_kframes)
+        
+        self.kframes.track2d_seq = self.frames.track2d_seq[kf_idxs, ...]
+        
         self.clear_kframes()
         for i, kf_idx in enumerate(kf_idxs):
-            tmp_frame = copy.deepcopy(obj_repr.frames[kf_idx])
-            # tmp_frame.obj_mask = obj_mask_seq[i]
-            # tmp_frame.dynamic_mask = dynamic_seq_updated[i]
-            obj_repr.kframes.append(tmp_frame)
-            
+            tmp_frame = copy.deepcopy(self.frames[kf_idx])
+            self.kframes.append(tmp_frame)
+        
         if save_memory:
             self.clear_frames()
     
@@ -71,7 +67,31 @@ class Obj_repr(Data):
             visualize=visualize
         )
         self.coarse_joint_dict = coarse_joint_dict
-        obj_repr.frames.write_joint_states(coarse_joint_dict["joint_states"])
+        self.frames.write_joint_states(coarse_joint_dict["joint_states"])
+    
+    def fine_joint_estimation(self, lr=1e-3, visualize=False):
+        joint_type = self.coarse_joint_dict["joint_type"]
+        fine_joint_dict = fine_estimation(
+            obj_repr=self,
+            opti_joint_dir=True,
+            opti_joint_start=(joint_type=="revolute"),
+            opti_joint_states_mask=np.arange(self.kframes.num_frames())!=0,
+            # update_dynamic_mask=None,
+            lr=lr, # 1mm
+            visualize=visualize
+        )
+        # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
+        self.kframes.write_joint_states(fine_joint_dict["joint_states"])
+        self.fine_joint_dict = fine_joint_dict
+        
+        # TODO: 默认在 explore 阶段是打开的轨迹
+        track_type = "open"
+        self.track_type = track_type
+        
+        # 看下当前的 joint_dir 到底对应 open 还是 close, 如果对应 close, 需要将 joint 进行翻转
+        # if track_type == "close":
+        #     reverse_joint_dict(coarse_state_dict)
+        #     reverse_joint_dict(fine_state_dict)
         
     def reconstruct(self):
         """
