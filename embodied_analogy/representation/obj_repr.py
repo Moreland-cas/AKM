@@ -113,6 +113,7 @@ class Obj_repr(Data):
         num_initial_pts=1000,
         num_kframes=5,
         obj_description="drawer",
+        fine_lr=1e-3,
         file_path=None,
         gt_joint_dir_w=None,
         visualize=True,
@@ -138,7 +139,7 @@ class Obj_repr(Data):
             joint_dict=self.coarse_joint_dict,
             visualize=visualize
         )
-        self.fine_joint_estimation(lr=1e-3, visualize=True)
+        self.fine_joint_estimation(lr=fine_lr, visualize=True)
             
         if file_path is not None:
             self.visualize()
@@ -191,20 +192,4 @@ if __name__ == "__main__":
     # obj_repr.visualize()
     
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
-    
-    # obj_idx = 7221
-    obj_idx = 44962
-    obj_repr_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/explore/explore_data.pkl"
-    obj_repr_data = Obj_repr.load(obj_repr_path)
-    # obj_repr_data.frames.frame_list.reverse()
-    
-    obj_repr_data.reconstruct(
-        num_initial_pts=1000,
-        num_kframes=5,
-        visualize=False,
-        gt_joint_dir_w=np.array([-1, 0, 0]),
-        # gt_joint_dir_w=np.array([0, 0, 1]),
-        # gt_joint_dir_w=None,
-        file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
-        # file_path = None
-    )
+    pass
