@@ -15,7 +15,7 @@ def reconstruct(
     num_kframes=5,
     obj_description="drawer",
     file_path=None,
-    gt_joint_dir=None,
+    gt_joint_dir_w=None,
     visualize=True,
 ):
     """
@@ -63,25 +63,30 @@ def reconstruct(
     """
         根据 dynamic_seq 中的 moving_part, 利用 ICP 估计出精确的 joint params
     """
-    obj_repr.fine_joint_estimation(lr=1e-3, visualize=visualize)
+    obj_repr.fine_joint_estimation(lr=1e-3, visualize=True)
         
     if file_path is not None:
         obj_repr.visualize()
         obj_repr.save(file_path)
     
-    if gt_joint_dir is not None:
-        print(f"\tgt axis: {gt_joint_dir}")
+    if gt_joint_dir_w is not None:
+        print(f"\tgt axis: {gt_joint_dir_w}")
 
-        dot_before = np.dot(gt_joint_dir, joint_dir_w)
+        coarse_dir_c = obj_repr.coarse_joint_dict["joint_dir"] 
+        coarse_dir_w = obj_repr.Tw2c[:3, :3].T @ coarse_dir_c
+        dot_before = np.dot(gt_joint_dir_w, coarse_dir_w)
         print(f"\tbefore: {np.degrees(np.arccos(dot_before))}")
-        print("\tjoint axis: ", joint_dir_w)
+        print("\tjoint axis: ", coarse_dir_w)
         
-        print("\tjoint states: ", joint_states[kf_idx])
+        print("\tjoint states: ", obj_repr.coarse_joint_dict["joint_states"][obj_repr.kf_idxs])
 
-        dot_after = np.dot(gt_joint_dir, joint_dir_w_updated)
+        fine_dir_c = obj_repr.fine_joint_dict["joint_dir"] 
+        fine_dir_w = obj_repr.Tw2c[:3, :3].T @ fine_dir_c
+        dot_after = np.dot(gt_joint_dir_w, fine_dir_w)
         print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
-        print("\tjoint axis: ", joint_dir_w_updated)
-        print("\tjoint states: ", joint_states_updated)
+        print("\tjoint axis: ", fine_dir_w)
+        
+        print("\tjoint states: ", obj_repr.fine_joint_dict["joint_states"])
     
 
 if __name__ == "__main__":
@@ -97,9 +102,9 @@ if __name__ == "__main__":
         num_initial_pts=1000,
         num_kframes=5,
         visualize=False,
-        # gt_joint_dir=np.array([-1, 0, 0]),
-        # gt_joint_dir=np.array([0, 0, 1]),
-        gt_joint_dir=None,
+        gt_joint_dir_w=np.array([-1, 0, 0]),
+        # gt_joint_dir_w=np.array([0, 0, 1]),
+        # gt_joint_dir_w=None,
         file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_idx}/reconstruct/recon_data.pkl"
         # file_path = None
     )

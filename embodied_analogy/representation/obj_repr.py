@@ -50,6 +50,7 @@ class Obj_repr(Data):
         self.kframes.static_mask = self.frames.static_mask
         
         kf_idxs = farthest_scale_sampling(self.coarse_joint_dict["joint_states"], num_kframes)
+        self.kf_idxs = kf_idxs
         
         self.kframes.track2d_seq = self.frames.track2d_seq[kf_idxs, ...]
         
@@ -72,7 +73,13 @@ class Obj_repr(Data):
     def fine_joint_estimation(self, lr=1e-3, visualize=False):
         joint_type = self.coarse_joint_dict["joint_type"]
         fine_joint_dict = fine_estimation(
-            obj_repr=self,
+            K=self.K,
+            joint_type=self.coarse_joint_dict["joint_type"],
+            joint_dir=self.coarse_joint_dict["joint_dir"],
+            joint_start=self.coarse_joint_dict["joint_start"],
+            joint_states=self.kframes.get_joint_states(),
+            depth_seq=self.kframes.get_depth_seq(),
+            dynamic_seq=self.kframes.get_dynamic_seq(),
             opti_joint_dir=True,
             opti_joint_start=(joint_type=="revolute"),
             opti_joint_states_mask=np.arange(self.kframes.num_frames())!=0,

@@ -56,6 +56,7 @@ class Frame(Data):
         joint_state=None,
         obj_bbox=None,
         obj_mask=None,
+        dynamic_mask=None,
         contact2d=None,
         contact3d=None,
         dir_out=None,
@@ -74,6 +75,7 @@ class Frame(Data):
         
         self.obj_bbox = obj_bbox
         self.obj_mask = obj_mask
+        self.dynamic_mask = dynamic_mask
         self.joint_state = joint_state
         
         self.contact2d = contact2d
@@ -88,6 +90,9 @@ class Frame(Data):
     def _visualize(self, viewer: napari.Viewer, prefix=""):
         viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
         
+        if self.dynamic_mask is not None:
+            viewer.add_labels(self.dynamic_mask.astype(np.int32), name=f"{prefix}_dynamic_mask")
+            
         if self.robot_mask is not None:
             viewer.add_labels(self.robot_mask, name=f"{prefix}_robot_mask")
             
@@ -327,10 +332,19 @@ class Frames(Data):
         joint_states = np.array([self.frame_list[i].joint_state for i in range(self.num_frames())]) 
         return joint_states
     
+    def get_dynamic_seq(self):
+        # T
+        dynamic_seq = np.array([self.frame_list[i].dynamic_mask for i in range(self.num_frames())]) 
+        return dynamic_seq
+    
     def write_joint_states(self, joint_states):
         assert len(joint_states) == self.num_frames()
         for i, joint_state in enumerate(joint_states):
             self.frame_list[i].joint_state = joint_state
+    
+    def write_dynamic_seq(self, dynamic_seq):
+        for i, dynamic in enumerate(dynamic_seq):
+            self.frame_list[i].dynamic_mask = dynamic
     
     def get_robot_mask_seq(self):
         # T, H, W
@@ -412,26 +426,16 @@ class Frames(Data):
         self.obj_mask_seq = obj_mask_seq
     
     def filter_dynamics(self, depth_tolerance=0.05, joint_dict=None, visualize=False):
-        """
-        K, # 相机内参
-        depth_seq,  # T, H, W
-        dynamic_seq, # T, H, W
-        joint_type,
-        joint_dir,
-        joint_start,
-        joint_states,
-        depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
-        visualize=False
-        """
+        dynamic_seq = self.get_dynamic_seq()
         depth_seq = self.get_depth_seq()
         joint_states = self.get_joint_states()
         T = self.num_frames()
         
-        dynamic_seq_updated = self.dynamic_seq.copy()
+        dynamic_seq_updated = dynamic_seq.copy()
         
         for i in range(T):
             query_depth = depth_seq[i]
-            query_dynamic = self.dynamic_seq[i]
+            query_dynamic = dynamic_seq[i]
             query_state = joint_states[i]
             
             other_mask = np.arange(T) != i
@@ -462,7 +466,7 @@ class Frames(Data):
             viewer.add_labels(dynamic_seq_updated.astype(np.int32), name='after filtering')
             napari.run()
         
-        self.dynamic_seq =  dynamic_seq_updated  # (T, H, W), composed of 1, 2, 3
+        self.write_dynamic_seq(dynamic_seq_updated)
         
     def classify_dynamics(self, filter=False, joint_dict=None, visualize=False):
         dynamic_seq = []
@@ -475,7 +479,8 @@ class Frames(Data):
             )
             dynamic_seq.append(dynamic)
         
-        self.dynamic_seq = np.array(dynamic_seq)
+        dynamic_seq = np.array(dynamic_seq)
+        self.write_dynamic_seq(dynamic_seq)
         
         if filter:
             self.filter_dynamics(

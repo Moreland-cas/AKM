@@ -152,7 +152,13 @@ def moving_ij_intersection_torch(
 
 
 def fine_estimation(
-    obj_repr,
+    K,
+    joint_type,
+    joint_dir,
+    joint_start,
+    joint_states,
+    depth_seq,
+    dynamic_seq,
     opti_joint_dir=True,
     opti_joint_start=True,
     opti_joint_states_mask=None, # boolean mask to select which states to optimize
@@ -165,15 +171,8 @@ def fine_estimation(
     损失函数为所有 (frame_i, frame_j) 的 point-to-point/plane ICP loss 
     """
     # 读取数据
-    T = len(obj_repr.kframes)
+    T = len(depth_seq)
     assert T >= 2
-    K = obj_repr.K
-    joint_type = obj_repr.coarse_joint_dict["joint_type"]
-    joint_dir = obj_repr.coarse_joint_dict["joint_dir"]
-    joint_start = obj_repr.coarse_joint_dict["joint_start"]
-    joint_states = obj_repr.kframes.get_joint_states()
-    depth_seq = obj_repr.kframes.get_depth_seq()
-    dynamic_seq = obj_repr.kframes.dynamic_seq
     
     if opti_joint_states_mask is None:
         opti_joint_states_mask = np.ones(T, dtype=np.bool_)
@@ -212,8 +211,8 @@ def fine_estimation(
     scheduler = Scheduler(
         optimizer, 
         lr_update_factor=0.5, 
-        lr_scheduler_patience=3, 
-        early_stop_patience=10
+        lr_scheduler_patience=5, 
+        early_stop_patience=20
     )
     
     # 生成 (i, j) 对，根据 state_mask 和是否优化 joint_dir 来决定

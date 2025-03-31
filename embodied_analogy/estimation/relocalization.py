@@ -69,18 +69,24 @@ def relocalization(
     query_frame.joint_state = query_state
     obj_repr.kframes.frame_list.insert(0, query_frame)
     
-    fine_estimation(
-        obj_repr=obj_repr,
+    fine_joint_dict = fine_estimation(
+        K=obj_repr.K,
+        joint_type=obj_repr.fine_joint_dict["joint_type"],
+        joint_dir=obj_repr.fine_joint_dict["joint_dir"],
+        joint_start=obj_repr.fine_joint_dict["joint_start"],
+        joint_states=obj_repr.kframes.get_joint_states(),
+        depth_seq=obj_repr.kframes.get_depth_seq(),
+        dynamic_seq=obj_repr.kframes.get_dynamic_seq(),
         opti_joint_dir=False,
         opti_joint_start=False,
         opti_joint_states_mask=np.arange(num_ref+1)==0,
         # 目前不更新 dynamic_mask
-        update_dynamic_mask=np.arange(num_ref+1)==-1,
         lr=3e-3,
         visualize=False
     )
     # 然后在这里把 query_frame 从 keyframes 中吐出来
     query_frame = obj_repr.kframes.frame_list.pop(0)
+    query_frame.joint_state = fine_joint_dict["joint_states"][0]
     
     if update_query_contact:
         # 然后将 initial_frame 中的 contact_3d 迁移到 query_frame 中去, 方便后续生成 query_frame 的抓取 pose
@@ -96,9 +102,9 @@ def relocalization(
             obj_repr.initial_frame = reloc_init_frame
         
         Tinit2query = joint_data_to_transform_np(
-            joint_type=obj_repr.joint_dict["joint_type"],
-            joint_dir=obj_repr.joint_dict["joint_dir"],
-            joint_start=obj_repr.joint_dict["joint_start"],
+            joint_type=obj_repr.fine_joint_dict["joint_type"],
+            joint_dir=obj_repr.fine_joint_dict["joint_dir"],
+            joint_start=obj_repr.fine_joint_dict["joint_start"],
             joint_state_ref2tgt=query_frame.joint_state-obj_repr.initial_frame.joint_state
         )
         contact_3d_query = Tinit2query[:3, :3] @ obj_repr.initial_frame.contact3d + Tinit2query[:3, 3] # 3
@@ -111,9 +117,9 @@ def relocalization(
         for i in range(num_ref):
             ref_moving_pc = depth_image_to_pointcloud(ref_depths[i], ref_dynamics[i]==MOVING_LABEL, K) # N, 3
             Tref2query = joint_data_to_transform_np(
-                joint_type=obj_repr.joint_dict["joint_type"],
-                joint_dir=obj_repr.joint_dict["joint_dir"],
-                joint_start=obj_repr.joint_dict["joint_start"],
+                joint_type=obj_repr.fine_joint_dict["joint_type"],
+                joint_dir=obj_repr.fine_joint_dict["joint_dir"],
+                joint_start=obj_repr.fine_joint_dict["joint_start"],
                 joint_state_ref2tgt=query_frame.joint_state-ref_joint_states[i]
             )
             ref_moving_pc_aug = np.concatenate([ref_moving_pc, np.ones((len(ref_moving_pc), 1))], axis=1) # N, 4
@@ -146,8 +152,8 @@ def relocalization(
 
 if __name__ == "__main__":
     # 读取数据
-    # obj_index = 44962
-    obj_index = 7221
+    obj_index = 44962
+    # obj_index = 7221
     obj_file_path = f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/reconstruct/recon_data.pkl"
     obj_repr = Obj_repr.load(obj_file_path)
     
@@ -158,6 +164,7 @@ if __name__ == "__main__":
         import copy
         obj_repr_tmp = copy.deepcopy(obj_repr)
         query_frame = obj_repr_tmp.kframes.frame_list.pop(i)
+        # query_frame = copy.deepcopy(obj_repr_tmp.kframes.frame_list[i])
         
         query_frame = relocalization(
             obj_repr_tmp,
