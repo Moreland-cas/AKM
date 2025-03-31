@@ -984,7 +984,7 @@ def filter_tracks_by_consistency(tracks, threshold=0.1):
     return consis_mask
 
 
-def get_dynamic_mask(mask, moving_points, static_points, visualize=False):
+def initialize_dynamic_mask(mask, moving_points, static_points, visualize=False):
     """
     根据A和B点集的最近邻分类让mask中为True的点分类。
 
@@ -994,7 +994,7 @@ def get_dynamic_mask(mask, moving_points, static_points, visualize=False):
         points_B (np.ndarray): 大小为(N, 2)的B类点集,具有(u, v)坐标
 
     返回:
-        dynamic_mask (np.ndarray): 大小为(H, W)的分类结果,A类标记1,B类标记2
+        dynamic_mask (np.ndarray): 大小为(H, W)的分类结果, A类标记1, B类标记2
     """
     H, W = mask.shape
 
@@ -1028,26 +1028,6 @@ def get_dynamic_mask(mask, moving_points, static_points, visualize=False):
         viewer.add_labels((dynamic_mask == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
         napari.run()
     return dynamic_mask
-
-def get_dynamic_seq(mask_seq, moving_points_seq, static_points_seq, visualize=False):
-    T = mask_seq.shape[0]
-    dynamic_seg_seq = []
-    
-    for i in range(T):
-        dynamic_seg = get_dynamic_mask(mask_seq[i], moving_points_seq[i], static_points_seq[i])
-        dynamic_seg_seq.append(dynamic_seg)
-    
-    dynamic_seg_seq = np.array(dynamic_seg_seq)
-    
-    if visualize:
-        import napari 
-        viewer = napari.view_image(mask_seq, rgb=False)
-        viewer.title = "dynamic segment video mask by tracks2d"
-        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-        viewer.add_labels((dynamic_seg_seq == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
-        viewer.add_labels((dynamic_seg_seq == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
-        napari.run()
-    return dynamic_seg_seq # T, H, W
 
 def get_depth_mask(depth, K, Tw2c, height=0.02):
     """

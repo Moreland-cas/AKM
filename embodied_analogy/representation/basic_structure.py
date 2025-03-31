@@ -7,12 +7,20 @@ from embodied_analogy.utility.utils import (
     napari_time_series_transform,
     image_to_camera,
     get_depth_mask,
+    get_dynamic_seq,
+    get_depth_mask_seq,
     depth_image_to_pointcloud,
     crop_nearby_points,
     fit_plane_ransac,
     visualize_pc,
-    make_bbox
+    make_bbox,
+    sample_points_within_bbox_and_mask,
+    extract_tracked_depths,
+    filter_tracks_by_consistency,
 )
+from embodied_analogy.perception.online_cotracker import track_any_points
+from embodied_analogy.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
+from embodied_analogy.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
 from embodied_analogy.grasping.anygrasp import (
     detect_grasp_anygrasp,
     filter_grasp_group,
@@ -46,7 +54,6 @@ class Frame(Data):
         joint_state=None,
         obj_bbox=None,
         obj_mask=None,
-        dynamic_mask=None,
         contact2d=None,
         contact3d=None,
         dir_out=None,
@@ -65,7 +72,6 @@ class Frame(Data):
         
         self.obj_bbox = obj_bbox
         self.obj_mask = obj_mask
-        self.dynamic_mask = dynamic_mask
         self.joint_state = joint_state
         
         self.contact2d = contact2d
@@ -76,7 +82,7 @@ class Frame(Data):
         self.robot2d = robot2d
         self.robot3d = robot3d
         self.robot_mask = robot_mask
-    
+        
     def _visualize(self, viewer: napari.Viewer, prefix=""):
         viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
         
@@ -86,9 +92,6 @@ class Frame(Data):
         if self.obj_mask is not None:
             viewer.add_labels(self.obj_mask, name=f"{prefix}_obj_mask")
         
-        if self.dynamic_mask is not None:
-            viewer.add_labels(self.dynamic_mask.astype(np.uint32), name=f"{prefix}_dynamic_mask")
-            
         if self.contact2d is not None:
             u, v = self.contact2d
             viewer.add_points((v, u), face_color="red", name=f"{prefix}_contact2d")
@@ -199,12 +202,11 @@ class Frame(Data):
                 post_contact_dirs=[self.dir_out]
             )
 
-
     def segment_obj(
         self, 
         obj_description=None,
         post_process_mask=True,
-        remove_robot=True,
+        filter=True,
         visualize=False
     ):
         from embodied_analogy.perception.grounded_sam import run_grounded_sam
@@ -222,15 +224,33 @@ class Frame(Data):
         )
         self.obj_bbox = obj_bbox
         
-        if remove_robot:
+        if filter:
             assert self.robot_mask is not None
             obj_mask = obj_mask & (~self.robot_mask)
+            # 使用 depth_mask 进行过滤
+            depth_mask = get_depth_mask(
+                depth=self.depth,
+                K=self.K,
+                Tw2c=self.Tw2c,
+                height=0.02
+            )
+            obj_mask = obj_mask & depth_mask
         
         self.obj_mask = obj_mask
             
         if visualize:
             self.visualize()
     
+    def sample_points(self, num_points=1000, visualize=False):
+        initial_uvs = sample_points_within_bbox_and_mask(self.obj_bbox, self.obj_mask, num_points)
+        self.track2d = initial_uvs
+        if visualize:
+            viewer = napari.view_image(self.rgb)
+            viewer.title = "initial uvs on intial rgb"
+            initial_uvs_vis = initial_uvs[:, [1, 0]]
+            viewer.add_points(initial_uvs_vis, size=3, name="initial_uvs", face_color="green")
+            napari.run()
+            
     def visualize(self):
         viewer = napari.Viewer()
         viewer.title = "frame visualization"
@@ -244,7 +264,14 @@ class Frames(Data):
         frame_list=[], 
         fps=30, 
         K=None, 
-        Tw2c=None
+        Tw2c=None,
+        track2d_seq=None,
+        track3d_seq=None,
+        # 用于记录 tracks 的语义分类
+        moving_mask=None,
+        static_mask=None,
+        obj_mask_seq=None,
+        dynamic_seq=None,
     ):
         """
         frame_list: list of class Frame
@@ -253,6 +280,15 @@ class Frames(Data):
         self.fps = fps
         self.K = K
         self.Tw2c = Tw2c
+        
+        self.track2d_seq = track2d_seq
+        self.track3d_seq = track3d_seq
+        
+        self.moving_mask = moving_mask
+        self.static_mask = static_mask
+        
+        self.obj_mask_seq = obj_mask_seq
+        self.dynamic_seq = dynamic_seq
     
     def num_frames(self):
         return len(self.frame_list)
@@ -299,11 +335,139 @@ class Frames(Data):
         obj_mask_seq = np.stack([self.frame_list[i].obj_mask for i in range(self.num_frames())]) 
         return obj_mask_seq
     
-    def get_dynamic_seq(self):
+    def set_obj_mask_seq(self, obj_mask_seq):
         # T, H, W
-        dynamic_mask_seq = np.stack([self.frame_list[i].dynamic_mask for i in range(self.num_frames())]) 
-        return dynamic_mask_seq
+        for i in range(self.num_frames()):
+            self.frame_list[i].obj_mask = obj_mask_seq[i]
     
+    def get_robot_mask_seq(self):
+        # T, H, W
+        robot_mask_seq = np.stack([self.frame_list[i].robot_mask for i in range(self.num_frames())]) 
+        return robot_mask_seq
+    
+    def get_track2d_seq(self):
+        # T, M, 2
+        track2d_seq = np.stack([self.frame_list[i].track2d for i in range(self.num_frames())])
+        return track2d_seq
+    
+    def get_track3d_seq(self):
+        # T, M, 3
+        track3d_seq = np.stack([self.frame_list[i].track3d for i in range(self.num_frames())])
+        return track3d_seq
+    
+    def track_points(self, visualize=False):
+        """
+        使用 cotracker 对于第一个 frame 上的 track2d 进行跟踪得到其他 frame 上的 track2d
+        """
+        assert self.frame_list[0].track2d is not None
+        # (T, M, 2), (T, M)
+        track2d_seq, pred_visibility = track_any_points(
+            rgb_frames=self.get_rgb_seq(),
+            queries=self.frame_list[0].track2d,
+            visualize=visualize
+        ) 
+        self.track2d_seq = track2d_seq
+    
+    def track2d_to_3d(self, filter=True, visualize=False):
+        # T, M, 2
+        track2d_seq = self.get_track2d_seq()
+        T, M, _ = track2d_seq.shape
+        # T, M
+        track_depths = extract_tracked_depths(
+            depth_seq=self.get_depth_seq(),
+            pred_tracks=track2d_seq
+        )
+        # T, M, 3
+        track3d_seq = image_to_camera(
+            uv=track2d_seq.reshape(T * M, -1), 
+            depth=track_depths.reshape(-1), 
+            K=self.K
+        ).reshape(T, M, 3)
+        self.track3d_seq = track3d_seq
+        
+        # 对得到的 track3d_seq 进行过滤
+        if filter:
+            # TODO: 这里可以加上 robot_mask 的 filter
+            consis_mask = filter_tracks_by_consistency(track3d_seq, threshold=0.02) # M
+            track2d_seq = track2d_seq[:, consis_mask]
+            track3d_seq = track3d_seq[:, consis_mask]
+            self.track2d_seq = track2d_seq
+            self.track3d_seq = track3d_seq
+    
+    def cluster_track3d(self, feat_type="diff", visualize=False):
+        moving_mask, static_mask = cluster_tracks_3d(
+            self.track3d_seq, 
+            feat_type=feat_type,
+            visualize=visualize, 
+        )
+        self.moving_mask = moving_mask
+        self.static_mask = static_mask
+    
+    def segment_obj(self, obj_description=None, filter=True, visualize=False):
+        # 对于所有 frames 进行物体分割
+        obj_mask_seq = mask_obj_from_video_with_image_sam2(
+            rgb_seq=self.get_rgb_seq(), 
+            obj_description=obj_description,
+            # positive_tracks2d=self.track2d_seq, 
+            # negative_tracks2d=self.get_robot2d_seq(), 
+            positive_tracks2d=None, 
+            negative_tracks2d=None, 
+            visualize=visualize
+        ) 
+        
+        if filter:
+            depth_mask_seq = get_depth_mask_seq(
+                depth_seq=self.get_depth_seq(),
+                K=self.K,
+                Tw2c=self.Tw2c,
+                height=0.02 # 2 cm
+            )
+            obj_mask_seq = obj_mask_seq & depth_mask_seq
+            robot_mask_seq = self.get_robot_mask_seq()
+            obj_mask_seq = obj_mask_seq & (~robot_mask_seq)
+        
+        # self.set_obj_mask_seq(obj_mask_seq)
+        self.obj_mask_seq = obj_mask_seq
+    
+    def initialize_dynamic(self, filter=False, visualize=False):
+        dynamic_seq = []
+        
+        for i in range(self.num_frames()):
+            dynamic = initialize_dynamic_mask(
+                self.obj_mask_seq[i], 
+                self.track2d_seq[i, self.moving_mask], 
+                self.track2d_seq[i, self.static_mask],
+            )
+            dynamic_seq.append(dynamic)
+        
+        self.dynamic_seq = np.array(dynamic_seq)
+        
+        if visualize:
+            import napari 
+            viewer = napari.view_image(self.obj_mask_seq, rgb=False)
+            viewer.title = "dynamic segment video mask by tracks2d"
+            # viewer.add_labels(self.obj_mask_seq.astype(np.int32), name='articulated objects')
+            viewer.add_labels((dynamic_seq == MOVING_LABEL).astype(np.int32) * 2, name='moving parts')
+            viewer.add_labels((dynamic_seq == STATIC_LABEL).astype(np.int32) * 3, name='static parts')
+            napari.run()
+        
+        if filter:
+            dynamic_seq_updated = filter_dynamic_seq(
+                K=K,
+                depth_seq=depth_seq[kf_idxs],
+                dynamic_seq=dynamic_seq,
+                joint_type=joint_type,
+                joint_dir=joint_dir_c,
+                joint_start=joint_start_c,
+                joint_states=joint_states[kf_idxs],
+                depth_tolerance=0.05, # 假设 coarse 阶段的误差估计在 5 cm 内
+                visualize=visualize
+            ) 
+        
+        for i in range(self.num_frames()):
+            self.frame_list[i].obj_mask = self.obj_mask_seq[i]
+            self.frame_list[i].dynamic_mask = dynamic_seq_updated[i]
+                    
     def _visualize_f(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()
         viewer.add_image(rgb_seq, rgb=True)

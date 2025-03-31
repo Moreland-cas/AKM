@@ -39,13 +39,13 @@ def relocalization(
     K = obj_repr.K
     query_dynamic = query_frame.dynamic_mask
     query_depth = query_frame.depth
-    ref_depths = obj_repr.key_frames.get_depth_seq()
-    ref_dynamics = obj_repr.key_frames.get_dynamic_seq()
-    ref_joint_states = obj_repr.key_frames.get_joint_states()
-    assert len(ref_joint_states) == len(obj_repr.key_frames)
+    ref_depths = obj_repr.kframes.get_depth_seq()
+    ref_dynamics = obj_repr.kframes.get_dynamic_seq()
+    ref_joint_states = obj_repr.kframes.get_joint_states()
+    assert len(ref_joint_states) == len(obj_repr.kframes)
         
     # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
-    num_ref = len(obj_repr.key_frames)
+    num_ref = len(obj_repr.kframes)
     
     # 初始化状态, 通过 rgb 或者 depth 找到最近的图像, 我觉得可以先通过 depth
     best_err = 1e10
@@ -65,9 +65,9 @@ def relocalization(
             best_matched_idx = i
     query_state = ref_joint_states[best_matched_idx] 
     
-    # 将 query_frame 写进 obj_repr.key_frames, 然后复用 fine_estimation 对初始帧进行优化
+    # 将 query_frame 写进 obj_repr.kframes, 然后复用 fine_estimation 对初始帧进行优化
     query_frame.joint_state = query_state
-    obj_repr.key_frames.frame_list.insert(0, query_frame)
+    obj_repr.kframes.frame_list.insert(0, query_frame)
     
     fine_estimation(
         obj_repr=obj_repr,
@@ -80,7 +80,7 @@ def relocalization(
         visualize=False
     )
     # 然后在这里把 query_frame 从 keyframes 中吐出来
-    query_frame = obj_repr.key_frames.frame_list.pop(0)
+    query_frame = obj_repr.kframes.frame_list.pop(0)
     
     if update_query_contact:
         # 然后将 initial_frame 中的 contact_3d 迁移到 query_frame 中去, 方便后续生成 query_frame 的抓取 pose
@@ -154,10 +154,10 @@ if __name__ == "__main__":
     # 开始 relocalization 的部分
     reloc_states = []
 
-    for i in range(len(obj_repr.key_frames)):
+    for i in range(len(obj_repr.kframes)):
         import copy
         obj_repr_tmp = copy.deepcopy(obj_repr)
-        query_frame = obj_repr_tmp.key_frames.frame_list.pop(i)
+        query_frame = obj_repr_tmp.kframes.frame_list.pop(i)
         
         query_frame = relocalization(
             obj_repr_tmp,
@@ -167,7 +167,7 @@ if __name__ == "__main__":
             visualize=False
         )
         reloc_states.append(query_frame.joint_state)
-    joint_states = obj_repr.key_frames.get_joint_states()
+    joint_states = obj_repr.kframes.get_joint_states()
     print(f"gt states: {joint_states}")
     print("reloc states: ", np.array(reloc_states))
     

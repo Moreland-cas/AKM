@@ -55,7 +55,7 @@ def mp4_to_numpy_array_list(mp4_path):
 
     return frames
 
-def track_any_points(rgb_frames, queries=None, grid_size=30, visiualize=False):
+def track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False):
     """
     Input:
         rgb_frames: 

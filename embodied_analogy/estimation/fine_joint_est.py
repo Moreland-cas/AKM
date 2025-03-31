@@ -293,15 +293,15 @@ def fine_estimation(
     损失函数为所有 (frame_i, frame_j) 的 point-to-point/plane ICP loss 
     """
     # 读取数据
-    T = len(obj_repr.key_frames)
+    T = len(obj_repr.kframes)
     assert T >= 2
     K = obj_repr.K
     joint_type = obj_repr.joint_dict["joint_type"]
     joint_dir = obj_repr.joint_dict["joint_dir"]
     joint_start = obj_repr.joint_dict["joint_start"]
-    joint_states = obj_repr.key_frames.get_joint_states()
-    depth_seq = obj_repr.key_frames.get_depth_seq()
-    dynamic_seq = obj_repr.key_frames.get_dynamic_seq()
+    joint_states = obj_repr.kframes.get_joint_states()
+    depth_seq = obj_repr.kframes.get_depth_seq()
+    dynamic_seq = obj_repr.kframes.dynamic_seq
     
     if opti_joint_states_mask is None:
         opti_joint_states_mask = np.ones(T, dtype=np.bool_)
@@ -531,7 +531,7 @@ def fine_estimation(
         napari.run()
     
     # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
-    obj_repr.key_frames.write_joint_states(scheduler.best_state_dict["joint_states"])
+    obj_repr.kframes.write_joint_states(scheduler.best_state_dict["joint_states"])
     scheduler.best_state_dict.pop("joint_states")
     obj_repr.joint_dict = scheduler.best_state_dict
     torch.cuda.empty_cache()
