@@ -51,7 +51,6 @@ class ReconEnv(ExploreEnv):
             num_kframes=self.num_kframes,
             obj_description=self.obj_description,
             fine_lr=self.fine_lr,
-            reloc_lr=self.reloc_lr,
             file_path=None,
             gt_joint_dir_w=None,
             visualize=visualize,

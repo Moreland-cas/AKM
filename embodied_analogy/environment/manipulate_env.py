@@ -161,7 +161,7 @@ if __name__ == '__main__':
     task_cfg={
         "instruction": "open the drawer",
         "obj_description": "drawer",
-        "delta_state": -0.2,
+        "delta_state": -0.1,
         "obj_cfg": {
             "index": 44962,
             "scale": 0.8,
@@ -169,7 +169,7 @@ if __name__ == '__main__':
             "active_link": "link_2",
             "active_joint": "joint_2",
             "joint_limit": None,
-            "init_state": 0.3
+            "init_state": 0.2
         },
     }
     # task_cfg={
