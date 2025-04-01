@@ -245,18 +245,16 @@ class BaseEnv():
     
     def capture_frame(self, visualize=False) -> Frame:
         rgb_np, depth_np, _, _ = self.capture_rgbd()
-        robot_mask = self.capture_robot_mask()
         
         frame = Frame(
             rgb=rgb_np,
             depth=depth_np,
             K=self.camera_intrinsic,
             Tw2c=self.camera_extrinsic,
-            robot2d=self.get_points_on_arm()[0],
-            robot_mask=robot_mask
         )
         if visualize:
             frame.visualize()
+            
         return frame
     
     def base_step(self):

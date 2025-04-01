@@ -41,7 +41,9 @@ class ManipulateEnv(ReconEnv):
                 "num_kframes": 5,
                 "fine_lr": 1e-3
             },
-            manip_cfg={}
+            manip_cfg={
+                "reloc_lr": 3e-3
+            }
         ):        
         super().__init__(
             base_cfg=base_cfg,
@@ -52,8 +54,44 @@ class ManipulateEnv(ReconEnv):
         )
         self.manip_cfg = manip_cfg
     
+    def transfer_grasp(self, ref_frame, tgt_frame, visualize=False):
+        """
+        将 ref_frame 中的 panda_hand grasp_pose 转换到 target_frame 中去
+        NOTE: 由于现在的抓取模块不是很强, 所以需要这个函数, 也就是说我们 transfer 的不是 contact_3d, 
+        而是 explore 阶段已经证实比较好的一个 panda_hand grasp pose
+        """
+        # 然后将 initial_frame 中的 contact_3d 迁移到 query_frame 中去, 方便后续生成 query_frame 的抓取 pose
+        if self.initial_frame.joint_state is None:
+            print("Initial joint state is None, first reloc init state..")
+            reloc_init_frame = self.reloc(
+                self,
+                query_frame=self.initial_frame,
+                update_query_dynamic=False,
+                update_query_contact=False,
+                visualize=False
+            )
+            self.initial_frame = reloc_init_frame
+        
+        Tinit2query = joint_data_to_transform_np(
+            joint_type=self.fine_joint_dict["joint_type"],
+            joint_dir=self.fine_joint_dict["joint_dir"],
+            joint_start=self.fine_joint_dict["joint_start"],
+            joint_state_ref2tgt=query_frame.joint_state-self.initial_frame.joint_state
+        )
+        contact_3d_query = Tinit2query[:3, :3] @ self.initial_frame.contact3d + Tinit2query[:3, 3] # 3
+        query_frame.contact3d = contact_3d_query
+        query_frame.contact2d = camera_to_image(contact_3d_query[None], K)[0][0]
+    
     def manipulate(self, delta_state=0, reserved_distance=0.05, visualize=False):
         from embodied_analogy.utility.estimation.relocalization import relocalization
+        """
+        manipulate 的执行逻辑:
+        首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
+        
+        对机械臂进行归位, 对当前状态进行定位, 计算出当前帧的抓取位姿 (使用 manipulate first frame)
+        
+        移动到该位姿, 并根据 target_state 进行操作
+        """
         
         Tw2c = self.camera_extrinsic
         Tc2w = np.linalg.inv(self.camera_extrinsic)

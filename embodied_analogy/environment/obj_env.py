@@ -34,7 +34,7 @@ class ObjEnv(RobotEnv):
         active_joint_names = [joint.name for joint in self.asset.get_active_joints()]
         initial_state = []
         for i, joint_name in enumerate(active_joint_names):
-            if joint_name == obj_config["active_joint"]:
+            if joint_name == obj_cfg["active_joint"]:
                 limit = self.asset.get_active_joints()[i].get_limits() # (2, )
                 # initial_state.append(0.1)
                 initial_state.append(np.deg2rad(0))
@@ -43,6 +43,13 @@ class ObjEnv(RobotEnv):
         self.asset.set_qpos(initial_state)
         
         self.obj_repr = Obj_repr()
+    
+    def capture_frame(self, visualize=False):
+        frame = self.capture_frame(visualize=False)
+        # TODO: 在这里获得 gt joint state, 并进行保存到 frame 中
+        if visualize:
+            frame.visualize()
+        return frame
     
     def load_object(self, obj_cfg):
         index = obj_cfg["index"]
@@ -96,6 +103,8 @@ class ObjEnv(RobotEnv):
                 self.evaluate_joint = joint
                 self.init_joint_transform = joint.get_global_pose().to_transformation_matrix() # 4, 4, Tw2c
         
+        # 在这里调用一个 base step 以实际 load 物体
+        self.base_step()
     def get_joint_state(self):
         cur_transform = self.evaluate_joint.get_global_pose().to_transformation_matrix()
         # Tinit2cur = Tw2cur @ Tw2init.inv

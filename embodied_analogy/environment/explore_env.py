@@ -91,17 +91,8 @@ class ExploreEnv(ObjEnv):
                 continue
             
             if self.check_valid():
-                # 在这里将 explore_uv 保存到 obj_repr 的 initial_frame 中
-                self.obj_repr.initial_frame.contact2d = explore_uv
-                uv_depth = self.obj_repr.initial_frame.depth[int(explore_uv[1]), int(explore_uv[0])]
-                self.obj_repr.initial_frame.contact3d = image_to_camera(
-                    uv=explore_uv[None], 
-                    depth=np.array([uv_depth]), 
-                    K=self.camera_intrinsic, 
-                )[0]
                 break
             else:
-                # 更新 affordance map
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
                 
         # save explore data
@@ -278,6 +269,6 @@ if __name__ == "__main__":
         obj_cfg=obj_config,
         explore_cfg=explore_cfg
     )
-    exploreEnv.explore_main(visualize=False)
+    exploreEnv.explore_main(visualize=True)
     # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     

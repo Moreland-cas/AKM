@@ -64,10 +64,9 @@ class Frame(Data):
         robot2d=None,
         robot3d=None,
         robot_mask=None,
+        Tph2w=None
     ):
-        """
-            NOTE: contact3d 在相机坐标系下, robot3d 在世界坐标系下
-        """ 
+        
         self.rgb = rgb
         self.depth = depth
         self.K = K
@@ -78,6 +77,7 @@ class Frame(Data):
         self.dynamic_mask = dynamic_mask
         self.joint_state = joint_state
         
+        # NOTE: 这几个都在相机坐标系下
         self.contact2d = contact2d
         self.contact3d = contact3d
         self.dir_out = dir_out
@@ -86,6 +86,9 @@ class Frame(Data):
         self.robot2d = robot2d
         self.robot3d = robot3d
         self.robot_mask = robot_mask
+        
+        # NOTE: Tph2w 是在世界坐标系下的 (4, 4)
+        self.Tph2w = Tph2w
         
     def _visualize(self, viewer: napari.Viewer, prefix=""):
         viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
@@ -459,10 +462,10 @@ class Frames(Data):
         
         if visualize:
             import napari 
-            viewer = napari.view_image((self.dynamic_seq != 0).astype(np.int32), rgb=False)
+            viewer = napari.Viewer()
             viewer.title = "filter dynamic seq (moving part)"
             # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
-            viewer.add_labels(self.dynamic_seq.astype(np.int32), name='before filtering')
+            viewer.add_labels(dynamic_seq.astype(np.int32), name='before filtering')
             viewer.add_labels(dynamic_seq_updated.astype(np.int32), name='after filtering')
             napari.run()
         

@@ -701,7 +701,7 @@ def tracksNd_variance_np(tracks: np.ndarray) -> float:
 
     return average_variance
 
-def farthest_scale_sampling(arr, M):
+def farthest_scale_sampling(arr, M, include_first=True):
     """
     从一维数组中选择 M 个点,确保它们之间的距离尽可能大（最大最小距离采样）。
     
@@ -719,7 +719,10 @@ def farthest_scale_sampling(arr, M):
         return arr  # 如果需要的点数大于等于数组长度,直接返回原数组
 
     # 随机选择第一个点（也可以选择固定的起点,如最小值或最大值）
-    selected_indices = [np.random.randint(0, N)]
+    if include_first:
+        selected_indices = [0]
+    else:
+        selected_indices = [np.random.randint(0, N)]
     
     # 迭代选择剩余的点
     for _ in range(1, M):

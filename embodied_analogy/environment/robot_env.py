@@ -11,6 +11,7 @@ from embodied_analogy.utility.sapien_utils import (
     parse_urdf_config,
     check_urdf_config,
 )
+from embodied_analogy.representation.basic_structure import Frame
 
 class RobotEnv(BaseEnv):
     def __init__(
@@ -24,7 +25,18 @@ class RobotEnv(BaseEnv):
         ):        
         super().__init__(base_cfg)
         self.load_robot(robot_cfg)
+    
+    def capture_frame(self, visualize=False) -> Frame:
+        frame = self.capture_frame(visualize=False)
         
+        frame.robot_mask = self.capture_robot_mask()
+        frame.robot2d=self.get_points_on_arm()[0]
+        frame.Tph2w = self.get_ee_pose(as_matrix=True)
+        
+        if visualize:
+            frame.visualize()
+        return frame
+    
     def load_robot(self, robot_cfg=None):
         # Robot config
         urdf_config = dict(
@@ -381,7 +393,7 @@ class RobotEnv(BaseEnv):
             moving_distance=moving_distance
         )
             
-    def get_ee_pose(self):
+    def get_ee_pose(self, as_matrix=False):
         """
         获取 end-effector (panda_hand) 的 ee_pos 和 ee_quat (Tph2w)
         ee_pos: np.array([3, ])
@@ -391,7 +403,15 @@ class RobotEnv(BaseEnv):
         # print(ee_link.name)
         ee_pos = ee_link.get_pose().p
         ee_quat = ee_link.get_pose().q
-        return ee_pos, ee_quat # numpy array
+        
+        if as_matrix:
+            T = np.eye(4)  # 创建一个 4x4 单位矩阵
+            R_matrix = R.from_quat(ee_quat, scalar_first=True).as_matrix() 
+            T[:3, :3] = R_matrix  # 将旋转矩阵放入变换矩阵
+            T[:3, 3] = ee_pos  # 将位置向量放入变换矩阵
+            return T
+        else:
+            return ee_pos, ee_quat # numpy array
 
     def anyGrasp2ph(self, grasp):
         """
