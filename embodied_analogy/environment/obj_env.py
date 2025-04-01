@@ -16,18 +16,23 @@ class ObjEnv(RobotEnv):
                 "use_sapien2": True 
             },
             robot_cfg={},
-            obj_cfg={
-                "index": 44962,
-                "scale": 0.8,
-                "pose": [1.0, 0., 0.5],
-                "active_link": "link_2",
-                "active_joint": "joint_2"
+            task_cfg={
+                "obj_cfg": {
+                    "index": 44962,
+                    "scale": 0.8,
+                    "pose": [1.0, 0., 0.5],
+                    "active_link": "link_2",
+                    "active_joint": "joint_2",
+                    "joint_limit": None,
+                    "init_state": 0
+                },
             }
         ):        
         super().__init__(
             base_cfg=base_cfg,
             robot_cfg=robot_cfg,
         )
+        obj_cfg = task_cfg["obj_cfg"]
         self.load_object(obj_cfg)
         # 随机初始化物体对应 joint 的状态
         cur_joint_state = self.asset.get_qpos()
@@ -35,17 +40,16 @@ class ObjEnv(RobotEnv):
         initial_state = []
         for i, joint_name in enumerate(active_joint_names):
             if joint_name == obj_cfg["active_joint"]:
-                limit = self.asset.get_active_joints()[i].get_limits() # (2, )
-                # initial_state.append(0.1)
-                initial_state.append(np.deg2rad(0))
+                initial_state.append(obj_cfg["init_state"])
             else:
                 initial_state.append(cur_joint_state[i])
+                self.asset.get_active_joints()[i].set_limits(np.array([[0, 0]])) # (2, )
         self.asset.set_qpos(initial_state)
         
         self.obj_repr = Obj_repr()
     
     def capture_frame(self, visualize=False):
-        frame = self.capture_frame(visualize=False)
+        frame = super().capture_frame(visualize=False)
         # TODO: 在这里获得 gt joint state, 并进行保存到 frame 中
         if visualize:
             frame.visualize()
@@ -113,14 +117,26 @@ class ObjEnv(RobotEnv):
 
 
 if __name__ == "__main__":
-    # drawer
-    obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
-        "active_link": "link_2",
-        "active_joint": "joint_2"
+    task_cfg={
+        "obj_cfg": {
+            "index": 44962,
+            "scale": 0.8,
+            "pose": [1.0, 0., 0.5],
+            "active_link": "link_2",
+            "active_joint": "joint_2",
+            "joint_limit": None,
+            "init_state": 0.1
+        },
     }
+    
+    # drawer
+    # obj_config = {
+    #     "index": 44962,
+    #     "scale": 0.8,
+    #     "pose": [1.0, 0., 0.5],
+    #     "active_link": "link_2",
+    #     "active_joint": "joint_2"
+    # }
     
     # door
     # obj_config = {
@@ -140,10 +156,10 @@ if __name__ == "__main__":
     #     "active_joint": "joint_0"
     # }
     
-    obj_index = obj_config["index"]
+    # obj_index = obj_config["index"]
     
     objEnv = ObjEnv(
-        obj_cfg=obj_config,
+        task_cfg=task_cfg,
     )
     while True:
         objEnv.step()

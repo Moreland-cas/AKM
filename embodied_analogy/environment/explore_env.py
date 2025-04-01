@@ -22,36 +22,39 @@ class ExploreEnv(ObjEnv):
                 "use_sapien2": True 
             },
             robot_cfg={},
-            obj_cfg={
-                "index": 44962,
-                "scale": 0.8,
-                "pose": [1.0, 0., 0.5],
-                "active_link": "link_2",
-                "active_joint": "joint_2"
+            task_cfg={
+                "instruction": "open the drawer",
+                "obj_description": "drawer",
+                "obj_cfg": {
+                    "index": 44962,
+                    "scale": 0.8,
+                    "pose": [1.0, 0., 0.5],
+                    "active_link": "link_2",
+                    "active_joint": "joint_2"
+                },
             },
             explore_cfg={
                 "record_fps": 30,
                 "pertubation_distance": 0.1,
-                "instruction": "open the drawer",
                 "max_tries": 10,
             }
         ):        
         super().__init__(
             base_cfg=base_cfg,
             robot_cfg=robot_cfg,
-            obj_cfg=obj_cfg
+            task_cfg=task_cfg
         )
         
         self.record_fps = explore_cfg["record_fps"]
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
         self.pertubation_distance = explore_cfg["pertubation_distance"]
-        self.instruction = explore_cfg["instruction"]
+        self.instruction = task_cfg["instruction"]
         self.max_tries = explore_cfg["max_tries"]
         # TODO: 用网络完成
-        self.obj_description = self.instruction.split(" ")[-1]
+        self.obj_description = task_cfg["obj_description"]
         self.has_valid_explore = False
         
-    def explore_main(self, visualize=False):
+    def explore_stage(self, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
             NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
@@ -60,7 +63,7 @@ class ExploreEnv(ObjEnv):
         from embodied_analogy.utility.proposal.ram_proposal import get_ram_affordance_2d
         
         self.base_step()
-        initial_frame = self.capture_frame()
+        initial_frame = super().capture_frame()
         
         # 只在第一次进行 contact transfer, 之后直接进行复用
         self.affordance_map_2d = get_ram_affordance_2d(
@@ -269,6 +272,6 @@ if __name__ == "__main__":
         obj_cfg=obj_config,
         explore_cfg=explore_cfg
     )
-    exploreEnv.explore_main(visualize=True)
+    exploreEnv.explore_stage(visualize=True)
     # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     

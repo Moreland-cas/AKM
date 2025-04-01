@@ -123,7 +123,6 @@ class Obj_repr(Data):
         num_kframes=5,
         obj_description="drawer",
         fine_lr=1e-3,
-        reloc_lr=3e-3,
         file_path=None,
         gt_joint_dir_w=None,
         visualize=True,
@@ -149,15 +148,7 @@ class Obj_repr(Data):
             joint_dict=self.coarse_joint_dict,
             visualize=visualize
         )
-        self.fine_joint_estimation(lr=fine_lr, visualize=True)
-        
-        # 在这里对于 initial_frame 进行重定位
-        self.initial_frame = self.reloc(
-            query_frame=self.initial_frame,
-            update_query_dynamic=True,
-            reloc_lr=reloc_lr,
-            visualize=visualize
-        )
+        self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
            
         if file_path is not None:
             self.visualize()

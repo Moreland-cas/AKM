@@ -121,6 +121,25 @@ class Frame(Data):
                 name=f"{prefix}_bbox",
             )
     
+    def get_pc(self, only_obj=True, visualize=False):
+        """
+        返回 camera 坐标系下的点云, 可以选择是否仅返回 obj_mask 为 True 的点
+        """
+        depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c, height=0.02)
+        
+        if only_obj:
+            assert self.obj_mask is not None
+            depth_mask = self.obj_mask & depth_mask
+            
+        obj_pc = depth_image_to_pointcloud(
+            depth_image=self.depth,
+            mask = depth_mask,
+            K=self.K
+        )
+        pc_colors = self.rgb[depth_mask]
+        
+        return obj_pc, pc_colors
+        
     def detect_grasp(self, visualize=False) -> GraspGroup:
         """
         返回当前 frame 的点云上 contact2d 附近的一个 graspGroup
@@ -137,13 +156,7 @@ class Frame(Data):
         contact3d = self.contact3d
         
         # 找到 contact3d 附近的点
-        depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c)
-        obj_pc = depth_image_to_pointcloud(
-            depth_image=self.depth,
-            mask = self.obj_mask & depth_mask,
-            K=self.K
-        )
-        pc_colors = self.rgb[self.obj_mask & depth_mask]
+        obj_pc, pc_colors = self.get_pc(only_obj=True)
         
         crop_mask = crop_nearby_points(
             point_clouds=obj_pc,

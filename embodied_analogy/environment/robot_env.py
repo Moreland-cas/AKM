@@ -27,7 +27,7 @@ class RobotEnv(BaseEnv):
         self.load_robot(robot_cfg)
     
     def capture_frame(self, visualize=False) -> Frame:
-        frame = self.capture_frame(visualize=False)
+        frame = super().capture_frame(visualize=False)
         
         frame.robot_mask = self.capture_robot_mask()
         frame.robot2d=self.get_points_on_arm()[0]
@@ -199,16 +199,18 @@ class RobotEnv(BaseEnv):
             self.base_step()
             count += 1
     
-    def reset_robot_with_pc(self, pc):        
+    def reset_robot_with_pc(self, pc=None):        
         # 先打开 gripper, 再撤退一段距离
+        self.open_gripper()
         self.move_forward(-0.05) # 向后撤退 5 cm
         
         # 读取一帧 rgbd， 经过 sam 得到 pc， 对 pc 进行处理
+        if pc is None:
+            pc = np.array([[0, 0, -1]])
         self.planner.update_point_cloud(pc)
+        
         self.reset_robot()
-
-        # 重置 point cloud
-        self.clear_planner_pc()
+        
     def clear_planner_pc(self):
         self.planner.update_point_cloud(np.array([[0, 0, -1]]))
         
