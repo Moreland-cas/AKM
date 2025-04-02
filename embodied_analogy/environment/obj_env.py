@@ -1,3 +1,6 @@
+import os
+import json
+import random
 import numpy as np
 import sapien.core as sapien
 from embodied_analogy.environment.robot_env import RobotEnv
@@ -19,12 +22,11 @@ class ObjEnv(RobotEnv):
             task_cfg={
                 "obj_cfg": {
                     "index": 44962,
+                    "asset_path": None, 
                     "scale": 0.8,
-                    "pose": [1.0, 0., 0.5],
-                    "active_link": "link_2",
-                    "active_joint": "joint_2",
-                    "joint_limit": None,
-                    "init_state": 0
+                    "active_link_name": "link_2",
+                    "active_joint_name": "joint_2",
+                    "active_joint_limit": None,
                 },
             }
         ):        
@@ -34,20 +36,28 @@ class ObjEnv(RobotEnv):
         )
         obj_cfg = task_cfg["obj_cfg"]
         self.load_object(obj_cfg)
-        # 随机初始化物体对应 joint 的状态
-        cur_joint_state = self.asset.get_qpos()
-        active_joint_names = [joint.name for joint in self.asset.get_active_joints()]
-        initial_state = []
-        for i, joint_name in enumerate(active_joint_names):
-            if joint_name == obj_cfg["active_joint"]:
-                initial_state.append(obj_cfg["init_state"])
-            else:
-                initial_state.append(cur_joint_state[i])
-                self.asset.get_active_joints()[i].set_limits(np.array([[0, 0]])) # (2, )
-        self.asset.set_qpos(initial_state)
-        
-        self.obj_repr = Obj_repr()
     
+    def change_obj(self, obj_cfg):
+        '''
+        Change the object in the env
+        '''
+
+        if self.renderer_type == 'sapien' :
+            self.scene.remove_articulation(self.obj)
+            if config is None :
+                self._add_object(*self._generate_object_config())
+            else :
+                self._add_object(*self._load_object_config(config))
+        elif self.renderer_type == 'client' :
+            # remove_articulation not supported in client
+            # So only change the randomization params
+            path, dof, pose = self._generate_object_config()
+            self.obj.set_qpos(dof)
+            self.obj.set_root_pose(pose)
+            self.obj_root_pose = pose
+            self.obj_init_dof = dof
+        pass
+        
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)
         # TODO: 在这里获得 gt joint state, 并进行保存到 frame 中
@@ -55,11 +65,94 @@ class ObjEnv(RobotEnv):
             frame.visualize()
         return frame
     
+    def randomize_obj(self, obj_cfg):
+        """
+        对于 obj_cfg 中的 pose 进行随机化
+        根据 tack_cfg 中的 open/close 以及 delta 值, 计算物体的 active_link 的初始状态的范围, 并随机选取一个值进行初始化
+        """
+        self.obj_init_pos_angle_low = -0.4
+        self.obj_init_pos_angle_high = 0.4
+        self.obj_init_rot_low = -0.2
+        self.obj_init_rot_high = 0.2
+        self.obj_init_dis_low = 0.5
+        self.obj_init_dis_high = 0.8
+        self.obj_init_height_low = 0.02
+        self.obj_init_height_high = 0.05
+        self.obj_init_dof_low = 0.0
+        self.obj_init_dof_high = 0.0
+        
+        def axis_angle_to_quat(axis, angle):
+            '''
+            axis: [[x, y, z]] or [x, y, z]
+            angle: rad
+            return: a quat that rotates angle around axis
+            '''
+            axis = np.array(axis)
+            shape = axis.shape
+            assert(shape[-1] == 3)
+            axis = axis.reshape(-1, 3)
+
+            angle = np.array(angle)
+            angle = angle.reshape(-1, 1)
+
+            axis = axis / (np.linalg.norm(axis, axis=-1, keepdims=True) + 1e-9)
+            quat1 = np.concatenate([np.cos(angle/2), axis[:, 0:1]*np.sin(angle/2), axis[:, 1:2]*np.sin(angle/2), axis[:, 2:3]*np.sin(angle/2)], axis=-1)
+            return quat1.reshape(*shape[:-1], 4)
+
+        def randomize_pose(ang_low, ang_high, rot_low, rot_high, dis_low, dis_high, height_low, height_high) :
+
+            ang = np.random.uniform(ang_low, ang_high)
+            rot = np.random.uniform(rot_low, rot_high)
+            dis = np.random.uniform(dis_low, dis_high)
+            height = np.random.uniform(height_low, height_high)
+
+            p0 = sapien.Pose(p=[dis, 0, height])
+            r0 = sapien.Pose(q=axis_angle_to_quat([0,0,1], ang))
+            r1 = sapien.Pose(q=axis_angle_to_quat([0,0,1], rot))
+
+            p1 = r0 * p0 * r1
+            return p1
+    
+        def randomize_dof(dof_low, dof_high) :
+            if dof_low == 'None' or dof_high == 'None' :
+                return None
+            return np.random.uniform(dof_low, dof_high)
+        
+        path = obj_cfg["asset_path"]
+        bbox_path = os.path.join(path, "bounding_box.json")
+        with open(bbox_path, "r") as f:
+            bbox = json.load(f)
+        
+        pose = randomize_pose(
+            self.obj_init_pos_angle_low,
+            self.obj_init_pos_angle_high,
+            self.obj_init_rot_low,
+            self.obj_init_rot_high,
+            self.obj_init_dis_low - bbox["min"][2]*0.75,
+            self.obj_init_dis_high - bbox["min"][2]*0.75,
+            self.obj_init_height_low - bbox["min"][1]*0.75,
+            self.obj_init_height_high - bbox["min"][1]*0.75
+        )
+        
+        dof = randomize_dof(
+            self.obj_init_dof_low,
+            self.obj_init_dof_high
+        )
+        
+        obj_cfg.update({
+            "pose": pose,
+            "init_joint_state": dof
+        })
+        return path, dof, pose
+    
     def load_object(self, obj_cfg):
+        # 首先获取 obj 的 pose
+        self.randomize_obj(obj_cfg)
+        
         index = obj_cfg["index"]
         scale = obj_cfg["scale"]
         pose = obj_cfg["pose"]
-        active_link = obj_cfg["active_link"]
+        active_link = obj_cfg["active_link_name"]
         
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale
@@ -84,48 +177,50 @@ class ObjEnv(RobotEnv):
         load_config = parse_urdf_config(urdf_config, self.scene)
         check_urdf_config(load_config)
         
-        self.asset = loader.load(
-            filename=self.asset_prefix + f"/{index}/mobility.urdf",
+        asset_path = obj_cfg["asset_path"]
+        self.obj = loader.load(
+            filename=f"{asset_path}/mobility.urdf",
             config=load_config
         )
         
-        self.asset.set_root_pose(sapien.Pose(pose, [1, 0, 0, 0]))
-        # self.asset.set_qpos(dof_value)
-        # self.asset.set_qvel(np.zeros_like(dof_value))
-        
-        # only for pot
-        # lift_joint = self.asset.get_joints()[-1]
-        # lift_joint.set_limit(np.array([0, 0.3]))
-        
+        self.obj.set_root_pose(pose)
         
         # 设置物体关节的参数, 把回弹关掉
-        for joint in self.asset.get_active_joints():
+        initial_states = []
+        for i, joint in enumerate(self.obj.get_active_joints()):
             joint.set_drive_property(stiffness=0, damping=0.1)
             
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
-            if joint.get_name() == obj_cfg["active_joint"]:
-                self.evaluate_joint = joint
-                self.init_joint_transform = joint.get_global_pose().to_transformation_matrix() # 4, 4, Tw2c
+            if joint.get_name() == obj_cfg["active_joint_name"]:
+                initial_states.append(obj_cfg["init_joint_state"])
+                self.active_joint_name = obj_cfg["active_joint_name"]
+                self.active_joint_idx = i
+            else:
+                initial_states.append(0)
+                joint.set_limits(np.array([[0, 0]]))
+        self.obj.set_qpos(initial_states)
         
         # 在这里调用一个 base step 以实际 load 物体
         self.base_step()
-    def get_joint_state(self):
-        cur_transform = self.evaluate_joint.get_global_pose().to_transformation_matrix()
-        # Tinit2cur = Tw2cur @ Tw2init.inv
-        Tinit2cur = cur_transform @ np.linalg.inv(self.init_joint_transform)
-        return Tinit2cur
+        
+        self.obj_repr = Obj_repr()
+        
+    def get_active_joint_state(self):
+        """
+        获取我们关心的关节的状态值
+        """
+        return self.obj.get_qpos()[self.active_joint_idx]
 
 
 if __name__ == "__main__":
     task_cfg={
         "obj_cfg": {
-            "index": 44962,
-            "scale": 0.8,
-            "pose": [1.0, 0., 0.5],
-            "active_link": "link_2",
-            "active_joint": "joint_2",
-            "joint_limit": None,
-            "init_state": 0.1
+            "index": 41083,
+            "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/41083_link_2", 
+            "scale": 1.,
+            "active_link_name": "link_2",
+            "active_joint_name": "joint_2",
+            "active_joint_limit": None,
         },
     }
     

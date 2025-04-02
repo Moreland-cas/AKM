@@ -60,6 +60,8 @@ class RobotEnv(BaseEnv):
         loader.fix_root_link = True
         self.robot: sapien.Articulation = loader.load(self.asset_prefix + "/panda/panda_v3.urdf", config)
         
+        self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
+        
         self.arm_qlimit = self.robot.get_qlimits()
         self.arm_q_lower = self.arm_qlimit[:, 0]
         self.arm_q_higher = self.arm_qlimit[:, 1]
