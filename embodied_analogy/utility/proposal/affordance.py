@@ -193,7 +193,7 @@ class Affordance_map_2d:
             concatenate_images(image_cos, image_rgb).show()
         return np.array([u_rgb, v_rgb])  
        
-    def update(self, neg_uv_rgb, visualize=False):
+    def update(self, neg_uv_rgb, update_sigma=0.05, visualize=False):
         """
         neg_uv_rgb: 
             失败的尝试点 (u_rgb, v_rgb) 
@@ -213,7 +213,7 @@ class Affordance_map_2d:
             )
 
         # 定义全图更新的高斯核标准差
-        sigma = int(self.cos_map.shape[0] * 0.1)
+        sigma = int(self.cos_map.shape[0] * update_sigma)
 
         # 生成坐标网格
         u_indices = np.arange(self.cos_map.shape[1])

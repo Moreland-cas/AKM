@@ -106,7 +106,8 @@ def detect_grasp_anygrasp(
             contact_point=np.array([0, 0, 0]),
             post_contact_dirs=dir_outs
         )
-    
+    import time
+    time.sleep(0.5)
     return ggs
 
 

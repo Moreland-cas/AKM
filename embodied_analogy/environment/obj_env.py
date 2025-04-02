@@ -75,7 +75,7 @@ class ObjEnv(RobotEnv):
         self.obj_init_rot_low = -0.2
         self.obj_init_rot_high = 0.2
         self.obj_init_dis_low = 0.5
-        self.obj_init_dis_high = 0.8
+        self.obj_init_dis_high = 0.6
         self.obj_init_height_low = 0.02
         self.obj_init_height_high = 0.05
         self.obj_init_dof_low = 0.0
@@ -149,7 +149,7 @@ class ObjEnv(RobotEnv):
         # 首先获取 obj 的 pose
         self.randomize_obj(obj_cfg)
         
-        index = obj_cfg["index"]
+        # index = obj_cfg["index"]
         scale = obj_cfg["scale"]
         pose = obj_cfg["pose"]
         active_link = obj_cfg["active_link_name"]
@@ -258,4 +258,4 @@ if __name__ == "__main__":
     )
     while True:
         objEnv.step()
-    
+        

@@ -1,4 +1,5 @@
 import numpy as np
+from transforms3d.quaternions import qmult
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 from PIL import Image, ImageColor
@@ -72,9 +73,17 @@ class BaseEnv():
             self.capture_rgbd = self.capture_rgbd_sapien3
             
         self.step = self.base_step
-        self.setup_camera()
-        
-    def setup_camera(self):
+        self.load_camera()
+    
+    def get_viewer_param(self):
+        """
+        返回
+        """
+        p = self.viewer.window.get_camera_position()
+        q = qmult(self.viewer.window.get_camera_rotation(), [0.5, -0.5, 0.5, 0.5])
+        return p, q
+    
+    def load_camera(self, pose=None):
         # camera config
         near, far = 0.1, 100
         width, height = 800, 600
@@ -117,7 +126,12 @@ class BaseEnv():
             set pose method 2
             这里的 set_local_pose 其实是指定了 Tc2w
         """
-        camera.set_local_pose(sapien.Pose([-0.474219, 0.783512, 0.544986], [0.964151, 0.0230758, 0.0894396, -0.248758]))
+        if pose is None:
+            pose = sapien.Pose(
+                [-0.04706102,  0.47101435,  1.0205718],
+                [0.9624247 ,  0.03577587,  0.21794608, -0.15798205]
+            )
+        camera.set_local_pose(pose)
         self.camera = camera
         
         # 记录相机的内参和外参

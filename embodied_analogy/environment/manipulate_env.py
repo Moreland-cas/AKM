@@ -39,7 +39,6 @@ class ManipulateEnv(ReconEnv):
                 "obj_description": "drawer",
                 "delta_state": 0.2,
                 "obj_cfg": {
-                    "index": 44962,
                     "scale": 0.8,
                     "pose": [1.0, 0., 0.5],
                     "active_link": "link_2",
@@ -96,7 +95,7 @@ class ManipulateEnv(ReconEnv):
         
         if visualize:
             pass
-    def manipulate(self, visualize=False):
+    def manip_stage(self, visualize=False):
         """
         manipulate 的执行逻辑:
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
@@ -150,26 +149,38 @@ class ManipulateEnv(ReconEnv):
             joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
             moving_distance=self.target_state-cur_frame.joint_state
         )
+    
+    def evaluate(self):
+        # 评测 manipulate 的好坏
+        pass
+    
+    def main(self):
+        # self.explore_stage(visualize=False)
+        try:
+            self.explore_stage(visualize=False)
+            self.recon_stage()
+            self.manip_stage()
+            self.evaluate()
+        except Exception as e:
+            print(e)
+            
         
-    def manipulate_main(self):
-        self.explore_stage()
-        self.recon_stage()
-        self.manipulate()
-        
-
 if __name__ == '__main__':
+    explore_cfg={
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "max_tries": 10,
+        "update_sigma": 0.05
+    }
     task_cfg={
         "instruction": "open the drawer",
         "obj_description": "drawer",
-        "delta_state": -0.1,
+        "delta_state": 0.1,
         "obj_cfg": {
-            "index": 44962,
+            "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/48878_link_0", 
             "scale": 0.8,
-            "pose": [1.0, 0., 0.5],
-            "active_link": "link_2",
-            "active_joint": "joint_2",
-            "joint_limit": None,
-            "init_state": 0.2
+            "active_link_name": "link_0",
+            "active_joint_name": "joint_0",
         },
     }
     # task_cfg={
@@ -186,9 +197,12 @@ if __name__ == '__main__':
     #         "init_state": 0
     #     }
     # }
-    me = ManipulateEnv(task_cfg=task_cfg)
+    me = ManipulateEnv(
+        explore_cfg=explore_cfg,
+        task_cfg=task_cfg
+    )
     # me.obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
-    me.manipulate_main()
+    me.main()
     
     while True:
         me.base_step()

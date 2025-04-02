@@ -49,6 +49,8 @@ class ExploreEnv(ObjEnv):
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
         self.pertubation_distance = explore_cfg["pertubation_distance"]
         self.instruction = task_cfg["instruction"]
+        
+        self.update_sigma = explore_cfg["update_sigma"]
         self.max_tries = explore_cfg["max_tries"]
         # TODO: 用网络完成
         self.obj_description = task_cfg["obj_description"]
@@ -87,20 +89,21 @@ class ExploreEnv(ObjEnv):
             self.reset_robot()
             self.obj_repr.clear_frames()
             
-            explore_ok, explore_uv = self.explore_once(visualize=visualize)
+            actually_tried, explore_uv = self.explore_once(visualize=visualize)
             num_tries += 1
-            if not explore_ok:
-                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
+            if not actually_tried:
+                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=True)
                 continue
             
             if self.check_valid():
                 break
             else:
-                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, visualize=visualize)
+                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=True)
                 
         # save explore data
         if not self.has_valid_explore:
             print("No valid exploration during explore phase!")
+            raise Exception("No valid exploration during explore phase!")
             
     def explore_once(
         self, 
@@ -155,16 +158,15 @@ class ExploreEnv(ObjEnv):
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             # TODO 这里可能需要更改
             if result_pre is not None:
+                if visualize or True:
+                    visualize_pc(
+                        points=pc_collision_w, 
+                        colors=pc_colors / 255,
+                        grasp=grasp, 
+                        contact_point=contact3d_w, 
+                        post_contact_dirs=[dir_out_w]
+                    )
                 break
-        
-        if visualize:
-            visualize_pc(
-                points=pc_collision_w, 
-                colors=pc_colors / 255,
-                grasp=grasp, 
-                contact_point=contact3d_w, 
-                post_contact_dirs=[dir_out_w]
-            )
         
         # 实际执行到该 proposal, 并在此过程中录制数据
         if result_pre is None:

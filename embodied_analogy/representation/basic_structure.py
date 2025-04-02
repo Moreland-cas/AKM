@@ -171,7 +171,7 @@ class Frame(Data):
             points=cropped_pc,
             threshold=0.005, 
             max_iterations=100,
-            visualize=visualize
+            visualize=False
         )
         if (plane_normal * np.array([0, 0, -1])).sum() > 0:
             dir_out = plane_normal
@@ -193,7 +193,7 @@ class Frame(Data):
             colors=pc_colors / 255.,
             dir_out=dir_out, 
             augment=True,
-            visualize=visualize
+            visualize=False
         )  
         gg = crop_grasp(
             grasp_group=gg,
@@ -220,7 +220,7 @@ class Frame(Data):
             visualize_pc(
                 points=obj_pc, 
                 colors=pc_colors / 255,
-                grasp=gg_sorted, 
+                grasp=gg_sorted[0], 
                 contact_point=self.contact3d, 
                 post_contact_dirs=[self.dir_out]
             )
