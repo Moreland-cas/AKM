@@ -20,6 +20,9 @@ class ObjEnv(RobotEnv):
             },
             robot_cfg={},
             task_cfg={
+                "instruction": "open the drawer",
+                "obj_description": "drawer",
+                "delta": 0.15,
                 "obj_cfg": {
                     "index": 44962,
                     "asset_path": None, 
@@ -36,7 +39,11 @@ class ObjEnv(RobotEnv):
         )
         obj_cfg = task_cfg["obj_cfg"]
         self.load_object(obj_cfg)
-    
+        
+        # 然后在这里记录下 gt_start_joint_state 和 gt_delta
+        self.gt_start_joint_state = self.get_active_joint_state()
+        self.gt_delta = task_cfg["delta"]
+        
     def change_obj(self, obj_cfg):
         '''
         Change the object in the env

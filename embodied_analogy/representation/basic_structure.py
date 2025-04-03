@@ -18,7 +18,8 @@ from embodied_analogy.utility.utils import (
     sample_points_within_bbox_and_mask,
     extract_tracked_depths,
     filter_tracks_by_consistency,
-    filter_dynamic
+    filter_dynamic,
+    camera_to_world
 )
 from embodied_analogy.utility.perception.online_cotracker import track_any_points
 
@@ -126,15 +127,27 @@ class Frame(Data):
                 name=f"{prefix}_bbox",
             )
     
-    def get_pc(self, only_obj=True, visualize=False):
+    def get_obj_pc(
+        self,
+        use_robot_mask=True, 
+        use_height_filter=True,
+        world_frame=False,
+        visualize=False
+    ):
         """
         返回 camera 坐标系下的点云, 可以选择是否仅返回 obj_mask 为 True 的点
         """
-        depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c, height=0.02)
+        if use_height_filter:
+            height_filter = 0.02
+        else:
+            height_filter = 0.0
+        depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c, height=height_filter)
         
-        if only_obj:
-            assert self.obj_mask is not None
-            depth_mask = self.obj_mask & depth_mask
+        assert self.obj_mask is not None
+        depth_mask = self.obj_mask & depth_mask
+        
+        if use_robot_mask:
+            depth_mask = depth_mask & (~self.robot_mask)
             
         obj_pc = depth_image_to_pointcloud(
             depth_image=self.depth,
@@ -142,6 +155,40 @@ class Frame(Data):
             K=self.K
         )
         pc_colors = self.rgb[depth_mask]
+        
+        if world_frame:
+            obj_pc = camera_to_world(obj_pc, self.Tw2c)
+        
+        return obj_pc, pc_colors
+    
+    def get_env_pc(
+        self,
+        use_robot_mask=True, 
+        use_height_filter=False,
+        world_frame=False,
+        visualize=False
+    ):
+        """
+        返回 camera 坐标系下的点云, 可以选择是否仅返回 obj_mask 为 True 的点
+        """
+        if use_height_filter:
+            height_filter = 0.02
+        else:
+            height_filter = 0.0
+        depth_mask = get_depth_mask(self.depth, self.K, self.Tw2c, height=height_filter)
+        
+        if use_robot_mask:
+            depth_mask = depth_mask & (~self.robot_mask)
+            
+        obj_pc = depth_image_to_pointcloud(
+            depth_image=self.depth,
+            mask = depth_mask,
+            K=self.K
+        )
+        pc_colors = self.rgb[depth_mask]
+        
+        if world_frame:
+            obj_pc = camera_to_world(obj_pc, self.Tw2c)
         
         return obj_pc, pc_colors
         
@@ -161,7 +208,11 @@ class Frame(Data):
         contact3d = self.contact3d
         
         # 找到 contact3d 附近的点
-        obj_pc, pc_colors = self.get_pc(only_obj=True)
+        obj_pc, pc_colors = self.get_obj_pc(
+            use_robot_mask=True,
+            use_height_filter=True,
+            world_frame=False
+        )
         
         crop_mask = crop_nearby_points(
             point_clouds=obj_pc,

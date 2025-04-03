@@ -3,7 +3,6 @@ import numpy as np
 from embodied_analogy.environment.reconstruct_env import ReconEnv
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
-    camera_to_world,
     initialize_napari,
     joint_data_to_transform_np,
 )
@@ -55,7 +54,6 @@ class ManipulateEnv(ReconEnv):
         )
         self.reloc_lr = manip_cfg["reloc_lr"]
         self.reserved_distance = manip_cfg["reserved_distance"]
-        self.delta_state = task_cfg["delta_state"]
     
     def set_goal(self, visualize=False):
         """
@@ -68,7 +66,7 @@ class ManipulateEnv(ReconEnv):
             visualize=visualize
         )
         self.initial_state = self.obj_repr.initial_frame.joint_state
-        self.target_state = self.initial_state + self.delta_state
+        self.target_state = self.initial_state + self.gt_delta
     
     def transfer_ph_pose(self, ref_frame: Frame, tgt_frame: Frame, visualize=False):
         """
@@ -95,7 +93,7 @@ class ManipulateEnv(ReconEnv):
         
         if visualize:
             pass
-    def manip_stage(self, load_path=None, visualize=False):
+    def manip_stage(self, load_path=None, evaluate=True, visualize=False):
         """
         manipulate 的执行逻辑:
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
@@ -112,7 +110,7 @@ class ManipulateEnv(ReconEnv):
         self.set_goal()
         
         # 首先进行机械手的 reset, 因为当前可能还处在 explore 阶段末尾的抓取阶段
-        self.reset_robot_with_pc(pc=None)
+        self.reset_robot_safe()
         
         # 然后估计出 cur_state
         self.base_step()
@@ -131,8 +129,11 @@ class ManipulateEnv(ReconEnv):
             visualize=visualize
         )
         
-        pc_c, _ = cur_frame.get_pc(only_obj=True)
-        pc_w = camera_to_world(pc_c, self.obj_repr.Tw2c)
+        pc_w, _ = cur_frame.get_obj_pc(
+            use_robot_mask=True,
+            use_height_filter=False,
+            world_frame=True
+        )
         self.planner.update_point_cloud(pc_w)
         
         Tph2w_pre = self.get_translated_ph(cur_frame.Tph2w, -self.reserved_distance)
@@ -152,10 +153,15 @@ class ManipulateEnv(ReconEnv):
             joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
             moving_distance=self.target_state-cur_frame.joint_state
         )
+        if evaluate:
+            print(self.evaluate())
     
     def evaluate(self):
         # 评测 manipulate 的好坏
-        pass
+        self.gt_end_joint_state = self.get_active_joint_state()
+        actual_delta = self.gt_end_joint_state - self.gt_start_joint_state
+        loss = actual_delta - self.gt_delta
+        return loss
     
     def main(self):
         # self.explore_stage(visualize=False)
@@ -172,18 +178,29 @@ if __name__ == '__main__':
     explore_cfg={
         "record_fps": 30,
         "pertubation_distance": 0.1,
-        "max_tries": 10,
+        "max_tries": 100,
         "update_sigma": 0.05
     }
+    # task_cfg={
+    #     "instruction": "open the drawer",
+    #     "obj_description": "drawer",
+    #     "delta_state": 0.1,
+    #     "obj_cfg": {
+    #         "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/48878_link_0", 
+    #         "scale": 0.8,
+    #         "active_link_name": "link_0",
+    #         "active_joint_name": "joint_0",
+    #     },
+    # }
     task_cfg={
         "instruction": "open the drawer",
         "obj_description": "drawer",
-        "delta_state": 0.1,
+        "delta": 0.4,
         "obj_cfg": {
-            "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/48878_link_0", 
-            "scale": 0.8,
-            "active_link_name": "link_0",
-            "active_joint_name": "joint_0",
+            "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/47578_link_2", 
+            "scale": 1.0,
+            "active_link_name": "link_2",
+            "active_joint_name": "joint_2",
         },
     }
     recon_cfg={
@@ -197,9 +214,12 @@ if __name__ == '__main__':
         task_cfg=task_cfg
     )
     obj_index = task_cfg["obj_cfg"]["asset_path"].split("/")[-1].split("_")[0]
+    # me.explore_stage()
+    # me.recon_stage(save_path="/home/zby/Prograwms/Embodied_Analogy/assets/tmp/47578/recon_data.pkl")
     me.manip_stage(
         # load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/recon_data.pkl",
-        load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/48878/recon_data.pkl",
+        load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/47578/recon_data.pkl",
+        evaluate=True,
         visualize=False
     )
     

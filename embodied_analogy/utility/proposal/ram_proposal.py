@@ -16,7 +16,7 @@ from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
 
 import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
+# matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
 
 from embodied_analogy.utility.proposal.affordance import Affordance_map_2d
 from embodied_analogy.utility.constants import *

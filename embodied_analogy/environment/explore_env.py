@@ -56,7 +56,7 @@ class ExploreEnv(ObjEnv):
         self.obj_description = task_cfg["obj_description"]
         self.has_valid_explore = False
         
-    def explore_stage(self, save_path="./", visualize=False):
+    def explore_stage(self, save_path=None, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
             NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
@@ -74,6 +74,10 @@ class ExploreEnv(ObjEnv):
             data_source="droid", # TODO
             visualize=visualize
         )
+        # self.affordance_map_2d.fit_GMM(
+        #     data=self.affordance_map_2d.sample_prob(alpha=30, num_samples=3000, return_rgb_frame=False, visualize=False),
+        #     visualize=True
+        # )
         # 在这里保存 first frame
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
@@ -85,9 +89,11 @@ class ExploreEnv(ObjEnv):
         num_tries = 0
         while num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
-            self.open_gripper()
-            self.reset_robot()
             self.obj_repr.clear_frames()
+            if num_tries == 0:
+                self.reset_robot()
+            else:
+                self.reset_robot_safe()
             
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
             num_tries += 1
@@ -118,7 +124,7 @@ class ExploreEnv(ObjEnv):
         visualize=False      
     ):
         """
-            在当前状态下进行一次探索, 默认此时的 robot arm 处于 rest 状态
+            在当前状态下进行一次探索, 默认此时的 robot arm 处于 reset 状态
             返回 explore_ok, explore_uv:
                 explore_ok: bool, 代表 plan 阶段是否成功
                 explore_uv: np.array([2,]), 代表本次尝试的 contact point 的 uv
@@ -150,10 +156,11 @@ class ExploreEnv(ObjEnv):
         dir_out_w = Tc2w[:3, :3] @ cur_frame.dir_out # 3
         
         result_pre = None
-        depth_mask = get_depth_mask(cur_frame.depth, self.camera_intrinsic, Tw2c, height=0.02)
-        pc_collision_c = depth_image_to_pointcloud(cur_frame.depth, obj_mask & depth_mask, self.camera_intrinsic) # N, 3
-        pc_colors = cur_frame.rgb[obj_mask & depth_mask]
-        pc_collision_w = camera_to_world(pc_collision_c, Tw2c)
+        # NOTE: 这里没有使用 get_obj_pc, 因为每次 explore 都会有新的 cur_frame, 因此并不总有 obj_mask 信息
+        pc_collision_w, pc_colors = cur_frame.get_env_pc(
+            use_height_filter=False,
+            world_frame=True
+        )
         self.planner.update_point_cloud(pc_collision_w)
             
         for grasp_w in grasps_w:

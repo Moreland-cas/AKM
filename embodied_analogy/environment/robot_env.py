@@ -201,15 +201,29 @@ class RobotEnv(BaseEnv):
             self.base_step()
             count += 1
     
-    def reset_robot_with_pc(self, pc=None):        
+    def reset_robot_safe(self):        
         # 先打开 gripper, 再撤退一段距离
         self.open_gripper()
+        
+        self.base_step()
+        self.planner.update_point_cloud(
+            self.capture_frame().get_env_pc(
+                use_robot_mask=True,
+                use_height_filter=False,
+                world_frame=True
+            )[0]
+        )
+        
         self.move_forward(-0.05) # 向后撤退 5 cm
         
-        # 读取一帧 rgbd， 经过 sam 得到 pc， 对 pc 进行处理
-        if pc is None:
-            pc = np.array([[0, 0, -1]])
-        self.planner.update_point_cloud(pc)
+        self.base_step()
+        self.planner.update_point_cloud(
+            self.capture_frame().get_env_pc(
+                use_robot_mask=True,
+                use_height_filter=False,
+                world_frame=True
+            )[0]
+        )
         
         self.reset_robot()
         

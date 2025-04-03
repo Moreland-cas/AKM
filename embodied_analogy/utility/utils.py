@@ -12,7 +12,7 @@ import graspnetAPI
 from pytorch_lightning import seed_everything
 from featup.util import pca, remove_axes
 import matplotlib
-matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
+# matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 from typing import List, Union

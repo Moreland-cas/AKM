@@ -100,10 +100,9 @@ class Affordance_map_2d:
         resized_mask = resized_mask > 0
         self.cos_map[~resized_mask] = -1
         
-    def sample_prob(self, alpha=10, visualize=False):
+    def sample_prob(self, alpha=10, num_samples=1, return_rgb_frame=True, visualize=False):
         """
             首先根据 cos_map 得到 prob_map, 然后随机 sample 一个, 并且保证该点落在 cropped_mask 中
-            TODO Not working well, might need to be fixed
         """
         if self.cos_map.max() == -1:
             assert False, "cos_map 中没有值"
@@ -115,25 +114,26 @@ class Affordance_map_2d:
         self.prob_map = prob_map_normalized
         
         flat_prob_map = prob_map_normalized.flatten()
-        index = np.random.choice(np.arange(flat_prob_map.size), p=flat_prob_map)
-        u_cos, v_cos = divmod(index, self.cos_map.shape[1]) 
-        u_rgb, v_rgb = self.cos_to_rgb_frame(u_cos, v_cos)
+        indices = np.random.choice(np.arange(flat_prob_map.size), size=num_samples, p=flat_prob_map)
+        
+        v_cos, u_cos = np.unravel_index(indices, self.cos_map.shape)
+        u_rgb, v_rgb = zip(*[self.cos_to_rgb_frame(u, v) for u, v in zip(u_cos, v_cos)])
         
         # 由于 cos_map/prob_map 的大小是经过缩放的, 和 cropped_region 的像素坐标并不严格对应, 因此从 prob_map 中采样出的点应该是经过归一化的
         if visualize:
             image_cos = self.get_colored_cos_map()
             image_cos = draw_points_on_image(
                 image=image_cos,
-                uv_list=[(u_cos, v_cos)],
-                radius=5,
+                uv_list=list(zip(u_cos, v_cos)),
+                radius=1,
                 normalized_uv=False
             )
             # image_cos.show()
             
             image_rgb = draw_points_on_image(
                 image=self.rgb_img,
-                uv_list=[(u_rgb, v_rgb)],
-                radius=5,
+                uv_list=list(zip(u_rgb, v_rgb)),
+                radius=1,
                 normalized_uv=False
             )
             # image_rgb.show()
@@ -147,8 +147,110 @@ class Affordance_map_2d:
             # image_mask.show()
             
             concatenate_images(image_cos, image_rgb).show()
-            
-        return (u_rgb, v_rgb)   
+        
+        if return_rgb_frame:
+            return np.array(list(zip(u_rgb, v_rgb)))   
+        else:
+            return np.array(list(zip(u_cos, v_cos)))
+    
+    def draw_covariance_ellipse_depre(self, draw, mean, cov, color='blue', num_points=100):
+        """Draws a covariance ellipse on the given PIL image draw object."""
+        # Calculate the eigenvalues and eigenvectors
+        eigenvalues, eigenvectors = np.linalg.eig(cov)
+        # Calculate the angle of the ellipse
+        angle = np.arctan2(eigenvectors[1, 0], eigenvectors[0, 0])
+
+        # Create points for the ellipse
+        t = np.linspace(0, 2 * np.pi, num_points)
+        ellipse_points = np.array([eigenvalues[0] * np.cos(t), eigenvalues[1] * np.sin(t)])
+        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+        ellipse_points = rotation_matrix @ ellipse_points
+
+        # Translate points to the mean
+        ellipse_points[0, :] += mean[0]
+        ellipse_points[1, :] += mean[1]
+
+        # Draw the ellipse
+        for j in range(num_points):
+            draw.line((ellipse_points[0, j - 1], ellipse_points[1, j - 1], ellipse_points[0, j], ellipse_points[1, j]), fill=color)
+    
+    def draw_covariance_ellipse(self, draw, mean, cov, color='blue', num_points=100):
+        """Draws a covariance ellipse on the given PIL image draw object."""
+        # Calculate the eigenvalues and eigenvectors
+        eigenvalues, eigenvectors = np.linalg.eig(cov)
+
+        # 计算椭圆的半轴长度（0.1个标准差）
+        semi_axes = np.sqrt(eigenvalues) * 3  # 3 * sigma
+
+        # Create points for the ellipse
+        t = np.linspace(0, 2 * np.pi, num_points)
+        ellipse_points = np.array([semi_axes[0] * np.cos(t),
+                                    semi_axes[1] * np.sin(t)])
+        
+        # Rotate the ellipse by the eigenvector angle
+        angle = np.arctan2(eigenvectors[1, 0], eigenvectors[0, 0])
+        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                    [np.sin(angle), np.cos(angle)]])
+        ellipse_points = rotation_matrix @ ellipse_points
+
+        # Translate points to the mean
+        ellipse_points[0, :] += mean[0]
+        ellipse_points[1, :] += mean[1]
+
+        # Draw the ellipse
+        for j in range(num_points):
+            x0, y0 = ellipse_points[0, j - 1], ellipse_points[1, j - 1]
+            x1, y1 = ellipse_points[0, j], ellipse_points[1, j]
+            draw.line((x0, y0, x1, y1), fill=color)
+        
+    def fit_GMM(self, data, visualize=False):
+        import matplotlib.pyplot as plt
+        from sklearn.mixture import BayesianGaussianMixture
+        from scipy.stats import multivariate_normal
+        from PIL import Image, ImageDraw
+        
+        # Fit the Bayesian Gaussian Mixture Model
+        gmm = BayesianGaussianMixture(
+            n_components=10,
+            covariance_type='full',
+            init_params="k-means++",
+            n_init=5,
+            weight_concentration_prior_type='dirichlet_process'
+        )
+        gmm.fit(data)
+        
+        # Get the parameters of the fitted model
+        means = gmm.means_
+        covariances = gmm.covariances_
+        weights = gmm.weights_
+
+        if visualize:
+            # Generate the colored cosine map
+            image_cos = self.get_colored_cos_map()
+            image_pil = image_cos
+            draw = ImageDraw.Draw(image_pil)
+
+            # Draw data points
+            for point in data:
+                draw.ellipse((point[0] - 1, point[1] - 1, point[0] + 1, point[1] + 1), fill='red')
+
+            # Calculate and draw the GMM components
+            for i in range(len(means)):
+                if weights[i] > 0.1:  # Only consider significant components
+                    mean = means[i]
+                    cov = covariances[i]
+
+                    # Draw the Gaussian mean (blue cross)
+                    draw.line((mean[0] - 5, mean[1], mean[0] + 5, mean[1]), fill='blue', width=2)
+                    draw.line((mean[0], mean[1] - 5, mean[0], mean[1] + 5), fill='blue', width=2)
+
+                    # Draw the covariance ellipse
+                    self.draw_covariance_ellipse(draw, mean, cov, color='blue')
+
+            # Show the final image
+            image_pil.show()
+
+        return means, covariances, weights
     
     def sample_highest(self, visualize=False):
         """
@@ -261,10 +363,11 @@ if __name__ == "__main__":
         cropped_region=input_data["cropped_region"],
     )
     affordance_map_2d.get_obj_mask(False)
-    # uv_rgb = affordance_map_2d.sample_prob(alpha=0, visualize=True)
-    uv_rgb = affordance_map_2d.sample_highest(visualize=True)
-    affordance_map_2d.update(uv_rgb, visualize=False)
-    uv_rgb = affordance_map_2d.sample_highest(visualize=True)
-    affordance_map_2d.update(uv_rgb, visualize=False)
-    uv_rgb = affordance_map_2d.sample_highest(visualize=True)
+    uv_rgb = affordance_map_2d.sample_prob(alpha=30, num_samples=1000, return_rgb_frame=False, visualize=False)
+    affordance_map_2d.fit_GMM(data=uv_rgb, visualize=True)
+    # uv_rgb = affordance_map_2d.sample_highest(visualize=True)
+    # affordance_map_2d.update(uv_rgb, visualize=False)
+    # uv_rgb = affordance_map_2d.sample_highest(visualize=True)
+    # affordance_map_2d.update(uv_rgb, visualize=False)
+    # uv_rgb = affordance_map_2d.sample_highest(visualize=True)
     
