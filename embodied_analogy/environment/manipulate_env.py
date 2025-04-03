@@ -95,7 +95,7 @@ class ManipulateEnv(ReconEnv):
         
         if visualize:
             pass
-    def manip_stage(self, visualize=False):
+    def manip_stage(self, load_path=None, visualize=False):
         """
         manipulate 的执行逻辑:
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
@@ -104,6 +104,9 @@ class ManipulateEnv(ReconEnv):
         
         移动到该位姿, 并根据 target_state 进行操作
         """
+        if load_path is not None:
+            self.obj_repr.load(load_path)
+            
         Tc2w = np.linalg.inv(self.camera_extrinsic)
         
         self.set_goal()
@@ -183,26 +186,22 @@ if __name__ == '__main__':
             "active_joint_name": "joint_0",
         },
     }
-    # task_cfg={
-    #     "instruction": "open the microwave",
-    #     "obj_description": "microwave",
-    #     "delta_state": np.deg2rad(30),
-    #     "obj_cfg": {
-    #         "index": 7221,
-    #         "scale": 0.4,
-    #         "pose": [0.8, 0.1, 0.6],
-    #         "active_link": "link_0",
-    #         "active_joint": "joint_0",
-    #         "joint_limit": None,
-    #         "init_state": 0
-    #     }
-    # }
+    recon_cfg={
+        "num_initial_pts": 1000,
+        "num_kframes": 5,
+        "fine_lr": 1e-3
+    }
     me = ManipulateEnv(
         explore_cfg=explore_cfg,
+        recon_cfg=recon_cfg,
         task_cfg=task_cfg
     )
-    # me.obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
-    me.main()
+    obj_index = task_cfg["obj_cfg"]["asset_path"].split("/")[-1].split("_")[0]
+    me.manip_stage(
+        # load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/recon_data.pkl",
+        load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/48878/recon_data.pkl",
+        visualize=False
+    )
     
     while True:
         me.base_step()

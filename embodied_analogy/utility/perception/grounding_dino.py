@@ -23,6 +23,7 @@ def run_groundingDINO(
     dino_model=None,
     visualize=False
 ):
+    assert image is not None
     model = dino_model
     if model is None:
         model = load_groundingDINO_model()

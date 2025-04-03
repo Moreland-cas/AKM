@@ -76,8 +76,8 @@ class ObjEnv(RobotEnv):
         self.obj_init_rot_high = 0.2
         self.obj_init_dis_low = 0.5
         self.obj_init_dis_high = 0.6
-        self.obj_init_height_low = 0.02
-        self.obj_init_height_high = 0.05
+        self.obj_init_height_low = 0.0
+        self.obj_init_height_high = 0.0
         self.obj_init_dof_low = 0.0
         self.obj_init_dof_high = 0.0
         

@@ -40,11 +40,16 @@ class Data():
         with open(file_path, "wb") as f:
             pickle.dump(self, f)
     
-    @classmethod
+    # @classmethod
+    # def load(self, file_path):
+    #     with open(file_path, "rb") as f:
+    #         self = pickle.load(f)
+        
     def load(self, file_path):
         with open(file_path, "rb") as f:
-            return pickle.load(f)
-        
+            loaded_data = pickle.load(f)
+            # 更新当前实例的属性
+            self.__dict__.update(loaded_data.__dict__)
         
 class Frame(Data):
     def __init__(
@@ -399,10 +404,27 @@ class Frames(Data):
         
         # 对得到的 track3d_seq 进行过滤
         if filter:
-            # TODO: 这里可以加上 robot_mask 的 filter
-            consis_mask = filter_tracks_by_consistency(track3d_seq, threshold=0.02) # M
-            track2d_seq = track2d_seq[:, consis_mask]
-            track3d_seq = track3d_seq[:, consis_mask]
+            def filter_pixel_tracks(boolean_mask, pixel_tracks):
+                T, H, W = boolean_mask.shape
+                M = pixel_tracks.shape[1]
+                # 创建一个大小为 M 的布尔掩码，初始化为 True
+                output_mask = np.ones(M, dtype=bool)
+                for m in range(M):
+                    for t in range(T):
+                        u, v = pixel_tracks[t, m]
+                        u, v = int(u), int(v)
+                        # 检查坐标 (u, v) 是否在布尔掩码中为 True
+                        if u < 0 or u >= H or v < 0 or v >= W or not boolean_mask[t, v, u]:
+                            output_mask[m] = False
+                            break  # 一旦发现不满足条件，就可以停止检查
+                return output_mask
+            
+            robot_filter = filter_pixel_tracks(~self.get_robot_mask_seq(), track2d_seq)
+            consis_filter = filter_tracks_by_consistency(track3d_seq, threshold=0.02) # M
+            
+            filter_mask = robot_filter & consis_filter
+            track2d_seq = track2d_seq[:, filter_mask]
+            track3d_seq = track3d_seq[:, filter_mask]
             self.track2d_seq = track2d_seq
             self.track3d_seq = track3d_seq
     

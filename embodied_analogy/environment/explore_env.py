@@ -56,7 +56,7 @@ class ExploreEnv(ObjEnv):
         self.obj_description = task_cfg["obj_description"]
         self.has_valid_explore = False
         
-    def explore_stage(self, visualize=False):
+    def explore_stage(self, save_path="./", visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
             NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
@@ -72,7 +72,7 @@ class ExploreEnv(ObjEnv):
             query_rgb=initial_frame.rgb,
             instruction=self.instruction,
             data_source="droid", # TODO
-            visualize=False
+            visualize=visualize
         )
         # 在这里保存 first frame
         self.obj_repr.obj_description = self.obj_description
@@ -92,18 +92,24 @@ class ExploreEnv(ObjEnv):
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
             num_tries += 1
             if not actually_tried:
-                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=True)
+                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
             
             if self.check_valid():
                 break
             else:
-                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=True)
+                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
         # save explore data
         if not self.has_valid_explore:
             print("No valid exploration during explore phase!")
             raise Exception("No valid exploration during explore phase!")
+        
+        if visualize:
+            self.obj_repr.visualize()
+            
+        if save_path is not None:
+            self.obj_repr.save(save_path)
             
     def explore_once(
         self, 
@@ -158,7 +164,7 @@ class ExploreEnv(ObjEnv):
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             # TODO 这里可能需要更改
             if result_pre is not None:
-                if visualize or True:
+                if visualize:
                     visualize_pc(
                         points=pc_collision_w, 
                         colors=pc_colors / 255,
@@ -225,11 +231,6 @@ class ExploreEnv(ObjEnv):
             return True
         else:
             return False
-    
-    def save(self, file_path=None, visualize=False):
-        if visualize:
-            self.obj_repr.visualize()
-        self.obj_repr.save(file_path)
         
     
 if __name__ == "__main__":

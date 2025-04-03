@@ -138,7 +138,7 @@ class Obj_repr(Data):
         )
         self.frames[0].sample_points(num_points=num_initial_pts, visualize=visualize)
         self.frames.track_points(visualize=visualize)
-        self.frames.track2d_to_3d(visualize=visualize)
+        self.frames.track2d_to_3d(filter=True, visualize=visualize)
         self.frames.cluster_track3d(visualize=visualize)
         self.coarse_joint_estimation(visualize=visualize)
         self.initialize_kframes(num_kframes=num_kframes, save_memory=True)
@@ -307,7 +307,8 @@ if __name__ == "__main__":
     # microwave
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/reconstruct/recon_data.pkl")
-    # obj_repr.visualize()
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/48878/recon_data.pkl")
+    obj_repr.visualize()
     
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
     pass
