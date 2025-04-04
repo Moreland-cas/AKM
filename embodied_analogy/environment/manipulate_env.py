@@ -163,15 +163,23 @@ class ManipulateEnv(ReconEnv):
         loss = actual_delta - self.gt_delta
         return loss
     
-    def main(self):
-        # self.explore_stage(visualize=False)
+    def main(self, visualize=False):
+        result = {
+            "exception": "",
+            "loss": None,
+        }
+        
         try:
-            self.explore_stage(visualize=False)
-            self.recon_stage()
-            self.manip_stage()
-            self.evaluate()
+            self.explore_stage(visualize=visualize)
+            self.recon_stage(visualize=visualize)
+            self.manip_stage(visualize=visualize)
+            loss = self.evaluate()
+            result["loss"] = loss
         except Exception as e:
             print(e)
+            result["exception"] = str(e)
+        
+        return result
             
         
 if __name__ == '__main__':

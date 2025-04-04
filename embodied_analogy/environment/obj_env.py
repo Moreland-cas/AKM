@@ -77,6 +77,7 @@ class ObjEnv(RobotEnv):
         对于 obj_cfg 中的 pose 进行随机化
         根据 tack_cfg 中的 open/close 以及 delta 值, 计算物体的 active_link 的初始状态的范围, 并随机选取一个值进行初始化
         """
+        # TODO: 需要修改这个, 以保证任务的有效性
         self.obj_init_pos_angle_low = -0.4
         self.obj_init_pos_angle_high = 0.4
         self.obj_init_rot_low = -0.2
