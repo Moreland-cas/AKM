@@ -71,7 +71,7 @@ class ExploreEnv(ObjEnv):
         self.affordance_map_2d = get_ram_affordance_2d(
             query_rgb=initial_frame.rgb,
             instruction=self.instruction,
-            data_source="droid", # TODO
+            obj_description=self.obj_description,
             visualize=visualize
         )
         # self.affordance_map_2d.fit_GMM(

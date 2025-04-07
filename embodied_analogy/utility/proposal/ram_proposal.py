@@ -69,7 +69,7 @@ def project_normals(img, pixel, normals, visualize=False):
 def get_ram_affordance_2d(
     query_rgb, # H, W, 3 in numpy
     instruction, # open the drawwer
-    data_source, # droid TODO: 把 data_source 扩充一下
+    obj_description, # drawer
     visualize=False
 ):
     """
@@ -83,7 +83,6 @@ def get_ram_affordance_2d(
         lang_mode='clip',
         topk=5, 
         crop=True, 
-        data_source=data_source,
     )
     
     # use retrieval to get ref_path (or ref image) and ref trajectory in 2d space
@@ -91,6 +90,7 @@ def get_ram_affordance_2d(
     topk_retrieved_data_dict = subset_retrieve_pipeline.retrieve(
         current_task=instruction,
         current_obs=query_rgb,
+        obj_description=obj_description,
         log=True,
         visualize=False
     )

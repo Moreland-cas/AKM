@@ -156,7 +156,7 @@ def get_end_start_direction(trajs):
     return dirs
 
 class SubsetRetrievePipeline:
-    def __init__(self, subset_dir, save_root=None, topk=5, lang_mode='clip', crop=True, data_source=None) -> None:
+    def __init__(self, subset_dir, save_root=None, topk=5, lang_mode='clip', crop=True) -> None:
         self.subset_dir = subset_dir
         self.save_root = save_root
         self.topk = topk
@@ -169,16 +169,15 @@ class SubsetRetrievePipeline:
         task_list_droid = os.listdir(os.path.join(subset_dir, "droid"))
         task_list_hoi4d = os.listdir(os.path.join(subset_dir, "HOI4D"))
         task_list_customize = os.listdir(os.path.join(subset_dir, "customize"))
-        if data_source == "droid":
-            task_list = task_list_droid
-        elif data_source == "HOI4D":
-            task_list = task_list_hoi4d
-        elif data_source == "customize":
-            task_list = task_list_customize
-        else:
-            raise ValueError("data_source should be 'droid' or 'HOI4D' or 'customize'")
-
-        self.data_source = data_source
+        
+        self.task_dict = {
+            "droid": [task.replace("_", " ") for task in task_list_droid],
+            "hoi4d": [task.replace("_", " ") for task in task_list_hoi4d],
+            "customize": [task.replace("_", " ") for task in task_list_customize]
+        }
+        # 将三个列表合并为一个, 并且将其中的 pickup 类删除
+        task_list = task_list_droid + task_list_hoi4d + task_list_customize
+        task_list = [task for task in task_list if not task.startswith("pickup")]
 
         self.task_list = [task.replace("_", " ") for task in task_list]
 
@@ -256,7 +255,8 @@ class SubsetRetrievePipeline:
             "img": [],
             "traj": [],
             "masked_img": [],
-            "mask": []
+            "mask": [],
+            "feat": []
         }
         
         for idx in range(len(sorted_index)):
@@ -269,6 +269,7 @@ class SubsetRetrievePipeline:
                 sorted_retrieved_data_dict["traj"].append(retrieved_data_dict["traj"][sorted_index[idx]])
                 sorted_retrieved_data_dict["masked_img"].append(retrieved_data_dict['masked_img'][sorted_index[idx]])
                 sorted_retrieved_data_dict["mask"].append(retrieved_data_dict['mask'][sorted_index[idx]])
+                sorted_retrieved_data_dict["feat"].append(retrieved_data_dict['feat'][sorted_index[idx]])
                 
                 if len(sorted_retrieved_data_dict["img"]) >= MAX_IMD_RANKING_NUM:
                     break
@@ -289,12 +290,20 @@ class SubsetRetrievePipeline:
         src_ft = extract_ft(Image.fromarray(sorted_retrieved_data_dict['masked_query']).convert("RGB"), prompt=obj_prompt, ftype='sd') # 1,c,h,w
         src_mask = sorted_retrieved_data_dict["query_mask"]
         imd_distances = []
-        sorted_retrieved_data_dict["feat"] = []
-        for idx in tqdm(range(len(sorted_retrieved_data_dict["img"]))):
-            tgt_ft = extract_ft(Image.fromarray(sorted_retrieved_data_dict['masked_img'][idx]).convert("RGB"), prompt=obj_prompt, ftype='sd')
-            sorted_retrieved_data_dict["feat"].append(tgt_ft)
-            tgt_mask = sorted_retrieved_data_dict["mask"][idx]
-            imd_distances.append(get_distance_imd(src_ft, tgt_ft, src_mask, tgt_mask))
+        if "feat" not in sorted_retrieved_data_dict:
+            print("sd feat is not preprocessed, this will cause a lot more time")
+            sorted_retrieved_data_dict["feat"] = []
+            for idx in tqdm(range(len(sorted_retrieved_data_dict["img"]))):
+                tgt_ft = extract_ft(Image.fromarray(sorted_retrieved_data_dict['masked_img'][idx]).convert("RGB"), prompt=obj_prompt, ftype='sd')
+                sorted_retrieved_data_dict["feat"].append(tgt_ft)
+                tgt_mask = sorted_retrieved_data_dict["mask"][idx]
+                imd_distances.append(get_distance_imd(src_ft, tgt_ft, src_mask, tgt_mask))
+        else:
+            for idx in tqdm(range(len(sorted_retrieved_data_dict["img"]))):
+                tgt_ft = sorted_retrieved_data_dict["feat"][idx]
+                tgt_mask = sorted_retrieved_data_dict["mask"][idx]
+                imd_distances.append(get_distance_imd(src_ft, tgt_ft, src_mask, tgt_mask))
+                
         sorted_index = np.argsort(imd_distances) # from smaller to larger, but the smaller, the better
         topk_retrieved_data_dict = {
             "query_img": sorted_retrieved_data_dict["query_img"],
@@ -320,13 +329,23 @@ class SubsetRetrievePipeline:
         return topk_retrieved_data_dict
 
     def load_retrieved_task_from_pkl(self, retrieved_task):
-        task_dir = os.path.join(self.subset_dir, self.data_source, retrieved_task.replace(" ", "_"))
-        if os.path.exists(os.path.join(task_dir, retrieved_task.replace(" ", "_") + "_new.pkl")):
-            with open(os.path.join(task_dir, retrieved_task.replace(" ", "_") + "_new.pkl"), 'rb') as f:
+        # 首先在这里根据 retrieved_task 解析出对应的 data_source 然后进行 load 
+        data_source = None
+        for source, tasks in self.task_dict.items():
+            if retrieved_task in tasks:
+                data_source = source
+                break
+        assert data_source is not None, "retrieved_task not found in task_dict"
+        task_dir = os.path.join(self.subset_dir, data_source, retrieved_task.replace(" ", "_"))
+        if os.path.exists(os.path.join(task_dir, retrieved_task.replace(" ", "_") + "_new_sd.pkl")):
+            with open(os.path.join(task_dir, retrieved_task.replace(" ", "_") + "_new_sd.pkl"), 'rb') as f:
                 retrieved_data_dict = pickle.load(f)
+        else:
+            read_path = os.path.join(task_dir, retrieved_task.replace(" ", "_") + "_new_sd.pkl")
+            assert f"{read_path} does not exist, run pre extract first"
         return retrieved_data_dict
 
-    def retrieve(self, current_task, current_obs, log=False, visualize=False):
+    def retrieve(self, current_task, current_obs, obj_description, log=False, visualize=False):
         """
             current_task: "open the drawer"
             current_obs: numpy rgb image
@@ -342,10 +361,8 @@ class SubsetRetrievePipeline:
         retrieved_data_dict = self.load_retrieved_task_from_pkl(retrieved_task) # img, traj, masked_img, mask
 
         if log: print("<3> Segment out the object from our observation")
-        # TODO: 这里是不是需要从 current_task 中解析出物体的名称先
-        query_obj_description = current_task.split(" ")[-1]
         # masked_frames, masks, trajs, regions
-        query_frame, query_mask, _, query_region = self.segment_objects([current_obs], query_obj_description)
+        query_frame, query_mask, _, query_region = self.segment_objects([current_obs], obj_description)
         
         retrieved_data_dict['query_img'] = current_obs
         retrieved_data_dict['query_mask'] = query_mask[0]

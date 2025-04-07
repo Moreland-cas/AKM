@@ -183,53 +183,51 @@ class ManipulateEnv(ReconEnv):
             
         
 if __name__ == '__main__':
-    explore_cfg={
-        "record_fps": 30,
-        "pertubation_distance": 0.1,
-        "max_tries": 100,
-        "update_sigma": 0.05
-    }
-    # task_cfg={
-    #     "instruction": "open the drawer",
-    #     "obj_description": "drawer",
-    #     "delta_state": 0.1,
-    #     "obj_cfg": {
-    #         "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/48878_link_0", 
-    #         "scale": 0.8,
-    #         "active_link_name": "link_0",
-    #         "active_joint_name": "joint_0",
-    #     },
-    # }
-    task_cfg={
-        "instruction": "open the drawer",
-        "obj_description": "drawer",
-        "delta": 0.4,
-        "obj_cfg": {
-            "asset_path": "/home/zby/Programs/VideoTracking-For-AxisEst/downloads/dataset/one_drawer_cabinet/47578_link_2", 
-            "scale": 1.0,
-            "active_link_name": "link_2",
-            "active_joint_name": "joint_2",
-        },
-    }
-    recon_cfg={
-        "num_initial_pts": 1000,
-        "num_kframes": 5,
-        "fine_lr": 1e-3
-    }
+    cfg = {
+        'base_cfg': {
+            'phy_timestep': 0.004, 
+            'planner_timestep': 0.01, 
+            'use_sapien2': True
+            }, 
+        'robot_cfg': {}, 
+        'explore_cfg': {
+            'record_fps': 30, 
+            'pertubation_distance': 0.1, 
+            'max_tries': 10, 
+            'update_sigma': 0.05
+            }, 
+        'recon_cfg': {
+            'num_initial_pts': 1000, 
+            'num_kframes': 5, 
+            'fine_lr': 0.001
+            }, 
+        'manip_cfg': {
+            'reloc_lr': 0.003, 
+            'reserved_distance': 0.05
+            }, 
+        'task_cfg': {
+            'instruction': 'open the cabinet', 
+            'obj_description': 'cabinet', 
+            'delta': 0.2617993877991494, 
+            'obj_cfg': {
+                'asset_path': '/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/46134_link_0', 
+                'scale': 1.0, 
+                'active_link_name': 'link_0', 
+                'active_joint_name': 'joint_0', 
+                # 'pose': Pose([0.917415, 0.148381, 0.512052], [0.988918, 0, 0, 0.148461]), 
+                # 'init_joint_state': 0.0
+                }
+            }
+        }
     me = ManipulateEnv(
-        explore_cfg=explore_cfg,
-        recon_cfg=recon_cfg,
-        task_cfg=task_cfg
+        explore_cfg=cfg["explore_cfg"],
+        recon_cfg=cfg["recon_cfg"],
+        task_cfg=cfg["task_cfg"]
     )
-    obj_index = task_cfg["obj_cfg"]["asset_path"].split("/")[-1].split("_")[0]
+    # obj_index = task_cfg["obj_cfg"]["asset_path"].split("/")[-1].split("_")[0]
     # me.explore_stage()
     # me.recon_stage(save_path="/home/zby/Prograwms/Embodied_Analogy/assets/tmp/47578/recon_data.pkl")
-    me.manip_stage(
-        # load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/recon_data.pkl",
-        load_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/47578/recon_data.pkl",
-        evaluate=True,
-        visualize=False
-    )
+    result = me.main(visualize=False)
     
     while True:
         me.base_step()
