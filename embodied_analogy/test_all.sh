@@ -44,6 +44,7 @@ mkdir -p "$LOG_DIR/revolute"
 #                     --planner_timestep=0.01 \
 #                     --record_fps=30 \
 #                     --pertubation_distance=0.1 \
+#                     --valid_thresh=0.5 \
 #                     --max_tries=10 \
 #                     --update_sigma=0.05 \
 #                     --num_initial_pts=1000 \
@@ -87,6 +88,7 @@ for action in "${actions[@]}"; do
                     --planner_timestep=0.01 \
                     --record_fps=30 \
                     --pertubation_distance=0.1 \
+                    --valid_thresh=0.5 \
                     --max_tries=10 \
                     --update_sigma=0.05 \
                     --num_initial_pts=1000 \

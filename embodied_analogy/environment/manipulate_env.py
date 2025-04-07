@@ -171,7 +171,7 @@ class ManipulateEnv(ReconEnv):
         
         try:
             self.explore_stage(visualize=visualize)
-            self.recon_stage(visualize=visualize)
+            self.recon_stage(visualize=True)
             self.manip_stage(visualize=visualize)
             loss = self.evaluate()
             result["loss"] = loss
@@ -193,6 +193,7 @@ if __name__ == '__main__':
         'explore_cfg': {
             'record_fps': 30, 
             'pertubation_distance': 0.1, 
+            "valid_thresh": 0.5,
             'max_tries': 10, 
             'update_sigma': 0.05
             }, 
@@ -210,10 +211,10 @@ if __name__ == '__main__':
             'obj_description': 'cabinet', 
             'delta': 0.2617993877991494, 
             'obj_cfg': {
-                'asset_path': '/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/46134_link_0', 
+                'asset_path': '/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/46277_link_1', 
                 'scale': 1.0, 
-                'active_link_name': 'link_0', 
-                'active_joint_name': 'joint_0', 
+                'active_link_name': 'link_1', 
+                'active_joint_name': 'joint_1', 
                 # 'pose': Pose([0.917415, 0.148381, 0.512052], [0.988918, 0, 0, 0.148461]), 
                 # 'init_joint_state': 0.0
                 }

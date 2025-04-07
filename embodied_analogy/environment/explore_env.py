@@ -48,6 +48,7 @@ class ExploreEnv(ObjEnv):
         self.record_fps = explore_cfg["record_fps"]
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
         self.pertubation_distance = explore_cfg["pertubation_distance"]
+        self.valid_thresh = explore_cfg["valid_thresh"]
         self.instruction = task_cfg["instruction"]
         
         self.update_sigma = explore_cfg["update_sigma"]
@@ -101,7 +102,7 @@ class ExploreEnv(ObjEnv):
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
             
-            if self.check_valid():
+            if self.check_valid(visualize=visualize):
                 break
             else:
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
@@ -200,6 +201,7 @@ class ExploreEnv(ObjEnv):
             joint_start=None,
             moving_distance=pertubation_distance
         )
+        
         self.step = self.base_step 
         
         return True, contact_uv
@@ -213,7 +215,7 @@ class ExploreEnv(ObjEnv):
             cur_frame = self.capture_frame()
             self.obj_repr.frames.append(cur_frame)
             
-    def check_valid(self):
+    def check_valid(self, visualize=False):
         if self.obj_repr.frames.num_frames() == 0:
             return False
         
@@ -225,15 +227,37 @@ class ExploreEnv(ObjEnv):
         last_frame = self.obj_repr.frames[-1]
         last_frame.segment_obj(obj_description=self.obj_description)
         
-        # 计算前后两帧 depth_map 的差值的变化程度
-        diff = np.abs(first_frame.depth - last_frame.depth) # H, W
-        diff_masked = diff[first_frame.obj_mask & last_frame.obj_mask] # N
+        # 计算首尾两帧的共同可见点云的变化情况
+        first_frame.obj_mask = first_frame.obj_mask & last_frame.obj_mask
+        last_frame.obj_mask = first_frame.obj_mask & last_frame.obj_mask
+        
+        first_pc_w, first_pc_color = first_frame.get_obj_pc(
+            use_robot_mask=True,
+            use_height_filter=True,
+            world_frame=True,
+        )
+        last_pc_w, last_pc_color = last_frame.get_obj_pc(
+            use_robot_mask=True,
+            use_height_filter=True,
+            world_frame=True,
+        )
+        if visualize:
+            visualize_pc(
+                first_pc_w, 
+                colors=first_pc_color / 255., 
+            )
+            visualize_pc(
+                last_pc_w, 
+                colors=last_pc_color / 255., 
+            )
+        diff_w = last_pc_w - first_pc_w  # N, 3
+        norm_w = np.linalg.norm(diff_w, axis=-1) # N
         
         # 将 diff_masked 进行聚类, 将变化大的一部分的平均值与 pertubation_distance 的 0.5 倍进行比较
-        diff_centroid, _, _ = cluster.k_means(diff_masked[:, None], init="k-means++", n_clusters=2)
+        centroids, _, _ = cluster.k_means(norm_w[:, None], init="k-means++", n_clusters=2)
         
         # 这里 0.5 是一个经验值, 因为对于旋转这个值不好解析的计算
-        if diff_centroid.max() > self.pertubation_distance * 0.5:
+        if centroids.max() > self.pertubation_distance * self.valid_thresh:
             self.has_valid_explore = True
             return True
         else:

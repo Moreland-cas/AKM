@@ -145,7 +145,12 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     # 即 tracks_3d_diff @ joint_start = (tracks_3d_mid * tracks_3d_diff).sum(axis=-1)
     tracks_3d_mid = (tracks_3d_mean[1:, ...] + tracks_3d_mean[:-1, ...]) / 2.0
     tracks_3d_mid = tracks_3d_mid.reshape(-1, 3) # N, 3
-    joint_start, _, _, _ = np.linalg.lstsq(tracks_3d_flow, (tracks_3d_flow * tracks_3d_mid).sum(axis=-1), rcond=None)
+    # old way of estimating joint_start, not stable!
+    # joint_start, _, _, _ = np.linalg.lstsq(tracks_3d_flow, (tracks_3d_flow * tracks_3d_mid).sum(axis=-1), rcond=None)
+    # New way of estimating joint_start, stable!
+    # 即找到运动轨迹最小的点, 那样的点是最接近旋转轴的
+    min_idx = np.argmin(np.linalg.norm(tracks_3d_diff, axis=-1).mean(0))
+    joint_start = tracks_3d[0, min_idx]
     joint_start = remove_dir_component(joint_start, joint_dir)
     # print(joint_dir, joint_start)
     

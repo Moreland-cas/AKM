@@ -44,26 +44,26 @@ class ObjEnv(RobotEnv):
         self.gt_start_joint_state = self.get_active_joint_state()
         self.gt_delta = task_cfg["delta"]
         
-    def change_obj(self, obj_cfg):
-        '''
-        Change the object in the env
-        '''
+    # def change_obj(self, obj_cfg):
+    #     '''
+    #     Change the object in the env
+    #     '''
 
-        if self.renderer_type == 'sapien' :
-            self.scene.remove_articulation(self.obj)
-            if config is None :
-                self._add_object(*self._generate_object_config())
-            else :
-                self._add_object(*self._load_object_config(config))
-        elif self.renderer_type == 'client' :
-            # remove_articulation not supported in client
-            # So only change the randomization params
-            path, dof, pose = self._generate_object_config()
-            self.obj.set_qpos(dof)
-            self.obj.set_root_pose(pose)
-            self.obj_root_pose = pose
-            self.obj_init_dof = dof
-        pass
+    #     if self.renderer_type == 'sapien' :
+    #         self.scene.remove_articulation(self.obj)
+    #         if config is None :
+    #             self._add_object(*self._generate_object_config())
+    #         else :
+    #             self._add_object(*self._load_object_config(config))
+    #     elif self.renderer_type == 'client' :
+    #         # remove_articulation not supported in client
+    #         # So only change the randomization params
+    #         path, dof, pose = self._generate_object_config()
+    #         self.obj.set_qpos(dof)
+    #         self.obj.set_root_pose(pose)
+    #         self.obj_root_pose = pose
+    #         self.obj_init_dof = dof
+    #     pass
         
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)

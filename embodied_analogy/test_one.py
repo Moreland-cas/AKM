@@ -19,6 +19,8 @@ def update_cfg(base_cfg, args):
         base_cfg['explore_cfg']['record_fps'] = args.record_fps
     if args.pertubation_distance is not None:
         base_cfg['explore_cfg']['pertubation_distance'] = args.pertubation_distance
+    if args.valid_thresh is not None:
+        base_cfg['explore_cfg']['valid_thresh'] = args.valid_thresh
     if args.max_tries is not None:
         base_cfg['explore_cfg']['max_tries'] = args.max_tries
     if args.update_sigma is not None:
