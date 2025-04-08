@@ -66,6 +66,7 @@ def read_cfg():
     # explore_cfg arguments
     parser.add_argument('--record_fps', type=int, help='Record FPS')
     parser.add_argument('--pertubation_distance', type=float, help='Perturbation distance')
+    parser.add_argument('--valid_thresh', type=float, help='factor of actual Perturbation distance')
     parser.add_argument('--max_tries', type=int, help='Maximum tries')
     parser.add_argument('--update_sigma', type=float, help='Update sigma')
 

@@ -13,58 +13,15 @@ from embodied_analogy.utility.sapien_utils import (
 class ObjEnv(RobotEnv):
     def __init__(
             self,
-            base_cfg={
-                "phy_timestep": 1/250.,
-                "planner_timestep": None,
-                "use_sapien2": True 
-            },
-            robot_cfg={},
-            task_cfg={
-                "instruction": "open the drawer",
-                "obj_description": "drawer",
-                "delta": 0.15,
-                "obj_cfg": {
-                    "index": 44962,
-                    "asset_path": None, 
-                    "scale": 0.8,
-                    "active_link_name": "link_2",
-                    "active_joint_name": "joint_2",
-                    "active_joint_limit": None,
-                },
-            }
+            cfg
         ):        
-        super().__init__(
-            base_cfg=base_cfg,
-            robot_cfg=robot_cfg,
-        )
-        obj_cfg = task_cfg["obj_cfg"]
-        self.load_object(obj_cfg)
+        super().__init__(cfg)
+        self.load_object(cfg)
         
         # 然后在这里记录下 gt_start_joint_state 和 gt_delta
-        self.gt_start_joint_state = self.get_active_joint_state()
-        self.gt_delta = task_cfg["delta"]
-        
-    # def change_obj(self, obj_cfg):
-    #     '''
-    #     Change the object in the env
-    #     '''
+        # self.gt_start_joint_state = self.get_active_joint_state()
+        # self.gt_delta = cfg["delta"]
 
-    #     if self.renderer_type == 'sapien' :
-    #         self.scene.remove_articulation(self.obj)
-    #         if config is None :
-    #             self._add_object(*self._generate_object_config())
-    #         else :
-    #             self._add_object(*self._load_object_config(config))
-    #     elif self.renderer_type == 'client' :
-    #         # remove_articulation not supported in client
-    #         # So only change the randomization params
-    #         path, dof, pose = self._generate_object_config()
-    #         self.obj.set_qpos(dof)
-    #         self.obj.set_root_pose(pose)
-    #         self.obj_root_pose = pose
-    #         self.obj_init_dof = dof
-    #     pass
-        
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)
         # TODO: 在这里获得 gt joint state, 并进行保存到 frame 中
@@ -72,7 +29,7 @@ class ObjEnv(RobotEnv):
             frame.visualize()
         return frame
     
-    def randomize_obj(self, obj_cfg):
+    def randomize_obj(self, cfg):
         """
         对于 obj_cfg 中的 pose 进行随机化
         根据 tack_cfg 中的 open/close 以及 delta 值, 计算物体的 active_link 的初始状态的范围, 并随机选取一个值进行初始化
@@ -137,12 +94,12 @@ class ObjEnv(RobotEnv):
                 return None
             return np.random.uniform(dof_low, dof_high)
         
-        path = obj_cfg["asset_path"]
+        path = cfg["asset_path"]
         bbox_path = os.path.join(path, "bounding_box.json")
         with open(bbox_path, "r") as f:
             bbox = json.load(f)
         
-        pose = randomize_pose(
+        sapien_pose = randomize_pose(
             self.obj_init_pos_angle_low,
             self.obj_init_pos_angle_high,
             self.obj_init_rot_low,
@@ -158,19 +115,20 @@ class ObjEnv(RobotEnv):
             self.obj_init_dof_high
         )
         
-        obj_cfg.update({
-            "pose": pose,
-            "init_joint_state": dof
+        cfg.update({
+            "load_pose": sapien_pose.p.tolist(),
+            "load_quat": sapien_pose.q.tolist(),
+            "load_scale": 1
+            # "init_joint_state": dof
         })
-        return path, dof, pose
+        return path, dof, sapien_pose
     
     def load_object(self, obj_cfg):
         # 首先获取 obj 的 pose
-        self.randomize_obj(obj_cfg)
+        _, _, sapien_pose = self.randomize_obj(obj_cfg)
         
         # index = obj_cfg["index"]
-        scale = obj_cfg["scale"]
-        pose = obj_cfg["pose"]
+        scale = obj_cfg["load_scale"]
         active_link = obj_cfg["active_link_name"]
         
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
@@ -202,7 +160,7 @@ class ObjEnv(RobotEnv):
             config=load_config
         )
         
-        self.obj.set_root_pose(pose)
+        self.obj.set_root_pose(sapien_pose)
         
         # 设置物体关节的参数, 把回弹关掉
         initial_states = []
@@ -211,7 +169,8 @@ class ObjEnv(RobotEnv):
             
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
             if joint.get_name() == obj_cfg["active_joint_name"]:
-                initial_states.append(obj_cfg["init_joint_state"])
+                # initial_states.append(obj_cfg["init_joint_state"])
+                initial_states.append(0)
                 self.active_joint_name = obj_cfg["active_joint_name"]
                 self.active_joint_idx = i
             else:

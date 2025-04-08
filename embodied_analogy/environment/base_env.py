@@ -11,15 +11,12 @@ from embodied_analogy.utility.utils import visualize_pc
 class BaseEnv():
     def __init__(
             self,
-            base_cfg={
-                "phy_timestep": 1/250.,
-                "planner_timestep": None,
-                "use_sapien2": True 
-            },
+            cfg
         ):        
-        phy_timestep = base_cfg["phy_timestep"]
-        planner_timestep = base_cfg["planner_timestep"]
-        use_sapien2 = base_cfg["use_sapien2"]
+        self.cfg = cfg
+        phy_timestep = cfg["phy_timestep"]
+        planner_timestep = cfg["planner_timestep"]
+        use_sapien2 = cfg["use_sapien2"]
         
         self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
         self.cur_steps = 0

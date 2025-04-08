@@ -8,6 +8,7 @@ REVOLUTE_DATA_ROOT="/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_
 # 定义实验参数
 prismatic_sizes=(0.05 0.1 0.2)  # Prismatic 使用的尺寸
 revolute_sizes=(0.2617993877991494 0.5235987755982988 0.7853981633974483)   # Revolute 使用的尺寸
+revolute_sizes=(0.5235987755982988 0.7853981633974483)
 actions=("open" "close")
 
 # 创建日志目录
@@ -89,7 +90,7 @@ for action in "${actions[@]}"; do
                     --record_fps=30 \
                     --pertubation_distance=0.1 \
                     --valid_thresh=0.5 \
-                    --max_tries=10 \
+                    --max_tries=5 \
                     --update_sigma=0.05 \
                     --num_initial_pts=1000 \
                     --num_kframes=5 \

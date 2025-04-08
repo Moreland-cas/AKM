@@ -1,3 +1,7 @@
+import os
+import json
+import logging
+import pickle
 import math
 import numpy as np
 import sklearn.cluster as cluster
@@ -16,48 +20,33 @@ from embodied_analogy.environment.obj_env import ObjEnv
 class ExploreEnv(ObjEnv):
     def __init__(
             self,
-            base_cfg={
-                "phy_timestep": 1/250.,
-                "planner_timestep": None,
-                "use_sapien2": True 
-            },
-            robot_cfg={},
-            task_cfg={
-                "instruction": "open the drawer",
-                "obj_description": "drawer",
-                "obj_cfg": {
-                    "index": 44962,
-                    "scale": 0.8,
-                    "pose": [1.0, 0., 0.5],
-                    "active_link": "link_2",
-                    "active_joint": "joint_2"
-                },
-            },
-            explore_cfg={
-                "record_fps": 30,
-                "pertubation_distance": 0.1,
-                "max_tries": 10,
-            }
+            cfg
         ):        
-        super().__init__(
-            base_cfg=base_cfg,
-            robot_cfg=robot_cfg,
-            task_cfg=task_cfg
-        )
-        
-        self.record_fps = explore_cfg["record_fps"]
+        super().__init__(cfg=cfg)
+        # self.cfg = cfg
+        self.record_fps = cfg["record_fps"]
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
-        self.pertubation_distance = explore_cfg["pertubation_distance"]
-        self.valid_thresh = explore_cfg["valid_thresh"]
-        self.instruction = task_cfg["instruction"]
+        self.pertubation_distance = cfg["pertubation_distance"]
+        self.valid_thresh = cfg["valid_thresh"]
+        self.instruction = cfg["instruction"]
         
-        self.update_sigma = explore_cfg["update_sigma"]
-        self.max_tries = explore_cfg["max_tries"]
-        # TODO: 用网络完成
-        self.obj_description = task_cfg["obj_description"]
+        self.update_sigma = cfg["update_sigma"]
+        self.max_tries = cfg["max_tries"]
+        self.obj_description = cfg["obj_description"]
         self.has_valid_explore = False
         
-    def explore_stage(self, save_path=None, visualize=False):
+        # 根据 logs_path 和 run_name 和 obj_info 生成 save 的路径
+        logs_path = cfg["logs_path"]
+        run_name = cfg["run_name"]
+        obj_index = cfg["obj_index"]
+        active_joint_name = cfg["active_joint_name"]
+        joint_index = cfg["joint_index"]
+        joint_type = cfg["joint_type"]
+        self.joint_type = joint_type
+        obj_folder = f"{obj_index}_{joint_index}_{joint_type}"
+        self.save_prefix = os.path.join(logs_path, run_name, obj_folder, "explore")
+        
+    def explore_stage(self, save_intermediate=False, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
             NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
@@ -87,17 +76,17 @@ class ExploreEnv(ObjEnv):
         self.obj_repr.frames.Tw2c = self.camera_extrinsic
         self.obj_repr.initial_frame = initial_frame
         
-        num_tries = 0
-        while num_tries < self.max_tries:
+        self.num_tries = 0
+        while self.num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
             self.obj_repr.clear_frames()
-            if num_tries == 0:
+            if self.num_tries == 0:
                 self.reset_robot()
             else:
                 self.reset_robot_safe()
             
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
-            num_tries += 1
+            self.num_tries += 1
             if not actually_tried:
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
@@ -110,13 +99,34 @@ class ExploreEnv(ObjEnv):
         # save explore data
         if not self.has_valid_explore:
             print("No valid exploration during explore phase!")
-            raise Exception("No valid exploration during explore phase!")
+            # raise Exception("No valid exploration during explore phase!")
         
         if visualize:
             self.obj_repr.visualize()
             
-        if save_path is not None:
-            self.obj_repr.save(save_path)
+        if save_intermediate:
+            os.makedirs(self.save_prefix, exist_ok=True)
+            # 首先保存 cfg 文件
+            with open(os.path.join(self.save_prefix, "cfg.json"), 'w', encoding='utf-8') as f:
+                json.dump(self.cfg, f, ensure_ascii=False, indent=4)
+            
+            # 然后保存 rgbd_seq
+            self.obj_repr.save(os.path.join(self.save_prefix, "obj_repr.npy"))
+            
+            # 然后保存 运行状态文件
+            result_dict = {
+                # 算法认为的是否有成功的探索
+                "num_tries": self.num_tries,
+                "has_valid_explore": self.has_valid_explore,
+                "joint_type": self.joint_type,
+                "joint_state_start": 0,
+                "joint_state_end": self.get_active_joint_state()
+            }
+            with open(os.path.join(self.save_prefix, 'result.pkl'), 'wb') as f:
+                pickle.dump(result_dict, f)
+    
+            # logging.info("Saved cfg:\n%s", self.cfg)
+            # logging.info("Saved result:\n%s", result_dict)
             
     def explore_once(
         self, 

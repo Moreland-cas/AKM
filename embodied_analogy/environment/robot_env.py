@@ -16,15 +16,10 @@ from embodied_analogy.representation.basic_structure import Frame
 class RobotEnv(BaseEnv):
     def __init__(
             self,
-            base_cfg={
-                "phy_timestep": 1/250.,
-                "planner_timestep": None,
-                "use_sapien2": True 
-            },
-            robot_cfg={},
+            cfg
         ):        
-        super().__init__(base_cfg)
-        self.load_robot(robot_cfg)
+        super().__init__(cfg)
+        self.load_robot()
     
     def capture_frame(self, visualize=False) -> Frame:
         frame = super().capture_frame(visualize=False)

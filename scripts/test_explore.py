@@ -1,0 +1,137 @@
+from embodied_analogy.environment.explore_env import ExploreEnv
+import argparse
+import json
+
+def none_or_float(value):
+    if value.lower() in ['none', 'null']:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid float value: '{value}'")
+    
+def none_or_list(value):
+    if value.lower() in ['none', 'null']:
+        return None
+    try:
+        result = [int(item) for item in value.split(',')]
+        return result
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid list value: '{value}'")
+    
+# 首先调用 argparser 来读取命令行参数, 生成 cfg 文件
+def update_cfg(base_cfg, args):
+    # 更新 env_folder
+    if args.logs_path is not None:
+        base_cfg['logs_path'] = args.logs_path
+    if args.run_name is not None:
+        base_cfg['run_name'] = args.run_name
+    
+    # 更新 base_cfg 字典中的值
+    if args.phy_timestep is not None:
+        base_cfg['phy_timestep'] = args.phy_timestep
+    if args.planner_timestep is not None:
+        base_cfg['planner_timestep'] = args.planner_timestep
+    if args.use_sapien2 is not None:
+        base_cfg['use_sapien2'] = args.use_sapien2
+
+    if args.record_fps is not None:
+        base_cfg['record_fps'] = args.record_fps
+    if args.pertubation_distance is not None:
+        base_cfg['pertubation_distance'] = args.pertubation_distance
+    if args.valid_thresh is not None:
+        base_cfg['valid_thresh'] = args.valid_thresh
+    if args.max_tries is not None:
+        base_cfg['max_tries'] = args.max_tries
+    if args.update_sigma is not None:
+        base_cfg['update_sigma'] = args.update_sigma
+    if args.reserved_distance is not None:
+        base_cfg['reserved_distance'] = args.reserved_distance
+    if args.instruction is not None:
+        base_cfg['instruction'] = args.instruction
+        
+    # load obj information
+    if args.obj_description is not None:
+        base_cfg['obj_description'] = args.obj_description
+    if args.joint_type is not None:
+        base_cfg['joint_type'] = args.joint_type
+    if args.obj_index is not None:
+        base_cfg['obj_index'] = args.obj_index
+    if args.joint_index is not None:
+        base_cfg['joint_index'] = args.joint_index
+    if args.asset_path is not None:
+        base_cfg['asset_path'] = args.asset_path
+    if args.load_scale is not None:
+        base_cfg['load_scale'] = args.load_scale
+    if args.load_pose is not None:
+        base_cfg['load_pose'] = args.load_pose
+    if args.load_quat is not None:
+        base_cfg['load_quat'] = args.load_quat
+    if args.active_link_name is not None:
+        base_cfg['active_link_name'] = args.active_link_name
+    if args.active_joint_name is not None:
+        base_cfg['active_joint_name'] = args.active_joint_name
+
+    return base_cfg
+
+def read_cfg():
+    parser = argparse.ArgumentParser(description='Update configuration for the robot.')
+    
+    # base_cfg arguments
+    parser.add_argument('--phy_timestep', type=float, help='Physical timestep')
+    parser.add_argument('--planner_timestep', type=float, help='Planner timestep')
+    parser.add_argument('--use_sapien2', type=bool, default=True, help='Use Sapien2')
+
+    # explore_cfg arguments
+    parser.add_argument('--record_fps', type=int, help='Record FPS')
+    parser.add_argument('--pertubation_distance', type=float, help='Perturbation distance')
+    parser.add_argument('--valid_thresh', type=float, help='factor of actual Perturbation distance')
+    parser.add_argument('--max_tries', type=int, help='Maximum tries')
+    parser.add_argument('--update_sigma', type=float, help='Update sigma')
+    parser.add_argument('--reserved_distance', type=float, help='Reserved distance')
+
+    # task_cfg arguments
+    parser.add_argument('--instruction', type=str, help='Task instruction')
+    parser.add_argument('--obj_description', type=str, help='Object description')
+    
+    # obj_cfg arguments
+    parser.add_argument('--asset_path', type=str, help='Asset path')
+    parser.add_argument('--joint_type', type=str, help='joint type')
+    parser.add_argument('--obj_index', type=str, help='obj_index')
+    parser.add_argument('--joint_index', type=str, help='joint_index')
+    parser.add_argument('--load_scale', type=none_or_float, help='object scale when loading')
+    parser.add_argument('--load_pose', type=none_or_list, help='object pose when loading')
+    parser.add_argument('--load_quat', type=none_or_list, help='object quat when loading')
+    parser.add_argument('--active_link_name', type=str, help='Active link name')
+    parser.add_argument('--active_joint_name', type=str, help='Active joint name')
+    
+    # experiment related
+    parser.add_argument('--logs_path', type=str, help='path to logs folder')
+    parser.add_argument('--run_name', type=str, help='name of this run')
+
+    args = parser.parse_args()
+
+    # 初始的配置
+    default_cfg = {
+        "phy_timestep": 1 / 250.,
+        "planner_timestep": 0.01,
+        "use_sapien2": True,
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "max_tries": 10,
+        "update_sigma": 0.05,
+        "reserved_distance": 0.05,
+    }
+
+    # 更新配置
+    updated_cfg = update_cfg(default_cfg, args)
+
+    return updated_cfg
+
+# 读取 args, 生成 cfg 文件, 输入给 manipulate_env 进行测试, 并返回测试结果 (数值 or logging)
+
+if __name__ == '__main__':
+    # exp folder: /logs/run_xxx/obj_idx_type/explore
+    cfg = read_cfg()
+    env = ExploreEnv(cfg)
+    env.explore_stage(save_intermediate=True)

@@ -171,7 +171,7 @@ class ManipulateEnv(ReconEnv):
         
         try:
             self.explore_stage(visualize=visualize)
-            self.recon_stage(visualize=True)
+            self.recon_stage(visualize=visualize)
             self.manip_stage(visualize=visualize)
             loss = self.evaluate()
             result["loss"] = loss
