@@ -276,7 +276,7 @@ class Frame(Data):
             visualize_pc(
                 points=obj_pc, 
                 colors=pc_colors / 255,
-                grasp=gg_sorted[0], 
+                grasp=None if gg_sorted is None else gg_sorted[0], 
                 contact_point=self.contact3d, 
                 post_contact_dirs=[self.dir_out]
             )

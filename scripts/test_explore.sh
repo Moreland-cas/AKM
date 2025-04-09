@@ -14,7 +14,6 @@ for test_data_cfg in $test_data_cfgs; do
     # 从 JSON 文件中提取相关信息
     joint_type=$(jq -r ".\"$test_data_cfg\".joint_type" "$test_data_cfg_path")
     asset_path=$(jq -r ".\"$test_data_cfg\".asset_path" "$test_data_cfg_path")
-    instruction=$(jq -r ".\"$test_data_cfg\".instruction" "$test_data_cfg_path")
     obj_description=$(jq -r ".\"$test_data_cfg\".obj_description" "$test_data_cfg_path")
     obj_index=$(jq -r ".\"$test_data_cfg\".obj_index" "$test_data_cfg_path")
     joint_index=$(jq -r ".\"$test_data_cfg\".joint_index" "$test_data_cfg_path")
@@ -38,10 +37,10 @@ for test_data_cfg in $test_data_cfgs; do
         --record_fps=30 \
         --pertubation_distance=0.1 \
         --valid_thresh=0.5 \
-        --max_tries=5 \
+        --max_tries=10 \
         --update_sigma=0.05 \
         --reserved_distance=0.05 \
-        --instruction="$instruction" \
+        --instruction="open the $obj_description" \
         --obj_description="$obj_description" \
         --asset_path="$asset_path" \
         --joint_type="$joint_type" \
@@ -53,7 +52,6 @@ for test_data_cfg in $test_data_cfgs; do
         --active_link_name="$active_link_name" \
         --active_joint_name="$active_joint_name" > "$output_file"  # 重定向输出
     # TODO: 读取 save_dir 下的运行文件, 如果不是正常运行的话, 再次执行 python
-    break
 done
 
 echo "所有命令已执行完成！"

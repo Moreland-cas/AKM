@@ -302,6 +302,7 @@ class Affordance_map_2d:
         根据 neg_uv_rgb 来更新 self.cos_map, 由于 cos_map 的值在 (-1, 1), 所以更新时要考虑这个值域
         """
         assert neg_uv_rgb is not None, "neg_uv_rgb 不能为空"
+        print("Updating affordance map ...")
         # 将失败的 RGB 坐标转换为 cos_map 坐标
         u_cos, v_cos = self.rgb_to_cos_frame(neg_uv_rgb[0], neg_uv_rgb[1])
 

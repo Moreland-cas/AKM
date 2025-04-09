@@ -134,4 +134,4 @@ if __name__ == '__main__':
     # exp folder: /logs/run_xxx/obj_idx_type/explore
     cfg = read_cfg()
     env = ExploreEnv(cfg)
-    env.explore_stage(save_intermediate=True)
+    env.explore_stage(save_intermediate=True, visualize=False)

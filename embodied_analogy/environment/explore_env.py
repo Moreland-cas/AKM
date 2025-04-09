@@ -1,6 +1,5 @@
 import os
 import json
-import logging
 import pickle
 import math
 import numpy as np
@@ -24,6 +23,8 @@ class ExploreEnv(ObjEnv):
         ):        
         super().__init__(cfg=cfg)
         # self.cfg = cfg
+        print("loading explore env, using cfg:", cfg)
+        
         self.record_fps = cfg["record_fps"]
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
         self.pertubation_distance = cfg["pertubation_distance"]
@@ -45,6 +46,7 @@ class ExploreEnv(ObjEnv):
         self.joint_type = joint_type
         obj_folder = f"{obj_index}_{joint_index}_{joint_type}"
         self.save_prefix = os.path.join(logs_path, run_name, obj_folder, "explore")
+        os.makedirs(self.save_prefix, exist_ok=True)
         
     def explore_stage(self, save_intermediate=False, visualize=False):
         """
@@ -58,11 +60,12 @@ class ExploreEnv(ObjEnv):
         initial_frame = super().capture_frame()
         
         # 只在第一次进行 contact transfer, 之后直接进行复用
+        print("Start transfering 2d contact affordance map...")
         self.affordance_map_2d = get_ram_affordance_2d(
             query_rgb=initial_frame.rgb,
             instruction=self.instruction,
             obj_description=self.obj_description,
-            visualize=visualize
+            visualize=False
         )
         # self.affordance_map_2d.fit_GMM(
         #     data=self.affordance_map_2d.sample_prob(alpha=30, num_samples=3000, return_rgb_frame=False, visualize=False),
@@ -76,6 +79,7 @@ class ExploreEnv(ObjEnv):
         self.obj_repr.frames.Tw2c = self.camera_extrinsic
         self.obj_repr.initial_frame = initial_frame
         
+        print(f"Start exploring..., you have {self.max_tries} chances to explore...")
         self.num_tries = 0
         while self.num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
@@ -85,27 +89,37 @@ class ExploreEnv(ObjEnv):
             else:
                 self.reset_robot_safe()
             
+            print(f"[{self.num_tries + 1}|{self.max_tries}]Start exploring once...")
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
             self.num_tries += 1
             if not actually_tried:
+                print("The planning path is not valid, update affordance map and try again...")
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
             
             if self.check_valid(visualize=visualize):
+                print("good, check valid, break explore loop")
                 break
             else:
+                print("bad, check invalid, update affordance map and try again...")
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
         # save explore data
-        if not self.has_valid_explore:
-            print("No valid exploration during explore phase!")
-            # raise Exception("No valid exploration during explore phase!")
-        
         if visualize:
             self.obj_repr.visualize()
-            
+        
+        result_dict = {
+            # 算法认为的是否有成功的探索
+            "num_tries": self.num_tries,
+            "has_valid_explore": self.has_valid_explore,
+            "joint_type": self.joint_type,
+            "joint_state_start": 0,
+            "joint_state_end": self.get_active_joint_state()
+        }
+        print("exploration stage result: ", result_dict)
+        
         if save_intermediate:
-            os.makedirs(self.save_prefix, exist_ok=True)
+            
             # 首先保存 cfg 文件
             with open(os.path.join(self.save_prefix, "cfg.json"), 'w', encoding='utf-8') as f:
                 json.dump(self.cfg, f, ensure_ascii=False, indent=4)
@@ -114,20 +128,16 @@ class ExploreEnv(ObjEnv):
             self.obj_repr.save(os.path.join(self.save_prefix, "obj_repr.npy"))
             
             # 然后保存 运行状态文件
-            result_dict = {
-                # 算法认为的是否有成功的探索
-                "num_tries": self.num_tries,
-                "has_valid_explore": self.has_valid_explore,
-                "joint_type": self.joint_type,
-                "joint_state_start": 0,
-                "joint_state_end": self.get_active_joint_state()
-            }
             with open(os.path.join(self.save_prefix, 'result.pkl'), 'wb') as f:
                 pickle.dump(result_dict, f)
+        
+        if not self.has_valid_explore:
+            print("In summary, no valid exploration during explore phase!")
+            # raise Exception("No valid exploration during explore phase!")
+        else:
+            print("In summary, get valid exploration during explore phase!")
+        print("done")
     
-            # logging.info("Saved cfg:\n%s", self.cfg)
-            # logging.info("Saved result:\n%s", result_dict)
-            
     def explore_once(
         self, 
         reserved_distance=0.05,
@@ -275,47 +285,42 @@ class ExploreEnv(ObjEnv):
         
     
 if __name__ == "__main__":
-    # drawer
-    obj_config = {
-        "index": 44962,
-        "scale": 0.8,
-        "pose": [1.0, 0., 0.5],
-        "active_link": "link_2",
-        "active_joint": "joint_2"
-    }
-    
-    # door
-    # obj_config = {
-    #     "index": 9288,
-    #     "scale": 1.0,
-    #     "pose": [0.7, 0., 0.7],
-    #     "active_link": "link_2",
-    #     "active_joint": "joint_0"
-    # }
-    
-    # microwave
-    # obj_config = {
-    #     "index": 7221,
-    #     "scale": 0.4,
-    #     "pose": [0.8, 0.1, 0.6],
-    #     "active_link": "link_0",
-    #     "active_joint": "joint_0"
-    # }
-    
-    obj_index = obj_config["index"]
-    
-    explore_cfg={
-        "record_fps": 30,
-        "pertubation_distance": 0.1,
-        "instruction": "open the drawer",
-        "max_tries": 10
-        # instruction="open the microwave",
-    }
     
     exploreEnv = ExploreEnv(
-        obj_cfg=obj_config,
-        explore_cfg=explore_cfg
+        cfg={
+    "phy_timestep": 0.004,
+    "planner_timestep": 0.01,
+    "use_sapien2": True,
+    "record_fps": 30,
+    "pertubation_distance": 0.1,
+    "max_tries": 10,
+    "update_sigma": 0.05,
+    "reserved_distance": 0.05,
+    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs_complex",
+    "run_name": "test_explore",
+    "valid_thresh": 0.5,
+    "instruction": "open the cabinet",
+    "obj_description": "cabinet",
+    "joint_type": "prismatic",
+    "obj_index": "40147",
+    "joint_index": "1",
+    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/40147_link_1",
+    "active_link_name": "link_1",
+    "active_joint_name": "joint_1",
+    "load_pose": [
+        0.8763857483863831,
+        0.0,
+        0.4520242512226105
+    ],
+    "load_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+    ],
+    "load_scale": 1
+}
     )
-    exploreEnv.explore_stage(visualize=True)
+    exploreEnv.explore_stage(visualize=False)
     # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")
     

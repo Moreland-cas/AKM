@@ -46,7 +46,20 @@ class Obj_repr(Data):
             "joint_start": None,
             "joint_states": None
         }
-        
+        self.gt_joint_dict = {
+            "joint_type": None,
+            "joint_dir": None,
+            "joint_start": None,
+            "joint_states": None
+        }
+    
+    def compute_joint_error(self):
+        """
+        分别计算 coarse_joint_dict, fine_joint_dict 与 gt_joint_dict 的差距, 并打印, 保存
+        还要分别计算 frames 和 kframes 的 joint_state_error
+        """
+        pass
+    
     def clear_frames(self):
         self.frames.clear()
         
@@ -307,8 +320,11 @@ if __name__ == "__main__":
     # microwave
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/reconstruct/recon_data.pkl")
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/48878/recon_data.pkl")
-    obj_repr.visualize()
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/48878/recon_data.pkl")
+    # obj_repr.visualize()
     
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
-    pass
+    # pass
+    obj_repr = Obj_repr()
+    obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore/40147_1_prismatic/explore/obj_repr.npy")
+    obj_repr.visualize()

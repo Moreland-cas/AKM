@@ -77,7 +77,7 @@ def get_ram_affordance_2d(
         prompt: used to extract dift feature
     """
     seed_everything(SEED)
-
+    print("Initializing SubsetRetrievePipeline ...")
     subset_retrieve_pipeline = SubsetRetrievePipeline(
         subset_dir="/home/zby/Programs/RAM_code/assets/data",
         lang_mode='clip',
@@ -117,6 +117,7 @@ def get_ram_affordance_2d(
         break
 
     # 进一步将 cos_map 转换为一个概率分布
+    print("Initializing Affordance_map_2d from DIFT similarity ...")
     affordance_map_2d = Affordance_map_2d(
         rgb_img=query_rgb,
         cos_map=cos_map,

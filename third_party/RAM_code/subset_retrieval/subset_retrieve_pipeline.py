@@ -350,8 +350,11 @@ class SubsetRetrievePipeline:
             current_task: "open the drawer"
             current_obs: numpy rgb image
         """
+        print("start retrieving")
         if log: print("<1> Retrieve the most similar task")
         retrieved_task = self.language_retrieve(current_task)
+        print(f"The current task is: {current_task}")
+        print(f"The retrieved task is: {retrieved_task}")
         obj_name = retrieved_task.split(" ")[-1]
         obj_prompt = f"A photo of {obj_name}"
         if log: print(f"Retrieved task: {retrieved_task}")
