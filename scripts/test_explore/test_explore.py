@@ -49,6 +49,8 @@ def update_cfg(base_cfg, args):
         base_cfg['reserved_distance'] = args.reserved_distance
     if args.instruction is not None:
         base_cfg['instruction'] = args.instruction
+    if args.num_initial_pts is not None:
+        base_cfg['num_initial_pts'] = args.num_initial_pts
         
     # load obj information
     if args.obj_description is not None:
@@ -89,6 +91,7 @@ def read_cfg():
     parser.add_argument('--max_tries', type=int, help='Maximum tries')
     parser.add_argument('--update_sigma', type=float, help='Update sigma')
     parser.add_argument('--reserved_distance', type=float, help='Reserved distance')
+    parser.add_argument('--num_initial_pts', type=int, help='number of tracking points initialized on first frame')
 
     # task_cfg arguments
     parser.add_argument('--instruction', type=str, help='Task instruction')

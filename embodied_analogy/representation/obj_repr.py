@@ -12,7 +12,8 @@ from embodied_analogy.utility.utils import (
     joint_data_to_transform_np,
     get_depth_mask,
     camera_to_image,
-    depth_image_to_pointcloud
+    depth_image_to_pointcloud,
+    line_to_line_distance
 )
 initialize_napari()
 from embodied_analogy.utility.constants import *
@@ -31,9 +32,8 @@ class Obj_repr(Data):
         # 通过 reconstruct 恢复出的结果
         self.kframes = Frames()
         self.track_type = None # either "open" or "close"
-        """
-        NOTE: 这里的 joint_dir 和 joint_start 均在相机坐标系下
-        """
+        
+        # 这里的 coarse_joint_dict 和 fine_joint_dict 是在相机坐标系下估计的
         self.coarse_joint_dict = {
             "joint_type": None,
             "joint_dir": None,
@@ -46,6 +46,7 @@ class Obj_repr(Data):
             "joint_start": None,
             "joint_states": None
         }
+        # 这里的 gt_joint_dict 是在 load object 阶段保存的, 存储的值是在世界坐标系下的 
         self.gt_joint_dict = {
             "joint_type": None,
             "joint_dir": None,
@@ -53,20 +54,91 @@ class Obj_repr(Data):
             "joint_states": None
         }
     
+    def get_joint_param(self, resolution="coarse", frame="world"):
+        assert resolution in ["coarse", "fine", "gt"]
+        assert frame in ["world", "camera"]
+        if resolution == "coarse":
+            if self.coarse_joint_dict["joint_type"] is None:
+                assert "coarse joint dict is not found"
+            joint_dict = copy.deepcopy(self.coarse_joint_dict)
+            if frame == "world":
+                Tc2w = np.linalg.inv(self.Tw2c)
+                joint_dict["joint_dir"] = Tc2w[:3, :3] @ joint_dict["joint_dir"]
+                joint_dict["joint_start"] = Tc2w[:3, :3] @ joint_dict["joint_start"] + Tc2w[:3, 3]
+        elif resolution == "fine":
+            if self.fine_joint_dict["joint_type"] is None:
+                assert "fine joint dict is not found"
+            joint_dict = copy.deepcopy(self.fine_joint_dict)
+            if frame == "world":
+                Tc2w = np.linalg.inv(self.Tw2c)
+                joint_dict["joint_dir"] = Tc2w[:3, :3] @ joint_dict["joint_dir"]
+                joint_dict["joint_start"] = Tc2w[:3, :3] @ joint_dict["joint_start"] + Tc2w[:3, 3]
+        elif resolution == "gt":
+            # TODO 可能有问题
+            if self.gt_joint_dict["joint_type"] is None:
+                assert "Ground truth joint dict is not found"
+            joint_dict = copy.deepcopy(self.gt_joint_dict)
+            if frame == "camera":
+                Tw2c = self.Tw2c
+                joint_dict["joint_dir"] = Tw2c[:3, :3] @ joint_dict["joint_dir"]
+                joint_dict["joint_start"] = Tw2c[:3, :3] @ joint_dict["joint_start"] + Tw2c[:3, 3]
+        return joint_dict
+    
     def compute_joint_error(self):
         """
         分别计算 coarse_joint_dict, fine_joint_dict 与 gt_joint_dict 的差距, 并打印, 保存
         还要分别计算 frames 和 kframes 的 joint_state_error
         """
-        pass
+        coarse_w = self.get_joint_param(resolution="coarse", frame="world")
+        fine_w = self.get_joint_param(resolution="fine", frame="world")
+        gt_w = self.get_joint_param(resolution="gt", frame="world")
+        result = {
+            "coarse_w": coarse_w,
+            "fine_w": fine_w,
+            "gt_w": gt_w,
+            "coarse_loss": {
+                "type_err": 0,
+                "angle_err": 0,
+                "pos_err": 0,
+            },
+            "fine_loss": {
+                "type_err": 0,
+                "angle_err": 0,
+                "pos_err": 0,
+            }
+        }
+        # TODO: 这里可能要对 angle_err 取一个 minimum
+        result["coarse_loss"]["type_err"] = 1 if coarse_w["joint_type"] != gt_w["joint_type"] else 0
+        result["coarse_loss"]["angle_err"] = np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]))
+        
+        result["fine_loss"]["type_err"] = 1 if fine_w["joint_type"] != gt_w["joint_type"] else 0
+        result["fine_loss"]["angle_err"] = np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]))
+        
+        if gt_w["joint_type"] == "revolute":
+            result["coarse_loss"]["pos_err"] = line_to_line_distance(
+                P1=coarse_w["joint_start"],
+                d1=coarse_w["joint_dir"],
+                P2=gt_w["joint_start"],
+                d2=gt_w["joint_dir"]
+            )
+            result["fine_loss"]["pos_err"] = line_to_line_distance(
+                P1=fine_w["joint_start"],
+                d1=fine_w["joint_dir"],
+                P2=gt_w["joint_start"],
+                d2=gt_w["joint_dir"]
+            )
+            
+        return result
     
     def clear_frames(self):
         self.frames.clear()
         
     def clear_kframes(self):
         self.kframes.clear()
-        
+    
     def initialize_kframes(self, num_kframes, save_memory=True):
+        self.clear_kframes()
+        
         self.kframes.fps = self.frames.fps
         self.kframes.K = self.frames.K
         self.kframes.Tw2c = self.frames.Tw2c
@@ -84,7 +156,6 @@ class Obj_repr(Data):
         
         self.kframes.track2d_seq = self.frames.track2d_seq[kf_idxs, ...]
         
-        self.clear_kframes()
         for i, kf_idx in enumerate(kf_idxs):
             tmp_frame = copy.deepcopy(self.frames[kf_idx])
             self.kframes.append(tmp_frame)
@@ -115,6 +186,7 @@ class Obj_repr(Data):
             opti_joint_states_mask=np.arange(self.kframes.num_frames())!=0,
             # update_dynamic_mask=None,
             lr=lr, # 1mm
+            gt_joint_dict=self.get_joint_param(resolution="gt", frame="camera"),
             visualize=visualize
         )
         # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
@@ -132,29 +204,30 @@ class Obj_repr(Data):
         
     def reconstruct(
         self,
-        num_initial_pts=1000,
+        # num_initial_pts=1000,
         num_kframes=5,
         obj_description="drawer",
         fine_lr=1e-3,
         file_path=None,
-        gt_joint_dir_w=None,
+        evaluate=False,
         visualize=True,
     ):
         """
             从 frames 中恢复出 joint state dict, 并对于 initial_frame 进行重定位
         """
-        self.frames[0].segment_obj(
-            obj_description=obj_description,
-            post_process_mask=True,
-            filter=True,
-            visualize=visualize
-        )
-        self.frames[0].sample_points(num_points=num_initial_pts, visualize=visualize)
-        self.frames.track_points(visualize=visualize)
-        self.frames.track2d_to_3d(filter=True, visualize=visualize)
-        self.frames.cluster_track3d(visualize=visualize)
+        # self.frames[0].segment_obj(
+        #     obj_description=obj_description,
+        #     post_process_mask=True,
+        #     filter=True,
+        #     visualize=visualize
+        # )
+        # self.frames[0].sample_points(num_points=num_initial_pts, visualize=visualize)
+        # self.frames.track_points(visualize=visualize)
+        # self.frames.track2d_to_3d(filter=True, visualize=visualize)
+        # self.frames.cluster_track3d(visualize=visualize)
+        
         self.coarse_joint_estimation(visualize=visualize)
-        self.initialize_kframes(num_kframes=num_kframes, save_memory=True)
+        self.initialize_kframes(num_kframes=num_kframes, save_memory=False)
         self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
         self.kframes.classify_dynamics(
             filter=True,
@@ -164,28 +237,15 @@ class Obj_repr(Data):
         self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
            
         if file_path is not None:
-            self.visualize()
+            # self.visualize()
             self.save(file_path)
         
-        if gt_joint_dir_w is not None:
-            print(f"\tgt axis: {gt_joint_dir_w}")
-
-            coarse_dir_c = self.coarse_joint_dict["joint_dir"] 
-            coarse_dir_w = self.Tw2c[:3, :3].T @ coarse_dir_c
-            dot_before = np.dot(gt_joint_dir_w, coarse_dir_w)
-            print(f"\tbefore: {np.degrees(np.arccos(dot_before))}")
-            print("\tjoint axis: ", coarse_dir_w)
+        if evaluate:
+            if self.gt_joint_dict["joint_type"] is None:
+                return 
+            result = self.compute_joint_error()
+            print("Reconstruction Result:", result)
             
-            print("\tjoint states: ", self.coarse_joint_dict["joint_states"][self.kf_idxs])
-
-            fine_dir_c = self.fine_joint_dict["joint_dir"] 
-            fine_dir_w = self.Tw2c[:3, :3].T @ fine_dir_c
-            dot_after = np.dot(gt_joint_dir_w, fine_dir_w)
-            print(f"\tafter : {np.degrees(np.arccos(dot_after))}")
-            print("\tjoint axis: ", fine_dir_w)
-            
-            print("\tjoint states: ", self.fine_joint_dict["joint_states"])
-    
     def reloc(
         self,
         query_frame: Frame,
@@ -325,6 +385,9 @@ if __name__ == "__main__":
     
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
     # pass
-    obj_repr = Obj_repr()
-    obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore/40147_1_prismatic/explore/obj_repr.npy")
-    obj_repr.visualize()
+    # obj_repr = Obj_repr()
+    # obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore/41083_2_prismatic/explore/obj_repr.npy")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore/41083_2_prismatic/explore/obj_repr.npy")
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy")
+    print(obj_repr.frames.track2d_seq.shape)
+    # obj_repr.visualize()

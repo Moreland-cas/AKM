@@ -8,6 +8,7 @@ from embodied_analogy.utility.utils import (
 )
 initialize_napari()
 from embodied_analogy.representation.basic_structure import Frame
+from embodied_analogy.representation.obj_repr import Obj_repr
 
 
 class ManipulateEnv(ReconEnv):
@@ -103,7 +104,7 @@ class ManipulateEnv(ReconEnv):
         移动到该位姿, 并根据 target_state 进行操作
         """
         if load_path is not None:
-            self.obj_repr.load(load_path)
+            self.obj_repr = Obj_repr.load(load_path)
             
         Tc2w = np.linalg.inv(self.camera_extrinsic)
         

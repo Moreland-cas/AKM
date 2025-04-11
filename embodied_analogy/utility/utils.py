@@ -1532,7 +1532,42 @@ def vis_tracks2d_napari(image_frames, tracks_2d, colors=None, viewer_title="napa
     viewer.add_points(napari_data, size=3, name='tracks_2d', opacity=1., face_color=colors)
     
     napari.run()
+
+
+def line_to_line_distance(P1, d1, P2, d2):
+    """
+    计算三维空间中两条直线的最短距离
     
+    参数:
+        P1 (np.array): 直线1上一点的坐标，形状 (3,)
+        d1 (np.array): 直线1的单位方向向量，形状 (3,)
+        P2 (np.array): 直线2上一点的坐标，形状 (3,)
+        d2 (np.array): 直线2的单位方向向量，形状 (3,)
+    
+    返回:
+        float: 两条直线的最短距离
+    """
+    # 计算连接向量 v = P2 - P1
+    v = P2 - P1
+    
+    # 计算方向向量的叉积 n = d1 × d2
+    n = np.cross(d1, d2)
+    
+    # 计算叉积的范数 ||n||
+    n_norm = np.linalg.norm(n)
+    
+    if n_norm > 1e-10:  # 如果两条直线不平行（n 不是零向量）
+        # 最短距离 = |v · n| / ||n||
+        distance = np.abs(np.dot(v, n)) / n_norm
+    else:  # 如果两条直线平行（n ≈ 0）
+        # 计算 v 在 d1 垂直方向的分量：v_perp = v - (v·d1) * d1
+        v_parallel = np.dot(v, d1) * d1
+        v_perp = v - v_parallel
+        distance = np.linalg.norm(v_perp)
+    
+    return distance
+
+
 if __name__ == "__main__":
     point_cloud = np.random.random([100, 3])
     point_cloud[:, 2] = 0

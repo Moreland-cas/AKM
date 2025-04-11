@@ -84,6 +84,7 @@ class ExploreEnv(ObjEnv):
         while self.num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
             self.obj_repr.clear_frames()
+            
             if self.num_tries == 0:
                 self.reset_robot()
             else:
@@ -235,7 +236,7 @@ class ExploreEnv(ObjEnv):
             cur_frame = self.capture_frame()
             self.obj_repr.frames.append(cur_frame)
             
-    def check_valid(self, visualize=False):
+    def check_valid_deprecated(self, visualize=False):
         if self.obj_repr.frames.num_frames() == 0:
             return False
         
@@ -282,6 +283,31 @@ class ExploreEnv(ObjEnv):
             return True
         else:
             return False
+    
+    def check_valid(self, visualize=False): 
+        # 对于 frames 进行 tracking, 然后根据聚类结果判断 moving_part 动的多不多, 多的话就认为 valid
+        # 这个函数相比于 deprecated 版本, 可以更好的处理 "柜子开一个缝隙, joint state 没有大的变化, 但是缝隙的深度有突变" 的情况
+        # 这个函数会写入 obj_repr 的 tracks2d, tracks3d 和 moving mask
+        self.obj_repr.frames[0].segment_obj(
+            obj_description=self.cfg["obj_description"],
+            post_process_mask=True,
+            filter=True,
+            visualize=visualize
+        )
+        self.obj_repr.frames[0].sample_points(num_points=self.cfg["num_initial_pts"], visualize=visualize)
+        self.obj_repr.frames.track_points(visualize=visualize)
+        self.obj_repr.frames.track2d_to_3d(filter=True, visualize=visualize)
+        self.obj_repr.frames.cluster_track3d(visualize=visualize)
+        
+        # 根据 moving tracks 的位移来判断
+        moving_tracks = self.obj_repr.frames.track3d_seq[:, self.obj_repr.frames.moving_mask, :]
+        
+        mean_delta = np.linalg.norm(moving_tracks[-1] - moving_tracks[0], axis=-1).mean()
+        if mean_delta > self.pertubation_distance * self.valid_thresh:
+            self.has_valid_explore = True
+            return True
+        else:
+            return False
         
     
 if __name__ == "__main__":
@@ -297,20 +323,21 @@ if __name__ == "__main__":
     "update_sigma": 0.05,
     "reserved_distance": 0.05,
     "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs_complex",
-    "run_name": "test_explore",
+    "run_name": "test_explore_4_11",
     "valid_thresh": 0.5,
     "instruction": "open the cabinet",
+    "num_initial_pts": 1000,
     "obj_description": "cabinet",
-    "joint_type": "prismatic",
-    "obj_index": "40147",
-    "joint_index": "1",
-    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/40147_link_1",
-    "active_link_name": "link_1",
-    "active_joint_name": "joint_1",
+    "joint_type": "revolute",
+    "obj_index": "45162",
+    "joint_index": "0",
+    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45162_link_0",
+    "active_link_name": "link_0",
+    "active_joint_name": "joint_0",
     "load_pose": [
-        0.8763857483863831,
+        0.8806502223014832,
         0.0,
-        0.4520242512226105
+        0.6088799834251404
     ],
     "load_quat": [
         1.0,

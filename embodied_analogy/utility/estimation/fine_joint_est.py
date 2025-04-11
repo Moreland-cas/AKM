@@ -164,6 +164,7 @@ def fine_estimation(
     opti_joint_states_mask=None, # boolean mask to select which states to optimize
     # update_dynamic_mask=None,
     lr = 1e-3, # 1mm
+    gt_joint_dict=None, # should be in camera frame
     visualize=False
 ):
     """
@@ -386,7 +387,7 @@ def fine_estimation(
         
         viewer.add_shapes(
             data=np.array([joint_start_updated, joint_start_updated + joint_dir_updated * 0.2]),
-            name="revolute joint",
+            name="joint axis",
             shape_type="line",
             edge_width=0.005,
             edge_color="blue",
@@ -399,6 +400,23 @@ def fine_estimation(
             face_color="blue",
             border_color="red",
         )
+        
+        if gt_joint_dict is not None:
+            viewer.add_shapes(
+                data=np.array([gt_joint_dict["joint_start"], gt_joint_dict["joint_start"] + gt_joint_dict["joint_dir"] * 0.2]),
+                name="joint axis",
+                shape_type="line",
+                edge_width=0.005,
+                edge_color="green",
+                face_color="blue",
+            )
+            viewer.add_points(
+                data=gt_joint_dict["joint_start"],
+                name="joint start",
+                size=0.02,
+                face_color="green",
+                border_color="red",
+            )
         napari.run()
     
     torch.cuda.empty_cache()

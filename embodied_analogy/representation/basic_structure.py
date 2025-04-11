@@ -31,8 +31,6 @@ from embodied_analogy.utility.grasp.anygrasp import (
     crop_grasp
 )
 
-
-
 class Data():
     def save(self, file_path):
         # 保存这个类到 file_path, 如果 file_path 所在的文件夹路径不存在, 则创建
@@ -41,16 +39,20 @@ class Data():
         with open(file_path, "wb") as f:
             pickle.dump(self, f)
     
-    # @classmethod
-    # def load(self, file_path):
-    #     with open(file_path, "rb") as f:
-    #         self = pickle.load(f)
-        
+    @classmethod
     def load(self, file_path):
         with open(file_path, "rb") as f:
-            loaded_data = pickle.load(f)
-            # 更新当前实例的属性
-            self.__dict__.update(loaded_data.__dict__)
+            return pickle.load(f)
+        
+    # def load(self, file_path):
+    #     with open(file_path, "rb") as f:
+    #         loaded_data = pickle.load(f)
+    #         # 递归更新所有属性
+    #         for key, value in loaded_data.__dict__.items():
+    #             if hasattr(self, key) and isinstance(getattr(self, key), object):
+    #                 # 这里可以添加更复杂的递归更新逻辑
+    #                 pass
+    #             setattr(self, key, value)
         
 class Frame(Data):
     def __init__(
@@ -67,6 +69,7 @@ class Frame(Data):
         contact3d=None,
         dir_out=None,
         grasp_group: GraspGroup = None,
+        track2d=None,
         robot2d=None,
         robot3d=None,
         robot_mask=None,
@@ -84,6 +87,7 @@ class Frame(Data):
         self.joint_state = joint_state
         
         # NOTE: 这几个都在相机坐标系下
+        self.track2d = track2d
         self.contact2d = contact2d
         self.contact3d = contact3d
         self.dir_out = dir_out
@@ -380,6 +384,10 @@ class Frames(Data):
     
     def clear(self):
         self.frame_list = []
+        self.track2d_seq = None
+        self.track3d_seq = None
+        self.moving_mask = None
+        self.static_mask = None
         
     def append(self, frame: Frame):
         self.frame_list.append(frame)

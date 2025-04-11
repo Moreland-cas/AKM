@@ -2,7 +2,7 @@
 
 # 创建日志目录
 LOG_DIR="/home/zby/Programs/Embodied_Analogy/assets/logs_complex"
-run_name="test_explore"
+run_name="test_explore_4_11"
 mkdir -p "$LOG_DIR/$run_name"
 
 test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
@@ -27,8 +27,13 @@ for test_data_cfg in $test_data_cfgs; do
     mkdir -p "$LOG_DIR/$run_name/${obj_index}_${joint_index}_${joint_type}/explore"
     output_file="${LOG_DIR}/$run_name/${obj_index}_${joint_index}_${joint_type}/explore/output.txt"
 
+    # TODO: 首先读取 output_file，若 output_file 不存在或者 output_file 的最后一行不是 "done", 那么才跑底下的python 脚本，否则continue
+    if [ -f "$output_file" ] && [ "$(tail -n 1 "$output_file")" == "done" ]; then
+        echo "Output file $output_file exists and the last line is 'done'. Skipping this configuration."
+        continue
+    fi
     # 执行 Python 脚本
-    python /home/zby/Programs/Embodied_Analogy/scripts/test_explore.py \
+    python /home/zby/Programs/Embodied_Analogy/scripts/test_explore/test_explore.py \
         --logs_path="$LOG_DIR" \
         --run_name="$run_name" \
         --phy_timestep=0.004 \
@@ -40,6 +45,7 @@ for test_data_cfg in $test_data_cfgs; do
         --max_tries=10 \
         --update_sigma=0.05 \
         --reserved_distance=0.05 \
+        --num_initial_pts=1000 \
         --instruction="open the $obj_description" \
         --obj_description="$obj_description" \
         --asset_path="$asset_path" \
@@ -51,7 +57,6 @@ for test_data_cfg in $test_data_cfgs; do
         --load_quat="$load_quat" \
         --active_link_name="$active_link_name" \
         --active_joint_name="$active_joint_name" > "$output_file"  # 重定向输出
-    # TODO: 读取 save_dir 下的运行文件, 如果不是正常运行的话, 再次执行 python
 done
 
 echo "所有命令已执行完成！"
