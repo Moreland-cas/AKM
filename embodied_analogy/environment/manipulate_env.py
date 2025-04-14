@@ -1,6 +1,6 @@
 import numpy as np
 
-from embodied_analogy.environment.reconstruct_env import ReconEnv
+from embodied_analogy.environment.obj_env import ObjEnv
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     initialize_napari,
@@ -11,65 +11,30 @@ from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.representation.obj_repr import Obj_repr
 
 
-class ManipulateEnv(ReconEnv):
+class ManipulateEnv(ObjEnv):
     def __init__(
-            self,
-            base_cfg={
-                "phy_timestep": 1/250.,
-                "planner_timestep": None,
-                "use_sapien2": True 
-            },
-            robot_cfg={},
-            explore_cfg={
-                "record_fps": 30,
-                "pertubation_distance": 0.1,
-                "max_tries": 10,
-            },
-            recon_cfg={
-                "num_initial_pts": 1000,
-                "num_kframes": 5,
-                "fine_lr": 1e-3
-            },
-            manip_cfg={
-                "reloc_lr": 3e-3,
-                "reserved_distance": 0.05
-            },
-            task_cfg={
-                "instruction": "open the drawer",
-                "obj_description": "drawer",
-                "delta_state": 0.2,
-                "obj_cfg": {
-                    "scale": 0.8,
-                    "pose": [1.0, 0., 0.5],
-                    "active_link": "link_2",
-                    "active_joint": "joint_2"
-                },
-            }
-        ):        
-        super().__init__(
-            base_cfg=base_cfg,
-            robot_cfg=robot_cfg,
-            task_cfg=task_cfg,
-            explore_cfg=explore_cfg,
-            recon_cfg=recon_cfg
-        )
-        self.reloc_lr = manip_cfg["reloc_lr"]
-        self.reserved_distance = manip_cfg["reserved_distance"]
-    
-    def set_goal(self, visualize=False):
+        self, 
+        cfg
+    ):       
         """
-        对于 obj_repr.initial_frame 进行重定位, 并根据要操作的值, 计算 target joint state
-        """    
-        self.obj_repr.initial_frame = self.obj_repr.reloc(
-            query_frame=self.obj_repr.initial_frame,
-            update_query_dynamic=True,
-            reloc_lr=self.reloc_lr,
-            visualize=visualize
-        )
-        self.initial_state = self.obj_repr.initial_frame.joint_state
-        self.target_state = self.initial_state + self.gt_delta
+        cfg 需要包含:
+            init_joint_state
+            goal_delta
+            obj_repr_path
+        TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
+        """
+        # 首先 load 物体
+        super().__init__(cfg)
+        self.reloc_lr = cfg["reloc_lr"]
+        self.reserved_distance = cfg["reserved_distance"]
+        
+        self.goal_delta = cfg["goal_delta"]
+        self.init_joint_state = cfg["init_joint_state"]
+        
+        self.obj_description = cfg["obj_description"]
+        self.obj_repr = Obj_repr.load(cfg["obj_repr_path"])
     
-    def transfer_ph_pose(self, ref_frame: Frame, tgt_frame: Frame, visualize=False):
+    def transfer_ph_pose(self, ref_frame: Frame, tgt_frame: Frame):
         """
         将 ref_frame 中的 panda_hand grasp_pose 转换到 target_frame 中去
         
@@ -92,8 +57,6 @@ class ManipulateEnv(ReconEnv):
         Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
         tgt_frame.Tph2w = Tph2w_tgt
         
-        if visualize:
-            pass
     def manip_stage(self, load_path=None, evaluate=True, visualize=False):
         """
         manipulate 的执行逻辑:
@@ -105,13 +68,9 @@ class ManipulateEnv(ReconEnv):
         """
         if load_path is not None:
             self.obj_repr = Obj_repr.load(load_path)
-            
+        
+        self.obj_repr : Obj_repr 
         Tc2w = np.linalg.inv(self.camera_extrinsic)
-        
-        self.set_goal()
-        
-        # 首先进行机械手的 reset, 因为当前可能还处在 explore 阶段末尾的抓取阶段
-        self.reset_robot_safe()
         
         # 然后估计出 cur_state
         self.base_step()
@@ -123,6 +82,7 @@ class ManipulateEnv(ReconEnv):
             visualize=visualize
         )
         self.cur_state = cur_frame.joint_state
+        self.target_state = self.cur_state + self.goal_delta
         
         self.transfer_ph_pose(
             ref_frame=self.obj_repr.kframes[0],
@@ -130,6 +90,7 @@ class ManipulateEnv(ReconEnv):
             visualize=visualize
         )
         
+        cur_frame.segment_obj(obj_description=self.obj_description, visualize=visualize)
         pc_w, _ = cur_frame.get_obj_pc(
             use_robot_mask=True,
             use_height_filter=False,
@@ -155,14 +116,21 @@ class ManipulateEnv(ReconEnv):
             moving_distance=self.target_state-cur_frame.joint_state
         )
         if evaluate:
-            print(self.evaluate())
+            result_dict = self.evaluate()
+            print(result_dict)
     
     def evaluate(self):
         # 评测 manipulate 的好坏
-        self.gt_end_joint_state = self.get_active_joint_state()
-        actual_delta = self.gt_end_joint_state - self.gt_start_joint_state
-        loss = actual_delta - self.gt_delta
-        return loss
+        actual_delta = self.get_active_joint_state() - self.init_joint_state
+        diff = actual_delta - self.goal_delta
+        loss = np.abs(diff)
+        result_dict = {
+            "diff": diff,
+            "l1_loss": loss,
+            "actual_delta": actual_delta,
+            "goal_delta": self.goal_delta
+        }
+        return result_dict
     
     def main(self, visualize=False):
         result = {

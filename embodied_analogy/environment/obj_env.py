@@ -17,10 +17,6 @@ class ObjEnv(RobotEnv):
         ):        
         super().__init__(cfg)
         self.load_object(cfg)
-        
-        # 然后在这里记录下 gt_start_joint_state 和 gt_delta
-        # self.gt_start_joint_state = self.get_active_joint_state()
-        # self.gt_delta = cfg["delta"]
 
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)
@@ -123,7 +119,7 @@ class ObjEnv(RobotEnv):
         })
         return path, dof, sapien_pose
     
-    def load_object(self, obj_cfg):
+    def load_object(self, obj_cfg, visualize=False):
         # 首先获取 obj 的 pose
         _, _, sapien_pose = self.randomize_obj(obj_cfg)
         
@@ -171,12 +167,12 @@ class ObjEnv(RobotEnv):
             
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
             if joint.get_name() == obj_cfg["active_joint_name"]:
-                # initial_states.append(obj_cfg["init_joint_state"])
                 self.active_joint = joint
-                initial_states.append(0)
+                # initial_states.append(0)
+                initial_states.append(obj_cfg["init_joint_state"])
             else:
                 initial_states.append(0)
-                joint.set_limits(np.array([[0, 0.1]]))
+                joint.set_limits(np.array([[0, 0]]))
         self.obj.set_qpos(initial_states)
         
         # 在这里调用一个 base step 以实际 load 物体
@@ -190,7 +186,7 @@ class ObjEnv(RobotEnv):
         if active_link_name != self.active_joint.get_child_link().get_name():
             print("active_link_name is not consistent with active_joint_name, there might be an error!")
         
-        Tparent2w = self.active_joint.get_child_link().get_pose().to_transformation_matrix() # Tparent2w
+        Tparent2w = self.active_joint.get_parent_link().get_pose().to_transformation_matrix() # Tparent2w
         joint_in_parent = self.active_joint.get_pose_in_parent().to_transformation_matrix()
         Tjoint2w = Tparent2w @ joint_in_parent
         # 不管是 prismatic joint 还是 revolute joint, joint_dir 都是由 joint 坐标系的 x 轴决定的
@@ -201,6 +197,20 @@ class ObjEnv(RobotEnv):
             "joint_states": None
         }
         
+        if visualize:
+            # 获取一帧的点云
+            frame = self.capture_frame(visualize=False)
+            frame.obj_mask = np.ones_like(frame.depth).astype(np.bool_)
+            pc, colors = frame.get_obj_pc(world_frame=True)
+            from embodied_analogy.utility.utils import visualize_pc
+            visualize_pc(
+                points=pc,
+                colors=colors / 255.,
+                grasp=None,
+                contact_point=self.obj_repr.gt_joint_dict["joint_start"],
+                post_contact_dirs=[self.obj_repr.gt_joint_dict["joint_dir"]],
+            )
+            
     def get_active_joint_state(self):
         """
         获取我们关心的关节的状态值
@@ -221,7 +231,7 @@ if __name__ == "__main__":
     "max_tries": 10,
     "update_sigma": 0.05,
     "reserved_distance": 0.05,
-    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs_complex",
+    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
     "run_name": "test_explore",
     "valid_thresh": 0.5,
     "instruction": "open the cabinet",
@@ -229,6 +239,7 @@ if __name__ == "__main__":
     "joint_type": "revolute",
     "obj_index": "44781",
     "joint_index": "0",
+    "init_joint_state": 0.2,
     "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/44781_link_0",
     "active_link_name": "link_0",
     "active_joint_name": "joint_0",

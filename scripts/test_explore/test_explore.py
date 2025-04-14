@@ -61,6 +61,8 @@ def update_cfg(base_cfg, args):
         base_cfg['obj_index'] = args.obj_index
     if args.joint_index is not None:
         base_cfg['joint_index'] = args.joint_index
+    if args.init_joint_state is not None:
+        base_cfg['init_joint_state'] = args.init_joint_state
     if args.asset_path is not None:
         base_cfg['asset_path'] = args.asset_path
     if args.load_scale is not None:
@@ -102,6 +104,7 @@ def read_cfg():
     parser.add_argument('--joint_type', type=str, help='joint type')
     parser.add_argument('--obj_index', type=str, help='obj_index')
     parser.add_argument('--joint_index', type=str, help='joint_index')
+    parser.add_argument('--init_joint_state', type=str, help='initial joint state when loading')
     parser.add_argument('--load_scale', type=none_or_float, help='object scale when loading')
     parser.add_argument('--load_pose', type=none_or_list, help='object pose when loading')
     parser.add_argument('--load_quat', type=none_or_list, help='object quat when loading')

@@ -41,7 +41,7 @@ if __name__ == "__main__":
     env = ReconEnv(cfg)
     
     env.recon_stage(
-        load_path=f"/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy",    
+        load_path=f"/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy",    
         save_path=None,
         evaluate=True,
         visualize=False

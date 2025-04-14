@@ -42,6 +42,16 @@ for tmp_folder in os.listdir(rev_path):
         }
     }
     cfg.update(tmp_dict)
+
+use_subset = True
+if use_subset:
+    total_list = [(k, v) for k,v in cfg.items()]
+    import random
+    random.shuffle(total_list)
+    cfg = {k:v for k,v in total_list[:10]}
+    with open(os.path.join("/home/zby/Programs/Embodied_Analogy/scripts", "test_data_subset.json"), 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=4)
+else:
+    with open(os.path.join("/home/zby/Programs/Embodied_Analogy/scripts", "test_data.json"), 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=4)
     
-with open(os.path.join("/home/zby/Programs/Embodied_Analogy/scripts", "test_data.json"), 'w', encoding='utf-8') as f:
-    json.dump(cfg, f, ensure_ascii=False, indent=4)

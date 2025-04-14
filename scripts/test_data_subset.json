@@ -1,0 +1,122 @@
+{
+    "45249_link_0": {
+        "joint_type": "revolute",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45249_link_0",
+        "obj_index": "45249",
+        "joint_index": "0",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_0",
+        "active_joint_name": "joint_0"
+    },
+    "44781_link_2": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/44781_link_2",
+        "obj_index": "44781",
+        "joint_index": "2",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_2",
+        "active_joint_name": "joint_2"
+    },
+    "45194_link_2": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/45194_link_2",
+        "obj_index": "45194",
+        "joint_index": "2",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_2",
+        "active_joint_name": "joint_2"
+    },
+    "45575_link_1": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/45575_link_1",
+        "obj_index": "45575",
+        "joint_index": "1",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_1",
+        "active_joint_name": "joint_1"
+    },
+    "45146_link_0": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/45146_link_0",
+        "obj_index": "45146",
+        "joint_index": "0",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_0",
+        "active_joint_name": "joint_0"
+    },
+    "45135_link_0": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/45135_link_0",
+        "obj_index": "45135",
+        "joint_index": "0",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_0",
+        "active_joint_name": "joint_0"
+    },
+    "45168_link_1": {
+        "joint_type": "revolute",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45168_link_1",
+        "obj_index": "45168",
+        "joint_index": "1",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_1",
+        "active_joint_name": "joint_1"
+    },
+    "45984_link_0": {
+        "joint_type": "revolute",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45984_link_0",
+        "obj_index": "45984",
+        "joint_index": "0",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_0",
+        "active_joint_name": "joint_0"
+    },
+    "44826_link_1": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/44826_link_1",
+        "obj_index": "44826",
+        "joint_index": "1",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_1",
+        "active_joint_name": "joint_1"
+    },
+    "46084_link_2": {
+        "joint_type": "prismatic",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/46084_link_2",
+        "obj_index": "46084",
+        "joint_index": "2",
+        "obj_description": "cabinet",
+        "load_pose": null,
+        "load_quat": null,
+        "load_scale": null,
+        "active_link_name": "link_2",
+        "active_joint_name": "joint_2"
+    }
+}

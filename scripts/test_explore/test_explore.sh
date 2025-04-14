@@ -1,11 +1,12 @@
 #!/bin/bash
 
 # 创建日志目录
-LOG_DIR="/home/zby/Programs/Embodied_Analogy/assets/logs_complex"
-run_name="test_explore_4_11"
+LOG_DIR="/home/zby/Programs/Embodied_Analogy/assets/logs"
+run_name="4_14"
 mkdir -p "$LOG_DIR/$run_name"
 
-test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
+# test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
+test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data_subset.json"
 
 # 读取 JSON 文件中的所有键
 test_data_cfgs=$(jq -r 'keys[]' "$test_data_cfg_path")
@@ -52,6 +53,7 @@ for test_data_cfg in $test_data_cfgs; do
         --joint_type="$joint_type" \
         --obj_index="$obj_index" \
         --joint_index="$joint_index" \
+        --init_joint_state=0 \
         --load_scale="$load_scale" \
         --load_pose="$load_pose" \
         --load_quat="$load_quat" \

@@ -322,7 +322,7 @@ if __name__ == "__main__":
     "max_tries": 10,
     "update_sigma": 0.05,
     "reserved_distance": 0.05,
-    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs_complex",
+    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
     "run_name": "test_explore_4_11",
     "valid_thresh": 0.5,
     "instruction": "open the cabinet",

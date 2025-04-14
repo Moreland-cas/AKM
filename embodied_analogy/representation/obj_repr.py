@@ -210,10 +210,11 @@ class Obj_repr(Data):
         fine_lr=1e-3,
         file_path=None,
         evaluate=False,
+        save_memory=True,
         visualize=True,
     ):
         """
-            从 frames 中恢复出 joint state dict, 并对于 initial_frame 进行重定位
+            从 frames 中恢复出 joint state dict
         """
         # self.frames[0].segment_obj(
         #     obj_description=obj_description,
@@ -227,7 +228,7 @@ class Obj_repr(Data):
         # self.frames.cluster_track3d(visualize=visualize)
         
         self.coarse_joint_estimation(visualize=visualize)
-        self.initialize_kframes(num_kframes=num_kframes, save_memory=False)
+        self.initialize_kframes(num_kframes=num_kframes, save_memory=save_memory)
         self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
         self.kframes.classify_dynamics(
             filter=True,
@@ -240,11 +241,15 @@ class Obj_repr(Data):
             # self.visualize()
             self.save(file_path)
         
+        result = None
         if evaluate:
             if self.gt_joint_dict["joint_type"] is None:
                 return 
             result = self.compute_joint_error()
-            print("Reconstruction Result:", result)
+            print("Reconstruction Result:")
+            for k, v in result.items():
+                print(k, v)
+        return result
             
     def reloc(
         self,
@@ -386,8 +391,8 @@ if __name__ == "__main__":
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
     # pass
     # obj_repr = Obj_repr()
-    # obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore/41083_2_prismatic/explore/obj_repr.npy")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore/41083_2_prismatic/explore/obj_repr.npy")
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs_complex/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy")
+    # obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy")
     print(obj_repr.frames.track2d_seq.shape)
     # obj_repr.visualize()
