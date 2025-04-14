@@ -3,7 +3,7 @@ import json
 import pickle
 import argparse
 from embodied_analogy.utility.utils import initialize_napari
-initialize_napari()
+# initialize_napari()
 from embodied_analogy.representation.obj_repr import Obj_repr
 
 def update_cfg(explore_cfg, args):
@@ -54,10 +54,10 @@ if __name__ == "__main__":
         print(recon_cfg)
     
         obj_repr = Obj_repr.load(os.path.join(explore_folder, "obj_repr.npy"))
+        obj_repr: Obj_repr
         print("load obj_repr from explore folder...")
         
         recon_result = obj_repr.reconstruct(
-            # num_initial_pts=self.num_initial_pts,
             num_kframes=recon_cfg["num_kframes"],
             obj_description=recon_cfg["obj_description"],
             fine_lr=recon_cfg["fine_lr"],

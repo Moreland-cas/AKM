@@ -2,7 +2,7 @@ import os
 import pickle
 import numpy as np
 
-root_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore_4_11"
+root_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14"
 # root_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore"
 results = []
 
@@ -66,7 +66,7 @@ for i, result in enumerate(results):
         prismatic_joint_delta_min = min(prismatic_joint_delta_min, joint_delta * 100) # cm
         # print(joint_delta * 100, "cm")
     else:
-        print(np.rad2deg(joint_delta), "degree")
+        # print(np.rad2deg(joint_delta), "degree")
         revolute_joint_delta_min = min(revolute_joint_delta_min, np.rad2deg(joint_delta)) # 度
         
 

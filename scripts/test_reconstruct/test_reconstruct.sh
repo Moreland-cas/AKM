@@ -2,7 +2,7 @@
 
 # 重建日志目录
 LOG_DIR="/home/zby/Programs/Embodied_Analogy/assets/logs"
-run_name="test_explore_4_11"
+run_name="4_14"
 
 # 遍历 LOG_DIR 下的文件夹
 for obj_folder in "$LOG_DIR/$run_name"/*; do
