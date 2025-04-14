@@ -284,23 +284,52 @@ class Obj_repr(Data):
         # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
         num_ref = len(self.kframes)
         
-        # 初始化状态, 通过 rgb 或者 depth 找到最近的图像, 我觉得可以先通过 depth
+        # 初始化 query_frame 的 joint 状态
+        """
+        大致的意思是说找到一个不错的 init_opti_state 就行
+        策略是 sample 多个 joint state, 然后依次得到多个 transformed_moving_pc
+        然后找到与 query_frame 最接近的那个 joint state
+        NOTE: 由于我们强制了 kframes[0] 其实就是 manipulate first frame, 且 first frame 的 joint state 是 0
+        所以之后的 joint_delta 都是直接加在 kframes[0] 的 joint_state 上
+        """
+        # 根据关节种类选择 sample 的范围
+        if self.coarse_joint_dict["joint_type"] == "revolute":
+            joint_delta = np.pi / 2.
+        elif self.coarse_joint_dict["joint_type"] == "prismatic":
+            joint_delta = 0.5
+        
+        sampled_states = np.linspace(0, joint_delta, 10)
+        # 获取 kframes[0] 中的 moving_part
+        moving_pc = depth_image_to_pointcloud(
+            depth_image=self.kframes[0].depth, 
+            mask=self.kframes[0].dynamic_mask == MOVING_LABEL, 
+            K=K
+        ) # N, 3
+        
         best_err = 1e10
         best_matched_idx = -1
-        for i in range(num_ref):
-            query_depth_mask = get_depth_mask(query_depth, K, self.Tw2c)
-            ref_depth = ref_depths[i]
-            ref_depth_mask = get_depth_mask(ref_depth, K, self.Tw2c)
+        for i, sampled_state in enumerate(sampled_states):
+            Tref2tgt = joint_data_to_transform_np(
+                joint_type=self.fine_joint_dict["joint_type"], 
+                joint_dir=self.fine_joint_dict["joint_dir"],
+                joint_start=self.fine_joint_dict["joint_start"],
+                joint_state_ref2tgt=sampled_state
+            )
+            tf_moving_pc = (Tref2tgt[:3, :3] @ moving_pc.T).T + Tref2tgt[:3, 3] # N, 3
+            tf_moving_uv, moving_depth = camera_to_image(tf_moving_pc, K) # (N, 2), (N, )
             
-            # 计算 mask 的交集, 对交集中点的深度计算一个观测误差
-            inter_mask = query_depth_mask & ref_depth_mask
-            delta_depth = (ref_depth - query_depth)**2
-            cur_mean_err = delta_depth[inter_mask].mean()
+            # 对于超出 depth 范围的 tf_moving_uv 进行过滤
+            in_img_mask = (tf_moving_uv[:, 0] >= 0) & (tf_moving_uv[:, 0] < query_frame.depth.shape[1]) & \
+                          (tf_moving_uv[:, 1] >= 0) & (tf_moving_uv[:, 1] < query_frame.depth.shape[0])
+            tf_moving_uv, moving_depth = tf_moving_uv[in_img_mask], moving_depth[in_img_mask]
             
+            # 读取 query_frame 在 tf_moving_uv 处的 depth, 并与 moving_depth 做比较
+            query_depth = query_frame.depth[tf_moving_uv[:, 1].astype(np.int32), tf_moving_uv[:, 0].astype(np.int32)]
+            cur_mean_err = np.abs(query_depth - moving_depth).mean()
             if cur_mean_err < best_err:
                 best_err = cur_mean_err
                 best_matched_idx = i
-        query_state = ref_joint_states[best_matched_idx] 
+        query_state = sampled_states[best_matched_idx] 
         
         # 将 query_frame 写进 obj_repr.kframes, 然后复用 fine_estimation 对初始帧进行优化
         query_frame.joint_state = query_state

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 from embodied_analogy.environment.obj_env import ObjEnv
@@ -21,6 +22,7 @@ class ManipulateEnv(ObjEnv):
             init_joint_state
             goal_delta
             obj_repr_path
+            reloc_lr
         TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
         """
         # 首先 load 物体
@@ -86,8 +88,7 @@ class ManipulateEnv(ObjEnv):
         
         self.transfer_ph_pose(
             ref_frame=self.obj_repr.kframes[0],
-            tgt_frame=cur_frame,
-            visualize=visualize
+            tgt_frame=cur_frame
         )
         
         cur_frame.segment_obj(obj_description=self.obj_description, visualize=visualize)
@@ -153,52 +154,51 @@ class ManipulateEnv(ObjEnv):
         
 if __name__ == '__main__':
     cfg = {
-        'base_cfg': {
-            'phy_timestep': 0.004, 
-            'planner_timestep': 0.01, 
-            'use_sapien2': True
-            }, 
-        'robot_cfg': {}, 
-        'explore_cfg': {
-            'record_fps': 30, 
-            'pertubation_distance': 0.1, 
-            "valid_thresh": 0.5,
-            'max_tries': 10, 
-            'update_sigma': 0.05
-            }, 
-        'recon_cfg': {
-            'num_initial_pts': 1000, 
-            'num_kframes': 5, 
-            'fine_lr': 0.001
-            }, 
-        'manip_cfg': {
-            'reloc_lr': 0.003, 
-            'reserved_distance': 0.05
-            }, 
-        'task_cfg': {
-            'instruction': 'open the cabinet', 
-            'obj_description': 'cabinet', 
-            'delta': 0.2617993877991494, 
-            'obj_cfg': {
-                'asset_path': '/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/46277_link_1', 
-                'scale': 1.0, 
-                'active_link_name': 'link_1', 
-                'active_joint_name': 'joint_1', 
-                # 'pose': Pose([0.917415, 0.148381, 0.512052], [0.988918, 0, 0, 0.148461]), 
-                # 'init_joint_state': 0.0
-                }
-            }
-        }
-    me = ManipulateEnv(
-        explore_cfg=cfg["explore_cfg"],
-        recon_cfg=cfg["recon_cfg"],
-        task_cfg=cfg["task_cfg"]
-    )
-    # obj_index = task_cfg["obj_cfg"]["asset_path"].split("/")[-1].split("_")[0]
-    # me.explore_stage()
-    # me.recon_stage(save_path="/home/zby/Prograwms/Embodied_Analogy/assets/tmp/47578/recon_data.pkl")
-    result = me.main(visualize=False)
+        "phy_timestep": 0.004,
+        "planner_timestep": 0.01,
+        "use_sapien2": True,
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "max_tries": 10,
+        "update_sigma": 0.05,
+        "reserved_distance": 0.05,
+        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
+        "run_name": "4_14",
+        "valid_thresh": 0.5,
+        "instruction": "open the cabinet",
+        "num_initial_pts": 1000,
+        "obj_description": "cabinet",
+        "joint_type": "prismatic",
+        "obj_index": "45135",
+        "joint_index": "0",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/45135_link_0",
+        "active_link_name": "link_0",
+        "active_joint_name": "joint_0",
+        "load_pose": [
+            0.8806247711181641,
+            0.0,
+            0.6068519949913025
+        ],
+        "load_quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "load_scale": 1,
+        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45135_0_prismatic",
+        "num_kframes": 5,
+        "fine_lr": 0.001,
+        "save_memory": True
+    }
     
-    while True:
-        me.base_step()
+    cfg.update({
+        "reloc_lr": 3e-3,
+        "init_joint_state": 0.3,
+        "goal_delta": -0.05,
+        "obj_repr_path": os.path.join(cfg["obj_folder"], "reconstruct", "obj_repr.npy")
+    })
+    me = ManipulateEnv(cfg)
+    me.manip_stage(evaluate=True)
+    
     
