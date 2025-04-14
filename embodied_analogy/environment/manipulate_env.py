@@ -32,6 +32,8 @@ class ManipulateEnv(ObjEnv):
         
         self.goal_delta = cfg["goal_delta"]
         self.init_joint_state = cfg["init_joint_state"]
+        # NOTE: 这里要将 target_state 初始化为 None, 然后在第一次调用 not_good_enough 的时候进行设置
+        self.target_state = None
         
         self.obj_description = cfg["obj_description"]
         self.obj_repr = Obj_repr.load(cfg["obj_repr_path"])
@@ -59,47 +61,33 @@ class ManipulateEnv(ObjEnv):
         Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
         tgt_frame.Tph2w = Tph2w_tgt
         
-    def manip_stage(self, load_path=None, evaluate=True, visualize=False):
+    def manip_once(self, visualize=False):
         """
-        manipulate 的执行逻辑:
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
         
         对机械臂进行归位, 对当前状态进行定位, 计算出当前帧的抓取位姿 (使用 manipulate first frame)
         
         移动到该位姿, 并根据 target_state 进行操作
         """
-        if load_path is not None:
-            self.obj_repr = Obj_repr.load(load_path)
-        
         self.obj_repr : Obj_repr 
-        Tc2w = np.linalg.inv(self.camera_extrinsic)
         
-        # 然后估计出 cur_state
-        self.base_step()
-        cur_frame = self.capture_frame()
-        cur_frame = self.obj_repr.reloc(
-            query_frame=cur_frame,
-            update_query_dynamic=True,
-            reloc_lr=self.reloc_lr,
-            visualize=visualize
-        )
-        self.cur_state = cur_frame.joint_state
-        self.target_state = self.cur_state + self.goal_delta
+        # 首先进行机械臂的归位
+        self.reset_robot_safe()
         
         self.transfer_ph_pose(
             ref_frame=self.obj_repr.kframes[0],
-            tgt_frame=cur_frame
+            tgt_frame=self.cur_frame
         )
         
-        cur_frame.segment_obj(obj_description=self.obj_description, visualize=visualize)
-        pc_w, _ = cur_frame.get_obj_pc(
+        # self.cur_frame.segment_obj(obj_description=self.obj_description, visualize=visualize)
+        pc_w, _ = self.cur_frame.get_obj_pc(
             use_robot_mask=True,
             use_height_filter=False,
             world_frame=True
         )
         self.planner.update_point_cloud(pc_w)
         
-        Tph2w_pre = self.get_translated_ph(cur_frame.Tph2w, -self.reserved_distance)
+        Tph2w_pre = self.get_translated_ph(self.cur_frame.Tph2w, -self.reserved_distance)
         result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
         
         # 实际执行
@@ -110,50 +98,67 @@ class ManipulateEnv(ObjEnv):
         self.close_gripper()
         
         # 转换 joint_dict 到世界坐标系
+        Tc2w = np.linalg.inv(self.camera_extrinsic)
         self.move_along_axis(
             joint_type=self.obj_repr.fine_joint_dict["joint_type"],
             joint_axis=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_dir"],
             joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
-            moving_distance=self.target_state-cur_frame.joint_state
+            moving_distance=self.target_state-self.cur_frame.joint_state
         )
-        if evaluate:
-            result_dict = self.evaluate()
-            print(result_dict)
+        
+        # 这里进行重定位, 如果离自己的目标差太多, 就重新执行
+        result_dict = self.evaluate()
+        print(result_dict)
+        return result_dict
     
+    def not_good_enough(self, visualize=False):
+        print("Check if current state is good enough...")
+        # NOTE: cur_frame 代表刚开始一轮操作时捕获的 frame
+        # 然后估计出 cur_state
+        self.base_step()
+        cur_frame = self.capture_frame()
+        cur_frame = self.obj_repr.reloc(
+            query_frame=cur_frame,
+            update_query_dynamic=False,
+            reloc_lr=self.reloc_lr,
+            visualize=visualize
+        )
+        self.cur_state = cur_frame.joint_state
+        self.cur_frame = cur_frame
+        
+        # NOTE: 仅在第一次调用 not_good_enough 的时候设置 target_state
+        if self.target_state is None:
+            self.target_state = self.cur_state + self.goal_delta
+        
+        if self.obj_repr.fine_joint_dict["joint_type"] == "prismatic":
+            return abs(self.cur_state - self.target_state) > 1e-2 # 1cm
+        elif self.obj_repr.fine_joint_dict["joint_type"] == "revolute":
+            return abs(self.cur_state - self.target_state) > np.deg2rad(5) # 5 degree 
+        
+    def manipulate_close_loop(self, visualize=False):
+        num_manip = 0
+        max_manip = 5
+        results = []
+        while(self.not_good_enough(visualize) and (num_manip < max_manip)):
+            print(f"Start manipulating, round {num_manip + 1}...")
+            result = self.manip_once(visualize=visualize)
+            print(result)
+            results.append(result)
+            
     def evaluate(self):
         # 评测 manipulate 的好坏
         actual_delta = self.get_active_joint_state() - self.init_joint_state
         diff = actual_delta - self.goal_delta
-        loss = np.abs(diff)
         result_dict = {
             "diff": diff,
-            "l1_loss": loss,
             "actual_delta": actual_delta,
             "goal_delta": self.goal_delta
         }
         return result_dict
-    
-    def main(self, visualize=False):
-        result = {
-            "exception": "",
-            "loss": None,
-        }
-        
-        try:
-            self.explore_stage(visualize=visualize)
-            self.recon_stage(visualize=visualize)
-            self.manip_stage(visualize=visualize)
-            loss = self.evaluate()
-            result["loss"] = loss
-        except Exception as e:
-            print(e)
-            result["exception"] = str(e)
-        
-        return result
             
         
 if __name__ == '__main__':
-    cfg = {
+    cfg_prismatic = {
         "phy_timestep": 0.004,
         "planner_timestep": 0.01,
         "use_sapien2": True,
@@ -191,14 +196,97 @@ if __name__ == '__main__':
         "fine_lr": 0.001,
         "save_memory": True
     }
+    cfg_revolute = {
+        "phy_timestep": 0.004,
+        "planner_timestep": 0.01,
+        "use_sapien2": True,
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "max_tries": 10,
+        "update_sigma": 0.05,
+        "reserved_distance": 0.05,
+        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
+        "run_name": "4_14",
+        "valid_thresh": 0.5,
+        "instruction": "open the cabinet",
+        "num_initial_pts": 1000,
+        "obj_description": "cabinet",
+        "joint_type": "revolute",
+        "obj_index": "45984",
+        "joint_index": "0",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45984_link_0",
+        "active_link_name": "link_0",
+        "active_joint_name": "joint_0",
+        "load_pose": [
+            0.8842315077781677,
+            0.0,
+            0.63484126329422
+        ],
+        "load_quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "load_scale": 1,
+        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45984_0_revolute",
+        "num_kframes": 5,
+        "fine_lr": 0.001,
+        "save_memory": True
+    }
+    
+    cfg_rev_bug = {
+    "phy_timestep": 0.004,
+    "planner_timestep": 0.01,
+    "use_sapien2": True,
+    "record_fps": 30,
+    "pertubation_distance": 0.1,
+    "max_tries": 10,
+    "update_sigma": 0.05,
+    "reserved_distance": 0.05,
+    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
+    "run_name": "4_14",
+    "valid_thresh": 0.5,
+    "instruction": "open the cabinet",
+    "num_initial_pts": 1000,
+    "obj_description": "cabinet",
+    "joint_type": "revolute",
+    "obj_index": "45168",
+    "joint_index": "1",
+    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45168_link_1",
+    "active_link_name": "link_1",
+    "active_joint_name": "joint_1",
+    "load_pose": [
+        0.951462984085083,
+        0.0,
+        0.5911185145378113
+    ],
+    "load_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+    ],
+    "load_scale": 1,
+    "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45168_1_revolute",
+    "num_kframes": 5,
+    "fine_lr": 0.001,
+    "save_memory": True
+}
+    # cfg = cfg_prismatic
+    cfg = cfg_revolute
     
     cfg.update({
         "reloc_lr": 3e-3,
-        "init_joint_state": 0.3,
-        "goal_delta": -0.05,
+        # "init_joint_state": 0.4,
+        # "goal_delta": -0.1,
+        "init_joint_state": np.deg2rad(5),
+        "goal_delta": np.deg2rad(45),
         "obj_repr_path": os.path.join(cfg["obj_folder"], "reconstruct", "obj_repr.npy")
     })
     me = ManipulateEnv(cfg)
-    me.manip_stage(evaluate=True)
+    me.manipulate_close_loop()
     
+    while True:
+        me.base_step()
     

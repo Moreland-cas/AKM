@@ -370,6 +370,7 @@ class Obj_repr(Data):
                 moving_uv, _ = camera_to_image(moving_pc, K) # N, 2
                 moving_uv = moving_uv.astype(np.int32)
                 tmp_zero = np.zeros_like(query_dynamic)
+                # TODO: 这里有越界的 bug
                 tmp_zero[moving_uv[:, 1], moving_uv[:, 0]] = True # H, W
                 query_dynamic_zero = query_dynamic_zero | tmp_zero
             
