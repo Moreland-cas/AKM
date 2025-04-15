@@ -316,9 +316,11 @@ def fine_estimation(
         }
         should_early_stop = scheduler.step(cur_icp_loss.item(), cur_state_dict)
         
-        print(f"[{k}/{max_icp_iters}] ICP loss:", cur_icp_loss.item())
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        print(f"\t lr:", cur_lr)
+        
+        if k % 10 == 0:
+            print(f"[{k}/{max_icp_iters}] ICP loss:", cur_icp_loss.item())
+            print(f"\t lr:", cur_lr)
         
         if should_early_stop:
             print("EARLY STOP")

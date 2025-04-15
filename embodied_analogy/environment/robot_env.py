@@ -178,9 +178,21 @@ class RobotEnv(BaseEnv):
         """
         reset_robot 不控制 gripper 的 open/close 状态, 只把其他关节进行 reset
         """
-        print("resetting robot ...")
+        print("Reset robot ...")
         init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
+        
+        # self.robot.set_qpos(
+        #     # np.array([ 1.9070574e+00, -6.2731731e-01, -1.8675604e-01, -8.6891341e-01,
+        #     #         -4.1449979e-01,  2.7250558e-01,  2.1395791e+00,  0.0000000e+00,
+        #     #         3.5331905e-06], dtype=np.float32)
+        #     np.array([ 6.7640580e-02, -1.9538710e-02, -7.9665380e-03, -8.8072553e-02,
+        #         -1.7020022e-02, -6.1102598e-03,  8.7956175e-02,  5.1196457e-05,
+        #             7.0376602e-09], dtype=np.float32)
+        # )
+        # self.robot.set_qvel(np.zeros(self.robot.dof))
+        # self.robot.set_qf(np.zeros(self.robot.dof))
+        # self.robot.set_qacc(np.zeros(self.robot.dof))
         
         # NOTE: 这里一定要进行一步 step, 因为现在是通过 cur_qpos 和 target_qpos 的差值来判断是否要结束同步的
         # 但是在 self.robot.set_qpos() 后的第一个 step 时的 cur_qpos 是等于 target_qpos 的, 后续才会变为实际值
@@ -192,13 +204,18 @@ class RobotEnv(BaseEnv):
             vel = self.robot.get_qvel()
             # 这里选用 vel_norm 作为 reset 进行同步的终止条件, 因为 vel 相对于 qpos 和 qacc 更加稳定
             # qpos 不知道要设置什么值, qacc 经常会突变
-            if np.linalg.norm(vel) < 2e-3: # 基本 vel 在 mm/s 的量级就是可以的
+            vel_norm = np.linalg.norm(vel)
+            if vel_norm < 2e-3: # 基本 vel 在 mm/s 的量级就是可以的
+                print(f"Break reset since small robot vel norm: {vel_norm}")
                 break
             self.base_step()
             count += 1
+            
+        if count == 100:
+            print("Break reset since reach max reset count")
     
     def reset_robot_safe(self):        
-        print("resetting robot safe ...")
+        print("Call safe robot reset ...")
         # 先打开 gripper, 再撤退一段距离
         self.open_gripper()
         
@@ -347,12 +364,13 @@ class RobotEnv(BaseEnv):
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
         joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
         """
+        print("Start move_along_axis function...")
         assert joint_type in ["prismatic", "revolute"]
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
             # 根据 moving distance 的大小计算出有多少个插值点
             # 对于平移关节时每次移动 3 cm
-            num_interp = max(3, int(moving_distance / 0.02))
+            num_interp = max(3, int(moving_distance / 0.01))
         else:
             # 对于旋转关节时每次移动 5 degree
             num_interp = max(3, int(moving_distance / np.deg2rad(5)))
@@ -391,8 +409,14 @@ class RobotEnv(BaseEnv):
         for Tph2w in T_list:
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
             if result is None:
+                # 一般是 reset_safe 的时候遇到
                 print("excounter None result when moving along axis, skip!")
                 continue
+            # 针对那种需要一个大的动作的操作, 直接不执行, 否则容易大幅度影响物体状态
+            elif len(result["time"]) > 200:
+                big_steps = len(result["time"])
+                print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
+                break
             self.follow_path(result)
     
     def move_forward(self, moving_distance):
@@ -454,17 +478,47 @@ class RobotEnv(BaseEnv):
     
     
 if __name__ == "__main__":
-    env = RobotEnv()
-    
-    env.step()
-    env.capture_frame()
-    
-    env.open_gripper()
-    env.move_forward(0.1)
-    env.close_gripper()
-    env.move_forward(-0.1)
-    env.open_gripper()
-    
+    env = RobotEnv(
+        {
+        "phy_timestep": 0.004,
+        "planner_timestep": 0.01,
+        "use_sapien2": True,
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "max_tries": 10,
+        "update_sigma": 0.05,
+        "reserved_distance": 0.05,
+        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
+        "run_name": "4_14",
+        "valid_thresh": 0.5,
+        "instruction": "open the cabinet",
+        "num_initial_pts": 1000,
+        "obj_description": "cabinet",
+        "joint_type": "revolute",
+        "obj_index": "45168",
+        "joint_index": "1",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45168_link_1",
+        "active_link_name": "link_1",
+        "active_joint_name": "joint_1",
+        "load_pose": [
+            0.951462984085083,
+            0.0,
+            0.5911185145378113
+        ],
+        "load_quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "load_scale": 1,
+        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45168_1_revolute",
+        "num_kframes": 5,
+        "fine_lr": 0.001,
+        "save_memory": True
+    }
+    )
+
     
     # for i in range(100):
     while True:

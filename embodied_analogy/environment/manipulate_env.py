@@ -1,13 +1,15 @@
 import os
 import numpy as np
 
-from embodied_analogy.environment.obj_env import ObjEnv
-from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
     initialize_napari,
     joint_data_to_transform_np,
 )
 initialize_napari()
+
+from embodied_analogy.environment.obj_env import ObjEnv
+from embodied_analogy.utility.constants import *
+
 from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.representation.obj_repr import Obj_repr
 
@@ -71,8 +73,11 @@ class ManipulateEnv(ObjEnv):
         """
         self.obj_repr : Obj_repr 
         
-        # 首先进行机械臂的归位
-        self.reset_robot_safe()
+        # NOTE: 感觉每次失败的时候没必要完全 reset, 只要撤回一段距离, 然后再次尝试就好了
+        # self.reset_robot_safe()
+        print("open gripper and move back a little bit...")
+        self.open_gripper()
+        self.move_forward(-self.reserved_distance)
         
         self.transfer_ph_pose(
             ref_frame=self.obj_repr.kframes[0],
@@ -80,11 +85,13 @@ class ManipulateEnv(ObjEnv):
         )
         
         # self.cur_frame.segment_obj(obj_description=self.obj_description, visualize=visualize)
-        pc_w, _ = self.cur_frame.get_obj_pc(
+        self.cur_frame: Frame
+        pc_w, _ = self.cur_frame.get_env_pc(
             use_robot_mask=True,
             use_height_filter=False,
             world_frame=True
         )
+        
         self.planner.update_point_cloud(pc_w)
         
         Tph2w_pre = self.get_translated_ph(self.cur_frame.Tph2w, -self.reserved_distance)
@@ -119,7 +126,6 @@ class ManipulateEnv(ObjEnv):
         cur_frame = self.capture_frame()
         cur_frame = self.obj_repr.reloc(
             query_frame=cur_frame,
-            update_query_dynamic=False,
             reloc_lr=self.reloc_lr,
             visualize=visualize
         )
@@ -139,11 +145,18 @@ class ManipulateEnv(ObjEnv):
         num_manip = 0
         max_manip = 5
         results = []
-        while(self.not_good_enough(visualize) and (num_manip < max_manip)):
+        while(self.not_good_enough(visualize=visualize) and (num_manip < max_manip)):
             print(f"Start manipulating, round {num_manip + 1}...")
             result = self.manip_once(visualize=visualize)
+            num_manip = num_manip + 1
             print(result)
             results.append(result)
+        
+        if num_manip == max_manip:
+            print(f"After {num_manip} round, Stopped since num_manip reach max_manip...")
+        else:
+            print(f"After {num_manip} round, Stopped since the robot thinks it is good enough...")
+        print("done")
             
     def evaluate(self):
         # 评测 manipulate 的好坏
@@ -236,52 +249,52 @@ if __name__ == '__main__':
     }
     
     cfg_rev_bug = {
-    "phy_timestep": 0.004,
-    "planner_timestep": 0.01,
-    "use_sapien2": True,
-    "record_fps": 30,
-    "pertubation_distance": 0.1,
-    "max_tries": 10,
-    "update_sigma": 0.05,
-    "reserved_distance": 0.05,
-    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
-    "run_name": "4_14",
-    "valid_thresh": 0.5,
-    "instruction": "open the cabinet",
-    "num_initial_pts": 1000,
-    "obj_description": "cabinet",
-    "joint_type": "revolute",
-    "obj_index": "45168",
-    "joint_index": "1",
-    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45168_link_1",
-    "active_link_name": "link_1",
-    "active_joint_name": "joint_1",
-    "load_pose": [
-        0.951462984085083,
-        0.0,
-        0.5911185145378113
-    ],
-    "load_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
-    ],
-    "load_scale": 1,
-    "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45168_1_revolute",
-    "num_kframes": 5,
-    "fine_lr": 0.001,
-    "save_memory": True
-}
-    # cfg = cfg_prismatic
-    cfg = cfg_revolute
+        "phy_timestep": 0.004,
+        "planner_timestep": 0.01,
+        "use_sapien2": True,
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "max_tries": 10,
+        "update_sigma": 0.05,
+        "reserved_distance": 0.05,
+        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
+        "run_name": "4_14",
+        "valid_thresh": 0.5,
+        "instruction": "open the cabinet",
+        "num_initial_pts": 1000,
+        "obj_description": "cabinet",
+        "joint_type": "revolute",
+        "obj_index": "45168",
+        "joint_index": "1",
+        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45168_link_1",
+        "active_link_name": "link_1",
+        "active_joint_name": "joint_1",
+        "load_pose": [
+            0.951462984085083,
+            0.0,
+            0.5911185145378113
+        ],
+        "load_quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        "load_scale": 1,
+        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45168_1_revolute",
+        "num_kframes": 5,
+        "fine_lr": 0.001,
+        "save_memory": True
+    }
+    cfg = cfg_prismatic
+    # cfg = cfg_revolute
     
     cfg.update({
         "reloc_lr": 3e-3,
-        # "init_joint_state": 0.4,
-        # "goal_delta": -0.1,
-        "init_joint_state": np.deg2rad(5),
-        "goal_delta": np.deg2rad(45),
+        "init_joint_state": 0.,
+        "goal_delta": 0.5,
+        # "init_joint_state": np.deg2rad(0),
+        # "goal_delta": np.deg2rad(60),
         "obj_repr_path": os.path.join(cfg["obj_folder"], "reconstruct", "obj_repr.npy")
     })
     me = ManipulateEnv(cfg)

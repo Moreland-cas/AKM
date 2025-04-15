@@ -127,7 +127,6 @@ class Obj_repr(Data):
                 P2=gt_w["joint_start"],
                 d2=gt_w["joint_dir"]
             )
-            
         return result
     
     def clear_frames(self):
@@ -250,45 +249,13 @@ class Obj_repr(Data):
             for k, v in result.items():
                 print(k, v)
         return result
-            
-    def reloc(
-        self,
-        query_frame: Frame,
-        update_query_dynamic=False,
-        reloc_lr=3e-3,
-        visualize=False
-    ) -> Frame:
+    
+    def update_state(self, query_frame: Frame, visualize=False):
         """
-        对 query frame 的 joint_state, dynamic 进行恢复 
-        其中 dynamic 的恢复来自 sam2 和 kframes
-        query_frame:
-            需包含 query_depth, query_dynamic
-        """
-        if query_frame.obj_mask is None:
-            print("obj_mask of query_frame is None, run grounded sam first..")
-            query_frame.segment_obj(obj_description=self.obj_description)
-        
-        if query_frame.dynamic_mask is None:
-            print("dynamic_mask of query_frame is None, initializing using obj_mask..")
-            query_frame.dynamic_mask = query_frame.obj_mask.astype(np.int32) * MOVING_LABEL
-        
-        # 从 obj_repr 中读取必要的数据
-        K = self.K
-        query_dynamic = query_frame.dynamic_mask
-        query_depth = query_frame.depth
-        ref_depths = self.kframes.get_depth_seq()
-        ref_dynamics = self.kframes.get_dynamic_seq()
-        ref_joint_states = self.kframes.get_joint_states()
-        assert len(ref_joint_states) == len(self.kframes)
-            
-        # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
-        num_ref = len(self.kframes)
-        
-        # 初始化 query_frame 的 joint 状态
-        """
-        大致的意思是说找到一个不错的 init_opti_state 就行
+        给 query_frame 的 joint_state 做一个粗略的估值
         策略是 sample 多个 joint state, 然后依次得到多个 transformed_moving_pc
         然后找到与 query_frame 最接近的那个 joint state
+        
         NOTE: 由于我们强制了 kframes[0] 其实就是 manipulate first frame, 且 first frame 的 joint state 是 0
         所以之后的 joint_delta 都是直接加在 kframes[0] 的 joint_state 上
         """
@@ -298,12 +265,12 @@ class Obj_repr(Data):
         elif self.coarse_joint_dict["joint_type"] == "prismatic":
             joint_delta = 0.5
         
-        sampled_states = np.linspace(0, joint_delta, 10)
+        sampled_states = np.linspace(0, joint_delta, 15)
         # 获取 kframes[0] 中的 moving_part
         moving_pc = depth_image_to_pointcloud(
             depth_image=self.kframes[0].depth, 
             mask=self.kframes[0].dynamic_mask == MOVING_LABEL, 
-            K=K
+            K=self.K
         ) # N, 3
         
         best_err = 1e10
@@ -316,7 +283,7 @@ class Obj_repr(Data):
                 joint_state_ref2tgt=sampled_state
             )
             tf_moving_pc = (Tref2tgt[:3, :3] @ moving_pc.T).T + Tref2tgt[:3, 3] # N, 3
-            tf_moving_uv, moving_depth = camera_to_image(tf_moving_pc, K) # (N, 2), (N, )
+            tf_moving_uv, moving_depth = camera_to_image(tf_moving_pc, self.K) # (N, 2), (N, )
             
             # 对于超出 depth 范围的 tf_moving_uv 进行过滤
             in_img_mask = (tf_moving_uv[:, 0] >= 0) & (tf_moving_uv[:, 0] < query_frame.depth.shape[1]) & \
@@ -331,10 +298,92 @@ class Obj_repr(Data):
                 best_matched_idx = i
         query_state = sampled_states[best_matched_idx] 
         
-        # 将 query_frame 写进 obj_repr.kframes, 然后复用 fine_estimation 对初始帧进行优化
-        query_frame.joint_state = query_state
-        self.kframes.frame_list.insert(0, query_frame)
+        if visualize:
+            # TODO
+            pass
         
+        print("Guessed query state:", query_state)
+        query_frame.joint_state = query_state
+    
+    def update_dynamic(self, query_frame: Frame, visualize=False):
+        """
+        使用 obj_repr 中的 kframes 的 dynamics 来更新 query_frame 的 dynamics
+        NOTE: 需要 query_frame 的 joint_state 不为空
+        """
+        K = self.K
+        ref_joint_states = self.kframes.get_joint_states()
+        assert len(ref_joint_states) == len(self.kframes)
+        
+        num_ref = len(self.kframes)
+        ref_depths = self.kframes.get_depth_seq()
+        ref_dynamics = self.kframes.get_dynamic_seq()
+        
+        query_moving = np.zeros_like(query_frame.depth).astype(np.bool_) # H, W
+        for i in range(num_ref):
+            ref_moving_pc = depth_image_to_pointcloud(ref_depths[i], ref_dynamics[i]==MOVING_LABEL, K) # N, 3
+            Tref2query = joint_data_to_transform_np(
+                joint_type=self.fine_joint_dict["joint_type"],
+                joint_dir=self.fine_joint_dict["joint_dir"],
+                joint_start=self.fine_joint_dict["joint_start"],
+                joint_state_ref2tgt=query_frame.joint_state-ref_joint_states[i]
+            )
+            ref_moving_pc_aug = np.concatenate([ref_moving_pc, np.ones((len(ref_moving_pc), 1))], axis=1) # N, 4
+            moving_pc = (ref_moving_pc_aug @ Tref2query.T)[:, :3] # N, 3
+            moving_uv, _ = camera_to_image(moving_pc, K) # N, 2
+            moving_uv = moving_uv.astype(np.int32)
+            
+            # 在这里处理越界的 bug
+            in_img_mask = (moving_uv[:, 0] >= 0) & (moving_uv[:, 0] < query_frame.depth.shape[1]) & \
+                          (moving_uv[:, 1] >= 0) & (moving_uv[:, 1] < query_frame.depth.shape[0])
+            moving_uv = moving_uv[in_img_mask]
+            
+            tmp_moving = np.zeros_like(query_moving)
+            tmp_moving[moving_uv[:, 1], moving_uv[:, 0]] = True # H, W
+            query_moving = query_moving | tmp_moving
+            # 真的需要那么多 ref ?? 尤其是在 k_frame 的 ref 不准的情况下
+            break
+        
+        # 用 depth_mask 和 robot_mask 对 query_dynamic 进行过滤
+        depth_mask = get_depth_mask(query_frame.depth, K, query_frame.Tw2c)
+        query_moving = query_moving & depth_mask & (~query_frame.robot_mask)
+        
+        # 先把整个图像赋值为 UNKNOWN
+        query_dynamic = np.ones_like(query_moving) * UNKNOWN_LABEL  
+        
+        # 再把其中的移动部分赋值为 MOVING_LABEL
+        query_dynamic[query_moving] = MOVING_LABEL
+        query_frame.dynamic_mask = query_dynamic
+        
+        if visualize:
+            viewer = napari.Viewer()
+            viewer.title = "update dynamic of query frame"
+            self.kframes[0]._visualize(viewer, prefix="initial_kframe")
+            query_frame._visualize(viewer, prefix="query")
+            napari.run()
+    
+    def reloc(
+        self,
+        query_frame: Frame,
+        reloc_lr=3e-3,
+        visualize=False
+    ) -> Frame:
+        """
+        对 query frame 的 joint_state, dynamic 进行恢复 
+        其中 dynamic 的恢复来自 sam2 和 kframes
+        query_frame:
+            需包含 query_depth, query_dynamic
+        """
+        # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
+        num_ref = len(self.kframes)
+        
+        # 初始化 query_frame 的 joint 状态
+        self.update_state(query_frame, visualize=visualize)
+        
+        # 对 query_frame 的 dynamic_mask 进行估计
+        self.update_dynamic(query_frame, visualize=visualize)
+        
+        # 将 query_frame 写进 obj_repr.kframes, 然后复用 fine_estimation 对初始帧进行优化
+        self.kframes.frame_list.insert(0, query_frame)
         fine_joint_dict = fine_estimation(
             K=self.K,
             joint_type=self.fine_joint_dict["joint_type"],
@@ -346,50 +395,15 @@ class Obj_repr(Data):
             opti_joint_dir=False,
             opti_joint_start=False,
             opti_joint_states_mask=np.arange(num_ref+1)==0,
-            # 目前不更新 dynamic_mask
             lr=reloc_lr,
-            visualize=False
+            visualize=visualize
         )
         # 然后在这里把 query_frame 从 keyframes 中吐出来
         query_frame = self.kframes.frame_list.pop(0)
         query_frame.joint_state = fine_joint_dict["joint_states"][0]
         
-        # 也就是说把 ref_frame 的 moving part 投影到 query frame 上, 对 query_dynamic 进行一个更新 (其余部分设置为 unknown)
-        if update_query_dynamic:
-            query_dynamic_zero = np.zeros_like(query_dynamic).astype(np.bool_) # H, W
-            for i in range(num_ref):
-                ref_moving_pc = depth_image_to_pointcloud(ref_depths[i], ref_dynamics[i]==MOVING_LABEL, K) # N, 3
-                Tref2query = joint_data_to_transform_np(
-                    joint_type=self.fine_joint_dict["joint_type"],
-                    joint_dir=self.fine_joint_dict["joint_dir"],
-                    joint_start=self.fine_joint_dict["joint_start"],
-                    joint_state_ref2tgt=query_frame.joint_state-ref_joint_states[i]
-                )
-                ref_moving_pc_aug = np.concatenate([ref_moving_pc, np.ones((len(ref_moving_pc), 1))], axis=1) # N, 4
-                moving_pc = (ref_moving_pc_aug @ Tref2query.T)[:, :3] # N, 3
-                moving_uv, _ = camera_to_image(moving_pc, K) # N, 2
-                moving_uv = moving_uv.astype(np.int32)
-                tmp_zero = np.zeros_like(query_dynamic)
-                # TODO: 这里有越界的 bug
-                tmp_zero[moving_uv[:, 1], moving_uv[:, 0]] = True # H, W
-                query_dynamic_zero = query_dynamic_zero | tmp_zero
-            
-            # 将投影来的点与 obj_mask 进行取交
-            obj_mask = query_frame.obj_mask
-            # 先把整个物体区域赋值为 UNKNOWN
-            query_dynamic_updated = obj_mask * UNKNOWN_LABEL  
-            # 再把其中的移动部分赋值为 MOVING_LABEL
-            query_dynamic_updated[(obj_mask & query_dynamic_zero).astype(np.bool_)] = MOVING_LABEL
-            query_frame.dynamic_mask = query_dynamic_updated
-        
-        if visualize:
-            # 展示 dynamic query 的变化
-            viewer = napari.Viewer()
-            viewer.title = "relocalization"
-            query_frame._visualize(viewer, prefix="query")
-            self._visualize(viewer, prefix="obj_repr")
-            print("query frame joint state: ", query_frame.joint_state)
-            napari.run()
+        # 都估计完了似乎也不需要再次 update 了?
+        # self.update_dynamic(query_frame, visualize=visualize)
             
         return query_frame
     
