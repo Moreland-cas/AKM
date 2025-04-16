@@ -2,12 +2,12 @@ import os
 import pickle
 import numpy as np
 
-root_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14"
+root_path = "/media/zby/MyBook/embody_analogy_data/assets/logs/recon_4_16"
 results = []
 
 # 遍历文件夹
 for object_folder in os.listdir(root_path):
-    object_path = os.path.join(root_path, object_folder, "reconstruct")
+    object_path = os.path.join(root_path, object_folder)
     
     with open(os.path.join(object_path, 'output.txt'), 'r') as output_file:
         output_lines = output_file.readlines()

@@ -2,13 +2,12 @@ import os
 import pickle
 import numpy as np
 
-root_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14"
-# root_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore"
+root_path = "/media/zby/MyBook/embody_analogy_data/assets/logs/explore_4_16"
 results = []
 
 # 遍历文件夹
 for object_folder in os.listdir(root_path):
-    object_path = os.path.join(root_path, object_folder, "explore")
+    object_path = os.path.join(root_path, object_folder)
     try:
         # 读取 cfg.json
         with open(os.path.join(object_path, 'cfg.json'), 'r') as cfg_file:

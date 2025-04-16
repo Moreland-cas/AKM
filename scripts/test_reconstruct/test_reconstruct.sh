@@ -23,6 +23,12 @@ for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
 
         output_file="$obj_folder_path_reconstruct/output.txt"
 
+        # 加一个逻辑, 如果已经有了则不再次执行
+        if [ -f "$output_file" ] && [ "$(tail -n 1 "$output_file")" == "done" ]; then
+            echo "Output file $output_file exists and the last line is 'done'. Skipping this reconstruction."
+            continue
+        fi
+
         # 执行 Python 脚本
         python /home/zby/Programs/Embodied_Analogy/scripts/test_reconstruct/test_reconstruct.py \
             --obj_folder_path_explore="$obj_folder_path_explore" \
@@ -31,7 +37,6 @@ for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
             --fine_lr=1e-3 \
             --save_memory=False > "$output_file"  # 重定向输出
     fi
-    break
 done
 
 echo "所有命令已执行完成！"

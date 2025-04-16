@@ -35,7 +35,7 @@ for test_data_cfg in $test_data_cfgs; do
 
     # TODO: 首先读取 output_file，若 output_file 不存在或者 output_file 的最后一行不是 "done", 那么才跑底下的python 脚本，否则continue
     if [ -f "$output_file" ] && [ "$(tail -n 1 "$output_file")" == "done" ]; then
-        echo "Output file $output_file exists and the last line is 'done'. Skipping this configuration."
+        echo "Output file $output_file exists and the last line is 'done'. Skipping this exploration."
         continue
     fi
     # 执行 Python 脚本
