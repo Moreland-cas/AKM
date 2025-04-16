@@ -3,14 +3,15 @@ import json
 
 cfg = {}
 
-pri_path = "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet"
+asset_path = "/media/zby/MyBook/embody_analogy_data/assets"
+pri_path = os.path.join(asset_path, "dataset/one_drawer_cabinet")
 for tmp_folder in os.listdir(pri_path):
     joint_index = tmp_folder.split("_")[-1]
     obj_index = tmp_folder.split("_")[0]
     tmp_dict = {
         tmp_folder: {
             "joint_type": "prismatic",
-            "asset_path": f"/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/{tmp_folder}",
+            "asset_path": os.path.join(pri_path, tmp_folder),
             "obj_index": obj_index,
             "joint_index": joint_index,
             "obj_description": "cabinet",
@@ -23,14 +24,14 @@ for tmp_folder in os.listdir(pri_path):
     }
     cfg.update(tmp_dict)
 
-rev_path = "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet"
+rev_path = os.path.join(asset_path, "dataset/one_door_cabinet")
 for tmp_folder in os.listdir(rev_path):
     joint_index = tmp_folder.split("_")[-1]
     obj_index = tmp_folder.split("_")[0]
     tmp_dict = {
         tmp_folder: {
             "joint_type": "revolute",
-            "asset_path": f"/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/{tmp_folder}",
+            "asset_path": os.path.join(rev_path, tmp_folder),
             "obj_index": obj_index,
             "joint_index": joint_index,
             "obj_description": "cabinet",
@@ -43,7 +44,7 @@ for tmp_folder in os.listdir(rev_path):
     }
     cfg.update(tmp_dict)
 
-use_subset = True
+use_subset = False
 if use_subset:
     total_list = [(k, v) for k,v in cfg.items()]
     import random

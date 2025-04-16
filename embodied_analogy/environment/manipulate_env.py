@@ -74,10 +74,12 @@ class ManipulateEnv(ObjEnv):
         self.obj_repr : Obj_repr 
         
         # NOTE: 感觉每次失败的时候没必要完全 reset, 只要撤回一段距离, 然后再次尝试就好了
-        # self.reset_robot_safe()
         print("open gripper and move back a little bit...")
         self.open_gripper()
         self.move_forward(-self.reserved_distance)
+        
+        # print("reset robot safe...")
+        # self.reset_robot_safe()
         
         self.transfer_ph_pose(
             ref_frame=self.obj_repr.kframes[0],
@@ -97,21 +99,24 @@ class ManipulateEnv(ObjEnv):
         Tph2w_pre = self.get_translated_ph(self.cur_frame.Tph2w, -self.reserved_distance)
         result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
         
-        # 实际执行
-        self.follow_path(result_pre)
-        self.open_gripper()
-        self.clear_planner_pc()
-        self.move_forward(self.reserved_distance)
-        self.close_gripper()
-        
-        # 转换 joint_dict 到世界坐标系
-        Tc2w = np.linalg.inv(self.camera_extrinsic)
-        self.move_along_axis(
-            joint_type=self.obj_repr.fine_joint_dict["joint_type"],
-            joint_axis=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_dir"],
-            joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
-            moving_distance=self.target_state-self.cur_frame.joint_state
-        )
+        if result_pre is None:
+            print("Get None planning result in manip_once()...")
+        else:
+            # 实际执行
+            self.follow_path(result_pre)
+            self.open_gripper()
+            self.clear_planner_pc()
+            self.move_forward(self.reserved_distance)
+            self.close_gripper()
+            
+            # 转换 joint_dict 到世界坐标系
+            Tc2w = np.linalg.inv(self.camera_extrinsic)
+            self.move_along_axis(
+                joint_type=self.obj_repr.fine_joint_dict["joint_type"],
+                joint_axis=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_dir"],
+                joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
+                moving_distance=self.target_state-self.cur_frame.joint_state
+            )
         
         # 这里进行重定位, 如果离自己的目标差太多, 就重新执行
         result_dict = self.evaluate()
@@ -287,7 +292,7 @@ if __name__ == '__main__':
         "save_memory": True
     }
     cfg = cfg_prismatic
-    # cfg = cfg_revolute
+    # cfg = cfg_rev_bug
     
     cfg.update({
         "reloc_lr": 3e-3,

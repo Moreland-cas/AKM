@@ -8,8 +8,11 @@ from embodied_analogy.representation.obj_repr import Obj_repr
 
 def update_cfg(explore_cfg, args):
     # 更新 env_folder
-    if args.obj_folder is not None:
-        explore_cfg['obj_folder'] = args.obj_folder
+    if args.obj_folder_path_explore is not None:
+        explore_cfg['obj_folder_path_explore'] = args.obj_folder_path_explore
+    if args.obj_folder_path_reconstruct is not None:
+        explore_cfg['obj_folder_path_reconstruct'] = args.obj_folder_path_reconstruct
+        
     if args.num_kframes is not None:
         explore_cfg['num_kframes'] = args.num_kframes
     if args.fine_lr is not None:
@@ -22,7 +25,8 @@ def read_args():
     parser = argparse.ArgumentParser(description='Update configuration for the robot.')
     
     # base_cfg arguments
-    parser.add_argument('--obj_folder', type=str, help='Folder where things are stored')
+    parser.add_argument('--obj_folder_path_explore', type=str, help='Folder where things are loaded')
+    parser.add_argument('--obj_folder_path_reconstruct', type=str, help='Folder where things are stored')
     parser.add_argument('--num_kframes', type=int, help='Number of kframes')
     parser.add_argument('--fine_lr', type=float, help='fine lr during optimizing ICP loss')
     parser.add_argument('--save_memory', type=bool, help='whether to keep the frames in memory')
@@ -36,7 +40,7 @@ if __name__ == "__main__":
     # 给定一个路径, 读取其中 explore 下的数据, 对于有成功 explore 的数据, 进行重建, 并且将重建的数据进行保存, 将结果打印
     args = read_args()
     # print(args.obj_folder)
-    explore_folder = os.path.join(args.obj_folder, "explore")
+    explore_folder = args.obj_folder_path_explore
     with open(os.path.join(explore_folder, "cfg.json"), 'r', encoding='utf-8') as file:
         explore_cfg = json.load(file)
     with open(os.path.join(explore_folder, "result.pkl"), 'rb') as f:
@@ -47,7 +51,7 @@ if __name__ == "__main__":
         print("No valid explore, thus no need to run reconstruction...")
     else:
         print("Find valid explore, keep going...")
-        recon_save_folder = os.path.join(args.obj_folder, "reconstruct")
+        recon_save_folder = args.obj_folder_path_reconstruct
         
         recon_cfg = update_cfg(explore_cfg, args)
         print("read reconstruction cfg...")

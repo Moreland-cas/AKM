@@ -22,10 +22,8 @@ def none_or_list(value):
 # 首先调用 argparser 来读取命令行参数, 生成 cfg 文件
 def update_cfg(base_cfg, args):
     # 更新 env_folder
-    if args.logs_path is not None:
-        base_cfg['logs_path'] = args.logs_path
-    if args.run_name is not None:
-        base_cfg['run_name'] = args.run_name
+    if args.obj_folder_path_explore is not None:
+        base_cfg['obj_folder_path_explore'] = args.obj_folder_path_explore
     
     # 更新 base_cfg 字典中的值
     if args.phy_timestep is not None:
@@ -112,22 +110,12 @@ def read_cfg():
     parser.add_argument('--active_joint_name', type=str, help='Active joint name')
     
     # experiment related
-    parser.add_argument('--logs_path', type=str, help='path to logs folder')
-    parser.add_argument('--run_name', type=str, help='name of this run')
+    parser.add_argument('--obj_folder_path_explore', type=str, help='path to explore object folder')
 
     args = parser.parse_args()
 
     # 初始的配置
-    default_cfg = {
-        "phy_timestep": 1 / 250.,
-        "planner_timestep": 0.01,
-        "use_sapien2": True,
-        "record_fps": 30,
-        "pertubation_distance": 0.1,
-        "max_tries": 10,
-        "update_sigma": 0.05,
-        "reserved_distance": 0.05,
-    }
+    default_cfg = {}
 
     # 更新配置
     updated_cfg = update_cfg(default_cfg, args)

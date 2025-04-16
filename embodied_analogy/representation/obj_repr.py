@@ -401,6 +401,7 @@ class Obj_repr(Data):
         # 然后在这里把 query_frame 从 keyframes 中吐出来
         query_frame = self.kframes.frame_list.pop(0)
         query_frame.joint_state = fine_joint_dict["joint_states"][0]
+        print(f"Fine estimated joint state: {query_frame.joint_state}")
         
         # 都估计完了似乎也不需要再次 update 了?
         # self.update_dynamic(query_frame, visualize=visualize)

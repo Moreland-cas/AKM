@@ -1,12 +1,15 @@
 #!/bin/bash
 
 # 创建日志目录
-LOG_DIR="/home/zby/Programs/Embodied_Analogy/assets/logs"
-run_name="4_14"
+LOG_DIR="$1"
+# "/media/zby/MyBook/embody_analogy_data/assets/logs"
+run_name="$2"
+# "explore_4_16"
 mkdir -p "$LOG_DIR/$run_name"
 
 # test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
-test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data_subset.json"
+test_data_cfg_path="$3"
+# "/home/zby/Programs/Embodied_Analogy/scripts/test_data_subset.json"
 
 # 读取 JSON 文件中的所有键
 test_data_cfgs=$(jq -r 'keys[]' "$test_data_cfg_path")
@@ -25,8 +28,10 @@ for test_data_cfg in $test_data_cfgs; do
     active_joint_name=$(jq -r ".\"$test_data_cfg\".active_joint_name" "$test_data_cfg_path")
 
     # 提取数据名称及其他参数
-    mkdir -p "$LOG_DIR/$run_name/${obj_index}_${joint_index}_${joint_type}/explore"
-    output_file="${LOG_DIR}/$run_name/${obj_index}_${joint_index}_${joint_type}/explore/output.txt"
+    obj_folder_name="${obj_index}_${joint_index}_${joint_type}"
+    obj_folder_path_explore="$LOG_DIR/$run_name/${obj_folder_name}/"
+    mkdir -p "$obj_folder_path_explore"
+    output_file="${obj_folder_path_explore}/output.txt"
 
     # TODO: 首先读取 output_file，若 output_file 不存在或者 output_file 的最后一行不是 "done", 那么才跑底下的python 脚本，否则continue
     if [ -f "$output_file" ] && [ "$(tail -n 1 "$output_file")" == "done" ]; then
@@ -35,8 +40,7 @@ for test_data_cfg in $test_data_cfgs; do
     fi
     # 执行 Python 脚本
     python /home/zby/Programs/Embodied_Analogy/scripts/test_explore/test_explore.py \
-        --logs_path="$LOG_DIR" \
-        --run_name="$run_name" \
+        --obj_folder_path_explore="$obj_folder_path_explore" \
         --phy_timestep=0.004 \
         --planner_timestep=0.01 \
         --use_sapien2=True \

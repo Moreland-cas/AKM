@@ -290,7 +290,7 @@ class RobotEnv(BaseEnv):
         if result is not None:
             self.follow_path(result)
         else:
-            "plan path failed!"
+            print("Get None result in move_to_pose function, not executing...")
     
     def get_translated_ph(self, Tph2w, distance):
         """
@@ -369,12 +369,13 @@ class RobotEnv(BaseEnv):
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
             # 根据 moving distance 的大小计算出有多少个插值点
-            # 对于平移关节时每次移动 3 cm
-            num_interp = max(3, int(moving_distance / 0.01))
-        else:
-            # 对于旋转关节时每次移动 5 degree
+            # 对于旋转关节时每次移动 3 cm
             num_interp = max(3, int(moving_distance / np.deg2rad(5)))
-            
+        else:
+            # 对于平移关节时每次移动 5 degree
+            num_interp = max(3, int(moving_distance / 0.02))
+        
+        print(f"Need {num_interp} interpolations to execute the manipulate traj...")
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
         Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3

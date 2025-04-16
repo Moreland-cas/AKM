@@ -36,16 +36,9 @@ class ExploreEnv(ObjEnv):
         self.obj_description = cfg["obj_description"]
         self.has_valid_explore = False
         
-        # 根据 logs_path 和 run_name 和 obj_info 生成 save 的路径
-        logs_path = cfg["logs_path"]
-        run_name = cfg["run_name"]
-        obj_index = cfg["obj_index"]
-        active_joint_name = cfg["active_joint_name"]
-        joint_index = cfg["joint_index"]
-        joint_type = cfg["joint_type"]
-        self.joint_type = joint_type
-        obj_folder = f"{obj_index}_{joint_index}_{joint_type}"
-        self.save_prefix = os.path.join(logs_path, run_name, obj_folder, "explore")
+        # 读取和保存所用的变量
+        self.joint_type = cfg["joint_type"]
+        self.save_prefix = cfg["obj_folder_path_explore"]
         os.makedirs(self.save_prefix, exist_ok=True)
         
     def explore_stage(self, save_intermediate=False, visualize=False):
@@ -322,8 +315,6 @@ if __name__ == "__main__":
     "max_tries": 10,
     "update_sigma": 0.05,
     "reserved_distance": 0.05,
-    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
-    "run_name": "test_explore_4_11",
     "valid_thresh": 0.5,
     "instruction": "open the cabinet",
     "num_initial_pts": 1000,
