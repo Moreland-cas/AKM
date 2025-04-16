@@ -1,15 +1,28 @@
 #!/bin/bash
 
 # 创建日志目录
-LOG_DIR="$1"
+LOG_DIR="\$1"
 # "/media/zby/MyBook/embody_analogy_data/assets/logs"
-run_name="$2"
+run_name="\$2"
 # "explore_4_16"
 mkdir -p "$LOG_DIR/$run_name"
 
 # test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
-test_data_cfg_path="$3"
+test_data_cfg_path="\$3"
 # "/home/zby/Programs/Embodied_Analogy/scripts/test_data_subset.json"
+
+#################### 超参在这里!! ####################
+phy_timestep=0.004
+planner_timestep=0.01
+use_sapien2=True
+record_fps=30
+pertubation_distance=0.1
+valid_thresh=0.5
+max_tries=10
+update_sigma=0.05
+reserved_distance=0.05
+num_initial_pts=1000
+####################################################
 
 # 读取 JSON 文件中的所有键
 test_data_cfgs=$(jq -r 'keys[]' "$test_data_cfg_path")
@@ -38,19 +51,20 @@ for test_data_cfg in $test_data_cfgs; do
         echo "Output file $output_file exists and the last line is 'done'. Skipping this exploration."
         continue
     fi
+
     # 执行 Python 脚本
     python /home/zby/Programs/Embodied_Analogy/scripts/test_explore/test_explore.py \
         --obj_folder_path_explore="$obj_folder_path_explore" \
-        --phy_timestep=0.004 \
-        --planner_timestep=0.01 \
-        --use_sapien2=True \
-        --record_fps=30 \
-        --pertubation_distance=0.1 \
-        --valid_thresh=0.5 \
-        --max_tries=10 \
-        --update_sigma=0.05 \
-        --reserved_distance=0.05 \
-        --num_initial_pts=1000 \
+        --phy_timestep="$phy_timestep" \
+        --planner_timestep="$planner_timestep" \
+        --use_sapien2="$use_sapien2" \
+        --record_fps="$record_fps" \
+        --pertubation_distance="$pertubation_distance" \
+        --valid_thresh="$valid_thresh" \
+        --max_tries="$max_tries" \
+        --update_sigma="$update_sigma" \
+        --reserved_distance="$reserved_distance" \
+        --num_initial_pts="$num_initial_pts" \
         --instruction="open the $obj_description" \
         --obj_description="$obj_description" \
         --asset_path="$asset_path" \

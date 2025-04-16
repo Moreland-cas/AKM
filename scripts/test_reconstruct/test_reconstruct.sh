@@ -9,8 +9,15 @@ explore_run_name="$2"
 
 recon_run_name="$3"
 # "recon_4_16"
-
 mkdir -p "$LOG_DIR/$recon_run_name"
+
+
+#################### 超参在这里!! ####################
+num_kframes=3
+fine_lr=1e-3
+save_memory=False
+####################################################
+
 
 # 遍历 LOG_DIR 下的文件夹
 for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
@@ -33,9 +40,9 @@ for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
         python /home/zby/Programs/Embodied_Analogy/scripts/test_reconstruct/test_reconstruct.py \
             --obj_folder_path_explore="$obj_folder_path_explore" \
             --obj_folder_path_reconstruct="$obj_folder_path_reconstruct" \
-            --num_kframes=5 \
-            --fine_lr=1e-3 \
-            --save_memory=False > "$output_file"  # 重定向输出
+            --num_kframes=$num_kframes \
+            --fine_lr=$fine_lr \
+            --save_memory=$save_memory > "$output_file"  # 重定向输出
     fi
 done
 

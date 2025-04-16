@@ -1,6 +1,5 @@
 import os
 import json
-import random
 import numpy as np
 import sapien.core as sapien
 from embodied_analogy.environment.robot_env import RobotEnv
@@ -30,7 +29,7 @@ class ObjEnv(RobotEnv):
         对于 obj_cfg 中的 pose 进行随机化
         根据 tack_cfg 中的 open/close 以及 delta 值, 计算物体的 active_link 的初始状态的范围, 并随机选取一个值进行初始化
         """
-        # TODO: 需要修改这个, 以保证任务的有效性
+        # TODO: 如果改为随机的话, 需要保证 ManipuleEnv 调用的这个函数完全从 cfg 中读取位姿势, 而不是随机生成
         # self.obj_init_pos_angle_low = -0.4
         # self.obj_init_pos_angle_high = 0.4
         # self.obj_init_rot_low = -0.2
@@ -50,8 +49,8 @@ class ObjEnv(RobotEnv):
         self.obj_init_dis_high = 0.55
         self.obj_init_height_low = 0.0
         self.obj_init_height_high = 0.0
-        self.obj_init_dof_low = 0.0
-        self.obj_init_dof_high = 0.0
+        # self.obj_init_dof_low = 0.0
+        # self.obj_init_dof_high = 0.0
         
         def axis_angle_to_quat(axis, angle):
             '''
@@ -84,11 +83,6 @@ class ObjEnv(RobotEnv):
 
             p1 = r0 * p0 * r1
             return p1
-    
-        def randomize_dof(dof_low, dof_high) :
-            if dof_low == 'None' or dof_high == 'None' :
-                return None
-            return np.random.uniform(dof_low, dof_high)
         
         path = cfg["asset_path"]
         bbox_path = os.path.join(path, "bounding_box.json")
@@ -106,22 +100,17 @@ class ObjEnv(RobotEnv):
             self.obj_init_height_high - bbox["min"][1]*0.75
         )
         
-        dof = randomize_dof(
-            self.obj_init_dof_low,
-            self.obj_init_dof_high
-        )
-        
         cfg.update({
             "load_pose": sapien_pose.p.tolist(),
             "load_quat": sapien_pose.q.tolist(),
-            "load_scale": 1
-            # "init_joint_state": dof
+            "load_scale": 1,
         })
-        return path, dof, sapien_pose
+        return sapien_pose
     
     def load_object(self, obj_cfg, visualize=False):
+        print("Loading Object ...")
         # 首先获取 obj 的 pose
-        _, _, sapien_pose = self.randomize_obj(obj_cfg)
+        sapien_pose = self.randomize_obj(obj_cfg)
         
         # index = obj_cfg["index"]
         scale = obj_cfg["load_scale"]
@@ -168,7 +157,6 @@ class ObjEnv(RobotEnv):
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
             if joint.get_name() == obj_cfg["active_joint_name"]:
                 self.active_joint = joint
-                # initial_states.append(0)
                 initial_states.append(obj_cfg["init_joint_state"])
             else:
                 initial_states.append(0)

@@ -1,0 +1,103 @@
+import os
+import sys
+import json
+import pickle
+import argparse
+import numpy as np
+from embodied_analogy.utility.utils import initialize_napari
+initialize_napari()
+
+from embodied_analogy.environment.manipulate_env import ManipulateEnv
+
+def update_cfg(recon_cfg, args):
+    # 更新 env_folder
+    if args.obj_folder_path_reconstruct is not None:
+        recon_cfg['obj_folder_path_reconstruct'] = args.obj_folder_path_reconstruct
+    if args.scale_dir is not None:
+        recon_cfg['scale_dir'] = args.scale_dir
+    if args.manipulate_type is not None:
+        recon_cfg['manipulate_type'] = args.manipulate_type
+    if args.manipulate_distance is not None:
+        recon_cfg['manipulate_distance'] = args.manipulate_distance
+    if args.reloc_lr is not None:
+        recon_cfg['reloc_lr'] = args.reloc_lr
+    if args.max_manip is not None:
+        recon_cfg['max_manip'] = args.max_manip
+    if args.max_distance is not None:
+        recon_cfg['max_distance'] = args.max_distance
+    return recon_cfg
+
+def read_args():
+    parser = argparse.ArgumentParser(description='Update configuration for the robot.')
+    
+    # base_cfg arguments
+    parser.add_argument('--obj_folder_path_reconstruct', type=str, help='Folder where things are loaded')
+    parser.add_argument('--scale_dir', type=str, help='Folder where things are stored')
+    parser.add_argument('--manipulate_type', type=str, help='Open or Close')
+    parser.add_argument('--manipulate_distance', type=float, help='Manipulate distance')
+    parser.add_argument('--reloc_lr', type=float, help='Learning rate for relocization optimization')
+    parser.add_argument('--max_manip', type=int, help='Maximum number of manipulation tries')
+    parser.add_argument('--max_distance', type=float, help='Maximum range of manipulation')
+
+    args = parser.parse_args()
+
+    return args
+
+if __name__ == '__main__':
+    args = read_args()
+    
+    try:
+        with open(os.path.join(args.obj_folder_path_reconstruct, "cfg.json"), 'r', encoding='utf-8') as file:
+            recon_cfg = json.load(file)
+    except Exception as e:
+        print(f"Error reading cfg file and obj_repr: ")
+        print("\t", e)
+        print("done")
+        sys.exit(0)
+    
+    
+    # 首先读取 cfg
+    manip_cfg = update_cfg(recon_cfg, args)
+    # 在这里计算 init_joint_state, 更新进 manip_cfg
+    
+    # 首先初始化 obj_init_dof_low 和 obj_init_dof_high
+    print("\t Load for manipulation ...")
+    manipulate_type = manip_cfg["manipulate_type"]
+    print(f"Since manipulate_type is {manipulate_type}")
+    if manip_cfg["manipulate_type"] == "open":
+        obj_init_dof_low = 0
+        obj_init_dof_high = manip_cfg["manipulate_distance"]
+    else:
+        obj_init_dof_low = manip_cfg["manipulate_distance"]
+        obj_init_dof_high = manip_cfg["max_distance"]
+    
+    if manip_cfg["joint_type"] == "revolute":
+        # 由于 test_manipulate.sh 中指定的 revolute 的 distance 是用 degree 表示的, 因此需要转换为弧度
+        obj_init_dof_low = np.deg2rad(obj_init_dof_low)
+        obj_init_dof_high = np.deg2rad(obj_init_dof_high)
+        
+    print(f"\t obj_init_dof_low and high are set to {obj_init_dof_low} and {obj_init_dof_high} respectively")
+    
+    def randomize_dof(dof_low, dof_high) :
+        if dof_low == 'None' or dof_high == 'None' :
+            return None
+        return np.random.uniform(dof_low, dof_high)
+    
+    dof = randomize_dof(
+        obj_init_dof_low,
+        obj_init_dof_high
+    )
+    print(f"\t Obj init joint state is set to {dof}")
+    manip_cfg.update({"init_joint_state": dof})
+    
+    with open(os.path.join(manip_cfg["scale_dir"], "cfg.json"), 'w', encoding='utf-8') as f:
+        json.dump(manip_cfg, f, ensure_ascii=False, indent=4)
+    
+    env = ManipulateEnv(manip_cfg)
+    result_list = env.manipulate_close_loop()
+    
+    with open(os.path.join(manip_cfg["scale_dir"], 'result.pkl'), 'wb') as f:
+        pickle.dump(result_list, f)
+        
+    print("done")
+    

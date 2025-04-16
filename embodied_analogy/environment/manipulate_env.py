@@ -20,25 +20,30 @@ class ManipulateEnv(ObjEnv):
         cfg
     ):       
         """
-        cfg 需要包含:
-            init_joint_state
-            goal_delta
-            obj_repr_path
-            reloc_lr
         TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
         """
         # 首先 load 物体
         super().__init__(cfg)
         self.reloc_lr = cfg["reloc_lr"]
         self.reserved_distance = cfg["reserved_distance"]
+        self.max_manip = cfg["max_manip"]
         
-        self.goal_delta = cfg["goal_delta"]
-        self.init_joint_state = cfg["init_joint_state"]
+        if cfg["manipulate_type"] == "close":
+            self.goal_delta = -cfg["manipulate_distance"]
+        elif cfg["manipulate_type"] == "open":
+            self.goal_delta = cfg["manipulate_distance"]
+            
+        if cfg["joint_type"] == "revolute":
+            self.goal_delta = np.deg2rad(self.goal_delta)
+        
+        # NOTE: 在 ObjEnv.__init__() 中会对 cfg 中的这个值进行修改
+        self.init_joint_state = cfg["init_joint_state"] 
+        
         # NOTE: 这里要将 target_state 初始化为 None, 然后在第一次调用 not_good_enough 的时候进行设置
         self.target_state = None
         
         self.obj_description = cfg["obj_description"]
-        self.obj_repr = Obj_repr.load(cfg["obj_repr_path"])
+        self.obj_repr = Obj_repr.load(os.path.join(cfg["obj_folder_path_reconstruct"], "obj_repr.npy"))
     
     def transfer_ph_pose(self, ref_frame: Frame, tgt_frame: Frame):
         """
@@ -63,7 +68,8 @@ class ManipulateEnv(ObjEnv):
         Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
         tgt_frame.Tph2w = Tph2w_tgt
         
-    def manip_once(self, visualize=False):
+    def manip_once(self):
+        print("Start one manipulation run ...")
         """
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
         
@@ -74,7 +80,7 @@ class ManipulateEnv(ObjEnv):
         self.obj_repr : Obj_repr 
         
         # NOTE: 感觉每次失败的时候没必要完全 reset, 只要撤回一段距离, 然后再次尝试就好了
-        print("open gripper and move back a little bit...")
+        print("\topen gripper and move back a little bit...")
         self.open_gripper()
         self.move_forward(-self.reserved_distance)
         
@@ -120,7 +126,7 @@ class ManipulateEnv(ObjEnv):
         
         # 这里进行重定位, 如果离自己的目标差太多, 就重新执行
         result_dict = self.evaluate()
-        print(result_dict)
+        # print(result_dict)
         return result_dict
     
     def not_good_enough(self, visualize=False):
@@ -147,22 +153,22 @@ class ManipulateEnv(ObjEnv):
             return abs(self.cur_state - self.target_state) > np.deg2rad(5) # 5 degree 
         
     def manipulate_close_loop(self, visualize=False):
+        print("Start manipulation Loop ...")
         num_manip = 0
-        max_manip = 5
         results = []
-        while(self.not_good_enough(visualize=visualize) and (num_manip < max_manip)):
+        while(self.not_good_enough(visualize=visualize) and (num_manip < self.max_manip)):
             print(f"Start manipulating, round {num_manip + 1}...")
-            result = self.manip_once(visualize=visualize)
+            result = self.manip_once()
             num_manip = num_manip + 1
             print(result)
             results.append(result)
         
-        if num_manip == max_manip:
+        if num_manip == self.max_manip:
             print(f"After {num_manip} round, Stopped since num_manip reach max_manip...")
         else:
             print(f"After {num_manip} round, Stopped since the robot thinks it is good enough...")
-        print("done")
-            
+        return results
+        
     def evaluate(self):
         # 评测 manipulate 的好坏
         actual_delta = self.get_active_joint_state() - self.init_joint_state

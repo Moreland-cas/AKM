@@ -3,7 +3,7 @@ import json
 import pickle
 import argparse
 from embodied_analogy.utility.utils import initialize_napari
-# initialize_napari()
+initialize_napari()
 from embodied_analogy.representation.obj_repr import Obj_repr
 
 def update_cfg(explore_cfg, args):
