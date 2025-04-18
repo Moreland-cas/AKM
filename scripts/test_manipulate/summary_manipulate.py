@@ -12,11 +12,16 @@ revolute
 """
 import os
 import pickle
+import argparse
 import json
 import numpy as np
 
-root_path = "/media/zby/MyBook/embody_analogy_data/assets/logs/manip_4_16_hard"
-# root_path = "/media/zby/MyBook/embody_analogy_data/assets/logs/manip_4_16"
+parser = argparse.ArgumentParser()
+parser.add_argument('--run_name', type=str, help='Folder where things are stored')
+args = parser.parse_args()
+
+root_path = os.path.join("/media/zby/MyBook/embody_analogy_data/assets/logs/", args.run_name)
+
 summary_dict = {
     "prismatic": {
         # 这个 dict 里面存储 scale： [loss_list, loss_list, ...]

@@ -13,16 +13,16 @@ mkdir -p "$LOG_DIR/$manip_run_name"
 
 #################### 超参在这里!! ####################
             # easy
-# prismatic_max_distance=0.3
-# revolute_max_distance=45
-# prismatic_manip_distances=(0.1 0.2)
-# revolute_manip_distances=(10 30)
+prismatic_max_distance=0.3
+revolute_max_distance=45
+prismatic_manip_distances=(0.1 0.2)
+revolute_manip_distances=(10 30)
 
             # hard
-prismatic_max_distance=0.5 
-revolute_max_distance=90
-prismatic_manip_distances=(0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45)
-revolute_manip_distances=(8.6 10 20 30 40 45 50 55 60 65 70)
+# prismatic_max_distance=0.5 
+# revolute_max_distance=90
+# prismatic_manip_distances=(0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45)
+# revolute_manip_distances=(8.6 10 20 30 40 45 50 55 60 65 70)
 
 reloc_lr=3e-3
 max_manip=5

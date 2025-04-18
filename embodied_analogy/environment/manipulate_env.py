@@ -84,6 +84,9 @@ class ManipulateEnv(ObjEnv):
         self.open_gripper()
         self.move_forward(-self.reserved_distance)
         
+        # 在这里是不是需要再跑一遍 reloc, 从而防止 open_gripper + move_backward 对于物体状态的影响
+        self.update_cur_frame()
+        
         # print("reset robot safe...")
         # self.reset_robot_safe()
         
@@ -129,10 +132,7 @@ class ManipulateEnv(ObjEnv):
         # print(result_dict)
         return result_dict
     
-    def not_good_enough(self, visualize=False):
-        print("Check if current state is good enough...")
-        # NOTE: cur_frame 代表刚开始一轮操作时捕获的 frame
-        # 然后估计出 cur_state
+    def update_cur_frame(self, visualize=False):
         self.base_step()
         cur_frame = self.capture_frame()
         cur_frame = self.obj_repr.reloc(
@@ -142,6 +142,12 @@ class ManipulateEnv(ObjEnv):
         )
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
+        
+    def not_good_enough(self, visualize=False):
+        print("Check if current state is good enough...")
+        # NOTE: cur_frame 代表刚开始一轮操作时捕获的 frame
+        # 然后估计出 cur_state
+        self.update_cur_frame(visualize=visualize)
         
         # NOTE: 仅在第一次调用 not_good_enough 的时候设置 target_state
         if self.target_state is None:
