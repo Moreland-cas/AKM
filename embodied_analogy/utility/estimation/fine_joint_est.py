@@ -168,6 +168,7 @@ def fine_estimation(
     visualize=False
 ):
     """
+    NOTE: 在相机坐标系下进行优化的
     对于 obj_repr 的 joint_dict 和 keyframe 中的 joint states 进行优化, 可根据 opti_xxx 有选择的优化部分值
     损失函数为所有 (frame_i, frame_j) 的 point-to-point/plane ICP loss 
     """

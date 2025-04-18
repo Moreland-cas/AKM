@@ -10,9 +10,10 @@ def icp_loss_torch(
     Tref2tgt, 
     ref_pc, 
     tgt_pc, 
-    target_normals=None, 
-    loss_type="point_to_point", 
-    icp_select_range=0.03
+    target_normals, # better provided
+    loss_type, # plane_to_plane
+    icp_select_range, # 0.1
+    num_sample_points=10000
 ):
     """
     计算 ICP 损失 (点到点 或 点到平面)，支持平移或旋转。
@@ -25,6 +26,7 @@ def icp_loss_torch(
         target_normals (np.ndarray, 可选): 目标点云法向量，形状 (M, 3)，仅在点到平面模式中使用
         loss_type (str): "point_to_point" 或 "point_to_plane" # TODO: 这里还可以加一种混合式
         joint_type (str): "prismatic" 或 "revolute"
+        sample_points (int): 如果点云超了, 那就 sample 出其中 10000 个点
 
     返回：
         loss (torch.Tensor): 计算得到的损失值
@@ -34,19 +36,41 @@ def icp_loss_torch(
     assert Tref2tgt.requires_grad and "Tref2tgt tensor must requires grad to be optimized"
     assert loss_type in ["point_to_point", "point_to_plane"]
     
-    # print(f"len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    print(f"icp input len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
     
     if min(len(ref_pc), len(tgt_pc)) < 100:
         return torch.tensor(0).cuda()
 
-    # 将 numpy 数组转换为 torch.Tensor
-    ref_pc = torch.tensor(ref_pc, dtype=torch.float32, device=Tref2tgt.device)
-    target_pc = torch.tensor(tgt_pc, dtype=torch.float32, device=Tref2tgt.device)
-
     if loss_type == "point_to_plane":
+        assert target_normals is not None, "Although there is way to work around, it is recommended to provide target_normals, \
+            since compute target normals based on sampled pointcloud here is less accurate"
         if target_normals is None:
             target_normals = compute_normals(tgt_pc) # N, 3
         target_normals = torch.tensor(target_normals, dtype=torch.float32, device=Tref2tgt.device)
+        
+    # 在这里有针对的进行采样:
+    # from embodied_analogy.utility.utils import farthest_point_sampling
+    # if len(ref_pc) > 5000:
+    #     sampled_index = farthest_point_sampling(ref_pc, num_sample_points)
+    #     ref_pc = ref_pc[sampled_index]
+    # if len(tgt_pc) > 5000:
+    #     sampled_index = farthest_point_sampling(tgt_pc, num_sample_points)
+    #     tgt_pc = tgt_pc[sampled_index]
+    #     target_normals = target_normals[sampled_index]
+    
+    if len(ref_pc) > num_sample_points:
+        sampled_index = np.random.choice(len(ref_pc), num_sample_points, replace=False)
+        ref_pc = ref_pc[sampled_index]
+    if len(tgt_pc) > num_sample_points:
+        sampled_index = np.random.choice(len(tgt_pc), num_sample_points, replace=False)
+        tgt_pc = tgt_pc[sampled_index]
+        target_normals = target_normals[sampled_index]
+    
+    print(f"downed sampled size len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    
+    # 将 numpy 数组转换为 torch.Tensor
+    ref_pc = torch.tensor(ref_pc, dtype=torch.float32, device=Tref2tgt.device)
+    target_pc = torch.tensor(tgt_pc, dtype=torch.float32, device=Tref2tgt.device)
 
     # 将 ref_pc 扩展到齐次坐标 (N, 4)
     ref_pc_homogeneous = torch.cat([ref_pc, torch.ones(ref_pc.shape[0], 1, device=ref_pc.device)], dim=1)

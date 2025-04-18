@@ -444,6 +444,29 @@ def create_cylinder(start, end, radius=0.01):
 
     return cylinder
 
+
+def farthest_point_sampling(point_cloud, M):
+    N = point_cloud.shape[0]
+    # 随机选择一个初始点
+    indices = np.zeros(M, dtype=np.int32)
+    farthest_index = np.random.randint(0, N)
+    indices[0] = farthest_index
+
+    # 计算每个点到已选择点的距离
+    distances = np.full(N, np.inf)
+
+    for i in range(1, M):
+        # 更新每个点到最近已选择点的距离
+        dist = np.linalg.norm(point_cloud - point_cloud[farthest_index], axis=1)
+        distances = np.minimum(distances, dist)
+
+        # 选择距离最远的点
+        farthest_index = np.argmax(distances)
+        indices[i] = farthest_index
+
+    return indices
+
+
 def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_contact_dirs=None):
     """
     visualize pointcloud

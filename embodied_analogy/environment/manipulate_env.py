@@ -182,132 +182,16 @@ class ManipulateEnv(ObjEnv):
             
         
 if __name__ == '__main__':
-    cfg_prismatic = {
-        "phy_timestep": 0.004,
-        "planner_timestep": 0.01,
-        "use_sapien2": True,
-        "record_fps": 30,
-        "pertubation_distance": 0.1,
-        "max_tries": 10,
-        "update_sigma": 0.05,
-        "reserved_distance": 0.05,
-        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
-        "run_name": "4_14",
-        "valid_thresh": 0.5,
-        "instruction": "open the cabinet",
-        "num_initial_pts": 1000,
-        "obj_description": "cabinet",
-        "joint_type": "prismatic",
-        "obj_index": "45135",
-        "joint_index": "0",
-        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_drawer_cabinet/45135_link_0",
-        "active_link_name": "link_0",
-        "active_joint_name": "joint_0",
-        "load_pose": [
-            0.8806247711181641,
-            0.0,
-            0.6068519949913025
-        ],
-        "load_quat": [
-            1.0,
-            0.0,
-            0.0,
-            0.0
-        ],
-        "load_scale": 1,
-        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45135_0_prismatic",
-        "num_kframes": 5,
-        "fine_lr": 0.001,
-        "save_memory": True
-    }
-    cfg_revolute = {
-        "phy_timestep": 0.004,
-        "planner_timestep": 0.01,
-        "use_sapien2": True,
-        "record_fps": 30,
-        "pertubation_distance": 0.1,
-        "max_tries": 10,
-        "update_sigma": 0.05,
-        "reserved_distance": 0.05,
-        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
-        "run_name": "4_14",
-        "valid_thresh": 0.5,
-        "instruction": "open the cabinet",
-        "num_initial_pts": 1000,
-        "obj_description": "cabinet",
-        "joint_type": "revolute",
-        "obj_index": "45984",
-        "joint_index": "0",
-        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45984_link_0",
-        "active_link_name": "link_0",
-        "active_joint_name": "joint_0",
-        "load_pose": [
-            0.8842315077781677,
-            0.0,
-            0.63484126329422
-        ],
-        "load_quat": [
-            1.0,
-            0.0,
-            0.0,
-            0.0
-        ],
-        "load_scale": 1,
-        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45984_0_revolute",
-        "num_kframes": 5,
-        "fine_lr": 0.001,
-        "save_memory": True
-    }
+    import json
+    # close
+    cfg_path = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/manip_4_16/46134_1_revolute/close/scale_30/cfg.json"
+    # cfg_path = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/manip_4_16/49133_1_revolute/close/scale_10/cfg.json"
     
-    cfg_rev_bug = {
-        "phy_timestep": 0.004,
-        "planner_timestep": 0.01,
-        "use_sapien2": True,
-        "record_fps": 30,
-        "pertubation_distance": 0.1,
-        "max_tries": 10,
-        "update_sigma": 0.05,
-        "reserved_distance": 0.05,
-        "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
-        "run_name": "4_14",
-        "valid_thresh": 0.5,
-        "instruction": "open the cabinet",
-        "num_initial_pts": 1000,
-        "obj_description": "cabinet",
-        "joint_type": "revolute",
-        "obj_index": "45168",
-        "joint_index": "1",
-        "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45168_link_1",
-        "active_link_name": "link_1",
-        "active_joint_name": "joint_1",
-        "load_pose": [
-            0.951462984085083,
-            0.0,
-            0.5911185145378113
-        ],
-        "load_quat": [
-            1.0,
-            0.0,
-            0.0,
-            0.0
-        ],
-        "load_scale": 1,
-        "obj_folder": "/home/zby/Programs/Embodied_Analogy/assets/logs/4_14/45168_1_revolute",
-        "num_kframes": 5,
-        "fine_lr": 0.001,
-        "save_memory": True
-    }
-    cfg = cfg_prismatic
-    # cfg = cfg_rev_bug
+    # open
+    # cfg_path = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/manip_4_16/49133_1_revolute/open/scale_30/cfg.json"
+    with open(cfg_path, "r") as f:
+        cfg = json.load(f)
     
-    cfg.update({
-        "reloc_lr": 3e-3,
-        "init_joint_state": 0.,
-        "goal_delta": 0.5,
-        # "init_joint_state": np.deg2rad(0),
-        # "goal_delta": np.deg2rad(60),
-        "obj_repr_path": os.path.join(cfg["obj_folder"], "reconstruct", "obj_repr.npy")
-    })
     me = ManipulateEnv(cfg)
     me.manipulate_close_loop()
     

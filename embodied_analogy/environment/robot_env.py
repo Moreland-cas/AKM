@@ -414,7 +414,7 @@ class RobotEnv(BaseEnv):
                 print("excounter None result when moving along axis, skip!")
                 continue
             # 针对那种需要一个大的动作的操作, 直接不执行, 否则容易大幅度影响物体状态
-            elif len(result["time"]) > 200:
+            elif len(result["time"]) > 1000: # TODO: 改为200
                 big_steps = len(result["time"])
                 print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
                 break
