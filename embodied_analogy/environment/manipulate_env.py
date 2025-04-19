@@ -8,13 +8,14 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 
 from embodied_analogy.environment.obj_env import ObjEnv
+from embodied_analogy.environment.reconstruct_env import ReconEnv
 from embodied_analogy.utility.constants import *
 
 from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.representation.obj_repr import Obj_repr
 
 
-class ManipulateEnv(ObjEnv):
+class ManipulateEnv(ReconEnv):
     def __init__(
         self, 
         cfg
@@ -23,7 +24,7 @@ class ManipulateEnv(ObjEnv):
         TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
         """
         # 首先 load 物体
-        super().__init__(cfg)
+        ObjEnv.__init__(cfg)
         self.reloc_lr = cfg["reloc_lr"]
         self.reserved_distance = cfg["reserved_distance"]
         self.max_manip = cfg["max_manip"]
@@ -44,29 +45,6 @@ class ManipulateEnv(ObjEnv):
         
         self.obj_description = cfg["obj_description"]
         self.obj_repr = Obj_repr.load(os.path.join(cfg["obj_folder_path_reconstruct"], "obj_repr.npy"))
-    
-    def transfer_ph_pose(self, ref_frame: Frame, tgt_frame: Frame):
-        """
-        将 ref_frame 中的 panda_hand grasp_pose 转换到 target_frame 中去
-        
-        NOTE: 
-            由于现在的抓取模块不是很强, 所以需要这个函数, 也就是说我们 transfer 的不是 contact_3d, 
-            而是 explore 阶段已经证实比较好的一个 panda_hand grasp pose
-        """
-        Tph2w_ref = ref_frame.Tph2w
-        Tph2c_ref = self.obj_repr.Tw2c @ Tph2w_ref
-        
-        # Tref2tgt 是 camera 坐标系下的一个变换
-        Tref2tgt_c = joint_data_to_transform_np(
-            joint_type=self.obj_repr.fine_joint_dict["joint_type"],
-            joint_dir=self.obj_repr.fine_joint_dict["joint_dir"],
-            joint_start=self.obj_repr.fine_joint_dict["joint_start"],
-            joint_state_ref2tgt=tgt_frame.joint_state-ref_frame.joint_state
-        )
-        
-        Tph2c_tgt = Tref2tgt_c @ Tph2c_ref
-        Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
-        tgt_frame.Tph2w = Tph2w_tgt
         
     def manip_once(self):
         print("Start one manipulation run ...")
@@ -90,7 +68,7 @@ class ManipulateEnv(ObjEnv):
         # print("reset robot safe...")
         # self.reset_robot_safe()
         
-        self.transfer_ph_pose(
+        self.ref_ph_to_tgt(
             ref_frame=self.obj_repr.kframes[0],
             tgt_frame=self.cur_frame
         )
@@ -131,17 +109,6 @@ class ManipulateEnv(ObjEnv):
         result_dict = self.evaluate()
         # print(result_dict)
         return result_dict
-    
-    def update_cur_frame(self, visualize=False):
-        self.base_step()
-        cur_frame = self.capture_frame()
-        cur_frame = self.obj_repr.reloc(
-            query_frame=cur_frame,
-            reloc_lr=self.reloc_lr,
-            visualize=visualize
-        )
-        self.cur_state = cur_frame.joint_state
-        self.cur_frame = cur_frame
         
     def not_good_enough(self, visualize=False):
         print("Check if current state is good enough...")
