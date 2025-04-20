@@ -28,6 +28,23 @@ class ReconEnv(ExploreEnv):
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
         
+    def transform_grasp(self, Tph2w_ref, ref_state, tgt_state):
+        """
+        根据 joint_dict_w 将 ref_state 下的 grasp_pose (Tph2w_ref) 转换到 target_state 下得到 Tph2w_tgt
+        """
+        joint_dict_w = self.obj_repr.get_joint_param(
+            resolution="fine",
+            frame="world"
+        )
+        Tref2tgt_w = joint_data_to_transform_np(
+            joint_type=joint_dict_w["joint_type"],
+            joint_dir=joint_dict_w["joint_dir"],
+            joint_start=joint_dict_w["joint_start"],
+            joint_state_ref2tgt=tgt_state-ref_state
+        )
+        Tph2w_tgt = Tref2tgt_w @ Tph2w_ref
+        return Tph2w_tgt
+
     def ref_ph_to_tgt(self, ref_frame: Frame, tgt_frame: Frame):
         """
         将 ref_frame 中的 panda_hand grasp_pose 转换到 target_frame 中去

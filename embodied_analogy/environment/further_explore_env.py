@@ -87,72 +87,6 @@ class FurtherExploreEnv(ReconEnv):
             "stable_grasp": [(0, self.obj_repr.kframes[0].Tph2w)],
             "unstable_grasp": []
         }
-
-    def further_explore_stage(self, save_intermediate=False, visualize=False):
-        """
-            对于物体的不同 stage 都进行一个 grasp 的 explore 阶段
-            当尝试次数用完了或者每个 stage 的 action grasp 都找到了就退出
-            NOTE: 目前主要靠 obj_repr 进行 sample, 当然也可以依靠 affordance_map_2d 辅助进行 sample
-        """
-        # 用集合的形式进行存储, 从而可以保证可以充分利用 manipulate trajectory
-        """
-        离散的字典为 
-        {
-            0.0
-                open: {"num_tries", "has_stable", frame (包含 state 和 grasp pose)}
-            0.1
-                open: {"num_tries", "has_stable", frame (包含 state 和 grasp pose)}
-                close: {"num_tries", "has_stable"}
-            ...
-            max_state:
-                close: {"num_tries", "has_stable"}
-        }
-    
-        可以用 0.1_open, 0.1_close, 0.2_open, 0.2_close 这样的顺序去遍历状态列表
-        
-        首先将状态复位到 0.0, 然后开始运行以下循环
-        # 假设我们总共有 num_discrete * 2 - 2 个需要完成的状态吧
-        # 因此尝试次数可以暂定为 (num_discrete * 2 - 2) * 5, 即每个状态保留五次尝试次数
-        
-        "尝试次数" 这个东西定义为一次 move_along_axis 的调用
-
-        这个东西可以作为一个函数:
-        def try_action_on_cur_state(self, grasp_dict):
-            获取当前关节状态, 判断当前状态是否已经有 optimal action
-            如果已经有了
-            # NOTE: 只要让一个ation管的区间大于我们划分的区间就可以了
-                # (利用阶段) 程序需要判断他一定到了缺失状态附近
-                尝试使用动作 ai 改变当前状态 si 到最近的缺失状态
-                # 但是还是有可能不能稳定的到达, 所以这里还是要有 尝试次数 + 1 的loss 
-                然后在该状态下调用 try_action_on_cur_state
-            否则
-                # (探索阶段)
-                获取当前 state 下的 action
-                并在当前状态下执行 action
-                # 尝试次数 + 1
-                # 成功的判断标准是 reloc(si+1) - (reloc(si) + exe_dis) < thresh
-                if 成功:
-                    对 grasp_dict 中的概率进行更新
-                    保存 si: ai
-                else:
-                    对 grasp_dict 中的概率进行更新
-                    # 由于不知道经过上次操作到哪里了, 所以在当前状态下继续操作
-                    try_action_on_cur_state()
-                
-        # TODO: try_action_on_cur_state 中有可能遇到什么异常吗?
-            1) 例如当前状态没有可选择的 action ? 不太可能, 总可以用第一帧的
-            2) 通过选择的当前状态
-
-        # 尝试次数用完了, 尝试次数的记录可以放在一个字典中, 每个字典的 key 为当前状态, value 为一个字典, 该字典的 key 为当前动作, value 为尝试次数lira
-        
-        # 关于选择 grasp 的策略, 可以对 query_frame 先进行 dynamic_classify, 用于 crop_grasp
-        # 然后用历史尝试信息转换到当前 frame, 然后根据 positive 和 negative 的执行信息对于当前 crop 出的 grasp 进行筛选
-        
-        # 关于给定 state 和 goal, action 是否稳定, 可以有以下评估指标
-            移动的实际距离与预期的是否一致
-            以及该动作是否能稳定复现
-        """ 
-        print("done")
     
     def classify_state_to_key(self):
         keys = self.grasp_dict.keys()
@@ -161,56 +95,144 @@ class FurtherExploreEnv(ReconEnv):
         min_index = np.argmin(dis_abs)
         self.cur_key = keys[min_index]
 
-    def get_stable_grasp_prior(self):
+    def get_stable_grasp_proposal(self):
         """
         返回基于当前状态的最好的 grasp
         要求在 cur_state 下首先检测可行的 grasp, 然后利用 dynamic_mask 和 历史记录对于 grasp 进行筛选, 返回最好的 grasp proposal
         """
         pass
 
-    def move_along_axis_complex(self, delta_state):
-        """
-        复杂的 move_along_axis 版本, 比原始版本更鲁棒
-        大致是把 cur_state 到 cur_state + delta_state 的变换换成几个阶段完成, 每个阶段根据执行的好坏选择要不要切换到该阶段的 stable_pose
-        这样总可以保证一定的界
-        """
-        return 
+    def is_state_action_stable(self, state, manip_type, delta, grasp):
+        # 首先到 state 附近, 然后在 manip_type 方向用 grasp 姿势移动 delta 距离
+        # 最后判断操作后的 state 和 inital_state + delta 是否足够接近
+        # 并且需要复现这个足够多次才可以
+        pass
 
-    """
-    这样离散化的方式还是不太好, 要不要还是试一下连续的方式, 也就是对于一个 state: grasp, 我们首先探寻他能稳定 manipulate 的区域
-    然后尝试在这个区域的边界上进行探索, 不断增加若干个这样的 state: grasp, 使得最后多个 grasp 的区域的并可以覆盖整个待操作区域
-
-    探索阶段的逻辑:
-        从初始的 state: action 开始, 探索其有效边界 (state_low, state_high)
-        边界的定义方式为 能使用该 action 鲁棒的在范围内改变物体状态
+    def explore_from_current_state(self):
+        """
+        TODO 
+            在探索的过程中最好保留每个 (state, manip_type + action, state) pair, 方便后续查询。
+            另外 explore 阶段也可以修改为把 invalid pair 也进行保存
         
-        由于我们是从 state = 0 开始探索, 因此只需要不断向上扩充边界, 即在当前的 state_high 开始
-        找到新的 action, 使得该 action 可以稳定的将物体开关到 (state_high, state_higher)
+        探索阶段的逻辑:
+            从初始的 state: action 开始, 探索其有效边界 (state_low, state_high)
+            TODO 其实这个边界应该跟 manip_type, 也就是操作方向也是有关的, 因此应该是 (state, action, manip_type, delta) 的形式
+            边界的定义方式为 能使用该 action 鲁棒的在范围内改变物体状态
+            
+            由于我们是从 state = 0 开始探索, 因此只需要不断向上扩充边界, 即在当前的 state_high 开始
+            找到新的 action, 使得该 action 可以稳定的将物体开关到 (state_high, state_higher)
 
-        这个循环会一直执行, 直到 state_high >= state_max
+            这个循环会一直执行, 直到 state_high >= state_max
+        """
+        # TODO 这里先考虑只打开的情况
+        # TODO 保存操作的历史信息
+        assert self.obj_repr.kframes[0].joint_state == 0
+        # 一些超参数
+        if self.obj_repr.fine_joint_dict["joint_type"] == "revolute":
+            delta_state = np.deg2rad(10) # 10 degree
+            stable_thresh = np.deg2rad(2) # 2 deg
+        elif self.obj_repr.fine_joint_dict["joint_type"] == "prismatic":
+            delta_state = 0.2 # 1 dm
+            stable_thresh = 0.01 # 1cm
 
-    操作阶段的逻辑：
+        # 一些中间变量
+        self.num_further_explore = 0
+        self.max_further_explore = 20
+
+        # 这个函数会被外层 while (True) 的执行, 因此需要有退出机制
+        if self.num_further_explore > self.max_further_explore:
+            return 
+        
+        # 首先恢复到当前探索的最远的稳定状态
+        # 获取当前状态
+        self.update_cur_frame()
+        # 获取离当前状态最近的稳定状态
+        nearest_stable_state = 0 # TODO 这里先设置为 0
+        # 首先获取当前状态, 即更新 cur_frame 和 cur_state
+        while (abs(self.cur_state - nearest_stable_state) > stable_thresh) and self.num_further_explore < self.max_further_explore:
+            # 获取可靠的 grasp
+            # 当第一次执行时
+            # Tph2w = self.transform_grasp(
+            #     Tph2w_ref=self.obj_repr.kframes[0].Tph2w,
+            #     ref_state=self.obj_repr.kframes[0].joint_state,
+            #     tgt_state=self.cur_state
+            # )
+            Tph2w = self.get_stable_grasp_proposal()
+
+            self.open_gripper()
+            self.move_to_pose_safe(
+                Tph2w=Tph2w,
+                reserved_distance=self.cfg["reserved_distance"]
+            )
+            self.close_gripper()
+            # 进行复位
+            joint_dict = self.obj_repr.get_joint_param(
+                resolution="fine",
+                frame="world"
+            )
+            self.move_along_axis(
+                joint_type=joint_dict["joint_type"],
+                joint_axis=joint_dict["joint_dir"],
+                joint_start=joint_dict["joint_start"],
+                moving_distance=nearest_stable_state-self.cur_state
+                # moving_distance=0-self.cur_state
+            )
+            self.num_further_explore += 1
+            self.update_cur_frame()
+
+            # TODO 对于这一次操作也进行记录
+        
+        # 记录下来当前的 state, manip_type, grasp
+        traj = {
+            "start_state": self.cur_state,
+            "manip_type": "open",
+            "start_grasp": self.get_ee_pose(as_matrix=True),
+            # open: [(0.1, 0.02), (0.2, 0.03), ...]
+            # close: [(-0.1, 0.01), (-0.2, -0.02), ...]
+            "range_with_loss": [] 
+        }
+        # 现在的状态是机械臂 close 在 nearest_stable_state 的地方, 那么从当前位置开始探索
+        goal = self.cur_state + delta_state # TODO 这里目前设置仅仅往更大的方向
+
+        # 假设尝试次数还有, 并且当前的 grasp 一直可以将物体比较准的打开, 那么就一直跑
+        while self.num_further_explore < self.max_further_explore and not self.get_all_grasp():
+            range_with_loss_tmp = [goal] # TODO: 是不是可以用一个 traj 类进行管理
+            # 那么我们不断的执行一小步的 open delta_state 操作, 每次执行完都看一下效果
+            self.move_along_axis(
+                joint_type=joint_dict["joint_type"],
+                joint_axis=joint_dict["joint_dir"],
+                joint_start=joint_dict["joint_start"],
+                # 由于之前的 while 循环是从 cur_state 很小跳出的, 所以我们不需要更新 cur_state 的估计
+                moving_distance=delta_state
+            )
+            num_further_explore += 1
+            
+            # 再跑一遍 reloc, 然后记录下真实的状态, 如果误差很大那么就退出 while 循环
+            self.update_cur_frame()
+            range_with_loss_tmp.append(self.cur_state)
+            # TODO: 看看是不是只有误差小的咱们说给他保存起来
+            traj["range_with_loss"].append(range_with_loss_tmp)
+
+            # 如果误差太大, 那就 break, 然后返回上一个状态进行 explore
+            if abs(self.cur_state - goal) > stable_thresh:   # 不应该大于 1cm
+                break
+        
+        # 退出上述循环后, 继续在当前状态下开始探索
+        self.explore_from_current_state()
+
+
+    def get_all_grasp(self):
+        """
+        判断目前探索的 grasp 所能控制的区间是否已经包含了 (0, max_distance)
+        """
+    def manip_complex(self, delta_state):
+        """
+        操作阶段的逻辑：
         state = state_start
         while state != state_end:
             对于当前的 state, 查询包含该 state 的 action 中, 最能接近 state_end 的 action 并进行执行
-    """
-    def find_grasp_dict(self):
         """
-        在当前的状态下, 对于 self.grasp_dict 进行补充
-        """
-        # 首先获取当前状态, 即更新 cur_frame 和 cur_state
-        self.update_cur_frame()
-        # 然后将 cur_state 分类到一个 grasp_key 所包含的区间中
-        self.classify_state_to_key()
-        # 看一下 cur_key 下有没有已经可以用的 stable_grasp
-        if self.grasp_dict[self.cur_key]["has_stable"]:
-            # 转移到最近的没有 stable_grasp 的地方进行探索
-            pass
-        else:
-            # 在当前状态下进行探索
-            Tph2w = self.get_stable_grasp_prior()
-            
-            pass
+        pass
 
     def explore_once(
         self, 

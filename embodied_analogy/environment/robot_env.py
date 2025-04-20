@@ -292,6 +292,34 @@ class RobotEnv(BaseEnv):
         else:
             print("Get None result in move_to_pose function, not executing...")
     
+    def move_to_pose_safe(self, Tph2w, reserved_distance=0.05):
+        """
+        控制 panda_hand 移动到 Tph2w 的目标位置
+        不同的是, 需考虑移动过程中的环境点云, 和 reserved_distance
+        """
+        # TODO 加一个局部调整 Tph2w 的函数
+        self.base_step()
+        frame = self.capture_frame()
+        pc_w, _ = frame.get_env_pc(
+            use_robot_mask=True,
+            use_height_filter=False,
+            world_frame=True
+        )
+        self.planner.update_point_cloud(pc_w)
+
+        # 获取 pre_grasp_pose
+        
+        Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
+        result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
+
+        if result_pre is None:
+            print("Warning in move_to_pose_safe: planning to pre_grasp_pose failed")
+        else:
+            self.follow_path(result_pre)
+            # 在往前走之前把 collision pc 去掉
+            self.clear_planner_pc()
+            self.move_forward(reserved_distance)
+
     def get_translated_ph(self, Tph2w, distance):
         """
             输出 Tph2w 沿着当前模型向前或者向后一定距离的一个 ph 位姿
@@ -362,7 +390,7 @@ class RobotEnv(BaseEnv):
     def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance):
         """
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
-        joint_axis: 1) 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
+        joint_axis: 1) NOTE 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
         """
         print("Start move_along_axis function...")
         assert joint_type in ["prismatic", "revolute"]
