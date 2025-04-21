@@ -179,7 +179,10 @@ class RobotEnv(BaseEnv):
         reset_robot 不控制 gripper 的 open/close 状态, 只把其他关节进行 reset
         """
         print("Reset robot ...")
-        init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
+        # 垂直的 pose
+        # init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
+        # 向后躺倒的 pose
+        init_panda_hand = mplib.Pose(p=[-0.3, 0, 0.9], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
         
         # self.robot.set_qpos(

@@ -18,6 +18,7 @@ class ReconEnv(ExploreEnv):
         self.fine_lr = cfg["fine_lr"]
     
     def update_cur_frame(self, visualize=False):
+        self.obj_repr: Obj_repr
         self.base_step()
         cur_frame = self.capture_frame()
         cur_frame = self.obj_repr.reloc(
