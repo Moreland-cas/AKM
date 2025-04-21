@@ -192,6 +192,7 @@ class FurtherExploreEnv(ReconEnv):
             "range_with_loss": [] 
         }
         # 现在的状态是机械臂 close 在 nearest_stable_state 的地方, 那么从当前位置开始探索
+        # !TODO goal 确实写的不对 不应该是 self.cur_state + delta_state 而应该是 state_start + x * delta_state
         goal = self.cur_state + delta_state # TODO 这里目前设置仅仅往更大的方向
 
         # 假设尝试次数还有, 并且当前的 grasp 一直可以将物体比较准的打开, 那么就一直跑
@@ -205,7 +206,7 @@ class FurtherExploreEnv(ReconEnv):
                 # 由于之前的 while 循环是从 cur_state 很小跳出的, 所以我们不需要更新 cur_state 的估计
                 moving_distance=delta_state
             )
-            num_further_explore += 1
+            self.num_further_explore += 1
             
             # 再跑一遍 reloc, 然后记录下真实的状态, 如果误差很大那么就退出 while 循环
             self.update_cur_frame()
