@@ -43,7 +43,7 @@ class Trajs:
         :param ranges: List[Tuple[float, float]]，输入的区间列表
         :return: List[Tuple[float, float]]，合并后的区间列表
         """
-        if len(self.trajs == 0):
+        if len(self.trajs) == 0:
             return []
         ranges = [traj.get_range() for traj in self.trajs]
         
@@ -101,7 +101,7 @@ class Trajs:
         :param target: Tuple[float, float]，目标区间
         :return: True/False
         """
-        merged = self.merge_ranges()
+        merged = self.merge_explored_ranges()
         target_start, target_end = self.min_state, self.max_state
         current_coverage = target_start  # 当前已覆盖到的位置
         
@@ -138,7 +138,15 @@ class Trajs:
         return False
     
     def get_current_range(self, cur_state):
-        # 获取包含当前状态的区间, 有可能是 explored_range 或者是 unexplored_range
+        """
+            获取包含当前状态的区间, 有可能是 explored_range 或者是 unexplored_range
+        """
+        # 首先判断极端情况, 即 cur_state 小于 0 或者 大于 max_state
+        if cur_state < self.min_state:
+            return self.get_current_range(0)
+        elif cur_state > self.max_state:
+            return self.get_current_range(self.max_state)
+        
         explored_ranges, unexplored_ranges = self.get_ranges()
         
         current_range = None

@@ -23,7 +23,7 @@ class ReconEnv(ExploreEnv):
         cur_frame = self.capture_frame()
         cur_frame = self.obj_repr.reloc(
             query_frame=cur_frame,
-            reloc_lr=self.reloc_lr,
+            reloc_lr=self.cfg["reloc_lr"],
             visualize=visualize
         )
         self.cur_state = cur_frame.joint_state

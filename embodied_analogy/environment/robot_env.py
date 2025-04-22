@@ -17,21 +17,21 @@ class RobotEnv(BaseEnv):
     def __init__(
             self,
             cfg
-        ):        
+        ):
         super().__init__(cfg)
         self.load_robot()
-    
+
     def capture_frame(self, visualize=False) -> Frame:
         frame = super().capture_frame(visualize=False)
-        
+
         frame.robot_mask = self.capture_robot_mask()
         frame.robot2d=self.get_points_on_arm()[0]
         frame.Tph2w = self.get_ee_pose(as_matrix=True)
-        
+
         if visualize:
             frame.visualize()
         return frame
-    
+
     def load_robot(self, robot_cfg=None):
         # Robot config
         urdf_config = dict(
@@ -49,14 +49,14 @@ class RobotEnv(BaseEnv):
         )
         config = parse_urdf_config(urdf_config, self.scene)
         check_urdf_config(config)
-        
+
         # load Robot
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.fix_root_link = True
         self.robot: sapien.Articulation = loader.load(self.asset_prefix + "/panda/panda_v3.urdf", config)
-        
+
         self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
-        
+
         self.arm_qlimit = self.robot.get_qlimits()
         self.arm_q_lower = self.arm_qlimit[:, 0]
         self.arm_q_higher = self.arm_qlimit[:, 1]
@@ -64,8 +64,8 @@ class RobotEnv(BaseEnv):
         # init_qpos = (self.arm_q_higher + self.arm_q_lower) / 2
         # init_qpos[5] = 0.278
         # self.init_qpos = init_qpos
-        
-        # Setup control properties 
+
+        # Setup control properties
         self.active_joints = self.robot.get_active_joints()
         for joint in self.active_joints[:4]:
             joint.set_drive_property(stiffness=160, damping=40, force_limit=100)    # original: 200
@@ -74,17 +74,17 @@ class RobotEnv(BaseEnv):
         for joint in self.active_joints[-2:]:
             # joint.set_drive_property(stiffness=4000, damping=10)
             joint.set_drive_property(stiffness=160, damping=10, force_limit=50)
-            
+
         # Set initial joint positions
         # init_qpos = [0, 0.19634954084936207, 0.0, -2.617993877991494, 0.0, 2.941592653589793, 0.7853981633974483, 0, 0]
         self.setup_planner()
         self.reset_robot()
-        
+
         # set id for getting mask
         for link in self.robot.get_links():
             for s in link.get_visual_bodies():
                 s.set_visual_id(255)
-    
+
     def capture_robot_mask(self):
         camera = self.camera
         camera.take_picture()
@@ -93,7 +93,7 @@ class RobotEnv(BaseEnv):
         mesh_np = seg_labels[..., 0].astype(np.uint8)  # mesh-level [H, W]
         # 这里之所以是 255 是因为在 load robot arm 的时候设置了其 visual_id 为 255
         return mesh_np == 255
-    
+
     def load_panda_hand(self, scale=1., pos=[0, 0, 0], quat=[1, 0, 0, 0]):
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.scale = scale
@@ -101,7 +101,7 @@ class RobotEnv(BaseEnv):
         self.asset = loader.load(self.asset_prefix + f"/panda/panda_v2_gripper.urdf")
         self.asset.set_root_pose(sapien.Pose(pos, quat))
         return self.asset
-    
+
     def get_points_on_arm(self):
         # 获取 robot arm 上的一些点的 2d 和 3d 的坐标（目前是 link_pose）
         link_poses_3d = []
@@ -109,7 +109,7 @@ class RobotEnv(BaseEnv):
             link_pos = link.get_pose().p # np.array(3)
             link_poses_3d.append(link_pos)
         link_poses_3d = np.array(link_poses_3d) # N, 3
-        
+
         # 投影到 2d 相机平面
         link_poses_2d = world_to_image(
             link_poses_3d,
@@ -118,19 +118,19 @@ class RobotEnv(BaseEnv):
         ) # N, 2
         link_poses_3d_w = link_poses_3d
         return link_poses_2d, link_poses_3d_w
-    
+
     def setup_planner(self):
         link_names = [link.get_name() for link in self.robot.get_links()]
         joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
         # active joints
-        # ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 
+        # ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5',
         # 'panda_joint6', 'panda_joint7', 'panda_finger_joint1', 'panda_finger_joint2']
-        
+
         # link names
-        # ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 
-        # 'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand', 'panda_hand_tcp', 'panda_leftfinger', 
+        # ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5',
+        # 'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand', 'panda_hand_tcp', 'panda_leftfinger',
         # 'panda_rightfinger', 'camera_base_link', 'camera_link']
-        
+
         self.planner = mplib.Planner(
             urdf=self.asset_prefix + "/panda/panda_v3.urdf",
             srdf=self.asset_prefix + "/panda/panda_v3.srdf",
@@ -140,17 +140,17 @@ class RobotEnv(BaseEnv):
             joint_vel_limits=np.ones(7),
             joint_acc_limits=np.ones(7))
         pass
-            
+
     def open_gripper(self, target=0.03):
         """
         这里用 self.step() 是可能在 record 中录制 open/close 的动作, 那时候 self.step 实际对应的是 self.record_step 函数
         """
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(target)
-        
+
         # NOTE: 与 reset 中的 self.step 一致, 可以在那里查看详细的解释
         self.step()
-        
+
         count = 0
         while count < 100:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
@@ -162,10 +162,10 @@ class RobotEnv(BaseEnv):
     def close_gripper(self, target=0.):
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(target)
-            
+
         # NOTE: 与 reset 中的 self.step 一致, 可以在那里查看详细的解释
         self.step()
-        
+
         count = 0
         while count < 100:
             vel_norm = np.linalg.norm(self.robot.get_qvel())
@@ -184,7 +184,7 @@ class RobotEnv(BaseEnv):
         # 向后躺倒的 pose
         init_panda_hand = mplib.Pose(p=[-0.3, 0, 0.9], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
-        
+
         # self.robot.set_qpos(
         #     # np.array([ 1.9070574e+00, -6.2731731e-01, -1.8675604e-01, -8.6891341e-01,
         #     #         -4.1449979e-01,  2.7250558e-01,  2.1395791e+00,  0.0000000e+00,
@@ -196,12 +196,12 @@ class RobotEnv(BaseEnv):
         # self.robot.set_qvel(np.zeros(self.robot.dof))
         # self.robot.set_qf(np.zeros(self.robot.dof))
         # self.robot.set_qacc(np.zeros(self.robot.dof))
-        
+
         # NOTE: 这里一定要进行一步 step, 因为现在是通过 cur_qpos 和 target_qpos 的差值来判断是否要结束同步的
         # 但是在 self.robot.set_qpos() 后的第一个 step 时的 cur_qpos 是等于 target_qpos 的, 后续才会变为实际值
         # 所以如果不 step 一下会导致同步失效, 直接退出
         self.base_step()
-        
+
         count = 0
         while count < 100:
             vel = self.robot.get_qvel()
@@ -213,15 +213,15 @@ class RobotEnv(BaseEnv):
                 break
             self.base_step()
             count += 1
-            
+
         if count == 100:
             print("Break reset since reach max reset count")
-    
-    def reset_robot_safe(self):        
+
+    def reset_robot_safe(self):
         print("Call safe robot reset ...")
         # 先打开 gripper, 再撤退一段距离
         self.open_gripper()
-        
+
         self.base_step()
         self.planner.update_point_cloud(
             self.capture_frame().get_env_pc(
@@ -230,9 +230,9 @@ class RobotEnv(BaseEnv):
                 world_frame=True
             )[0]
         )
-        
+
         self.move_forward(-0.05) # 向后撤退 5 cm
-        
+
         self.base_step()
         self.planner.update_point_cloud(
             self.capture_frame().get_env_pc(
@@ -241,21 +241,21 @@ class RobotEnv(BaseEnv):
                 world_frame=True
             )[0]
         )
-        
+
         self.reset_robot()
-        
+
     def clear_planner_pc(self):
         self.planner.update_point_cloud(np.array([[0, 0, -1]]))
-        
+
     def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w
         if isinstance(target_pose, np.ndarray):
             target_pose = mplib.Pose(target_pose)
         try:
             result = self.planner.plan_pose(
-                goal_pose=target_pose, 
-                current_qpos=self.robot.get_qpos(), 
-                time_step=self.planner_timestep, 
+                goal_pose=target_pose,
+                current_qpos=self.robot.get_qpos(),
+                time_step=self.planner_timestep,
                 rrt_range=0.1,
                 planning_time=1,
                 wrt_world=wrt_world
@@ -263,30 +263,30 @@ class RobotEnv(BaseEnv):
         except Exception as e:
             print(f"An error occurred during plan_path(): {e}")
             return None
-        
+
         if result['status'] != "Success":
             return None
-        
+
         return result
-            
+
     def follow_path(self, result):
         n_step = result['position'].shape[0]
         print("n_step:", n_step)
-        for i in range(n_step):  
+        for i in range(n_step):
             position_target = result['position'][i]
             velocity_target = result['velocity'][i]
             # num_repeat 需要根据 mplib.planner 初始化时候的 time_step 进行计算
             # num_repeat = int(self.time_step / self.phy_timestep)
             num_repeat = math.ceil(self.planner_timestep / self.phy_timestep)
-            for _ in range(num_repeat): 
+            for _ in range(num_repeat):
                 qf = self.robot.compute_passive_force(gravity=True, coriolis_and_centrifugal=True, external=False)
                 self.robot.set_qf(qf)
-                
+
                 for j in range(7):
                     self.active_joints[j].set_drive_target(position_target[j])
                     self.active_joints[j].set_drive_velocity_target(velocity_target[j])
                 self.step()
-    
+
     def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
         # pose: Tph2w
         result = self.plan_path(target_pose=pose, wrt_world=wrt_world)
@@ -294,7 +294,7 @@ class RobotEnv(BaseEnv):
             self.follow_path(result)
         else:
             print("Get None result in move_to_pose function, not executing...")
-    
+
     def move_to_pose_safe(self, Tph2w, reserved_distance=0.05):
         """
         控制 panda_hand 移动到 Tph2w 的目标位置
@@ -311,7 +311,7 @@ class RobotEnv(BaseEnv):
         self.planner.update_point_cloud(pc_w)
 
         # 获取 pre_grasp_pose
-        
+
         Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
         result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
 
@@ -332,7 +332,7 @@ class RobotEnv(BaseEnv):
         forward_direction = Tph2w[:3, :3] @ np.array([0, 0, 1]) # 3
         Tph2w_[:3, 3] = Tph2w[:3, 3] + distance * forward_direction
         return Tph2w_
-    
+
     def get_rotated_grasp(self, grasp, axis_out_w):
         """
             绕着 y 轴旋转 grasp 坐标系使得 grasp 坐标系的 x 轴与 axis_out_w 的点乘尽可能小
@@ -342,20 +342,20 @@ class RobotEnv(BaseEnv):
         from graspnetAPI import Grasp
         grasp_ = Grasp()
         grasp_.grasp_array = np.copy(grasp.grasp_array)
-        
+
         Rgrasp2w = grasp_.rotation_matrix
         """
         Rrefine2w = Rgrasp2w @ Rrefine2grasp
         Rrefine2w[:, 0] * axis_out_w 尽可能小
         又因为 Rrefine2grasp 是绕着 y 轴的旋转, 所以有形式:
             cos(a), 0, sin(a)
-            0, 1, 0, 
+            0, 1, 0,
             -sin(a), 0, cos(a)
-        所以 
-            Rrefine2w[:, 0]  
+        所以
+            Rrefine2w[:, 0]
             = Rgrasp2w @ [cos(a), 0, -sin(a)].t
             = cos(a) * Rgrasp2w[:, 0] - sin(a) * Rgrasp2w[:, 2]
-        所以 
+        所以
             Rrefine2w[:, 0] * axis_out_w
             = cos(a) * Rgrasp2w[:, 0] * axis_out_w - sin(a) * Rgrasp2w[:, 2] * axis_out_w
         对 a 求导数, 有:
@@ -373,23 +373,23 @@ class RobotEnv(BaseEnv):
                 [-math.sin(theta), 0, math.cos(theta)]
             ])
             return rotation_matrix
-        
+
         theta1 = np.arctan(-(axis_out_w * Rgrasp2w[:, 2]).sum() / (axis_out_w * Rgrasp2w[:, 0]).sum())
         theta2 = np.arctan(+(axis_out_w * Rgrasp2w[:, 2]).sum() / (axis_out_w * Rgrasp2w[:, 0]).sum())
-        
+
         Rrefine2grasp1 = rotation_y(theta1)
         Rrefine2grasp2 = rotation_y(theta2)
-        
+
         Rrefine2w1 = Rgrasp2w @ Rrefine2grasp1
         Rrefine2w2 = Rgrasp2w @ Rrefine2grasp2
-        
+
         if (Rrefine2w1[:, 0] * axis_out_w).sum() < (Rrefine2w2[:, 0] * axis_out_w).sum():
             grasp_.rotation_matrix = Rrefine2w1.reshape(-1)
         else:
             grasp_.rotation_matrix = Rrefine2w2.reshape(-1)
-        
+
         return grasp_
-    
+
     def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance):
         """
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
@@ -405,12 +405,12 @@ class RobotEnv(BaseEnv):
         else:
             # 对于平移关节时每次移动 5 degree
             num_interp = max(3, int(moving_distance / 0.02))
-        
+
         print(f"Need {num_interp} interpolations to execute the manipulate traj...")
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
         Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
-            
+
         if joint_type == "prismatic":
             def T_with_delta(delta):
                 axis = joint_axis / np.linalg.norm(joint_axis)  # 确保轴是单位向量
@@ -419,7 +419,7 @@ class RobotEnv(BaseEnv):
                 # 对于 panda_hand 来说, z-axis 的正方向是向前
                 Tph2w[:3, 3] = ee_pose + delta * axis
                 return Tph2w
-            
+
         elif joint_type == "revolute":
             def T_with_delta(delta):
                 # 计算旋转矩阵，delta为旋转角度
@@ -432,11 +432,11 @@ class RobotEnv(BaseEnv):
                 Tph2w[:3, :3] = R_delta @ Rph2w  # 先旋转再应用当前的旋转
                 Tph2w[:3, 3] = R_delta @ (ee_pose - joint_start) + joint_start  # 保持末端执行器的位置不变
                 return Tph2w
-        
+
         # 先得到连续的插值位姿
         deltas = np.linspace(0, moving_distance, num_interp)
         T_list = [T_with_delta(delta) for delta in deltas]
-        
+
         # 然后依次执行这些位姿
         for Tph2w in T_list:
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
@@ -452,7 +452,7 @@ class RobotEnv(BaseEnv):
             #     print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
             #     break
             self.follow_path(result)
-    
+
     def move_forward(self, moving_distance):
         # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
         _, ee_quat = self.get_ee_pose() # Tph2w
@@ -465,7 +465,7 @@ class RobotEnv(BaseEnv):
             joint_start=None,
             moving_distance=moving_distance
         )
-            
+
     def get_ee_pose(self, as_matrix=False):
         """
         获取 end-effector (panda_hand) 的 ee_pos 和 ee_quat (Tph2w)
@@ -476,10 +476,10 @@ class RobotEnv(BaseEnv):
         # print(ee_link.name)
         ee_pos = ee_link.get_pose().p
         ee_quat = ee_link.get_pose().q
-        
+
         if as_matrix:
             T = np.eye(4)  # 创建一个 4x4 单位矩阵
-            R_matrix = R.from_quat(ee_quat, scalar_first=True).as_matrix() 
+            R_matrix = R.from_quat(ee_quat, scalar_first=True).as_matrix()
             T[:3, :3] = R_matrix  # 将旋转矩阵放入变换矩阵
             T[:3, 3] = ee_pos  # 将位置向量放入变换矩阵
             return T
@@ -495,12 +495,12 @@ class RobotEnv(BaseEnv):
         def T_with_offset(offset):
             Tph2grasp = np.array([
                 [0, 0, 1, -(0.045 + 0.069) + offset],  # TODO: offset 设置为 0.014?
-                [0, 1, 0, 0], 
-                [-1, 0, 0, 0], 
+                [0, 1, 0, 0],
+                [-1, 0, 0, 0],
                 [0, 0, 0, 1]
             ])
             return Tph2grasp
-        
+
         R_grasp2w = grasp.rotation_matrix # 3, 3
         t_grasp2w = grasp.translation # 3
         Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
@@ -509,8 +509,8 @@ class RobotEnv(BaseEnv):
         # Tph2w = Tgrasp2w @ T_with_offset(0.02)
         Tph2w = Tgrasp2w @ T_with_offset(0.014)
         return Tph2w
-    
-    
+
+
 if __name__ == "__main__":
     env = RobotEnv(
         {
@@ -553,8 +553,8 @@ if __name__ == "__main__":
     }
     )
 
-    
+
     # for i in range(100):
     while True:
         env.step()
-    
+

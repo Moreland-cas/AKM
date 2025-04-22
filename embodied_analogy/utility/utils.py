@@ -1592,13 +1592,36 @@ def line_to_line_distance(P1, d1, P2, d2):
     return distance
 
 
+def custom_linspace(a, b, delta):
+    if delta <= 0:
+        raise ValueError("delta must be positive")
+    
+    # 确定递增/递减方向
+    direction = 1 if b >= a else -1
+    diff = abs(b - a)
+    
+    # 计算最大完整步数
+    n = int(np.floor(diff / delta))
+    
+    # 生成基础点序列
+    if n == 0:
+        return np.array([b])
+    else:
+        points = a + direction * delta * np.arange(1, n+1)
+        
+        # 判断是否需要追加端点b
+        last = points[-1]
+        if (direction == 1 and not np.isclose(last, b) and last < b) or \
+           (direction == -1 and not np.isclose(last, b) and last > b):
+            points = np.append(points, b)
+        
+        return points
+    
+    
 if __name__ == "__main__":
-    point_cloud = np.random.random([100, 3])
-    point_cloud[:, 2] = 0
-    point_cloud[:30, 2] = np.random.random([30]) * 1
-    # print(point_cloud)
-    normal_vector1 = fit_plane_normal(point_cloud)
-    normal_vector2 = fit_plane_ransac(point_cloud, max_iterations=100, visualize=True)
-    print("归一化后的法向量:", normal_vector1)
-    print("归一化后的法向量(ransac):", normal_vector2)
+    print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]
+    print(custom_linspace(0, 5, 1))      # [1., 2., 3., 4., 5.]
+    print(custom_linspace(10, 5, 2))     # [8., 6., 5.]
+    print(custom_linspace(3, 3, 0.5))    # [3]
+    print(custom_linspace(2, 5, 0.5))    # [2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
