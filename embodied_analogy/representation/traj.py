@@ -1,21 +1,23 @@
 # 专门用来存储探索过程中的 grasp 数据
 import numpy as np
-
+from embodied_analogy.utility.utils import dis_point_to_range
 
 class Traj:
     def __init__(
         self,
         start_state=None,
         manip_type=None,
-        Tph2w=None,
+        pre_qpos=None, # NOTE pre_Tph2w 对应的 qpos
+        Tph2w=None, # NOTE 并非实际 close gripper 后的 Tph2w, 而是由 grasp 转换来的 Tph2w
         goal_state=None,
         end_state=None,
         valid_mask=None
     ):
         # 初始化属性
-        self.start_state = start_state  # 初始状态
+        self.start_state = start_state    # 初始状态
         self.manip_type = manip_type      # 操作类型
         self.Tph2w = Tph2w                # 变换矩阵 (4, 4)
+        self.pre_qpos = pre_qpos          # 抓取前的 qpos
         self.goal_state = goal_state      # 目标状态
         self.end_state = end_state        # 结束状态
         self.valid_mask = valid_mask      # 有效掩码
@@ -23,6 +25,13 @@ class Traj:
     def get_range(self):
         return (self.start_state, self.end_state)
 
+    def __repr__(self):
+        return (f"Traj(start_state={self.start_state}, "
+                f"manip_type={self.manip_type}, "
+                f"Tph2w={self.Tph2w}, "
+                f"goal_state={self.goal_state}, "
+                f"end_state={self.end_state}, "
+                f"valid_mask={self.valid_mask})")
 
 class Trajs:
     def __init__(self, joint_type):
@@ -32,10 +41,10 @@ class Trajs:
         self.joint_type = joint_type
         if joint_type == "prismatic":
             self.min_state = 0
-            self.max_state = 0.35
+            self.max_state = 0.5
         else:
             self.min_state = 0
-            self.max_state = np.deg2rad(90)
+            self.max_state = np.deg2rad(70)
 
     def merge_explored_ranges(self):
         """
@@ -93,6 +102,46 @@ class Trajs:
             unexplored_ranges.append((merged[-1][1], target_end))
         
         return explored_ranges, unexplored_ranges
+    
+    def find_nearest_unexplored_range(self, cur_state):
+        """
+        找到距离 cur_state 最近的未探索区间, 且该区间需要足够的大, 太小的没必要探索了
+        """
+        # 首先获取所有的未探索区间
+        _, unexplored_ranges = self.get_ranges()
+        if len(unexplored_ranges) == 0:
+            return None
+        
+        # 然后把特别小的未探索区间过滤掉
+        filter_thresh = 0.05 if self.joint_type == "prismatic" else np.deg2rad(6)
+        filtered_unexplored_ranges = []
+        for unexplored_range in unexplored_ranges:
+            if abs(unexplored_range[1] - unexplored_range[0]) > filter_thresh:
+                filtered_unexplored_ranges.append(unexplored_range)
+        if len(filtered_unexplored_ranges) == 0:
+            return None
+            
+        # 最后找到距离当前状态最近的 range
+        min_dist = 1e6
+        min_range_idx = None
+        for i, filtered_unexplored_range in enumerate(filtered_unexplored_ranges):
+            cur_dist = dis_point_to_range(cur_state, filtered_unexplored_range)
+            if cur_dist < min_dist:
+                min_dist = cur_dist
+                min_range_idx = i
+        
+        return filtered_unexplored_ranges[min_range_idx]
+            
+            
+    def exist_large_unexplored_range(self):
+        """
+        判断当前是否还有比较大的 unexplored_range
+        """
+        if self.find_nearest_unexplored_range(0) is None:
+            return False
+        else:
+            return True
+        
     
     def is_range_covered(self):
         """
@@ -199,6 +248,30 @@ class Trajs:
         elif not right_explored:
             return current_end, "right", abs(current_end - self.max_state)
         return None, None, None
+    
+    def get_all_grasp(self):
+        """
+        返回一个列表 (state, grasp) 的列表
+        """
+        valid_grasp = []
+        failed_grasp = []
+        for traj in self.trajs:
+            traj: Traj
+            tmp_grasp = (traj.start_state, traj.pre_qpos)
+            if traj.valid_mask == True:
+                valid_grasp.append(tmp_grasp)
+            else:
+                failed_grasp.append(tmp_grasp)
+        return valid_grasp, failed_grasp
+
+    
+    def __repr__(self):
+        explrored_ranges, unexplrored_ranges = self.get_ranges()
+        return f"Trajs(\
+            \n\tmin_state={self.min_state}, max_state={self.max_state},\
+            \n\texplored_ranges={explrored_ranges},\
+            \n\tunexplrored_ranges={unexplrored_ranges},\
+        )"
     
     
 if __name__ == "__main__":

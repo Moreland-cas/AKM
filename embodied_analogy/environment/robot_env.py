@@ -370,12 +370,37 @@ class RobotEnv(BaseEnv):
 
         if result_pre is None:
             print("Warning in move_to_pose_safe: planning to pre_grasp_pose failed")
+            return None
         else:
             self.follow_path(result_pre)
+            # 在这里获取 robot qpos, 也即 pre_Tph2w 对应的 pre_qpos
+            pre_qpos = self.robot.get_qpos()
             # 在往前走之前把 collision pc 去掉
             self.clear_planner_pc()
             self.move_forward(reserved_distance)
+            return pre_qpos
 
+    def move_to_qpos_safe(self, qpos):
+        """
+        控制 franka 的状态变为 qpos, 并且不碰撞环境物体
+        不同的是, 需考虑移动过程中的环境点云, 和 reserved_distance
+        """
+        self.base_step()
+        frame = self.capture_frame()
+        pc_w, _ = frame.get_env_pc(
+            use_robot_mask=True,
+            use_height_filter=False,
+            world_frame=True
+        )
+        self.planner.update_point_cloud(pc_w)
+
+        plan_result = self.plan_qpos(goal_qpos=qpos)
+
+        if plan_result is None:
+            print("Warning in move_to_qpos_safe: planning to goal_qpos failed, do_nothing")
+        else:
+            self.follow_path(plan_result)
+        
     def get_translated_ph(self, Tph2w, distance):
         """
             输出 Tph2w 沿着当前模型向前或者向后一定距离的一个 ph 位姿

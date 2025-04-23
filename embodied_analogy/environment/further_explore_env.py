@@ -1,13 +1,10 @@
 import os
-import json
-import pickle
-import math
+import random
 import numpy as np
 from embodied_analogy.utility.utils import (
-    camera_to_world,
     initialize_napari,
-    visualize_pc,
-    custom_linspace
+    custom_linspace,
+    dis_point_to_range
 )
 initialize_napari()
 from embodied_analogy.environment.obj_env import ObjEnv
@@ -61,55 +58,80 @@ class FurtherExploreEnv(ReconEnv):
 
     def get_stable_grasp_proposal(self):
         """
-        基于 self.cur_frame 和 self.trajs, 返回一个 stable_grasp proposal TODO 需要修改
-        """
-        # 假设 cur_frame 处于 explored_range 中, 那么直接用现成的 grasp
-        # 否则 detect_grasp, 并且根据历史信息筛选。方式为随机 sampe, 但是通过 history traj 影响 sample 的概率分布
-        # self.cur_frame.detect_grasp()
+        基于 self.cur_frame 和 self.trajs, 返回一个 stable_grasp proposal (由 Grasp 直接转换得到的 Tph2w)
         
-        # if self.cur_frame.grasp_group is None:
-        #     assert "detect no grasp on current frame"
-        #     return None
-        # else:
-        #     grasps_w = self.cur_frame.grasp_group.transform(np.linalg.inv(self.cur_frame.Tw2c))
-        #     for grasp_w in grasps_w:
-        #         # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
-        #         # grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
-        #         Tph2w = self.anyGrasp2ph(grasp=grasp_w)        
-        #         Tph2w_pre = self.get_translated_ph(Tph2w, -self.cfg["reserved_distance"])
-        #         result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-        #         if result_pre is not None:
-        #             return grasp_w
-        #     return None
+        NOTE 
+        我们的策略是优先尝试已有 grasp, 以及已有 grasp 的不同 pre_qpos
+        如果都不行 (traj 中有明确的尝试情况且都是失败的)
+        那么就重新在当前 frame 下运行 Anygrasp, 并得到一个新的 proposal
+        """
+        print("Tring to get a stable grasp proposal...")
         self.ref_ph_to_tgt(
             ref_frame=self.obj_repr.kframes[0],
             tgt_frame=self.cur_frame
         )
-        return self.cur_frame.Tph2w
+        # Tph2w, pre_qpos = None, None
+        
+        # 优先尝试 trajs 中已有的 Tph2w
+        valid_grasps, failed_grasps = self.trajs.get_all_grasp()
+        available_grasps = []
+        for valid_grasp in valid_grasps:
+            ref_state, Tph2w_ref = valid_grasp
+            available_grasp = self.transfer_Tph2w(
+                Tph2w_ref=Tph2w_ref,
+                ref_state=ref_state,
+                tgt_state=self.cur_state
+            )
+            available_grasps.append(available_grasp)
+        # 并且剔除那种跟 cur_state 附近的失败尝试拥有相似 pre_gpos 的 (因为 pre_qpos 几乎直接决定了 Tph2w)
+        
+        if len(available_grasps) != 0:
+            return None, None
+        else:
+            grasp_group = self.cur_frame.detect_grasp_moving(
+                crop_thresh=0.1,
+                visualize=True
+            )
+            if grasp_group is None:
+                print("Anygrasp did not detect any valid grasp after filtering by moving part in current frame")
+                return None, None
             
-    def move_along_axis_with_reloc(self, target_state, update_traj=False):
+            # TODO 然后在这个函数里拒绝一些 trajs 中为 False 的
+            selected_grasp = grasp_group[0]
+            grasps_w = selected_grasp.transform(np.linalg.inv(self.cur_frame.Tw2c)) # Tgrasp2w
+            Tph2w = self.anyGrasp2ph(grasps_w)
+            pre_Tph2w = self.get_translated_ph(
+                Tph2w=Tph2w,
+                distance=self.cfg["reserved_distance"]
+            )
+            self.planner.update_point_cloud(
+                self.cur_frame.get_env_pc(
+                    use_robot_mask=True,
+                    world_frame=True
+                )
+            )
+            pre_qpos = self.IK(
+                target_pose=pre_Tph2w,
+                wrt_world=True,
+                n_init_qpos=30
+            )
+            # 最后使用 IK 跑一个 pre_gpos 出来
+            return Tph2w, random.choice(pre_qpos)
+            
+    def move_along_axis_with_reloc(self, target_state, traj: Traj):
         """
         move_along_axis 的封装版本, 额外增加了每隔一段距离 reloc 判断执行状态的功能
         NOTE: 该函数假设机器人此时已经抓住了物体, 只需要进行一个位移操作, cur_state 是 close gripper 后检测出的 joint 状态
         """
         # 这里虽然进行了 reloc, 但是不要更新 move_along_axis 的 cur_state
+        self.update_cur_frame()
         interpolate_targets = custom_linspace(self.cur_state, target_state, self.reloc_interval)
-        # 初始夹爪关闭状态下的 panda_hand pose (TODO 是不是存储关闭前的会更好)
-        Tph2w = self.get_ee_pose(as_matrix=True)
+        print(f"The interpolate_targets is {interpolate_targets}")
         
         if target_state > self.cur_state:
             sign = 1
         else:
             sign = -1
-        
-        traj = Traj(
-            start_state=self.cur_state,
-            manip_type="open" if target_state > self.cur_state else "close",
-            Tph2w=Tph2w,
-            goal_state=None,
-            end_state=None,
-            valid_mask=None
-        )
         
         joint_dict_w = self.obj_repr.get_joint_param(resolution="fine", frame="world")
         for i, interpolate_target in enumerate(interpolate_targets):
@@ -131,37 +153,49 @@ class FurtherExploreEnv(ReconEnv):
                     joint_start=joint_dict_w["joint_start"],
                     moving_distance=moving_distance,
                 )
-            
             # 跑 reloc 并生成 traj
             self.update_cur_frame()
             if abs(self.cur_state - interpolate_target) > self.stable_thresh:
+                print("Not working well with reloc checkpoint, break from move_along_axis_with_reloc")
                 break
             else:
+                print("It currently works well with reloc checkpoint, keep manipulating to see the bound")
                 traj.end_state = self.cur_state
                 traj.goal_state = interpolate_target
+            print(f"The initialized traj is curretly {traj}")
                 
         if traj.end_state is None:
             traj.valid_mask = False
         else:
             traj.valid_mask = True
         
+    def grasp_and_move(self, target_state, update_traj=False):
+        # NOTE 从 reset 状态开始, 抓取到当前状态的物体上, 并进行 make_a_move 操作
+        Tph2w, pre_qpos = self.get_stable_grasp_proposal()
+        traj = Traj(
+            start_state=self.cur_state,
+            manip_type="open" if target_state > self.cur_state else "close",
+            Tph2w=Tph2w,
+            pre_qpos=pre_qpos,
+            goal_state=None,
+            end_state=None,
+            valid_mask=None
+        )
+        print(f"Init a new traj: ", traj)
+        
+        self.open_gripper()
+        # 需要这个函数返回一下 pre_Tph2w 对应的 qpos
+        self.move_to_qpos_safe(pre_qpos)
+        # 然后关闭环境点云, 并且控制 panda_hand 向前移动 5cm
+        self.clear_planner_pc()
+        self.move_forward(self.cfg["reserved_distance"])
+        self.close_gripper()
+        print("Start move_along_axis_with_reloc...")
+        self.move_along_axis_with_reloc(target_state=target_state)
+        
         if update_traj:
             self.trajs.update(traj)
-    
-    def grasp_and_move(self, target_state):
-        # NOTE 从 reset 状态开始, 抓取到当前状态的物体上, 并进行 make_a_move 操作
-        Tph2w = self.get_stable_grasp_proposal()
-        self.open_gripper()
-        self.move_to_pose_safe(Tph2w)
-        self.close_gripper()
         
-        self.update_cur_frame()
-        trajs = self.move_along_axis_with_reloc(target_state=target_state)
-        self.trajs.update(trajs)
-        
-        # 为防止循环不停止
-        self.num_further_explore += 1
-    
     def further_explore_loop(self):
         # NOTE 保证调用这个函数的时候 franke 处于 reset 状态
         
@@ -195,49 +229,76 @@ class FurtherExploreEnv(ReconEnv):
         self.trajs.update(initial_traj)
         
         # 然后开始探索
-        while not self.trajs.is_range_covered() and self.num_further_explore < self.max_further_explore:
+        while self.trajs.exist_large_unexplored_range() and self.num_further_explore < self.max_further_explore:
+            print(f"[{self.num_further_explore + 1}/{self.max_further_explore}] Strat further explore...")
             # 首先获取当前状态
             self.update_cur_frame()
-            is_explored, current_range = self.trajs.get_current_range(self.cur_state)
-            
-            if is_explored:
-                # 一开始默认处于 reset_pose
-                if current_range[0] > self.trajs.min_state:
-                    # 向左探索
-                    target_state = current_range[0]
-                    manip_type = "close"
-                elif current_range[1] < self.trajs.max_state:
-                    # 向右探索
-                    target_state = current_range[1]
+            nearest_unexplored_range = self.trajs.find_nearest_unexplored_range(self.cur_state)
+            print("Curret trajs: ", self.trajs)
+            print(f"Start exploring range {nearest_unexplored_range}")
+            """
+            这里需要加一个简单的分类逻辑
+            """
+            if dis_point_to_range(self.cur_state, nearest_unexplored_range) != 0:
+                # cur_state 在 nearest_unexplored_range 外, 那就尝试到 nearest_unexplored_range 的附近, 然后开始探索
+                print(f"Currently outside nearest_unexplored_range {nearest_unexplored_range}")
+                if nearest_unexplored_range[0] > self.cur_state:
                     manip_type = "open"
+                    target_state = nearest_unexplored_range[0]
                 else:
-                    continue
+                    manip_type = "close"
+                    target_state = nearest_unexplored_range[1]
+                    
+                # 如果距离已经很近了, 那就直接开始探索, 否则先到 nearest_unexplored_range 附近 
+                joint_type = self.obj_repr.fine_joint_dict["joint_type"]
+                thresh = 0.025 if joint_type == "prismatic" else np.deg2rad(3)
                 
-                # 此时 panda_hand 应该没有抓住物体
-                self.grasp_and_move(target_state=target_state)
+                if abs(dis_point_to_range(self.cur_state, nearest_unexplored_range)) > thresh:
+                    print(f"Since it's a little bit further, first move to state {target_state}")
+                    self.grasp_and_move(target_state=target_state, update_traj=False)
+                    # 松开并复位
+                    self.reset_robot_safe()
+                    self.update_cur_frame()
                 
-                # 松开并复位
-                self.reset_robot_safe()
                 # 然后开始真正的尝试
-                self.update_cur_frame()
+                print("Start exploring...")
                 self.grasp_and_move(
-                    target_state=self.trajs.min_state if manip_type == "close" else self.trajs.max_state
+                    target_state=self.trajs.min_state if manip_type == "close" else self.trajs.max_state,
+                    update_traj=True
                 )
+                print("Trajs after updating: ", self.trajs)
                 self.reset_robot_safe()
             else:
-                # 一开始默认处于 reset_pose
-                # 直接向 current_range[0] 探索
-                target_state = current_range[0]
-                manip_type = "close"
-                
-                self.grasp_and_move(target_state=target_state)
+                # cur_state 在 nearest_unexplored_range 内
+                # 无非是向左或者向右探索, 选择那个区间更长的就完事了
+                print(f"Currently within nearest_unexplored_range {nearest_unexplored_range}")
+                if nearest_unexplored_range[1] - self.cur_state > self.cur_state - nearest_unexplored_range[0]:
+                    # 向右探索
+                    print("Explore to open...")
+                    self.grasp_and_move(
+                        target_state=self.trajs.max_state,
+                        update_traj=True
+                    )
+                else:
+                    # 向左探索
+                    print("Explore to close...")
+                    self.grasp_and_move(
+                        target_state=self.trajs.min_state,
+                        update_traj=True
+                    )
+                # 松开并复位
+                print("Trajs after updating: ", self.trajs)
                 self.reset_robot_safe()
+                self.update_cur_frame()
+            
+            # 在这里限制 while 循环无限执行
+            self.num_further_explore += 1
         
     
 if __name__ == "__main__":
     Env = FurtherExploreEnv(
         cfg={
-    "obj_folder_path_explore": "/media/zby/MyBook/embody_analogy_data/assets/logs/explore_4_16/45135_1_prismatic",
+    "obj_folder_path_explore": "/media/zby/MyBook/embody_analogy_data/assets/logs/explore_4_16/49133_1_revolute",
     "phy_timestep": 0.004,
     "planner_timestep": 0.01,
     "use_sapien2": True,
@@ -250,17 +311,17 @@ if __name__ == "__main__":
     "instruction": "open the cabinet",
     "num_initial_pts": 1000,
     "obj_description": "cabinet",
-    "joint_type": "prismatic",
-    "obj_index": "45135",
+    "joint_type": "revolute",
+    "obj_index": "49133",
     "joint_index": "1",
     "init_joint_state": "0",
-    "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_1",
+    "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/49133_link_1",
     "active_link_name": "link_1",
     "active_joint_name": "joint_1",
     "load_pose": [
-        0.8806247711181641,
+        0.9077050089836121,
         0.0,
-        0.6068519949913025
+        0.5163614749908447
     ],
     "load_quat": [
         1.0,
@@ -269,12 +330,15 @@ if __name__ == "__main__":
         0.0
     ],
     "load_scale": 1,
-    "obj_folder_path_reconstruct": "/media/zby/MyBook/embody_analogy_data/assets/logs/recon_4_16_1/45135_1_prismatic/",
+    "obj_folder_path_reconstruct": "/media/zby/MyBook/embody_analogy_data/assets/logs/recon_4_18_2/49133_1_revolute/",
     "num_kframes": 3,
     "fine_lr": 0.001,
     "save_memory": True,
-            "reloc_lr": 3e-3,
-        }
+    "reloc_lr": 3e-3
+}
     )
     Env.further_explore_loop()
+    
+    while True:
+        Env.step()
     

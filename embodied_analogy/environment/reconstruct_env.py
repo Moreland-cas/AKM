@@ -28,6 +28,8 @@ class ReconEnv(ExploreEnv):
         )
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
+        print("Extimated Current State: ", self.cur_state)
+        print("GT Current State: ", self.get_active_joint_state())
         
     def transform_grasp(self, Tph2w_ref, ref_state, tgt_state):
         """
@@ -68,6 +70,24 @@ class ReconEnv(ExploreEnv):
         Tph2c_tgt = Tref2tgt_c @ Tph2c_ref
         Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
         tgt_frame.Tph2w = Tph2w_tgt
+        
+    def transfer_Tph2w(self, Tph2w_ref, ref_state, tgt_state):
+        """
+        将 Tph2w 从 ref_state 转换到 tgt_state
+        """
+        Tph2c_ref = self.obj_repr.Tw2c @ Tph2w_ref
+        
+        # Tref2tgt 是 camera 坐标系下的一个变换
+        Tref2tgt_c = joint_data_to_transform_np(
+            joint_type=self.obj_repr.fine_joint_dict["joint_type"],
+            joint_dir=self.obj_repr.fine_joint_dict["joint_dir"],
+            joint_start=self.obj_repr.fine_joint_dict["joint_start"],
+            joint_state_ref2tgt=tgt_state-ref_state
+        )
+        
+        Tph2c_tgt = Tref2tgt_c @ Tph2c_ref
+        Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
+        return Tph2w_tgt
 
     def recon_stage(self, load_path=None, save_path=None, visualize=False):
         if load_path is not None:

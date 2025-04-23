@@ -27,8 +27,8 @@ from embodied_analogy.utility.estimation.clustering import cluster_tracks_3d_spe
 from embodied_analogy.utility.grasp.anygrasp import (
     detect_grasp_anygrasp,
     filter_grasp_group,
-    sort_grasp_group,
-    crop_grasp
+    crop_grasp,
+    crop_grasp_by_moving
 )
 
 class Data():
@@ -284,6 +284,44 @@ class Frame(Data):
                 contact_point=self.contact3d, 
                 post_contact_dirs=[self.dir_out]
             )
+            
+    def detect_grasp_moving(self, crop_thresh=0.1, visualize=False) -> GraspGroup:
+        """
+        返回当前 frame 的点云上 moving_part 附近的一个 graspGroup
+        """
+        assert (self.dynamic_mask is not None) and (self.obj_mask is not None)
+        
+        obj_pc, pc_colors = self.get_obj_pc(
+            use_robot_mask=True,
+            use_height_filter=True,
+            world_frame=False
+        )
+        
+        # 这里用相机坐标系的 -z 轴作为 dir_out
+        dir_out = np.linalg.inv(self.Tw2c)[:3, :3] @ np.array([0, 0, -1])
+        gg = detect_grasp_anygrasp(
+            points=obj_pc, 
+            colors=pc_colors / 255.,
+            dir_out=dir_out, 
+            augment=True,
+            visualize=False
+        )  
+        # 这是在所有物体点云上检测得到的 grasp, 我们需要把距离 dynamic_mask 中 moving_mask 近的裁剪出来
+        gg = crop_grasp_by_moving(
+            grasp_group=gg,
+            contact_region=depth_image_to_pointcloud(self.depth, self.dynamic_mask == MOVING_LABEL, self.K),
+            crop_thresh=crop_thresh
+        )
+        
+        if visualize:
+            visualize_pc(
+                points=obj_pc, 
+                colors=pc_colors / 255,
+                grasp=None if gg is None else gg, 
+                contact_point=None, 
+                post_contact_dirs=[self.dir_out]
+            )
+        return gg
 
     def segment_obj(
         self, 

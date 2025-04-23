@@ -1638,6 +1638,17 @@ def extract_pos_quat_from_matrix(T):
     return pos, quat
 
 
+def dis_point_to_range(point, range):
+    a = point
+    b, c = range[0], range[1]
+    assert b <= c
+    if a >= b and a <= c:
+        return 0
+    elif a < b:
+        return b - a
+    else:
+        return a - c
+    
     
 if __name__ == "__main__":
     print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]

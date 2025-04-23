@@ -29,6 +29,33 @@ def crop_grasp(grasp_group, contact_point, radius=0.1):
     return grasp_group_
     
     
+def filter_grasp_group(
+    grasp_group, 
+    degree_thre=30,
+    dir_out=None,
+):
+    '''
+        filter grasp_group, 使得保留的 grasp 的 appro_vector 的负方向与 dir_out 尽可能平行
+        grasp_group: Tgrasp2c
+        dir_out: (3, )
+        contact_region: (N, 3), 也即是 moving part
+        NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
+    '''
+    if grasp_group is None:
+        return None
+    
+    Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
+    neg_x_axis = -Rgrasp2c[:, :, 0] # N, 3
+    
+    # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
+    product = np.sum(neg_x_axis * dir_out, axis=-1) # N
+    product = product / (np.linalg.norm(neg_x_axis, axis=-1) * np.linalg.norm(dir_out))
+    index = product > np.cos(np.deg2rad(degree_thre))
+    grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
+    
+    return grasp_group
+
+
 @torch.no_grad()
 def detect_grasp_anygrasp(
     points, 
@@ -129,57 +156,31 @@ def find_nearest_grasp(grasp_group, contact_point):
     return grasp_group[nearest_index]
 
 
-def sort_grasp_group(grasp_group, contact_region, pre_filter=False):
+def crop_grasp_by_moving(grasp_group, contact_region, crop_thresh=0.1):
     '''
-        找到离 contact region 中点最近的 grasp, 且 grasp_fram 的 -x 轴越是平行于 dir_out 越好
+        找到离 contact region 中点最近的 grasp
         grasp_group: Tgrasp2c
-        dir_out: (3, )
-        contact_region: (N, 3), 也即是 moving part
+        contact_region: (N, 3), 也即是 moving part 所构成的点云
         NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
     '''
     if grasp_group is None:
         return None
-    
-    if pre_filter: # 保留前 50 的 grasp
-        grasp_group = grasp_group.nms().sort_by_score()
-        grasp_group = grasp_group[0:50]
         
-    t_grasp2w = grasp_group.translations # N, 3
+    t_grasp2c = grasp_group.translations # N, 3
+    _, distances, _ = find_correspondences(t_grasp2c, contact_region) # N
+    
+    # 首先 hard-filter 一下, 距离最近 contact_region 也超过 1dm 的 grasp 直接不考虑了
+    hard_mask = distances < crop_thresh
+    if hard_mask.sum() == 0:
+        return None
+    grasp_group.grasp_group_array = grasp_group.grasp_group_array[hard_mask]
+    
     pred_scores = grasp_group.scores # N
-    
-    _, distances, _ = find_correspondences(t_grasp2w, contact_region) # N
-    distance_scores = np.exp(-2 * distances) 
-    
+    distance_scores = 1 / (distances[hard_mask] + 1e-6) 
     grasp_scores = pred_scores * distance_scores  # N
+    
     index = np.argsort(grasp_scores)
     index = index[::-1]
-    grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
-    
-    return grasp_group
-
-
-def filter_grasp_group(
-    grasp_group, 
-    degree_thre=30,
-    dir_out=None,
-):
-    '''
-        filter grasp_group, 使得保留的 grasp 的 appro_vector 的负方向与 dir_out 尽可能平行
-        grasp_group: Tgrasp2c
-        dir_out: (3, )
-        contact_region: (N, 3), 也即是 moving part
-        NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
-    '''
-    if grasp_group is None:
-        return None
-    
-    Rgrasp2c = grasp_group.rotation_matrices # N, 3, 3
-    neg_x_axis = -Rgrasp2c[:, :, 0] # N, 3
-    
-    # 让 grasp_frame 的 -x 轴尽可能平行于 dir_out
-    product = np.sum(neg_x_axis * dir_out, axis=-1) # N
-    product = product / (np.linalg.norm(neg_x_axis, axis=-1) * np.linalg.norm(dir_out))
-    index = product > np.cos(np.deg2rad(degree_thre))
     grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
     
     return grasp_group
