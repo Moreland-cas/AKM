@@ -1,3 +1,14 @@
+# 大致需要解决 move_along_axis
+# IK
+# plane_path 等函数
+
+# 先在我自己的 robot_env 里尝试一下, IK, collision IK
+
+# 以及从当前的 pose 执行到, Tph2w
+
+# 以及给定完整的 pose, 从当前状态执行过去
+
+
 import math
 import mplib
 import numpy as np
@@ -12,6 +23,8 @@ from embodied_analogy.utility.sapien_utils import (
     check_urdf_config,
 )
 from embodied_analogy.representation.basic_structure import Frame
+from embodied_analogy.utility.utils import extract_pos_quat_from_matrix
+
 
 class RobotEnv(BaseEnv):
     def __init__(
@@ -120,27 +133,166 @@ class RobotEnv(BaseEnv):
         return link_poses_2d, link_poses_3d_w
 
     def setup_planner(self):
-        link_names = [link.get_name() for link in self.robot.get_links()]
-        joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
-        # active joints
-        # ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5',
-        # 'panda_joint6', 'panda_joint7', 'panda_finger_joint1', 'panda_finger_joint2']
+        from curobo.types.base import TensorDeviceType
+        from curobo.types.robot import RobotConfig
+        from curobo.util_file import get_robot_configs_path, join_path, load_yaml
+        from curobo.cuda_robot_model.cuda_robot_model import CudaRobotModelConfig
+        from curobo.cuda_robot_model.cuda_robot_generator import CudaRobotGeneratorConfig
+        
+        self.tensor_args = TensorDeviceType()
 
-        # link names
-        # ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5',
-        # 'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand', 'panda_hand_tcp', 'panda_leftfinger',
-        # 'panda_rightfinger', 'camera_base_link', 'camera_link']
+        config_file = load_yaml(join_path(get_robot_configs_path(), "franka.yml"))
+        urdf_file = config_file["robot_cfg"]["kinematics"][
+            "urdf_path"
+        ]  # Send global path starting with "/"
+        base_link = config_file["robot_cfg"]["kinematics"]["base_link"]
+        ee_link = config_file["robot_cfg"]["kinematics"]["ee_link"]
+        # robot_cfg = RobotConfig.from_basic(urdf_file, base_link, ee_link, self.tensor_args)
+        
+        tmp_cfg = CudaRobotModelConfig.from_config(
+            config=CudaRobotGeneratorConfig(
+                base_link=base_link,
+                ee_link=ee_link,
+                tensor_args=self.tensor_args,
+                urdf_path=urdf_file,
+            )
+        )
+        # NOTE 这一步很重要, 否则按照默认只有 panda_hand 的 link_name
+        # tmp_cfg.link_names = ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand', 'panda_hand_tcp', 'panda_leftfinger', 'panda_rightfinger', 'camera_base_link', 'camera_link']
+        # tmp_cfg.link_names = [
+        #     'panda_link0', 'panda_link1', 'panda_link2', 
+        #     'panda_link3', 'panda_link4', 'panda_link5', 
+        #     'panda_link6', 'panda_link7', 'panda_link8', 'panda_hand']
+        tmp_cfg.link_names = [
+            'panda_link0', 'panda_link1', 'panda_link2', 
+            'panda_link3', 'panda_link4', 'panda_link5', 
+            'panda_link6', 'panda_link7', 'panda_hand']
+        robot_cfg = RobotConfig(
+            kinematics=tmp_cfg,
+            tensor_args=self.tensor_args,
+        )
+        self.robot_cfg = robot_cfg
+    
+    def forward_kinematics(self, joint_qpos):
+        """
+        joint_qpos: (7, )
+        """
+        # Third Party
+        import torch
 
-        self.planner = mplib.Planner(
-            urdf=self.asset_prefix + "/panda/panda_v3.urdf",
-            srdf=self.asset_prefix + "/panda/panda_v3.srdf",
-            user_link_names=link_names,
-            user_joint_names=joint_names,
-            move_group="panda_hand",
-            joint_vel_limits=np.ones(7),
-            joint_acc_limits=np.ones(7))
+        # cuRobo
+        from curobo.cuda_robot_model.cuda_robot_model import CudaRobotModel, CudaRobotModelConfig
+        from curobo.types.base import TensorDeviceType
+        from curobo.types.robot import RobotConfig
+        from curobo.types.math import Pose
+        from curobo.util_file import get_robot_path, join_path, load_yaml
+
+        kin_model = CudaRobotModel(self.robot_cfg.kinematics)
+
+        # compute forward kinematics:
+        # torch random sampling might give values out of joint limits
+        q = torch.from_numpy(joint_qpos[None], **(self.tensor_args.as_torch_dict())) # (1, 7)
+        out = kin_model.get_state(q)
+        links_position = out.links_position[0, :].cpu().numpy() # (dof, 3)
+        links_quaternion = out.links_quaternion[0, :].cpu().numpy() # (dof, 4)
+        link_names = out.link_names # list of str
+        
+        link_dicts = {}
+        for i, link_name in enumerate(link_names):
+            link_dicts[link_name] = Pose(
+                position=links_position[i][None],
+                quaternion=links_quaternion[i][None]
+            )
+         
+        return link_dicts
+        
+    def run_IK(self, Tph2w):
+        """
+        给定 panda_hand 的 pose, 运行 IK 来得到可行的 joint_qpos
+        """
+        from curobo.types.math import Pose
+        from curobo.wrap.reacher.ik_solver import IKSolver, IKSolverConfig
+
+        ik_config = IKSolverConfig.load_from_robot_config(
+            robot_cfg=self.robot_cfg,
+            word_model=None,
+            rotation_threshold=0.05,
+            position_threshold=0.005,
+            num_seeds=20,
+            self_collision_check=False,
+            self_collision_opt=False,
+            tensor_args=self.tensor_args,
+            use_cuda_graph=True,
+        )
+        ik_solver = IKSolver(ik_config)
+
+        pos, quat = extract_pos_quat_from_matrix(Tph2w) # (3, ), (3, )
+        pos, quat = pos[None], quat[None] # (1, 3), (1, 3)
+        
+        # 在这里将 Tph2w 转换为 curobo 中的 Pose
+        goal = Pose(pos, quat) 
+        result = ik_solver.solve_batch(goal)
+        
+        success = result.success[0, 0].cpu().numpy() # True or False
+        q_solution = result.solution[0, 0].cpu().numpy() # (7, )
+        
+        return success, q_solution
+        
+    def run_IK_with_collision(self):
         pass
+        # TODO
+    
+    def move_to_pose_curobo(self, Tph2w, qpos=None):
+        # Third Party
+        import torch
 
+        # cuRobo
+        from curobo.types.math import Pose
+        from curobo.types.robot import JointState
+        from curobo.wrap.reacher.motion_gen import MotionGen, MotionGenConfig, MotionGenPlanConfig
+
+        motion_gen_config = MotionGenConfig.load_from_robot_config(
+            robot_cfg=self.robot_cfg,
+            world_model=None,
+            interpolation_dt=0.01,
+        )
+        motion_gen = MotionGen(motion_gen_config)
+        motion_gen.warmup()
+
+        pos, quat = extract_pos_quat_from_matrix(Tph2w) # (3, ), (3, )
+        goal_pose = Pose(position=pos, quaternion=quat)
+        
+        # 在这里获取当前 robot 的 qpos, 并初始化 curobo 的 start_state
+        start_state = JointState.from_position(
+            position=torch.from_numpy(self.robot.get_qpos()[:-2]).cuda(),
+            joint_names=['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 'panda_joint6', 'panda_joint7']
+        )
+        # link_poses should be a list of curobo Pose
+        """
+        link_poses: Dictionary of link poses to reach. This is only required for multi-link
+            pose reaching, where the goal is to reach multiple poses with different links. To
+            use this,
+            :attr:`curobo.cuda_robot_model.cuda_robot_model.CudaRobotModelConfig.link_names`
+            should have the link names to reach.
+        """
+        if qpos is not None:
+            # 使用 forward_kinematics 来计算 link_poses
+            link_dicts = self.forward_kinematics(qpos)
+        else:
+            link_dicts = None
+            
+        result = motion_gen.plan_single(
+            start_state=start_state,
+            goal_pose=goal_pose,
+            plan_config=MotionGenPlanConfig(max_attempts=1),
+            link_poses=link_dicts
+        )
+        traj = result.get_interpolated_plan()  # result.interpolation_dt has the dt between timesteps
+        print("Trajectory Generated: ", result.success)
+    
+    def move_to_pose_with_collision_curobo(self, Tph2w, link_poses=None):
+        pass
+    
     def open_gripper(self, target=0.03):
         """
         这里用 self.step() 是可能在 record 中录制 open/close 的动作, 那时候 self.step 实际对应的是 self.record_step 函数
@@ -158,7 +310,8 @@ class RobotEnv(BaseEnv):
                 break
             self.step()
             count += 1
-
+    
+    
     def close_gripper(self, target=0.):
         for joint in self.active_joints[-2:]:
             joint.set_drive_target(target)
@@ -180,9 +333,9 @@ class RobotEnv(BaseEnv):
         """
         print("Reset robot ...")
         # 垂直的 pose
-        init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
+        # init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         # 向后躺倒的 pose
-        # init_panda_hand = mplib.Pose(p=[-0.3, 0, 0.9], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
+        init_panda_hand = mplib.Pose(p=[-0.3, 0, 0.9], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
 
         # self.robot.set_qpos(
@@ -247,59 +400,6 @@ class RobotEnv(BaseEnv):
     def clear_planner_pc(self):
         self.planner.update_point_cloud(np.array([[0, 0, -1]]))
 
-    def plan_qpos(self, goal_qpos):
-        """
-        调用 self.planner 的 plan_qpos 方法, 输入一个 goal_qpos, 返回一个 plan_result
-        
-        goal_qpos: np.ndarray, shape=(7,), dtype=np.float32
-        return:
-            {
-                "status": "Success",
-                "time": times,
-                "position": pos,
-                "velocity": vel,
-                "acceleration": acc,
-                "duration": duration,
-            }
-            
-        NOTE: 
-        区别在于 mplib.planner 的 plan_qpos 会输出多个 goal_qpos, 而返回一个 plan_result
-        
-        我们就只是输入一个 goal_qpos, 不行就换下一个, 因为我们想要多个 plan_result, 他们有不同
-        的qpos, 但是相同的 ee_pos
-        """
-        format_input = [goal_qpos]
-        current_qpos = self.robot.get_qpos()
-        result = self.planner.plan_qpos(
-            goal_qposes=format_input,
-            current_qpos=current_qpos,
-            time_step=self.planner_timestep,
-            rrt_range=0.1,
-            planning_time=1
-        )
-        if result["status"] != "Success":
-            return None
-        else:
-            return result
-    
-    def IK(self, target_pose, wrt_world: bool = True, n_init_qpos=20):
-        """
-        给定一个 end-effector pose, 返回一个可行的 robot qpos
-        NOTE 返回的是一个列表, 且 mplib 本身已经有一定程度的 nms 了
-        """
-        if wrt_world:
-            goal_pose = self.planner._transform_goal_to_wrt_base(target_pose)
-        
-        # 如果 goal_qpos 的列表不止一个, 则 ik_status 为 "Success"
-        ik_status, goal_qpos = self.planner.IK(
-            goal_pose=goal_pose,
-            start_qpos=self.robot.get_qpos(),
-            n_init_qpos=n_init_qpos
-        )
-        if ik_status != "Success":
-            return None
-        return goal_qpos
-    
     def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w
         if isinstance(target_pose, np.ndarray):
@@ -606,34 +706,8 @@ if __name__ == "__main__":
     }
     )
 
-    # 实现一个功能, 就是先到达一个位置, 然后用多种不同的方式再到达这个位置
+
     # for i in range(100):
-    env.move_along_axis(
-        joint_type="prismatic",
-        joint_axis=[1, 0, -1],
-        joint_start=None,
-        moving_distance=0.2
-    )
-    env.move_along_axis(
-        joint_type="revolute",
-        joint_axis=[1, 0, 0],
-        joint_start=[0, 0, 0.8],
-        moving_distance=np.deg2rad(30)
-    )
-    Tph2w = env.get_ee_pose(as_matrix=True)
-    print(Tph2w)
-    goal_qpos_list = env.IK(Tph2w)
-    print("found ", len(goal_qpos_list), " avaliable goal_qpos")
-    
-    for i, goal_qpos in enumerate(goal_qpos_list):
-        print(f"[{i + 1}/{len(goal_qpos_list)}] Trying goal_qpos ", goal_qpos)
-        plan_result = env.plan_qpos(goal_qpos)
-        if plan_result is None:
-            print("This qpos is not reachable, skip!")
-            continue
-        env.follow_path(plan_result)
-        env.reset_robot()
-        
     while True:
         env.step()
 

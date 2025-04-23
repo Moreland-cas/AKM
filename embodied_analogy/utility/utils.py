@@ -1616,7 +1616,28 @@ def custom_linspace(a, b, delta):
             points = np.append(points, b)
         
         return points
-    
+
+
+def extract_pos_quat_from_matrix(T):
+    """
+    从 4x4 变换矩阵中提取位置和四元数
+    输入:
+        T: Tph2w, np.array(4, 4), 变换矩阵
+    输出:
+        pos: np.array([3, ]), 位置向量
+        quat: np.array([4, ]), 四元数 (w, x, y, z) 顺序
+    """
+    # 提取位置向量
+    pos = T[:3, 3]
+
+    # 提取旋转矩阵并转换为四元数
+    R_matrix = T[:3, :3]
+    quat = R.from_matrix(R_matrix).as_quat(scalar_first=False)  # 返回 (x, y, z, w) 顺序
+    quat = np.array([quat[3], quat[0], quat[1], quat[2]])  # 转换为 (w, x, y, z) 顺序
+
+    return pos, quat
+
+
     
 if __name__ == "__main__":
     print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]
