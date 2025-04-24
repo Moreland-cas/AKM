@@ -231,7 +231,10 @@ class RobotEnv(BaseEnv):
             )[0]
         )
 
-        self.move_forward(-0.05) # 向后撤退 5 cm
+        self.move_forward(
+            moving_distance=-0.05,
+            drop_large_move=False
+        ) # 向后撤退 5 cm
 
         self.base_step()
         self.planner.update_point_cloud(
@@ -377,13 +380,17 @@ class RobotEnv(BaseEnv):
             pre_qpos = self.robot.get_qpos()
             # 在往前走之前把 collision pc 去掉
             self.clear_planner_pc()
-            self.move_forward(reserved_distance)
+            self.move_forward(
+                moving_distance=reserved_distance,
+                drop_large_move=False
+            )
             return pre_qpos
 
     def move_to_qpos_safe(self, qpos):
         """
         控制 franka 的状态变为 qpos, 并且不碰撞环境物体
         不同的是, 需考虑移动过程中的环境点云, 和 reserved_distance
+        NOTE 调用这个函数的 input qpos 一般都是 pre_qpos
         """
         self.base_step()
         frame = self.capture_frame()
@@ -468,7 +475,7 @@ class RobotEnv(BaseEnv):
 
         return grasp_
 
-    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance):
+    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance, drop_large_move):
         """
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
         joint_axis: 1) NOTE 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
@@ -524,14 +531,15 @@ class RobotEnv(BaseEnv):
                 continue
             # 针对那种需要一个大的动作的操作, 直接不执行, 否则容易大幅度影响物体状态
             # 直接去掉呢？
-            elif len(result["time"]) > 200: # TODO: 改为200
+            elif len(result["time"]) > 200: 
                 print("Warning: encounter {big_steps} steps in move_along_axis")
-            #     big_steps = len(result["time"])
-            #     print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
-            #     break
+                if drop_large_move:
+                    big_steps = len(result["time"])
+                    print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
+                    break
             self.follow_path(result)
 
-    def move_forward(self, moving_distance):
+    def move_forward(self, moving_distance, drop_large_move):
         # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
         _, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
@@ -541,7 +549,8 @@ class RobotEnv(BaseEnv):
             joint_type="prismatic",
             joint_axis=moving_direction,
             joint_start=None,
-            moving_distance=moving_distance
+            moving_distance=moving_distance,
+            drop_large_move=drop_large_move
         )
 
     def get_ee_pose(self, as_matrix=False):

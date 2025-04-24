@@ -1650,6 +1650,28 @@ def dis_point_to_range(point, range):
         return a - c
     
     
+def distance_between_transformation(mat1, mat2):
+    """
+    计算两个 Transformation 之间的距离
+    mat1: (4, 4)
+    """
+    def translation_distance(mat1, mat2):
+        translation1 = mat1[:3, 3]
+        translation2 = mat2[:3, 3]
+        return np.linalg.norm(translation1 - translation2)
+    
+    def rotation_difference(mat1, mat2):
+        R1 = mat1[:3, :3]
+        R2 = mat2[:3, :3]
+        # 计算旋转矩阵之间的差异
+        angle_diff = np.arccos((np.trace(R1.T @ R2) - 1) / 2)
+        return angle_diff
+    
+    trans_dist = translation_distance(mat1, mat2)
+    rot_dist = rotation_difference(mat1, mat2)
+    return trans_dist + rot_dist  # 或者其他加权方式
+
+
 if __name__ == "__main__":
     print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]
     print(custom_linspace(0, 5, 1))      # [1., 2., 3., 4., 5.]

@@ -17,13 +17,14 @@ class ReconEnv(ExploreEnv):
         self.num_kframes = cfg["num_kframes"]
         self.fine_lr = cfg["fine_lr"]
     
-    def update_cur_frame(self, visualize=False):
+    def update_cur_frame(self, init_guess=None, visualize=False):
         self.obj_repr: Obj_repr
         self.base_step()
         cur_frame = self.capture_frame()
         cur_frame = self.obj_repr.reloc(
             query_frame=cur_frame,
             reloc_lr=self.cfg["reloc_lr"],
+            init_guess=init_guess,
             visualize=visualize
         )
         self.cur_state = cur_frame.joint_state

@@ -308,7 +308,9 @@ class Obj_repr(Data):
     def update_dynamic(self, query_frame: Frame, visualize=False):
         """
         使用 obj_repr 中的 kframes 的 dynamics 来更新 query_frame 的 dynamics
-        NOTE: 需要 query_frame 的 joint_state 不为空
+        NOTE: 
+            需要 query_frame 的 joint_state 不为空
+            但是不需要 obj_mask ??
         """
         K = self.K
         ref_joint_states = self.kframes.get_joint_states()
@@ -364,6 +366,7 @@ class Obj_repr(Data):
     def reloc(
         self,
         query_frame: Frame,
+        init_guess=None,
         reloc_lr=3e-3,
         visualize=False
     ) -> Frame:
@@ -376,8 +379,11 @@ class Obj_repr(Data):
         # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
         num_ref = len(self.kframes)
         
-        # 初始化 query_frame 的 joint 状态
-        self.update_state(query_frame, visualize=visualize)
+        if init_guess is not None:
+            query_frame.joint_state = init_guess
+        else:
+            # 初始化 query_frame 的 joint 状态
+            self.update_state(query_frame, visualize=visualize)
         
         # 对 query_frame 的 dynamic_mask 进行估计
         self.update_dynamic(query_frame, visualize=visualize)
@@ -400,11 +406,18 @@ class Obj_repr(Data):
         )
         # 然后在这里把 query_frame 从 keyframes 中吐出来
         query_frame = self.kframes.frame_list.pop(0)
+        if fine_joint_dict == {}:
+            print("Fine estimation failed, return state as 0 or initial_guess if given")
+            if init_guess is not None:
+                query_frame.joint_state = init_guess
+            else:
+                query_frame.joint_state = 0
+            return query_frame
         query_frame.joint_state = fine_joint_dict["joint_states"][0]
         print(f"Fine estimated joint state: {query_frame.joint_state}")
         
-        # 都估计完了似乎也不需要再次 update 了?
-        # self.update_dynamic(query_frame, visualize=visualize)
+        # 估计完后再更新一次 dynamic 估计
+        self.update_dynamic(query_frame, visualize=visualize)
             
         return query_frame
     

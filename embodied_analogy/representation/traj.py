@@ -23,15 +23,23 @@ class Traj:
         self.valid_mask = valid_mask      # 有效掩码
         
     def get_range(self):
-        return (self.start_state, self.end_state)
+        min_state = min(self.start_state, self.end_state)
+        max_state = max(self.start_state, self.end_state)
+        return (min_state, max_state)
 
     def __repr__(self):
-        return (f"Traj(start_state={self.start_state}, "
-                f"manip_type={self.manip_type}, "
-                f"Tph2w={self.Tph2w}, "
-                f"goal_state={self.goal_state}, "
-                f"end_state={self.end_state}, "
-                f"valid_mask={self.valid_mask})")
+        result_str = \
+            "Traj(" + \
+            f"\n\tstart_state={self.start_state}, " +\
+            f"\n\tmanip_type={self.manip_type}, " +\
+            f"\n\tTph2w={self.Tph2w}, " +\
+            f"\n\tpre_qpos={self.pre_qpos}, " +\
+            f"\n\tgoal_state={self.goal_state}, " +\
+            f"\n\tend_state={self.end_state}, " +\
+            f"\n\tvalid_mask={self.valid_mask})"
+
+        return result_str
+
 
 class Trajs:
     def __init__(self, joint_type):
@@ -54,13 +62,14 @@ class Trajs:
         """
         if len(self.trajs) == 0:
             return []
-        ranges = [traj.get_range() for traj in self.trajs]
+        ranges = [traj.get_range() for traj in self.trajs if traj.valid_mask]
         
         # 按区间起点排序
         sorted_ranges = sorted(ranges, key=lambda x: x[0])
         merged = [list(sorted_ranges[0])]
         
         for current_start, current_end in sorted_ranges[1:]:
+            assert current_start <= current_end and f"Check Traj.get_range(), range_start {current_start} should be less than range_end {current_end}"
             last_start, last_end = merged[-1]
             
             # 如果当前区间与最后一个合并区间有重叠或相邻
@@ -257,21 +266,43 @@ class Trajs:
         failed_grasp = []
         for traj in self.trajs:
             traj: Traj
-            tmp_grasp = (traj.start_state, traj.pre_qpos)
+            tmp_grasp = (traj.start_state, traj.pre_qpos, traj.Tph2w)
             if traj.valid_mask == True:
                 valid_grasp.append(tmp_grasp)
             else:
                 failed_grasp.append(tmp_grasp)
         return valid_grasp, failed_grasp
-
+    
+    def failed_grasp_around(self, cur_state):
+        """
+        找到 cur_state 附近的 invalid grasp, 用于做拒绝采样
+        """
+        _, failed_grasps = self.get_all_grasp()
+        
+        if len(failed_grasps) == 0:
+            return None
+        else:
+            nearby_failed_grasps = []
+            for failed_grasp in failed_grasps:
+                # 判断 failed_grasp 中的 state 是否与 cur_state 足够接近
+                failed_grasp_start_state = failed_grasp[0]
+                thresh = 0.05 if self.joint_type == "prismatic" else np.deg2rad(20)
+                if abs(failed_grasp_start_state - cur_state) < thresh:
+                    nearby_failed_grasps.append(failed_grasp)
+            if len(nearby_failed_grasps) == 0:
+                return None
+            else:
+                return nearby_failed_grasps
     
     def __repr__(self):
         explrored_ranges, unexplrored_ranges = self.get_ranges()
-        return f"Trajs(\
-            \n\tmin_state={self.min_state}, max_state={self.max_state},\
+        summary_str = f"Trajs(\
+            \n\tmin_max_range={self.min_state, self.max_state},\
             \n\texplored_ranges={explrored_ranges},\
             \n\tunexplrored_ranges={unexplrored_ranges},\
-        )"
+        \n)"
+        detailed_strs = [str(traj) for traj in self.trajs]
+        return summary_str + "\n" + ("\n").join(detailed_strs)
     
     
 if __name__ == "__main__":
