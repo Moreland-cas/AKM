@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # 创建日志目录
-LOG_DIR="\$1"
+LOG_DIR="$1"
 # "/media/zby/MyBook/embody_analogy_data/assets/logs"
-run_name="\$2"
+run_name="$2"
 # "explore_4_16"
 mkdir -p "$LOG_DIR/$run_name"
 
 # test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
-test_data_cfg_path="\$3"
+test_data_cfg_path="$3"
 # "/home/zby/Programs/Embodied_Analogy/scripts/test_data_subset.json"
 
 #################### 超参在这里!! ####################

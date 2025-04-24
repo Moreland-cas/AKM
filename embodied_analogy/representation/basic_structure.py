@@ -28,7 +28,8 @@ from embodied_analogy.utility.grasp.anygrasp import (
     detect_grasp_anygrasp,
     filter_grasp_group,
     crop_grasp,
-    crop_grasp_by_moving
+    crop_grasp_by_moving,
+    sort_grasp_group
 )
 
 class Data():
@@ -272,7 +273,6 @@ class Frame(Data):
         gg_sorted = sort_grasp_group(
             grasp_group=gg_filtered,
             contact_region=self.contact3d[None],
-            pre_filter=False
         )
         self.grasp_group = gg_sorted
         

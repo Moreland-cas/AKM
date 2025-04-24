@@ -203,7 +203,10 @@ class ExploreEnv(ObjEnv):
         self.follow_path(result_pre)
         self.open_gripper()
         self.clear_planner_pc()
-        self.move_forward(reserved_distance)
+        self.move_forward(
+            moving_distance=reserved_distance,
+            drop_large_move=False
+        )
         self.close_gripper()
         
         # 在 close gripper 之后再开始录制数据
@@ -213,7 +216,8 @@ class ExploreEnv(ObjEnv):
             joint_type="prismatic",
             joint_axis=dir_out_w,
             joint_start=None,
-            moving_distance=pertubation_distance
+            moving_distance=pertubation_distance,
+            drop_large_move=False
         )
         
         self.step = self.base_step 

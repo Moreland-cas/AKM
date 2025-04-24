@@ -186,6 +186,30 @@ def crop_grasp_by_moving(grasp_group, contact_region, crop_thresh=0.1):
     return grasp_group
 
 
+def sort_grasp_group(grasp_group, contact_region):
+    '''
+        找到离 contact region 中点最近的 grasp
+        grasp_group: Tgrasp2c
+        contact_region: (N, 3), 也即是 moving part 所构成的点云
+        NOTE: grasp_group, contact_region 和 dir_out 均在相机坐标系下
+    '''
+    if grasp_group is None:
+        return None
+        
+    t_grasp2c = grasp_group.translations # N, 3
+    _, distances, _ = find_correspondences(t_grasp2c, contact_region) # N
+    
+    pred_scores = grasp_group.scores # N
+    distance_scores = 1 / (distances + 1e-6) 
+    grasp_scores = pred_scores * distance_scores  # N
+    
+    index = np.argsort(grasp_scores)
+    index = index[::-1]
+    grasp_group.grasp_group_array = grasp_group.grasp_group_array[index]
+    
+    return grasp_group
+
+
 if __name__ == '__main__':
     import os
     from PIL import Image
