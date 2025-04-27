@@ -474,7 +474,8 @@ def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_conta
     colors: Nx3 (0-1)
     grasp: None
     """
-    assert isinstance(post_contact_dirs, List)
+    if post_contact_dirs is not None:
+        assert isinstance(post_contact_dirs, List)
     # 初始化点云
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)

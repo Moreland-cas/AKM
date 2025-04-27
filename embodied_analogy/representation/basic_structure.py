@@ -164,6 +164,8 @@ class Frame(Data):
         if world_frame:
             obj_pc = camera_to_world(obj_pc, self.Tw2c)
         
+        if visualize:
+            visualize_pc(obj_pc, pc_colors / 255)
         return obj_pc, pc_colors
     
     def get_env_pc(
@@ -195,6 +197,8 @@ class Frame(Data):
         if world_frame:
             obj_pc = camera_to_world(obj_pc, self.Tw2c)
         
+        if visualize:
+            visualize_pc(obj_pc, pc_colors / 255)
         return obj_pc, pc_colors
         
     def detect_grasp(self, visualize=False) -> GraspGroup:
