@@ -56,7 +56,29 @@ if __name__ == '__main__':
         sys.exit(0)
     
     
-    # 首先读取 cfg
+    # 首先读取 recon_cfg
+    obj_folder_path_reconstruct = recon_cfg["obj_folder_path_reconstruct"]
+    # 读取其中的 result.pkl 文件, 如果发现误差太大，则不进行 manipulate
+    with open(os.path.join(obj_folder_path_reconstruct, 'result.pkl'), 'rb') as result_file:
+        recon_result = pickle.load(result_file)
+        joint_type = recon_result["gt_w"]["joint_type"]
+        
+        fine_loss = recon_result['fine_loss']
+        fine_type_loss = fine_loss['type_err']
+        fine_angle_err = fine_loss['angle_err']
+        fine_pos_err = fine_loss['pos_err']
+        
+        if joint_type == "prismatic":
+            if not(fine_angle_err < np.deg2rad(10) and fine_type_loss == 0):
+                print("Skip since the reconstruction is not good enough")
+                print("done")
+                sys.exit(0)
+        else:
+            if not(fine_pos_err < 0.05 and fine_angle_err < np.deg2rad(10) and fine_type_loss == 0):
+                print("Skip since the reconstruction is not good enough")
+                print("done")
+                sys.exit(0)
+    
     manip_cfg = update_cfg(recon_cfg, args)
     # 在这里计算 init_joint_state, 更新进 manip_cfg
     

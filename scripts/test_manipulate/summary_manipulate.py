@@ -24,13 +24,14 @@ root_path = os.path.join("/media/zby/MyBook/embody_analogy_data/assets/logs/", a
 
 summary_dict = {
     "prismatic": {
-        # 这个 dict 里面存储 scale： [loss_list, loss_list, ...]
+        # "open": {"scale": scale_dict}
+        # scale_dict: {"loss_lists": [], success: 10, failed: 20}
         "open": {}, 
-        "close": {}
+        "close": {},
     },
     "revolute": {
         "open": {}, 
-        "close": {}
+        "close": {},
     },
     "max_tries": -1
 }
@@ -40,14 +41,14 @@ def print_summary_dict(summary_dict):
     print("\topen")
     for scale in summary_dict["prismatic"]["open"]:
         print(f"\t\tscale {scale}:")
-        for loss_list in summary_dict["prismatic"]["open"][scale]:
+        for loss_list in summary_dict["prismatic"]["open"][scale]["loss_lists"]:
             loss_list = [f"{loss:.2f}cm" for loss in loss_list]
             print(f"\t\t\t{loss_list}:")
     
     print("\tclose")
     for scale in summary_dict["prismatic"]["close"]:
         print(f"\t\tscale {scale}:")
-        for loss_list in summary_dict["prismatic"]["close"][scale]:
+        for loss_list in summary_dict["prismatic"]["close"][scale]["loss_lists"]:
             loss_list = [f"{loss:.2f}cm" for loss in loss_list]
             print(f"\t\t\t{loss_list}")
 
@@ -55,18 +56,27 @@ def print_summary_dict(summary_dict):
     print("\topen")
     for scale in summary_dict["revolute"]["open"]:
         print(f"\t\tscale {scale}:")
-        for loss_list in summary_dict["revolute"]["open"][scale]:
+        for loss_list in summary_dict["revolute"]["open"][scale]["loss_lists"]:
             loss_list = [f"{loss:.2f}dg" for loss in loss_list]
             print(f"\t\t\t{loss_list}")
 
     print("\tclose")
     for scale in summary_dict["revolute"]["close"]:
         print(f"\t\tscale {scale}:")
-        for loss_list in summary_dict["revolute"]["close"][scale]:
+        for loss_list in summary_dict["revolute"]["close"][scale]["loss_lists"]:
             loss_list = [f"{loss:.2f}dg" for loss in loss_list]
             print(f"\t\t\t{loss_list}")
     
-    
+
+def loss_list_success(loss_list, joint_type):
+    final_loss = loss_list[-1]
+    if joint_type == "prismatic":
+        # return abs(final_loss) < 0.05
+        return abs(final_loss) < 1
+    else:
+        # return abs(final_loss) < np.deg2rad(10)
+        return abs(final_loss) < np.deg2rad(90)
+        
 # 遍历文件夹
 for object_folder in os.listdir(root_path):
     # /logs/manip_4_16/45135_1_prismatic
@@ -101,10 +111,20 @@ for object_folder in os.listdir(root_path):
                     else:
                         diff = np.rad2deg(result["diff"])
                     loss_list.append(diff)
+                
                 if scale_value not in summary_dict[joint_type][manip_type]:
-                    summary_dict[joint_type][manip_type][scale_value] = []
+                    summary_dict[joint_type][manip_type][scale_value] = {
+                        "loss_lists": [],
+                        "success": 0,
+                        "failed": 0
+                    }
                 else:
-                    summary_dict[joint_type][manip_type][scale_value].append(loss_list)
+                    # 在这里取出 loss_list 的最后一个元素, 看一下是不是足够小
+                    if loss_list_success(loss_list, joint_type):
+                        summary_dict[joint_type][manip_type][scale_value]["loss_lists"].append(loss_list)
+                        summary_dict[joint_type][manip_type][scale_value]["success"] += 1
+                    else:
+                        summary_dict[joint_type][manip_type][scale_value]["failed"] += 1
                 # 从 cfg.json 中读取 max_tries
                 with open(os.path.join(scale_path, "cfg.json"), 'r', encoding='utf-8') as file:
                     manip_cfg = json.load(file)
@@ -131,20 +151,23 @@ def process_summary_dict(summary_dict):
                 # print(f"{joint_type} {manip_type} {scale}")
                 num_manip = 0
                 # 将所有 loss_list 补全到 max_tries 长度, 用原本数组的最后一个元素进行 pad
-                for i, loss_list in enumerate(summary_dict[joint_type][manip_type][scale]):
+                for i, loss_list in enumerate(summary_dict[joint_type][manip_type][scale]["loss_lists"]):
                     num_manip += len(loss_list)
                     loss_list = [abs(loss) for loss in loss_list]
                     loss_list = loss_list + [loss_list[-1]] * (max_tries - len(loss_list))
-                    summary_dict[joint_type][manip_type][scale][i] = loss_list
+                    summary_dict[joint_type][manip_type][scale]["loss_lists"][i] = loss_list
                 
                 # num_exp * close_loop_times    
-                loss_array = np.array(summary_dict[joint_type][manip_type][scale]) 
+                loss_array = np.array(summary_dict[joint_type][manip_type][scale]["loss_lists"]) 
                 
                 if loss_array.ndim == 1:
                     # 处理 num_exp == 1 的情况
                     loss_array = loss_array.reshape(1, -1)
                 
                 print(f"\n{joint_type} {manip_type} {scale}")
+                num_success = summary_dict[joint_type][manip_type][scale]["success"]
+                num_failed = summary_dict[joint_type][manip_type][scale]["failed"]
+                print(f"Success rate: {num_success / (num_success + num_failed) * 100}")
                 print(f"avg manip: {num_manip / loss_array.shape[0]}")
                 print(f"final error: {loss_array[:, -1].mean():.3f} {unit}\n")
                 for i in range(max_tries):

@@ -24,7 +24,7 @@ class ManipulateEnv(ReconEnv):
         TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
         """
         # 首先 load 物体
-        ObjEnv.__init__(cfg)
+        ObjEnv.__init__(self, cfg)
         self.reloc_lr = cfg["reloc_lr"]
         self.reserved_distance = cfg["reserved_distance"]
         self.max_manip = cfg["max_manip"]
@@ -60,7 +60,10 @@ class ManipulateEnv(ReconEnv):
         # NOTE: 感觉每次失败的时候没必要完全 reset, 只要撤回一段距离, 然后再次尝试就好了
         print("\topen gripper and move back a little bit...")
         self.open_gripper()
-        self.move_forward(-self.reserved_distance)
+        self.move_forward(
+            moving_distance=-self.reserved_distance,
+            drop_large_move=False
+        )
         
         # 在这里是不是需要再跑一遍 reloc, 从而防止 open_gripper + move_backward 对于物体状态的影响
         self.update_cur_frame()
@@ -93,7 +96,10 @@ class ManipulateEnv(ReconEnv):
             self.follow_path(result_pre)
             self.open_gripper()
             self.clear_planner_pc()
-            self.move_forward(self.reserved_distance)
+            self.move_forward(
+                moving_distance=self.reserved_distance,
+                drop_large_move=False
+            )
             self.close_gripper()
             
             # 转换 joint_dict 到世界坐标系
@@ -102,7 +108,8 @@ class ManipulateEnv(ReconEnv):
                 joint_type=self.obj_repr.fine_joint_dict["joint_type"],
                 joint_axis=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_dir"],
                 joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
-                moving_distance=self.target_state-self.cur_frame.joint_state
+                moving_distance=self.target_state-self.cur_frame.joint_state,
+                drop_large_move=False
             )
         
         # 这里进行重定位, 如果离自己的目标差太多, 就重新执行
