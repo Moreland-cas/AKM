@@ -421,6 +421,68 @@ class Obj_repr(Data):
             
         return query_frame
     
+    def visualize_joint(self):
+        tmp_frame: Frame = None
+        if len(self.frames) > 0:
+            tmp_frame = self.frames[0]
+        elif len(self.kframes) > 0:
+            tmp_frame = self.kframes[0]
+        env_pc, colors = tmp_frame.get_env_pc(
+            use_robot_mask=True, 
+            use_height_filter=True,
+            world_frame=True,
+        )
+        joint_dict_w = self.get_joint_param(resolution="fine", frame="world")
+        joint_dir = joint_dict_w["joint_dir"]
+        joint_start = joint_dict_w["joint_start"]
+        
+        joint_dict_gt_w = self.get_joint_param(resolution="gt", frame="world")
+        joint_dir_gt = joint_dict_gt_w["joint_dir"]
+        joint_start_gt = joint_dict_gt_w["joint_start"]
+        
+        viewer = napari.Viewer(ndisplay=3)
+        viewer.title = "fine joint est visualization"
+        
+        # 改变坐标系
+        joint_start[-1] *= -1
+        joint_dir[-1] *= -1
+        
+        viewer.add_points(env_pc, size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
+
+        # 绘制一下 joint start 和 joint axis
+        viewer.add_shapes(
+            data=np.array([joint_start, joint_start + joint_dir * 0.2]),
+            name="est joint dir",
+            shape_type="line",
+            edge_width=0.005,
+            face_color="blue",
+            edge_color="blue"
+        )
+        viewer.add_points(
+            data=joint_start,
+            name="est joint start",
+            size=0.02,
+            face_color="blue",
+            border_color="red",
+        )
+        
+        viewer.add_shapes(
+            data=np.array([joint_start_gt, joint_start_gt + joint_dir_gt * 0.2]),
+            name="gt joint dir",
+            shape_type="line",
+            edge_width=0.005,
+            face_color="green",
+            edge_color="green"
+        )
+        viewer.add_points(
+            data=joint_start_gt,
+            name="gt joint start",
+            size=0.02,
+            face_color="green",
+            border_color="red",
+        )
+        napari.run()
+            
     def _visualize(self, viewer: napari.Viewer, prefix=""):
         pass
     

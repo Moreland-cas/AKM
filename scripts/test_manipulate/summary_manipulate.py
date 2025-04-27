@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run_name', type=str, help='Folder where things are stored')
 args = parser.parse_args()
 
-root_path = os.path.join("/media/zby/MyBook/embody_analogy_data/assets/logs/", args.run_name)
+root_path = os.path.join("/media/zby/MyBook1/embody_analogy_data/assets/logs/", args.run_name)
 
 summary_dict = {
     "prismatic": {
@@ -68,14 +68,14 @@ def print_summary_dict(summary_dict):
             print(f"\t\t\t{loss_list}")
     
 
-def loss_list_success(loss_list, joint_type):
+def scaled_loss_list_success(loss_list, joint_type):
     final_loss = loss_list[-1]
     if joint_type == "prismatic":
         # return abs(final_loss) < 0.05
-        return abs(final_loss) < 1
+        return abs(final_loss) < 0.05 * 100
     else:
         # return abs(final_loss) < np.deg2rad(10)
-        return abs(final_loss) < np.deg2rad(90)
+        return abs(final_loss) < 10
         
 # 遍历文件夹
 for object_folder in os.listdir(root_path):
@@ -120,7 +120,7 @@ for object_folder in os.listdir(root_path):
                     }
                 else:
                     # 在这里取出 loss_list 的最后一个元素, 看一下是不是足够小
-                    if loss_list_success(loss_list, joint_type):
+                    if scaled_loss_list_success(loss_list, joint_type):
                         summary_dict[joint_type][manip_type][scale_value]["loss_lists"].append(loss_list)
                         summary_dict[joint_type][manip_type][scale_value]["success"] += 1
                     else:
