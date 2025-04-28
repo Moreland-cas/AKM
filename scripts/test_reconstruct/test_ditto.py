@@ -1,6 +1,8 @@
+import argparse
+import pickle
 import os
 import numpy as np
-from embodied_analogy.representation.basic_structure import Frame
+from embodied_analogy.representation.basic_structure import Frame, Frames
 from embodied_analogy.representation.obj_repr import Obj_repr
 import os, sys
 sys.path.append('/home/zby/Programs/Embodied_Analogy/third_party/Ditto/src')
@@ -22,8 +24,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 import trimesh
-from utils3d.mesh.utils import as_mesh
-from utils3d.render.pyrender import get_pose, PyRenderer
+# from utils3d.mesh.utils import as_mesh
+# from utils3d.render.pyrender import get_pose, PyRenderer
 
 def plot_3d_point_cloud(
     x,
@@ -239,7 +241,14 @@ def get_ditto_model():
 
 def unnormalize_joint_param(joint_axis, pivot_point, center, scale):
     joint_start = pivot_point * scale + center
-    joint_dir = joint_axis * scale + center
+    # NOTE jonit_dir 直接 scale 就行了
+    """
+    start_w, end_w  ->  start_n, end_n
+    start_n = (start_w - center) / scale
+    end_n = (end_w - center) / scale
+    end_n - start_n = (end_w - start_w) / scale
+    """
+    joint_dir = joint_axis * scale
     joint_dir = joint_dir / np.linalg.norm(joint_dir)
     return joint_dir, joint_start
 
@@ -249,7 +258,9 @@ def run_ditto_on_pc(pc_start, pc_end, model=None, generator=None, visualize=Fals
     """
     if model is None or generator is None:
         model, generator = get_ditto_model()
-        
+    
+    pc_start_v = pc_start.copy()
+    pc_end_v = pc_end.copy()
     # 处理输入
     center, scale = get_normalize_param(np.concatenate([pc_start, pc_end]))
 
@@ -275,7 +286,8 @@ def run_ditto_on_pc(pc_start, pc_end, model=None, generator=None, visualize=Fals
     
     joint_type_prob = joint_type_logits.sigmoid().mean()
     joint_type = None
-    if joint_type_prob.item()< 0.5:
+    # TODO 原本是 < 0.5, 仅仅做测试，记得改回去 !!
+    if joint_type_prob.item() < 0.5:
         joint_type = "revolute"
         # axis voting, revolute
         joint_r_axis = (
@@ -332,7 +344,26 @@ def run_ditto_on_pc(pc_start, pc_end, model=None, generator=None, visualize=Fals
     
     # 将 normalized 坐标系下的 joint_param 缩放回世界坐标系下
     joint_dir, joint_start = unnormalize_joint_param(joint_axis_pred, pivot_point_pred, center, scale)
-    # joint_dir, joint_start = joint_axis_pred, pivot_point_pred
+    
+    # from embodied_analogy.utility.utils import visualize_pc
+    # visualize_pc(
+    #     # points=pc_start_v,
+    #     points=np.concatenate([pc_start, pc_end]),
+    #     colors=None,
+    #     grasp=None,
+    #     contact_point=pivot_point_pred,
+    #     post_contact_dirs=[joint_axis_pred]
+    # )
+    # visualize_pc(
+    #     # points=pc_start_v,
+    #     points=np.concatenate([pc_start_v, pc_end_v]),
+    #     colors=None,
+    #     grasp=None,
+    #     contact_point=joint_start,
+    #     post_contact_dirs=[joint_dir]
+    # )
+    
+    
     # 返回一个 joint_dict
     joint_dict = {
         "joint_type": joint_type,
@@ -368,6 +399,10 @@ def run_ditto(obj_repr: Obj_repr, visualize=False):
         world_frame=True,
         # visualize=True,
     )
+    # 把 obj_repr 的 frames 只保留始末两帧
+    obj_repr.frames.clear()
+    obj_repr.frames.frame_list = [frame_start, frame_end]
+    
     joint_dict_w = run_ditto_on_pc(pc_start, pc_end, visualize=False)
     # NOTE 一定要将这个 joint_dict 写入到 obj_repr 中, 由于 ditto 返回的是世界坐标系下的, 因此写回时应该转换到 camera 坐标系下
     Tw2c = obj_repr.Tw2c
@@ -389,14 +424,96 @@ def run_ditto(obj_repr: Obj_repr, visualize=False):
     print("Reconstruction Result:")
     for k, v in result.items():
         print(k, v)
-    return result
-    # print("done")
     
+    return obj_repr, result
+    
+def update_cfg(explore_cfg, args):
+    # 更新 env_folder
+    if args.obj_folder_path_explore is not None:
+        explore_cfg['obj_folder_path_explore'] = args.obj_folder_path_explore
+    if args.obj_folder_path_reconstruct is not None:
+        explore_cfg['obj_folder_path_reconstruct'] = args.obj_folder_path_reconstruct
+        
+    # if args.num_kframes is not None:
+    #     explore_cfg['num_kframes'] = args.num_kframes
+    # if args.fine_lr is not None:
+    #     explore_cfg['fine_lr'] = args.fine_lr
+    # if args.save_memory is not None:
+    #     explore_cfg['save_memory'] = args.save_memory
+    return explore_cfg
+def read_args():
+    parser = argparse.ArgumentParser(description='Update configuration for the robot.')
+    
+    # base_cfg arguments
+    parser.add_argument('--obj_folder_path_explore', type=str, help='Folder where things are loaded')
+    parser.add_argument('--obj_folder_path_reconstruct', type=str, help='Folder where things are stored')
+    # parser.add_argument('--num_kframes', type=int, help='Number of kframes')
+    # parser.add_argument('--fine_lr', type=float, help='fine lr during optimizing ICP loss')
+    # parser.add_argument('--save_memory', type=bool, help='whether to keep the frames in memory')
+
+    args = parser.parse_args()
+
+    return args
+
 if __name__ == "__main__":
     # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/40147_1_prismatic"
     # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/48271_0_revolute"
     # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45168_0_prismatic"
-    obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/49042_0_revolute"
-    obj_repr: Obj_repr = Obj_repr.load(os.path.join(obj_folder, "obj_repr.npy"))
-    run_ditto(obj_repr, visualize=True)
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/49042_0_revolute"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/47578_1_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/48258_1_prismatics"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/48258_3_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/47578_2_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45746_2_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45677_3_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45687_0_revolute"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45841_2_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/47578_1_prismatic"
+    # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/48258_2_prismatic"
+    # obj_repr: Obj_repr = Obj_repr.load(os.path.join(obj_folder, "obj_repr.npy"))
+    # obj_repr, result = run_ditto(obj_repr, visualize=False)
+    
+    
+    
+    # 给定一个路径, 读取其中 explore 下的数据, 对于有成功 explore 的数据, 进行重建, 并且将重建的数据进行保存, 将结果打印
+    args = read_args()
+    # print(args.obj_folder)
+    explore_folder = args.obj_folder_path_explore
+    with open(os.path.join(explore_folder, "cfg.json"), 'r', encoding='utf-8') as file:
+        explore_cfg = json.load(file)
+    with open(os.path.join(explore_folder, "result.pkl"), 'rb') as f:
+        explore_result = pickle.load(f)
+    
+    # 如果没有成功的 explore, 则退出
+    if not explore_result["has_valid_explore"]:
+        print("No valid explore, thus no need to run reconstruction...")
+    else:
+        print("Find valid explore, keep going...")
+        recon_save_folder = args.obj_folder_path_reconstruct
+        
+        recon_cfg = update_cfg(explore_cfg, args)
+        print("read reconstruction cfg...")
+        print(recon_cfg)
 
+        with open(os.path.join(recon_save_folder, "cfg.json"), 'w', encoding='utf-8') as f:
+            json.dump(recon_cfg, f, ensure_ascii=False, indent=4)
+            
+        obj_repr: Obj_repr = Obj_repr.load(os.path.join(explore_folder, "obj_repr.npy"))
+        print("load obj_repr from explore folder...")
+        try:
+            obj_repr, result = run_ditto(obj_repr, visualize=False)
+        except Exception as e:
+            print("Reconstruction failed...")
+            print(e)
+            print("done")
+            sys.exit(0)
+        
+        # 然后保存 rgbd_seq
+        obj_repr.save(os.path.join(recon_save_folder, "obj_repr.npy"))
+        
+        # 然后保存 运行状态文件
+        with open(os.path.join(recon_save_folder, 'result.pkl'), 'wb') as f:
+            pickle.dump(result, f)
+        
+    print("done")
+    

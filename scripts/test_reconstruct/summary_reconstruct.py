@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run_name', type=str, help='Folder where things are stored')
 args = parser.parse_args()
 
-root_path = os.path.join("/media/zby/MyBook/embody_analogy_data/assets/logs/", args.run_name)
+root_path = os.path.join("/media/zby/MyBook1/embody_analogy_data/assets/logs/", args.run_name)
 results = []
 
 # 遍历文件夹
@@ -64,13 +64,13 @@ for i, result in enumerate(results):
     
     if joint_type == "prismatic":
         num_prismatic += 1
-        if fine_angle_err < np.deg2rad(10) and fine_type_loss == 0:
+        if fine_angle_err < np.deg2rad(30) and fine_type_loss == 0:
             num_prismatic_success += 1
             prismatic_angle_err_coarse.append(coarse_angle_err)
             prismatic_angle_err_fine.append(fine_angle_err)
     else:
         num_revolute += 1
-        if fine_pos_err < 0.05 and fine_angle_err < np.deg2rad(10) and fine_type_loss == 0:
+        if fine_pos_err < 0.2 and fine_angle_err < np.deg2rad(30) and fine_type_loss == 0:
             num_revolute_success += 1
             revolute_pos_err_coarse.append(coarse_pos_err)
             revolute_angle_err_coarse.append(coarse_angle_err)
@@ -89,19 +89,19 @@ for i, result in enumerate(results):
 print(f"Total successful exp: {len(results)} / {num_exp} = {len(results) / num_exp:.4f}")
 print(f"Total successful type classification: {len(results) - sum(type_loss)} / {len(results)} = {len(results) - sum(type_loss) / len(results):.4f}")
 
-print(f"\nNumber of success prismatic: {num_prismatic_success}/{num_prismatic}, {num_prismatic_success/num_prismatic:.4f}")
-prismatic_angle_err_coarse_mean = sum(prismatic_angle_err_coarse) / num_prismatic_success
-prismatic_angle_err_fine_mean = sum(prismatic_angle_err_fine) / num_prismatic_success
+print(f"\nNumber of success prismatic: {num_prismatic_success}/{num_prismatic}, {num_prismatic_success/max(num_prismatic, 1):.4f}")
+prismatic_angle_err_coarse_mean = sum(prismatic_angle_err_coarse) / max(num_prismatic_success, 1)
+prismatic_angle_err_fine_mean = sum(prismatic_angle_err_fine) / max(num_prismatic_success, 1)
 print(f"\tcoarse angle loss: {np.rad2deg(prismatic_angle_err_coarse_mean):.4f} degree")
 print(f"\tfine   angle loss: {np.rad2deg(prismatic_angle_err_fine_mean):.4f} degree") 
 
-print(f"Number of success revolute: {num_revolute_success}/{num_revolute}, {num_revolute_success/num_revolute:.4f}")
-revolute_angle_err_coarse_mean = sum(revolute_angle_err_coarse) / num_revolute_success
-revolute_angle_err_fine_mean = sum(revolute_angle_err_fine) / num_revolute_success
+print(f"Number of success revolute: {num_revolute_success}/{num_revolute}, {num_revolute_success/max(num_revolute, 1):.4f}")
+revolute_angle_err_coarse_mean = sum(revolute_angle_err_coarse) / max(num_revolute_success, 1)
+revolute_angle_err_fine_mean = sum(revolute_angle_err_fine) / max(num_revolute_success, 1)
 print(f"\tcoarse angle loss: {np.rad2deg(revolute_angle_err_coarse_mean):.4f} degree")
 print(f"\tfine   angle loss: {np.rad2deg(revolute_angle_err_fine_mean):.4f} degree")
 
-revolute_pos_err_coarse_mean = sum(revolute_pos_err_coarse) / num_revolute_success
-revolute_pos_err_fine_mean = sum(revolute_pos_err_fine) / num_revolute_success
+revolute_pos_err_coarse_mean = sum(revolute_pos_err_coarse) / max(num_revolute_success, 1)
+revolute_pos_err_fine_mean = sum(revolute_pos_err_fine) / max(num_revolute_success, 1)
 print(f"\tcoarse pose loss: {revolute_pos_err_coarse_mean * 100:.4f} cm")
 print(f"\tfine   pose loss: {revolute_pos_err_fine_mean * 100:.4f} cm")

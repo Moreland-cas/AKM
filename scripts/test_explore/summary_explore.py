@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run_name', type=str, help='Folder where things are stored')
 args = parser.parse_args()
 
-root_path = os.path.join("/media/zby/MyBook/embody_analogy_data/assets/logs/", args.run_name)
+root_path = os.path.join("/media/zby/MyBook1/embody_analogy_data/assets/logs/", args.run_name)
 
 results = []
 

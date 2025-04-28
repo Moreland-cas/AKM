@@ -84,10 +84,12 @@ class Obj_repr(Data):
                 joint_dict["joint_start"] = Tw2c[:3, :3] @ joint_dict["joint_start"] + Tw2c[:3, 3]
         return joint_dict
     
-    def compute_joint_error(self):
+    def compute_joint_error(self, omit_positive_dir=True):
         """
         分别计算 coarse_joint_dict, fine_joint_dict 与 gt_joint_dict 的差距, 并打印, 保存
         还要分别计算 frames 和 kframes 的 joint_state_error
+        
+        omit_positive_dir: 是否忽略 joint_axis 的正负方向
         """
         coarse_w = self.get_joint_param(resolution="coarse", frame="world")
         fine_w = self.get_joint_param(resolution="fine", frame="world")
@@ -109,10 +111,16 @@ class Obj_repr(Data):
         }
         # TODO: 这里可能要对 angle_err 取一个 minimum
         result["coarse_loss"]["type_err"] = 1 if coarse_w["joint_type"] != gt_w["joint_type"] else 0
-        result["coarse_loss"]["angle_err"] = np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]))
+        if np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"])) > np.pi / 2:
+            result["coarse_loss"]["angle_err"] = np.pi - np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]))
+        else:
+            result["coarse_loss"]["angle_err"] = np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]))
         
         result["fine_loss"]["type_err"] = 1 if fine_w["joint_type"] != gt_w["joint_type"] else 0
-        result["fine_loss"]["angle_err"] = np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]))
+        if np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"])) > np.pi / 2:
+            result["fine_loss"]["angle_err"] = np.pi - np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]))
+        else:
+            result["fine_loss"]["angle_err"] = np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]))
         
         if gt_w["joint_type"] == "revolute":
             result["coarse_loss"]["pos_err"] = line_to_line_distance(
