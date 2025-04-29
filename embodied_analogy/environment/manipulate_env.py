@@ -28,7 +28,7 @@ class ManipulateEnv(ReconEnv):
         ObjEnv.__init__(self, cfg)
         self.reloc_lr = cfg["reloc_lr"]
         self.reserved_distance = cfg["reserved_distance"]
-        self.max_manip = cfg["max_manip"]
+        
         
         if cfg["manipulate_type"] == "close":
             self.goal_delta = -cfg["manipulate_distance"]
@@ -134,6 +134,7 @@ class ManipulateEnv(ReconEnv):
             return abs(self.cur_state - self.target_state) > np.deg2rad(5) # 5 degree 
         
     def manipulate_close_loop(self, visualize=False):
+        self.max_manip = cfg["max_manip"]
         print("Start manipulation Loop ...")
         num_manip = 0
         results = []
@@ -151,7 +152,7 @@ class ManipulateEnv(ReconEnv):
         return results
         
     ###################################### 底下是新版本 ######################################
-    def manipulate_close_loop_intermediate(self, visualize=False):
+    def manipulate_close_loop_intermediate(self):
         """
         给定 target_state, 每隔一段距离进行一个 close_loop, 而不是整个执行完一个 close_loop
         """
@@ -166,13 +167,13 @@ class ManipulateEnv(ReconEnv):
         # 配置参数（保持不变）
         self.joint_type = self.obj_repr.fine_joint_dict["joint_type"]
         if self.joint_type == "prismatic":
-            step = 0.05
-            tolerance = 0.008
+            step = self.cfg["prismatic_reloc_interval"]
+            tolerance = self.cfg["prismatic_reloc_tolerance"]
         else:
-            step = np.deg2rad(5)
-            tolerance = np.deg2rad(1.5)
+            step = np.deg2rad(self.cfg["revolute_reloc_interval"])
+            tolerance = np.deg2rad(self.cfg["revolute_reloc_tolerance"])
         
-        max_attempts = 5
+        max_attempts = self.cfg["max_attempts"]
         global_attempt = 0
         
         self.init_guess = None
@@ -316,7 +317,7 @@ if __name__ == '__main__':
     
     for k, v in cfg.items():
         if isinstance(v, str):
-            cfg[k] = v.replace("MyBook", "MyBook1")
+            cfg[k] = v.replace("MyBook*/", "MyBook1/")
     # cfg["asset_path"] = cfg["asset_path"].replace("MyBook", "MyBook1")
     me = ManipulateEnv(cfg)
     me.manipulate_close_loop_intermediate()

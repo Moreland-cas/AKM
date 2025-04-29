@@ -14,11 +14,9 @@ mkdir -p "$LOG_DIR/$manip_run_name"
 #################### 超参在这里!! ####################
             # easy  subset
 prismatic_max_distance=0.3
-revolute_max_distance=45
-# prismatic_manip_distances=(0.1 0.2)
-# revolute_manip_distances=(10 30)
-prismatic_manip_distances=(0.15)
-revolute_manip_distances=(20)
+revolute_max_distance=35
+prismatic_manip_distances=(0.1 0.15 0.2)
+revolute_manip_distances=(10 20 30)
 
             # hard
 # prismatic_max_distance=0.5 
@@ -27,7 +25,11 @@ revolute_manip_distances=(20)
 # revolute_manip_distances=(8.6 10 20 30 40 45 50 55 60 65 70)
 
 reloc_lr=3e-3
-max_manip=5
+max_attempts=5 # 等于1时代表没有 close_loop
+prismatic_reloc_interval=0.05 # m
+prismatic_reloc_tolerance=0.01
+revolute_reloc_interval=5  #degree
+revolute_reloc_tolerance=2
 ####################################################
 
 # 遍历 LOG_DIR 下的重建文件夹
@@ -70,8 +72,13 @@ for obj_folder_path_reconstruct in "$LOG_DIR/$recon_run_name"/*; do
                     --manipulate_type="$operation" \
                     --manipulate_distance="$distance" \
                     --reloc_lr=$reloc_lr \
-                    --max_manip=$max_manip \
+                    --max_attempts=$max_attempts \
+                    --prismatic_reloc_interval=$prismatic_reloc_interval \
+                    --prismatic_reloc_tolerance=$prismatic_reloc_tolerance \
+                    --revolute_reloc_interval=$revolute_reloc_interval \
+                    --revolute_reloc_tolerance=$revolute_reloc_tolerance \
                     --max_distance="$max_distance" > "$output_file"  # 重定向输出
+                break 3
             done
         done
     fi

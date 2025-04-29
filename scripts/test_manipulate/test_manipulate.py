@@ -21,10 +21,18 @@ def update_cfg(recon_cfg, args):
         recon_cfg['manipulate_distance'] = args.manipulate_distance
     if args.reloc_lr is not None:
         recon_cfg['reloc_lr'] = args.reloc_lr
-    if args.max_manip is not None:
-        recon_cfg['max_manip'] = args.max_manip
+    if args.max_attempts is not None:
+        recon_cfg['max_attempts'] = args.max_attempts
     if args.max_distance is not None:
         recon_cfg['max_distance'] = args.max_distance
+    if args.prismatic_reloc_interval is not None:
+        recon_cfg['prismatic_reloc_interval'] = args.prismatic_reloc_interval
+    if args.prismatic_reloc_tolerance is not None:
+        recon_cfg['prismatic_reloc_tolerance'] = args.prismatic_reloc_tolerance
+    if args.revolute_reloc_interval is not None:
+        recon_cfg['revolute_reloc_interval'] = args.revolute_reloc_interval
+    if args.revolute_reloc_tolerance is not None:
+        recon_cfg['revolute_reloc_tolerance'] = args.revolute_reloc_tolerance
     return recon_cfg
 
 def read_args():
@@ -36,8 +44,12 @@ def read_args():
     parser.add_argument('--manipulate_type', type=str, help='Open or Close')
     parser.add_argument('--manipulate_distance', type=float, help='Manipulate distance')
     parser.add_argument('--reloc_lr', type=float, help='Learning rate for relocization optimization')
-    parser.add_argument('--max_manip', type=int, help='Maximum number of manipulation tries')
+    parser.add_argument('--max_attempts', type=int, help='Maximum number of manipulation retries')
     parser.add_argument('--max_distance', type=float, help='Maximum range of manipulation')
+    parser.add_argument('--prismatic_reloc_interval', type=float, help='.')
+    parser.add_argument('--prismatic_reloc_tolerance', type=float, help='.')
+    parser.add_argument('--revolute_reloc_interval', type=float, help='.')
+    parser.add_argument('--revolute_reloc_tolerance', type=float, help='.')
 
     args = parser.parse_args()
 
@@ -46,9 +58,14 @@ def read_args():
 if __name__ == '__main__':
     args = read_args()
     
+    # obj_folder_path_reconstruct = args.obj_folder_path_reconstruct.replace("MyBook", "MyBook1")
     try:
         with open(os.path.join(args.obj_folder_path_reconstruct, "cfg.json"), 'r', encoding='utf-8') as file:
             recon_cfg = json.load(file)
+            print(recon_cfg)
+            for k, v in recon_cfg.items():
+                if isinstance(v, str):
+                    recon_cfg[k] = v.replace("MyBook", "MyBook1")
     except Exception as e:
         print(f"Error reading cfg file and obj_repr: ")
         print("\t", e)
@@ -116,7 +133,8 @@ if __name__ == '__main__':
         json.dump(manip_cfg, f, ensure_ascii=False, indent=4)
     
     env = ManipulateEnv(manip_cfg)
-    result_list = env.manipulate_close_loop()
+    # NOTE 这里改用最新版本的 manipulate_close_loop_intermediate, 而不是 manipulate_close_loop
+    result_list = env.manipulate_close_loop_intermediate()
     
     with open(os.path.join(manip_cfg["scale_dir"], 'result.pkl'), 'wb') as f:
         pickle.dump(result_list, f)
