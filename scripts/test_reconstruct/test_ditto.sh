@@ -13,7 +13,8 @@ mkdir -p "$LOG_DIR/$recon_run_name"
 
 
 #################### 超参在这里!! ####################
-
+use_gt_joint_type=True
+model_type="Ditto_s2m"  # or "Ditto_syn"
 ####################################################
 
 
@@ -37,7 +38,9 @@ for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
         # 执行 Python 脚本
         python /home/zby/Programs/Embodied_Analogy/scripts/test_reconstruct/test_ditto.py \
             --obj_folder_path_explore="$obj_folder_path_explore" \
-            --obj_folder_path_reconstruct="$obj_folder_path_reconstruct" > "$output_file"  # 重定向输出
+            --obj_folder_path_reconstruct="$obj_folder_path_reconstruct" \
+            --use_gt_joint_type="$use_gt_joint_type" \
+            --model_type="$model_type" > "$output_file"  # 重定向输出
     fi
 done
 

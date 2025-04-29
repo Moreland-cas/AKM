@@ -197,7 +197,8 @@ def normalize_point_cloud(pcd, center, scale):
     """
     return (pcd - center) / scale
 
-def get_ditto_model():
+def get_ditto_model(model_type="Ditto_s2m"):
+    assert model_type in ["Ditto_s2m", "Ditto_syn"]
     import torch
     from hydra import compose, initialize
     # from hydra.experimental import initialize, initialize_config_module, initialize_config_dir, compose
@@ -214,7 +215,7 @@ def get_ditto_model():
         config = compose(
             config_name='config',
             overrides=[
-                'experiment=Ditto_s2m.yaml',
+                f'experiment={model_type}.yaml',
             ], return_hydra_config=True)
         
     config.datamodule.opt.train.data_dir = '/home/zby/Programs/Ditto/data/'
@@ -222,7 +223,7 @@ def get_ditto_model():
     config.datamodule.opt.test.data_dir = '/home/zby/Programs/Ditto/data/'
 
     model = hydra.utils.instantiate(config.model)
-    ckpt = torch.load('/home/zby/Programs/Ditto/data/Ditto_s2m.ckpt')
+    ckpt = torch.load(f'/home/zby/Programs/Ditto/data/{model_type}.ckpt')
     device = torch.device(0)
     model.load_state_dict(ckpt['state_dict'], strict=True)
     model = model.eval().to(device)
@@ -252,12 +253,12 @@ def unnormalize_joint_param(joint_axis, pivot_point, center, scale):
     joint_dir = joint_dir / np.linalg.norm(joint_dir)
     return joint_dir, joint_start
 
-def run_ditto_on_pc(pc_start, pc_end, model=None, generator=None, visualize=False):
+def run_ditto_on_pc(pc_start, pc_end, model_type="Ditto_s2m", gt_joint_type=None, model=None, generator=None, visualize=False):
     """
         pc_start 和 pc_end 需要在世界坐标系下
     """
     if model is None or generator is None:
-        model, generator = get_ditto_model()
+        model, generator = get_ditto_model(model_type)
     
     pc_start_v = pc_start.copy()
     pc_end_v = pc_end.copy()
@@ -287,7 +288,16 @@ def run_ditto_on_pc(pc_start, pc_end, model=None, generator=None, visualize=Fals
     joint_type_prob = joint_type_logits.sigmoid().mean()
     joint_type = None
     # TODO 原本是 < 0.5, 仅仅做测试，记得改回去 !!
-    if joint_type_prob.item() < 0.5:
+    print("***************************")
+    print(joint_type_prob.item())
+    
+    def is_revolute():
+        if gt_joint_type is not None:
+            return gt_joint_type == "revolute"
+        else:
+            return joint_type_prob.item() < 0.5
+    
+    if is_revolute():
         joint_type = "revolute"
         # axis voting, revolute
         joint_r_axis = (
@@ -373,7 +383,7 @@ def run_ditto_on_pc(pc_start, pc_end, model=None, generator=None, visualize=Fals
     print("joint dict estimated by Ditto:\n", joint_dict)
     return joint_dict
 
-def run_ditto(obj_repr: Obj_repr, visualize=False):
+def run_ditto(obj_repr: Obj_repr, model_type="Ditto_s2m", gt_joint_type=None, visualize=False):
     # 提取首尾两帧
     frame_start: Frame = obj_repr.frames[0]
     frame_start.segment_obj(
@@ -403,7 +413,7 @@ def run_ditto(obj_repr: Obj_repr, visualize=False):
     obj_repr.frames.clear()
     obj_repr.frames.frame_list = [frame_start, frame_end]
     
-    joint_dict_w = run_ditto_on_pc(pc_start, pc_end, visualize=False)
+    joint_dict_w = run_ditto_on_pc(pc_start, pc_end, model_type=model_type, gt_joint_type=gt_joint_type, visualize=False)
     # NOTE 一定要将这个 joint_dict 写入到 obj_repr 中, 由于 ditto 返回的是世界坐标系下的, 因此写回时应该转换到 camera 坐标系下
     Tw2c = obj_repr.Tw2c
     # Tw2c = np.eye(4)
@@ -433,13 +443,11 @@ def update_cfg(explore_cfg, args):
         explore_cfg['obj_folder_path_explore'] = args.obj_folder_path_explore
     if args.obj_folder_path_reconstruct is not None:
         explore_cfg['obj_folder_path_reconstruct'] = args.obj_folder_path_reconstruct
+    if args.use_gt_joint_type is not None:
+        explore_cfg['use_gt_joint_type'] = args.use_gt_joint_type
+    if args.model_type is not None:
+        explore_cfg['model_type'] = args.model_type
         
-    # if args.num_kframes is not None:
-    #     explore_cfg['num_kframes'] = args.num_kframes
-    # if args.fine_lr is not None:
-    #     explore_cfg['fine_lr'] = args.fine_lr
-    # if args.save_memory is not None:
-    #     explore_cfg['save_memory'] = args.save_memory
     return explore_cfg
 def read_args():
     parser = argparse.ArgumentParser(description='Update configuration for the robot.')
@@ -447,9 +455,8 @@ def read_args():
     # base_cfg arguments
     parser.add_argument('--obj_folder_path_explore', type=str, help='Folder where things are loaded')
     parser.add_argument('--obj_folder_path_reconstruct', type=str, help='Folder where things are stored')
-    # parser.add_argument('--num_kframes', type=int, help='Number of kframes')
-    # parser.add_argument('--fine_lr', type=float, help='fine lr during optimizing ICP loss')
-    # parser.add_argument('--save_memory', type=bool, help='whether to keep the frames in memory')
+    parser.add_argument('--use_gt_joint_type', type=bool, help='whether to use gt joint_type')
+    parser.add_argument('--model_type', type=str, help='which pretrained Ditto to use')
 
     args = parser.parse_args()
 
@@ -471,9 +478,8 @@ if __name__ == "__main__":
     # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/47578_1_prismatic"
     # obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/48258_2_prismatic"
     # obj_repr: Obj_repr = Obj_repr.load(os.path.join(obj_folder, "obj_repr.npy"))
-    # obj_repr, result = run_ditto(obj_repr, visualize=False)
-    
-    
+    # obj_repr, result = run_ditto(obj_repr, model_type="Ditto_syn", gt_joint_type="prismatic", visualize=False)
+    # sys.exit(0)
     
     # 给定一个路径, 读取其中 explore 下的数据, 对于有成功 explore 的数据, 进行重建, 并且将重建的数据进行保存, 将结果打印
     args = read_args()
@@ -501,7 +507,9 @@ if __name__ == "__main__":
         obj_repr: Obj_repr = Obj_repr.load(os.path.join(explore_folder, "obj_repr.npy"))
         print("load obj_repr from explore folder...")
         try:
-            obj_repr, result = run_ditto(obj_repr, visualize=False)
+            gt_joint_type = obj_repr.gt_joint_dict["joint_type"] if args.use_gt_joint_type else None
+            print("gt_joint_type", gt_joint_type)
+            obj_repr, result = run_ditto(obj_repr, model_type=args.model_type, gt_joint_type=gt_joint_type, visualize=False)
         except Exception as e:
             print("Reconstruction failed...")
             print(e)

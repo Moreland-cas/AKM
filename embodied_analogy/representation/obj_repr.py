@@ -389,6 +389,7 @@ class Obj_repr(Data):
         
         if init_guess is not None:
             query_frame.joint_state = init_guess
+            print("Given Guessed query state:", init_guess)
         else:
             # 初始化 query_frame 的 joint 状态
             self.update_state(query_frame, visualize=visualize)
