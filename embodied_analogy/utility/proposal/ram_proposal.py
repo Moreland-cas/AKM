@@ -70,6 +70,7 @@ def get_ram_affordance_2d(
     query_rgb, # H, W, 3 in numpy
     instruction, # open the drawwer
     obj_description, # drawer
+    fully_zeroshot=False,
     visualize=False
 ):
     """
@@ -83,6 +84,7 @@ def get_ram_affordance_2d(
         lang_mode='clip',
         topk=5, 
         crop=True, 
+        fully_zeroshot=fully_zeroshot
     )
     
     # use retrieval to get ref_path (or ref image) and ref trajectory in 2d space
@@ -151,16 +153,16 @@ def get_ram_affordance_2d(
         #     # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
         # napari.run()
         
-        Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
-        Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
-        Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
+        # Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
+        # Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
+        # Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
         
         for i in range(len(topk_retrieved_data_dict["img"])):
-            Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
+            # Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
             masked_img = topk_retrieved_data_dict["masked_img"][i]
             masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
             masked_img.show()
-            Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
+            # Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
             # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
             break
     torch.cuda.empty_cache()

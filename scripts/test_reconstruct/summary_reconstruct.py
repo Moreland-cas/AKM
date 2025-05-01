@@ -47,6 +47,8 @@ type_loss = []
 
 # 打印所有 prismatic 的平均
 # 打印所有 revolute 的平均
+
+# TODO 这里换几个不同的 err_thresh 打印
 for i, result in enumerate(results):
     joint_type = result["gt_w"]["joint_type"]
     coarse_loss = result['coarse_loss']
@@ -64,13 +66,15 @@ for i, result in enumerate(results):
     
     if joint_type == "prismatic":
         num_prismatic += 1
-        if fine_angle_err < np.deg2rad(30) and fine_type_loss == 0:
+        # if fine_angle_err < np.deg2rad(30) and fine_type_loss == 0:
+        if fine_angle_err < np.deg2rad(10) and fine_type_loss == 0:
             num_prismatic_success += 1
             prismatic_angle_err_coarse.append(coarse_angle_err)
             prismatic_angle_err_fine.append(fine_angle_err)
     else:
         num_revolute += 1
-        if fine_pos_err < 0.2 and fine_angle_err < np.deg2rad(30) and fine_type_loss == 0:
+        # if fine_pos_err < 0.2 and fine_angle_err < np.deg2rad(30) and fine_type_loss == 0:
+        if fine_pos_err < 0.05 and fine_angle_err < np.deg2rad(10) and fine_type_loss == 0:
             num_revolute_success += 1
             revolute_pos_err_coarse.append(coarse_pos_err)
             revolute_angle_err_coarse.append(coarse_angle_err)

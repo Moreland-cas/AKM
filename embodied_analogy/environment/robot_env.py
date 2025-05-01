@@ -333,7 +333,7 @@ class RobotEnv(BaseEnv):
             velocity_target = result['velocity'][i]
             # num_repeat 需要根据 mplib.planner 初始化时候的 time_step 进行计算
             # num_repeat = int(self.time_step / self.phy_timestep)
-            num_repeat = math.ceil(self.planner_timestep / self.phy_timestep)
+            num_repeat = math.ceil(self.planner_timestep / self.phy_timestep) 
             for _ in range(num_repeat):
                 qf = self.robot.compute_passive_force(gravity=True, coriolis_and_centrifugal=True, external=False)
                 self.robot.set_qf(qf)
@@ -485,10 +485,8 @@ class RobotEnv(BaseEnv):
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
             # 根据 moving distance 的大小计算出有多少个插值点
-            # 对于旋转关节时每次移动 3 cm
             num_interp = max(3, int(moving_distance / np.deg2rad(5)))
         else:
-            # 对于平移关节时每次移动 5 degree
             num_interp = max(3, int(moving_distance / 0.02))
 
         print(f"Need {num_interp} interpolations to execute the manipulate traj...")
@@ -531,12 +529,12 @@ class RobotEnv(BaseEnv):
                 continue
             # 针对那种需要一个大的动作的操作, 直接不执行, 否则容易大幅度影响物体状态
             # 直接去掉呢？
-            elif len(result["time"]) > 200: 
-                print("Warning: encounter {big_steps} steps in move_along_axis")
+            elif len(result["time"]) > 300: 
+                big_steps = len(result["time"])
+                print(f"Warning: encounter {big_steps} steps in move_along_axis")
                 if drop_large_move:
-                    big_steps = len(result["time"])
                     print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
-                    break
+                    # return
             self.follow_path(result)
 
     def move_forward(self, moving_distance, drop_large_move):

@@ -1,7 +1,7 @@
 {
     "41083_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/41083_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/41083_link_2",
         "obj_index": "41083",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -13,7 +13,7 @@
     },
     "41083_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/41083_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/41083_link_3",
         "obj_index": "41083",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -25,7 +25,7 @@
     },
     "45841_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45841_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45841_link_1",
         "obj_index": "45841",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -37,7 +37,7 @@
     },
     "45841_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45841_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45841_link_2",
         "obj_index": "45841",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -49,7 +49,7 @@
     },
     "45841_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45841_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45841_link_3",
         "obj_index": "45841",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -61,7 +61,7 @@
     },
     "45687_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45687_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45687_link_1",
         "obj_index": "45687",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -73,7 +73,7 @@
     },
     "46856_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46856_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46856_link_2",
         "obj_index": "46856",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -85,7 +85,7 @@
     },
     "46856_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46856_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46856_link_3",
         "obj_index": "46856",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -97,7 +97,7 @@
     },
     "47944_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/47944_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/47944_link_2",
         "obj_index": "47944",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -109,7 +109,7 @@
     },
     "40147_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/40147_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/40147_link_1",
         "obj_index": "40147",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -121,7 +121,7 @@
     },
     "45168_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45168_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45168_link_0",
         "obj_index": "45168",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -133,7 +133,7 @@
     },
     "48063_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/48063_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/48063_link_2",
         "obj_index": "48063",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -145,7 +145,7 @@
     },
     "48258_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_0",
         "obj_index": "48258",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -157,7 +157,7 @@
     },
     "48258_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_1",
         "obj_index": "48258",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -169,7 +169,7 @@
     },
     "48258_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_2",
         "obj_index": "48258",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -181,7 +181,7 @@
     },
     "48258_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/48258_link_3",
         "obj_index": "48258",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -193,7 +193,7 @@
     },
     "45243_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_0",
         "obj_index": "45243",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -205,7 +205,7 @@
     },
     "45243_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_1",
         "obj_index": "45243",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -217,7 +217,7 @@
     },
     "45243_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_2",
         "obj_index": "45243",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -229,7 +229,7 @@
     },
     "45243_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45243_link_3",
         "obj_index": "45243",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -241,7 +241,7 @@
     },
     "45162_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45162_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45162_link_1",
         "obj_index": "45162",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -253,7 +253,7 @@
     },
     "45784_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45784_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45784_link_1",
         "obj_index": "45784",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -265,7 +265,7 @@
     },
     "45290_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45290_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45290_link_0",
         "obj_index": "45290",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -277,7 +277,7 @@
     },
     "45290_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45290_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45290_link_1",
         "obj_index": "45290",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -289,7 +289,7 @@
     },
     "45290_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45290_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45290_link_2",
         "obj_index": "45290",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -301,7 +301,7 @@
     },
     "46839_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46839_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46839_link_2",
         "obj_index": "46839",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -313,7 +313,7 @@
     },
     "46839_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46839_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46839_link_3",
         "obj_index": "46839",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -325,7 +325,7 @@
     },
     "45636_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45636_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45636_link_3",
         "obj_index": "45636",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -337,7 +337,7 @@
     },
     "44781_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/44781_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/44781_link_2",
         "obj_index": "44781",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -349,7 +349,7 @@
     },
     "45135_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_0",
         "obj_index": "45135",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -361,7 +361,7 @@
     },
     "45135_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_1",
         "obj_index": "45135",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -373,7 +373,7 @@
     },
     "45135_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45135_link_2",
         "obj_index": "45135",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -385,7 +385,7 @@
     },
     "46060_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_0",
         "obj_index": "46060",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -397,7 +397,7 @@
     },
     "46060_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_1",
         "obj_index": "46060",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -409,7 +409,7 @@
     },
     "46060_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_2",
         "obj_index": "46060",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -421,7 +421,7 @@
     },
     "46060_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46060_link_3",
         "obj_index": "46060",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -433,7 +433,7 @@
     },
     "45427_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45427_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45427_link_0",
         "obj_index": "45427",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -445,7 +445,7 @@
     },
     "45427_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45427_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45427_link_1",
         "obj_index": "45427",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -457,7 +457,7 @@
     },
     "45427_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45427_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45427_link_2",
         "obj_index": "45427",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -469,7 +469,7 @@
     },
     "45146_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45146_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45146_link_0",
         "obj_index": "45146",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -481,7 +481,7 @@
     },
     "45575_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45575_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45575_link_1",
         "obj_index": "45575",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -493,7 +493,7 @@
     },
     "44826_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/44826_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/44826_link_1",
         "obj_index": "44826",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -505,7 +505,7 @@
     },
     "46084_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46084_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46084_link_2",
         "obj_index": "46084",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -517,7 +517,7 @@
     },
     "46084_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/46084_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/46084_link_3",
         "obj_index": "46084",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -529,7 +529,7 @@
     },
     "47578_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_0",
         "obj_index": "47578",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -541,7 +541,7 @@
     },
     "47578_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_1",
         "obj_index": "47578",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -553,7 +553,7 @@
     },
     "47578_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_2",
         "obj_index": "47578",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -565,7 +565,7 @@
     },
     "47578_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/47578_link_3",
         "obj_index": "47578",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -577,7 +577,7 @@
     },
     "45746_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45746_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45746_link_1",
         "obj_index": "45746",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -589,7 +589,7 @@
     },
     "45746_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45746_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45746_link_2",
         "obj_index": "45746",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -601,7 +601,7 @@
     },
     "45940_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45940_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45940_link_2",
         "obj_index": "45940",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -613,7 +613,7 @@
     },
     "45677_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_0",
         "obj_index": "45677",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -625,7 +625,7 @@
     },
     "45677_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_1",
         "obj_index": "45677",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -637,7 +637,7 @@
     },
     "45677_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_2",
         "obj_index": "45677",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -649,7 +649,7 @@
     },
     "45677_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45677_link_3",
         "obj_index": "45677",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -661,7 +661,7 @@
     },
     "48878_link_0": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/48878_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/48878_link_0",
         "obj_index": "48878",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -673,7 +673,7 @@
     },
     "45661_link_1": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45661_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45661_link_1",
         "obj_index": "45661",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -685,7 +685,7 @@
     },
     "45661_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45661_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45661_link_2",
         "obj_index": "45661",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -697,7 +697,7 @@
     },
     "45194_link_2": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45194_link_2",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45194_link_2",
         "obj_index": "45194",
         "joint_index": "2",
         "obj_description": "cabinet",
@@ -709,7 +709,7 @@
     },
     "45194_link_3": {
         "joint_type": "prismatic",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_drawer_cabinet/45194_link_3",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_drawer_cabinet/45194_link_3",
         "obj_index": "45194",
         "joint_index": "3",
         "obj_description": "cabinet",
@@ -721,7 +721,7 @@
     },
     "49133_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/49133_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/49133_link_0",
         "obj_index": "49133",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -733,7 +733,7 @@
     },
     "49133_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/49133_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/49133_link_1",
         "obj_index": "49133",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -745,7 +745,7 @@
     },
     "45687_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45687_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45687_link_0",
         "obj_index": "45687",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -757,7 +757,7 @@
     },
     "46197_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46197_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46197_link_0",
         "obj_index": "46197",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -769,7 +769,7 @@
     },
     "45168_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45168_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45168_link_1",
         "obj_index": "45168",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -781,7 +781,7 @@
     },
     "46456_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46456_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46456_link_0",
         "obj_index": "46456",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -793,7 +793,7 @@
     },
     "46456_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46456_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46456_link_1",
         "obj_index": "46456",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -805,7 +805,7 @@
     },
     "45162_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45162_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45162_link_0",
         "obj_index": "45162",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -817,7 +817,7 @@
     },
     "46889_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46889_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46889_link_0",
         "obj_index": "46889",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -829,7 +829,7 @@
     },
     "45936_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45936_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45936_link_0",
         "obj_index": "45936",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -841,7 +841,7 @@
     },
     "46839_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46839_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46839_link_0",
         "obj_index": "46839",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -853,7 +853,7 @@
     },
     "46839_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46839_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46839_link_1",
         "obj_index": "46839",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -865,7 +865,7 @@
     },
     "45249_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45249_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45249_link_0",
         "obj_index": "45249",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -877,7 +877,7 @@
     },
     "46859_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46859_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46859_link_0",
         "obj_index": "46859",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -889,7 +889,7 @@
     },
     "45623_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45623_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45623_link_0",
         "obj_index": "45623",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -901,7 +901,7 @@
     },
     "45638_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45638_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45638_link_0",
         "obj_index": "45638",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -913,7 +913,7 @@
     },
     "47529_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/47529_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/47529_link_0",
         "obj_index": "47529",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -925,7 +925,7 @@
     },
     "45354_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45354_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45354_link_0",
         "obj_index": "45354",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -937,7 +937,7 @@
     },
     "45354_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45354_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45354_link_1",
         "obj_index": "45354",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -949,7 +949,7 @@
     },
     "45984_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45984_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45984_link_0",
         "obj_index": "45984",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -961,7 +961,7 @@
     },
     "46037_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46037_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46037_link_0",
         "obj_index": "46037",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -973,7 +973,7 @@
     },
     "46037_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46037_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46037_link_1",
         "obj_index": "46037",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -985,7 +985,7 @@
     },
     "45384_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45384_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45384_link_0",
         "obj_index": "45384",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -997,7 +997,7 @@
     },
     "45780_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45780_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45780_link_0",
         "obj_index": "45780",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1009,7 +1009,7 @@
     },
     "45780_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45780_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45780_link_1",
         "obj_index": "45780",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1021,7 +1021,7 @@
     },
     "45176_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45176_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45176_link_0",
         "obj_index": "45176",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1033,7 +1033,7 @@
     },
     "47315_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/47315_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/47315_link_0",
         "obj_index": "47315",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1045,7 +1045,7 @@
     },
     "45238_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45238_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45238_link_0",
         "obj_index": "45238",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1057,7 +1057,7 @@
     },
     "45238_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45238_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45238_link_1",
         "obj_index": "45238",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1069,7 +1069,7 @@
     },
     "46277_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46277_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46277_link_0",
         "obj_index": "46277",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1081,7 +1081,7 @@
     },
     "46277_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46277_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46277_link_1",
         "obj_index": "46277",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1093,7 +1093,7 @@
     },
     "45606_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45606_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45606_link_0",
         "obj_index": "45606",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1105,7 +1105,7 @@
     },
     "45961_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45961_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45961_link_0",
         "obj_index": "45961",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1117,7 +1117,7 @@
     },
     "45526_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45526_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45526_link_0",
         "obj_index": "45526",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1129,7 +1129,7 @@
     },
     "44781_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/44781_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/44781_link_0",
         "obj_index": "44781",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1141,7 +1141,7 @@
     },
     "44781_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/44781_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/44781_link_1",
         "obj_index": "44781",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1153,7 +1153,7 @@
     },
     "46045_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46045_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46045_link_0",
         "obj_index": "46045",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1165,7 +1165,7 @@
     },
     "46033_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46033_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46033_link_0",
         "obj_index": "46033",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1177,7 +1177,7 @@
     },
     "45244_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45244_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45244_link_0",
         "obj_index": "45244",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1189,7 +1189,7 @@
     },
     "45916_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45916_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45916_link_0",
         "obj_index": "45916",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1201,7 +1201,7 @@
     },
     "48452_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/48452_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/48452_link_0",
         "obj_index": "48452",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1213,7 +1213,7 @@
     },
     "48271_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/48271_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/48271_link_0",
         "obj_index": "48271",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1225,7 +1225,7 @@
     },
     "45007_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45007_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45007_link_1",
         "obj_index": "45007",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1237,7 +1237,7 @@
     },
     "48379_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/48379_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/48379_link_0",
         "obj_index": "48379",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1249,7 +1249,7 @@
     },
     "48379_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/48379_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/48379_link_1",
         "obj_index": "48379",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1261,7 +1261,7 @@
     },
     "46084_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46084_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46084_link_0",
         "obj_index": "46084",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1273,7 +1273,7 @@
     },
     "46084_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46084_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46084_link_1",
         "obj_index": "46084",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1285,7 +1285,7 @@
     },
     "46134_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46134_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46134_link_0",
         "obj_index": "46134",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1297,7 +1297,7 @@
     },
     "46134_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/46134_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/46134_link_1",
         "obj_index": "46134",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1309,7 +1309,7 @@
     },
     "47570_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/47570_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/47570_link_0",
         "obj_index": "47570",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1321,7 +1321,7 @@
     },
     "45661_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45661_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45661_link_0",
         "obj_index": "45661",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1333,7 +1333,7 @@
     },
     "45908_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45908_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45908_link_1",
         "obj_index": "45908",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1345,7 +1345,7 @@
     },
     "45194_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45194_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45194_link_0",
         "obj_index": "45194",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1357,7 +1357,7 @@
     },
     "45194_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/45194_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/45194_link_1",
         "obj_index": "45194",
         "joint_index": "1",
         "obj_description": "cabinet",
@@ -1369,7 +1369,7 @@
     },
     "49042_link_0": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/49042_link_0",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/49042_link_0",
         "obj_index": "49042",
         "joint_index": "0",
         "obj_description": "cabinet",
@@ -1381,7 +1381,7 @@
     },
     "49042_link_1": {
         "joint_type": "revolute",
-        "asset_path": "/media/zby/MyBook/embody_analogy_data/assets/dataset/one_door_cabinet/49042_link_1",
+        "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/49042_link_1",
         "obj_index": "49042",
         "joint_index": "1",
         "obj_description": "cabinet",

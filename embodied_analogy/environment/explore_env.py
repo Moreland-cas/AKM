@@ -22,7 +22,7 @@ class ExploreEnv(ObjEnv):
             cfg
         ):        
         super().__init__(cfg=cfg)
-        # self.cfg = cfg
+        self.cfg = cfg
         print("loading explore env, using cfg:", cfg)
         
         self.record_fps = cfg["record_fps"]
@@ -41,7 +41,7 @@ class ExploreEnv(ObjEnv):
         self.save_prefix = cfg["obj_folder_path_explore"]
         os.makedirs(self.save_prefix, exist_ok=True)
         
-    def explore_stage(self, save_intermediate=False, visualize=False):
+    def explore_stage(self, visualize=False):
         """
             explore 多次, 直到找到一个符合要求的操作序列, 或者在尝试足够多次后退出
             NOTE: 目前是 direct reuse, 之后也许需要改为 fusion 的方式
@@ -58,7 +58,8 @@ class ExploreEnv(ObjEnv):
             query_rgb=initial_frame.rgb,
             instruction=self.instruction,
             obj_description=self.obj_description,
-            visualize=False
+            fully_zeroshot=self.cfg["fully_zeroshot"],
+            visualize=visualize
         )
         # self.affordance_map_2d.fit_GMM(
         #     data=self.affordance_map_2d.sample_prob(alpha=30, num_samples=3000, return_rgb_frame=False, visualize=False),
@@ -112,25 +113,12 @@ class ExploreEnv(ObjEnv):
         }
         print("exploration stage result: ", result_dict)
         
-        if save_intermediate:
-            
-            # 首先保存 cfg 文件
-            with open(os.path.join(self.save_prefix, "cfg.json"), 'w', encoding='utf-8') as f:
-                json.dump(self.cfg, f, ensure_ascii=False, indent=4)
-            
-            # 然后保存 rgbd_seq
-            self.obj_repr.save(os.path.join(self.save_prefix, "obj_repr.npy"))
-            
-            # 然后保存 运行状态文件
-            with open(os.path.join(self.save_prefix, 'result.pkl'), 'wb') as f:
-                pickle.dump(result_dict, f)
-        
         if not self.has_valid_explore:
             print("In summary, no valid exploration during explore phase!")
             # raise Exception("No valid exploration during explore phase!")
         else:
             print("In summary, get valid exploration during explore phase!")
-        print("done")
+        return result_dict
     
     def explore_once(
         self, 
@@ -311,36 +299,27 @@ if __name__ == "__main__":
     
     exploreEnv = ExploreEnv(
         cfg={
+    "obj_folder_path_explore": "/media/zby/MyBook1/embody_analogy_data/assets/logs/explore_51/44781_1_revolute/",
     "phy_timestep": 0.004,
     "planner_timestep": 0.01,
     "use_sapien2": True,
+    "fully_zeroshot": True,
     "record_fps": 30,
     "pertubation_distance": 0.1,
+    "valid_thresh": 0.5,
     "max_tries": 10,
     "update_sigma": 0.05,
     "reserved_distance": 0.05,
-    "valid_thresh": 0.5,
     "instruction": "open the cabinet",
     "num_initial_pts": 1000,
     "obj_description": "cabinet",
     "joint_type": "revolute",
-    "obj_index": "45162",
-    "joint_index": "0",
-    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/45162_link_0",
-    "active_link_name": "link_0",
-    "active_joint_name": "joint_0",
-    "load_pose": [
-        0.8806502223014832,
-        0.0,
-        0.6088799834251404
-    ],
-    "load_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
-    ],
-    "load_scale": 1
+    "obj_index": "44781",
+    "joint_index": "1",
+    "init_joint_state": "0",
+    "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/44781_link_1",
+    "active_link_name": "link_1",
+    "active_joint_name": "joint_1"
 }
     )
     exploreEnv.explore_stage(visualize=False)

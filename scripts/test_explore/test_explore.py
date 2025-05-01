@@ -2,6 +2,14 @@ from embodied_analogy.environment.explore_env import ExploreEnv
 import argparse
 import json
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+    
 def none_or_float(value):
     if value.lower() in ['none', 'null']:
         return None
@@ -32,7 +40,8 @@ def update_cfg(base_cfg, args):
         base_cfg['planner_timestep'] = args.planner_timestep
     if args.use_sapien2 is not None:
         base_cfg['use_sapien2'] = args.use_sapien2
-
+    if args.fully_zeroshot is not None:
+        base_cfg['fully_zeroshot'] = args.fully_zeroshot
     if args.record_fps is not None:
         base_cfg['record_fps'] = args.record_fps
     if args.pertubation_distance is not None:
@@ -82,10 +91,11 @@ def read_cfg():
     # base_cfg arguments
     parser.add_argument('--phy_timestep', type=float, help='Physical timestep')
     parser.add_argument('--planner_timestep', type=float, help='Planner timestep')
-    parser.add_argument('--use_sapien2', type=bool, default=True, help='Use Sapien2')
+    parser.add_argument('--use_sapien2', type=str2bool, default=True, help='Use Sapien2')
 
     # explore_cfg arguments
     parser.add_argument('--record_fps', type=int, help='Record FPS')
+    parser.add_argument('--fully_zeroshot', type=str2bool, help='Whether to remove cabinet class in RAM')
     parser.add_argument('--pertubation_distance', type=float, help='Perturbation distance')
     parser.add_argument('--valid_thresh', type=float, help='factor of actual Perturbation distance')
     parser.add_argument('--max_tries', type=int, help='Maximum tries')
@@ -126,6 +136,24 @@ def read_cfg():
 
 if __name__ == '__main__':
     # exp folder: /logs/run_xxx/obj_idx_type/explore
+    import os
+    import pickle
     cfg = read_cfg()
+    
+    # 首先保存 cfg 文件
+    save_prefix = cfg['obj_folder_path_explore']
+    with open(os.path.join(save_prefix, "cfg.json"), 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=4)
+        
+        
     env = ExploreEnv(cfg)
-    env.explore_stage(save_intermediate=True, visualize=False)
+    result = env.explore_stage(visualize=True)
+    
+    # 然后保存 rgbd_seq
+    env.obj_repr.save(os.path.join(save_prefix, "obj_repr.npy"))
+    
+    # 然后保存 运行状态文件
+    with open(os.path.join(save_prefix, 'result.pkl'), 'wb') as f:
+        pickle.dump(result, f)
+
+    print("done")

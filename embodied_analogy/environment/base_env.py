@@ -11,9 +11,11 @@ from embodied_analogy.utility.utils import visualize_pc
 class BaseEnv():
     def __init__(
             self,
-            cfg
+            cfg,
+            offscreen=False
         ):        
         self.cfg = cfg
+        self.offscreen = offscreen
         phy_timestep = cfg["phy_timestep"]
         planner_timestep = cfg["planner_timestep"]
         use_sapien2 = cfg["use_sapien2"]
@@ -22,7 +24,7 @@ class BaseEnv():
         self.cur_steps = 0
         
         self.engine = sapien.Engine()  # Create a physical simulation engine
-        self.renderer = sapien.SapienRenderer()  # Create a Vulkan renderer
+        self.renderer = sapien.SapienRenderer(offscreen_only=offscreen)  # Create a Vulkan renderer
         self.engine.set_renderer(self.renderer)  # Bind the renderer and the engine
         if False:
             from sapien.core import renderer as R
@@ -55,14 +57,15 @@ class BaseEnv():
         self.scene.add_point_light([1, -2, 2], [1, 1, 1], shadow=True)
         self.scene.add_point_light([-1, 0, 1], [1, 1, 1], shadow=True)
         
-        self.viewer = Viewer(self.renderer)  # Create a viewer (window)
-        self.viewer.set_scene(self.scene)  # Bind the viewer and the scene
-        self.viewer.set_camera_xyz(x=-1, y=1, z=2)
-        self.viewer.set_camera_rpy(r=0, p=-np.arctan2(1, 1), y=np.arctan2(1, 1))
-        self.viewer.window.set_camera_parameters(near=0.05, far=100, fovy=1)
-            
-        if use_sapien2:
+        if not offscreen:
+            self.viewer = Viewer(self.renderer)  # Create a viewer (window)
+            self.viewer.set_scene(self.scene)  # Bind the viewer and the scene
+            self.viewer.set_camera_xyz(x=-1, y=1, z=2)
+            self.viewer.set_camera_rpy(r=0, p=-np.arctan2(1, 1), y=np.arctan2(1, 1))
+            self.viewer.window.set_camera_parameters(near=0.05, far=100, fovy=1)
             self.viewer.toggle_axes(False)
+        
+        if use_sapien2:
             self.capture_rgb = self.capture_rgb_sapien2
             self.capture_rgbd = self.capture_rgbd_sapien2
         else:
@@ -271,7 +274,8 @@ class BaseEnv():
     def base_step(self):
         self.scene.step()
         self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
-        self.viewer.render()
+        if not self.offscreen:
+            self.viewer.render()
         self.cur_steps += 1
 
 

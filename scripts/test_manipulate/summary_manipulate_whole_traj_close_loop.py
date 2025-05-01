@@ -10,6 +10,15 @@
 prismatic
 revolute 
 """
+
+########################### 超参数 ###########################
+prismatic_success_loss = 5 # cm
+revolute_success_loss = 10 # degree
+
+
+
+#############################################################
+
 import os
 import pickle
 import argparse
@@ -72,10 +81,10 @@ def scaled_loss_list_success(loss_list, joint_type):
     final_loss = loss_list[-1]
     if joint_type == "prismatic":
         # return abs(final_loss) < 0.05
-        return abs(final_loss) < 0.05 * 100
+        return abs(final_loss) < prismatic_success_loss
     else:
         # return abs(final_loss) < np.deg2rad(10)
-        return abs(final_loss) < 10
+        return abs(final_loss) < revolute_success_loss
         
 # 遍历文件夹
 for object_folder in os.listdir(root_path):

@@ -24,11 +24,12 @@ class ManipulateEnv(ReconEnv):
         """
         TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
         """
+        self.cfg = cfg
         # 首先 load 物体
         ObjEnv.__init__(self, cfg)
+        
         self.reloc_lr = cfg["reloc_lr"]
         self.reserved_distance = cfg["reserved_distance"]
-        
         
         if cfg["manipulate_type"] == "close":
             self.goal_delta = -cfg["manipulate_distance"]
@@ -129,9 +130,9 @@ class ManipulateEnv(ReconEnv):
             self.target_state = self.cur_state + self.goal_delta
         
         if self.obj_repr.fine_joint_dict["joint_type"] == "prismatic":
-            return abs(self.cur_state - self.target_state) > 1e-2 # 1cm
+            return abs(self.cur_state - self.target_state) > self.cfg["prismatic_whole_traj_success_thresh"] # 1cm
         elif self.obj_repr.fine_joint_dict["joint_type"] == "revolute":
-            return abs(self.cur_state - self.target_state) > np.deg2rad(5) # 5 degree 
+            return abs(self.cur_state - self.target_state) > np.deg2rad(self.cfg["revolute_whole_traj_success_thresh"]) # 5 degree 
         
     def manipulate_close_loop(self, visualize=False):
         self.max_manip = cfg["max_manip"]
@@ -192,7 +193,8 @@ class ManipulateEnv(ReconEnv):
             # 终止检查
             if abs(self.cur_state - self.target_state) <= tolerance:
                 print(">> 成功抵达最终目标！")
-                return True
+                break
+                # return True
 
             # === 核心修改点2：显示中间点生成过程 ===
             intermediates = custom_linspace(self.cur_state, self.target_state, step)
@@ -210,10 +212,15 @@ class ManipulateEnv(ReconEnv):
                     break  # 退出当前路径循环，触发外层循环重新生成路径
             else:
                 print(">> 完整路径执行成功！")
-                return True
+                # return True
 
-        print("## 超过最大尝试次数，操作终止")
-        return False
+        if global_attempt == max_attempts:
+            print("## 超过最大尝试次数，操作终止")
+        # return False
+        result_dict = self.evaluate()
+        print("result:")
+        print(result_dict)
+        return result_dict
     
     def _move_to_grasp_and_close(self):
         """
@@ -262,7 +269,7 @@ class ManipulateEnv(ReconEnv):
             joint_axis=joint_config["joint_dir"],
             joint_start=joint_config["joint_start"],
             moving_distance=target - self.cur_state,
-            drop_large_move=True,
+            drop_large_move=False,
         )
         
         # 立即验证实际位置
@@ -307,11 +314,10 @@ class ManipulateEnv(ReconEnv):
 if __name__ == '__main__':
     import json
     # close
-    # cfg_path = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/manip_4_16/46134_1_revolute/close/scale_30/cfg.json"
-    cfg_path = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/manip_4_16_hard/45135_1_prismatic/open/scale_0.45/cfg.json"
+    # cfg_path = "/media/zby/MyBook1/embody_analogy_data/assets/logs/manip_429/45243_0_prismatic/open/scale_0.15/cfg.json"
+    cfg_path = "/media/zby/MyBook1/embody_analogy_data/assets/logs/manip_429/45961_0_revolute/open/scale_30/cfg.json"
     
     # open
-    # cfg_path = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/manip_4_16/49133_1_revolute/open/scale_30/cfg.json"
     with open(cfg_path, "r") as f:
         cfg = json.load(f)
     
@@ -320,8 +326,9 @@ if __name__ == '__main__':
             cfg[k] = v.replace("MyBook*/", "MyBook1/")
     # cfg["asset_path"] = cfg["asset_path"].replace("MyBook", "MyBook1")
     me = ManipulateEnv(cfg)
-    me.manipulate_close_loop_intermediate()
-    
+    # result = me.manipulate_close_loop_intermediate()
+    result = me.manipulate_close_loop()
+    print(result)
     while True:
         me.base_step()
     

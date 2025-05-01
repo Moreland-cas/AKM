@@ -6,6 +6,14 @@ from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 from embodied_analogy.representation.obj_repr import Obj_repr
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+    
 def update_cfg(explore_cfg, args):
     # 更新 env_folder
     if args.obj_folder_path_explore is not None:
@@ -29,7 +37,7 @@ def read_args():
     parser.add_argument('--obj_folder_path_reconstruct', type=str, help='Folder where things are stored')
     parser.add_argument('--num_kframes', type=int, help='Number of kframes')
     parser.add_argument('--fine_lr', type=float, help='fine lr during optimizing ICP loss')
-    parser.add_argument('--save_memory', type=bool, help='whether to keep the frames in memory')
+    parser.add_argument('--save_memory', type=str2bool, help='whether to keep the frames in memory')
 
     args = parser.parse_args()
 

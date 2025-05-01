@@ -22,6 +22,7 @@ max_tries=10
 update_sigma=0.05
 reserved_distance=0.05
 num_initial_pts=1000
+fully_zeroshot=False
 ####################################################
 
 # 读取 JSON 文件中的所有键
@@ -61,6 +62,7 @@ for test_data_cfg in $test_data_cfgs; do
         --record_fps="$record_fps" \
         --pertubation_distance="$pertubation_distance" \
         --valid_thresh="$valid_thresh" \
+        --fully_zeroshot="$fully_zeroshot" \
         --max_tries="$max_tries" \
         --update_sigma="$update_sigma" \
         --reserved_distance="$reserved_distance" \
@@ -76,7 +78,9 @@ for test_data_cfg in $test_data_cfgs; do
         --load_pose="$load_pose" \
         --load_quat="$load_quat" \
         --active_link_name="$active_link_name" \
-        --active_joint_name="$active_joint_name" > "$output_file"  # 重定向输出
+        --active_joint_name="$active_joint_name" 
+        # > "$output_file"  # 重定向输出
+    break
 done
 
 echo "所有命令已执行完成！"

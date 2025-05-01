@@ -3,7 +3,7 @@ import json
 
 cfg = {}
 
-asset_path = "/media/zby/MyBook/embody_analogy_data/assets"
+asset_path = "/media/zby/MyBook1/embody_analogy_data/assets"
 pri_path = os.path.join(asset_path, "dataset/one_drawer_cabinet")
 for tmp_folder in os.listdir(pri_path):
     joint_index = tmp_folder.split("_")[-1]
@@ -44,7 +44,7 @@ for tmp_folder in os.listdir(rev_path):
     }
     cfg.update(tmp_dict)
 
-use_subset = False
+use_subset = True
 if use_subset:
     total_list = [(k, v) for k,v in cfg.items()]
     import random

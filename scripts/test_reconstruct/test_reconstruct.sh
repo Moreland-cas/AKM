@@ -15,7 +15,7 @@ mkdir -p "$LOG_DIR/$recon_run_name"
 #################### 超参在这里!! ####################
 num_kframes=5
 fine_lr=1e-3
-save_memory=False
+save_memory=True
 ####################################################
 
 

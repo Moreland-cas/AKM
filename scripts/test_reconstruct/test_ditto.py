@@ -27,6 +27,14 @@ import trimesh
 # from utils3d.mesh.utils import as_mesh
 # from utils3d.render.pyrender import get_pose, PyRenderer
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+    
 def plot_3d_point_cloud(
     x,
     y,
@@ -455,7 +463,7 @@ def read_args():
     # base_cfg arguments
     parser.add_argument('--obj_folder_path_explore', type=str, help='Folder where things are loaded')
     parser.add_argument('--obj_folder_path_reconstruct', type=str, help='Folder where things are stored')
-    parser.add_argument('--use_gt_joint_type', type=bool, help='whether to use gt joint_type')
+    parser.add_argument('--use_gt_joint_type', type=str2bool, help='whether to use gt joint_type')
     parser.add_argument('--model_type', type=str, help='which pretrained Ditto to use')
 
     args = parser.parse_args()

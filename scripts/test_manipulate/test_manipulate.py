@@ -9,6 +9,14 @@ initialize_napari()
 
 from embodied_analogy.environment.manipulate_env import ManipulateEnv
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+    
 def update_cfg(recon_cfg, args):
     # 更新 env_folder
     if args.obj_folder_path_reconstruct is not None:
@@ -21,6 +29,18 @@ def update_cfg(recon_cfg, args):
         recon_cfg['manipulate_distance'] = args.manipulate_distance
     if args.reloc_lr is not None:
         recon_cfg['reloc_lr'] = args.reloc_lr
+        
+    if args.whole_traj_close_loop is not None:
+        recon_cfg['whole_traj_close_loop'] = args.whole_traj_close_loop
+    # if args.drop_large_move is not None:
+    #     recon_cfg['drop_large_move'] = args.drop_large_move
+    if args.max_manip is not None:
+        recon_cfg['max_manip'] = args.max_manip
+    if args.prismatic_whole_traj_success_thresh is not None:
+        recon_cfg['prismatic_whole_traj_success_thresh'] = args.prismatic_whole_traj_success_thresh
+    if args.revolute_whole_traj_success_thresh is not None:
+        recon_cfg['revolute_whole_traj_success_thresh'] = args.revolute_whole_traj_success_thresh
+        
     if args.max_attempts is not None:
         recon_cfg['max_attempts'] = args.max_attempts
     if args.max_distance is not None:
@@ -31,8 +51,11 @@ def update_cfg(recon_cfg, args):
         recon_cfg['prismatic_reloc_tolerance'] = args.prismatic_reloc_tolerance
     if args.revolute_reloc_interval is not None:
         recon_cfg['revolute_reloc_interval'] = args.revolute_reloc_interval
-    if args.revolute_reloc_tolerance is not None:
-        recon_cfg['revolute_reloc_tolerance'] = args.revolute_reloc_tolerance
+    
+    if args.prismatic_recon_success_thresh is not None:
+        recon_cfg['prismatic_recon_success_thresh'] = args.prismatic_recon_success_thresh
+    if args.revolute_recon_success_thresh is not None:
+        recon_cfg['revolute_recon_success_thresh'] = args.revolute_recon_success_thresh
     return recon_cfg
 
 def read_args():
@@ -50,6 +73,14 @@ def read_args():
     parser.add_argument('--prismatic_reloc_tolerance', type=float, help='.')
     parser.add_argument('--revolute_reloc_interval', type=float, help='.')
     parser.add_argument('--revolute_reloc_tolerance', type=float, help='.')
+    
+    parser.add_argument('--whole_traj_close_loop', type=str2bool, help='.')
+    parser.add_argument('--max_manip', type=float, help='.')
+    parser.add_argument('--prismatic_whole_traj_success_thresh', type=float, help='.')
+    parser.add_argument('--revolute_whole_traj_success_thresh', type=float, help='.')
+    
+    parser.add_argument('--prismatic_recon_success_thresh', type=float, help='.')
+    parser.add_argument('--revolute_recon_success_thresh', type=float, help='.')
 
     args = parser.parse_args()
 
@@ -86,12 +117,12 @@ if __name__ == '__main__':
         fine_pos_err = fine_loss['pos_err']
         
         if joint_type == "prismatic":
-            if not(fine_angle_err < np.deg2rad(10) and fine_type_loss == 0):
+            if not(fine_angle_err < np.deg2rad(args.revolute_recon_success_thresh) and fine_type_loss == 0):
                 print("Skip since the reconstruction is not good enough")
                 print("done")
                 sys.exit(0)
         else:
-            if not(fine_pos_err < 0.05 and fine_angle_err < np.deg2rad(10) and fine_type_loss == 0):
+            if not(fine_pos_err < args.prismatic_recon_success_thresh and fine_angle_err < np.deg2rad(args.revolute_recon_success_thresh) and fine_type_loss == 0):
                 print("Skip since the reconstruction is not good enough")
                 print("done")
                 sys.exit(0)
@@ -133,11 +164,14 @@ if __name__ == '__main__':
         json.dump(manip_cfg, f, ensure_ascii=False, indent=4)
     
     env = ManipulateEnv(manip_cfg)
-    # NOTE 这里改用最新版本的 manipulate_close_loop_intermediate, 而不是 manipulate_close_loop
-    result_list = env.manipulate_close_loop_intermediate()
     
+    if not manip_cfg["whole_traj_close_loop"]:
+        result = env.manipulate_close_loop_intermediate()
+    else:
+        result = env.manipulate_close_loop()
+        
     with open(os.path.join(manip_cfg["scale_dir"], 'result.pkl'), 'wb') as f:
-        pickle.dump(result_list, f)
+        pickle.dump(result, f)
         
     print("done")
     

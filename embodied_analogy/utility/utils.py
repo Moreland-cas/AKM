@@ -22,23 +22,19 @@ from scipy.spatial import cKDTree
 from embodied_analogy.utility.constants import *
 
 def initialize_napari():
-    # there are 2 ways:
-    # 1) need to manually close
-    # import napari
-    # viewer = napari.Viewer()
-    # napari.run()
-    # 2) automatically close
-    global NAPARI_INITIALIZED
-    if not NAPARI_INITIALIZED:
-        import napari
-        from qtpy.QtCore import QTimer
+    if True:
+    # if False:
+        global NAPARI_INITIALIZED
+        if not NAPARI_INITIALIZED:
+            import napari
+            from qtpy.QtCore import QTimer
 
-        with napari.gui_qt() as app:
-            viewer = napari.Viewer()
-            time_in_msec = 100
-            QTimer().singleShot(time_in_msec, app.quit)
-        viewer.close()
-        NAPARI_INITIALIZED = True
+            with napari.gui_qt() as app:
+                viewer = napari.Viewer()
+                time_in_msec = 100
+                QTimer().singleShot(time_in_msec, app.quit)
+            viewer.close()
+            NAPARI_INITIALIZED = True
     
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式

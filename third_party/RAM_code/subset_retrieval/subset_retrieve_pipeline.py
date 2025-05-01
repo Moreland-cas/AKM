@@ -156,7 +156,7 @@ def get_end_start_direction(trajs):
     return dirs
 
 class SubsetRetrievePipeline:
-    def __init__(self, subset_dir, save_root=None, topk=5, lang_mode='clip', crop=True) -> None:
+    def __init__(self, subset_dir, save_root=None, topk=5, lang_mode='clip', crop=True, fully_zeroshot=False) -> None:
         self.subset_dir = subset_dir
         self.save_root = save_root
         self.topk = topk
@@ -169,6 +169,14 @@ class SubsetRetrievePipeline:
         task_list_droid = os.listdir(os.path.join(subset_dir, "droid"))
         task_list_hoi4d = os.listdir(os.path.join(subset_dir, "HOI4D"))
         task_list_customize = os.listdir(os.path.join(subset_dir, "customize"))
+        print(task_list_droid, task_list_hoi4d, task_list_customize)
+        # 如果 fully_zeroshot, 在这里将 cabinet 类进行过滤
+        if fully_zeroshot:
+            task_list_droid = [task for task in task_list_droid if not task.endswith("cabinet")]
+            task_list_hoi4d = [task for task in task_list_hoi4d if not task.endswith("cabinet")]
+            task_list_customize = [task for task in task_list_customize if not task.endswith("cabinet")]
+        print("fully_zeroshot: ", fully_zeroshot)
+        print(task_list_droid, task_list_hoi4d, task_list_customize)
         
         self.task_dict = {
             "droid": [task.replace("_", " ") for task in task_list_droid],
