@@ -78,9 +78,7 @@ for test_data_cfg in $test_data_cfgs; do
         --load_pose="$load_pose" \
         --load_quat="$load_quat" \
         --active_link_name="$active_link_name" \
-        --active_joint_name="$active_joint_name" 
-        # > "$output_file"  # 重定向输出
-    break
+        --active_joint_name="$active_joint_name" > "$output_file"  # 重定向输出
 done
 
 echo "所有命令已执行完成！"

@@ -142,12 +142,12 @@ if __name__ == '__main__':
     
     # 首先保存 cfg 文件
     save_prefix = cfg['obj_folder_path_explore']
+    env = ExploreEnv(cfg)
+    
     with open(os.path.join(save_prefix, "cfg.json"), 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=4)
         
-        
-    env = ExploreEnv(cfg)
-    result = env.explore_stage(visualize=True)
+    result = env.explore_stage(visualize=False)
     
     # 然后保存 rgbd_seq
     env.obj_repr.save(os.path.join(save_prefix, "obj_repr.npy"))

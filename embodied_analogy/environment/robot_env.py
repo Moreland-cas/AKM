@@ -141,7 +141,7 @@ class RobotEnv(BaseEnv):
             joint_acc_limits=np.ones(7))
         pass
 
-    def open_gripper(self, target=0.03):
+    def open_gripper(self, target=0.02):
         """
         这里用 self.step() 是可能在 record 中录制 open/close 的动作, 那时候 self.step 实际对应的是 self.record_step 函数
         """

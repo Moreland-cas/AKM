@@ -31,7 +31,7 @@ class ObjEnv(RobotEnv):
         """
         # TODO: 如果改为随机的话, 需要保证 ManipuleEnv 调用的这个函数完全从 cfg 中读取位姿势, 而不是随机生成
         # self.obj_init_pos_angle_low = -0.4
-        # self.obj_init_pos_angle_high = 0.4
+        # self.obj_init_pos_angle_high = -0.4
         # self.obj_init_rot_low = -0.2
         # self.obj_init_rot_high = 0.2
         # self.obj_init_dis_low = 0.5
@@ -43,10 +43,14 @@ class ObjEnv(RobotEnv):
         
         self.obj_init_pos_angle_low = -0.
         self.obj_init_pos_angle_high = 0.
-        self.obj_init_rot_low = -0.
-        self.obj_init_rot_high = 0.
-        self.obj_init_dis_low = 0.55
-        self.obj_init_dis_high = 0.55
+        self.obj_init_zrot_low = -0.1
+        self.obj_init_zrot_high = -0.
+        
+        self.obj_init_xrot_low = -0.05
+        self.obj_init_xrot_high = 0.05
+        
+        self.obj_init_dis_low = 0.5
+        self.obj_init_dis_high = 0.6
         self.obj_init_height_low = 0.0
         self.obj_init_height_high = 0.0
         # self.obj_init_dof_low = 0.0
@@ -70,18 +74,20 @@ class ObjEnv(RobotEnv):
             quat1 = np.concatenate([np.cos(angle/2), axis[:, 0:1]*np.sin(angle/2), axis[:, 1:2]*np.sin(angle/2), axis[:, 2:3]*np.sin(angle/2)], axis=-1)
             return quat1.reshape(*shape[:-1], 4)
 
-        def randomize_pose(ang_low, ang_high, rot_low, rot_high, dis_low, dis_high, height_low, height_high) :
+        def randomize_pose(ang_low, ang_high, zrot_low, zrot_high, xrot_low, xrot_high, dis_low, dis_high, height_low, height_high) :
 
             ang = np.random.uniform(ang_low, ang_high)
-            rot = np.random.uniform(rot_low, rot_high)
+            zrot = np.random.uniform(zrot_low, zrot_high)
+            xrot = np.random.uniform(xrot_low, xrot_high)
             dis = np.random.uniform(dis_low, dis_high)
             height = np.random.uniform(height_low, height_high)
 
             p0 = sapien.Pose(p=[dis, 0, height])
-            r0 = sapien.Pose(q=axis_angle_to_quat([0,0,1], ang))
-            r1 = sapien.Pose(q=axis_angle_to_quat([0,0,1], rot))
-
-            p1 = r0 * p0 * r1
+            r0 = sapien.Pose(q=axis_angle_to_quat([0,0,1], ang)) # 绕原点旋转
+            r1 = sapien.Pose(q=axis_angle_to_quat([0,0,1], zrot)) # 原地旋转
+            r2 = sapien.Pose(q=axis_angle_to_quat([1,0,0], xrot)) # 原地旋转
+            
+            p1 = r0 * p0 * r1 * r2
             return p1
         
         path = cfg["asset_path"]
@@ -92,8 +98,10 @@ class ObjEnv(RobotEnv):
         sapien_pose = randomize_pose(
             self.obj_init_pos_angle_low,
             self.obj_init_pos_angle_high,
-            self.obj_init_rot_low,
-            self.obj_init_rot_high,
+            self.obj_init_zrot_low,
+            self.obj_init_zrot_high,
+            self.obj_init_xrot_low,
+            self.obj_init_xrot_high,
             self.obj_init_dis_low - bbox["min"][2]*0.75,
             self.obj_init_dis_high - bbox["min"][2]*0.75,
             self.obj_init_height_low - bbox["min"][1]*0.75,

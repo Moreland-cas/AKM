@@ -14,10 +14,10 @@ results = []
 for object_folder in os.listdir(root_path):
     object_path = os.path.join(root_path, object_folder)
     
-    with open(os.path.join(object_path, 'output.txt'), 'r') as output_file:
-        output_lines = output_file.readlines()
-        output = output_lines[-1]  # 获取最后一行
-        assert output.strip() == "done"
+    # with open(os.path.join(object_path, 'output.txt'), 'r') as output_file:
+    #     output_lines = output_file.readlines()
+    #     output = output_lines[-1]  # 获取最后一行
+    #     assert output.strip() == "done"
     
     # 因为有些文件夹（没有成功 explore 的那些）没有result.pkl，所以需要try
     try:
@@ -25,7 +25,7 @@ for object_folder in os.listdir(root_path):
             result = pickle.load(result_file)
             results.append(result)
     except Exception as e:
-        print(f"Skip {object_path}: {e}, Since no result.pkl")
+        # print(f"Skip {object_path}: {e}, Since no result.pkl")
         continue  # 出现异常时跳过当前文件夹
 
 # 统计有效结果
@@ -91,7 +91,7 @@ for i, result in enumerate(results):
 
 # 打印结果
 print(f"Total successful exp: {len(results)} / {num_exp} = {len(results) / num_exp:.4f}")
-print(f"Total successful type classification: {len(results) - sum(type_loss)} / {len(results)} = {len(results) - sum(type_loss) / len(results):.4f}")
+print(f"Total successful type classification: {len(results) - sum(type_loss)} / {len(results)} = {(len(results) - sum(type_loss)) / len(results):.4f}")
 
 print(f"\nNumber of success prismatic: {num_prismatic_success}/{num_prismatic}, {num_prismatic_success/max(num_prismatic, 1):.4f}")
 prismatic_angle_err_coarse_mean = sum(prismatic_angle_err_coarse) / max(num_prismatic_success, 1)

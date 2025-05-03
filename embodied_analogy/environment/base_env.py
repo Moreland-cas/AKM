@@ -13,6 +13,7 @@ class BaseEnv():
             self,
             cfg,
             offscreen=False
+            # offscreen=True
         ):        
         self.cfg = cfg
         self.offscreen = offscreen
@@ -58,7 +59,10 @@ class BaseEnv():
         self.scene.add_point_light([-1, 0, 1], [1, 1, 1], shadow=True)
         
         if not offscreen:
-            self.viewer = Viewer(self.renderer)  # Create a viewer (window)
+            self.viewer = Viewer(
+                renderer=self.renderer,
+                resolutions=(800, 600)
+            )  # Create a viewer (window)
             self.viewer.set_scene(self.scene)  # Bind the viewer and the scene
             self.viewer.set_camera_xyz(x=-1, y=1, z=2)
             self.viewer.set_camera_rpy(r=0, p=-np.arctan2(1, 1), y=np.arctan2(1, 1))
