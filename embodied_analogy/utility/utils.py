@@ -1,6 +1,6 @@
 import os
-import napari
-import pygame
+# import napari
+# import pygame
 import torch
 import random
 from PIL import Image
@@ -10,9 +10,6 @@ import cv2
 import open3d as o3d
 import graspnetAPI
 from pytorch_lightning import seed_everything
-from featup.util import pca, remove_axes
-import matplotlib
-# matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 from typing import List, Union
@@ -22,19 +19,16 @@ from scipy.spatial import cKDTree
 from embodied_analogy.utility.constants import *
 
 def initialize_napari():
-    if True:
-    # if False:
-        global NAPARI_INITIALIZED
-        if not NAPARI_INITIALIZED:
-            import napari
-            from qtpy.QtCore import QTimer
+    global ACTIVATE_NAPARI
+    if ACTIVATE_NAPARI:
+        import napari
+        from qtpy.QtCore import QTimer
 
-            with napari.gui_qt() as app:
-                viewer = napari.Viewer()
-                time_in_msec = 100
-                QTimer().singleShot(time_in_msec, app.quit)
-            viewer.close()
-            NAPARI_INITIALIZED = True
+        with napari.gui_qt() as app:
+            viewer = napari.Viewer()
+            time_in_msec = 100
+            QTimer().singleShot(time_in_msec, app.quit)
+        viewer.close()
     
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式

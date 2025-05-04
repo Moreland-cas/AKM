@@ -1,8 +1,10 @@
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
-
+import os
 import sys
-sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/RAM_code")
+code_dir = os.path.dirname(os.path.abspath(__file__))
+relative_path = os.path.join(code_dir, "../../../third_party", "RAM_code")
+sys.path.append(relative_path)
 
 import cv2
 import numpy as np
@@ -80,7 +82,7 @@ def get_ram_affordance_2d(
     seed_everything(SEED)
     print("Initializing SubsetRetrievePipeline ...")
     subset_retrieve_pipeline = SubsetRetrievePipeline(
-        subset_dir="/home/zby/Programs/RAM_code/assets/data",
+        subset_dir=os.path.join(ASSET_PATH, "RAM_memory"),
         lang_mode='clip',
         topk=5, 
         crop=True, 

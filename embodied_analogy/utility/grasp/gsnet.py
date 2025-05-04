@@ -5,14 +5,16 @@ import random
 import os
 import sys
 import cv2
-sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/RAM_code/")
-# sys.path.append("vision")
+code_dir = os.path.dirname(os.path.abspath(__file__))
+relative_path = os.path.join(code_dir, "../../../third_party", "RAM_code")
+sys.path.append(relative_path)
 from graspness_implementation.gsnet import GSNet, vis_save_grasp
 from graspnetAPI import GraspGroup, Grasp
 import argparse
+from embodied_analogy.utility.constants import ASSET_PATH
 
 
-def prepare_gsnet(asset_path):
+def prepare_gsnet(asset_path=ASSET_PATH):
     config = {
         "gsnet": {
             "save_files": False,

@@ -1,6 +1,5 @@
 import copy
 import numpy as np
-import napari
 from embodied_analogy.representation.basic_structure import Data, Frame, Frames
 from embodied_analogy.utility.estimation.coarse_joint_est import coarse_estimation
 from embodied_analogy.utility.estimation.fine_joint_est import fine_estimation
@@ -492,7 +491,7 @@ class Obj_repr(Data):
         )
         napari.run()
             
-    def _visualize(self, viewer: napari.Viewer, prefix=""):
+    def _visualize(self, viewer, prefix=""):
         pass
     
     def visualize(self):

@@ -7,7 +7,7 @@ setup(
     install_requires=[
         # 'open3d',
         # 'opencv-python-headless',
-        'pygame==2.6.1',
+        # 'pygame==2.6.1',
         # 'sapien==3.0.0b1',
         'sapien==2.2.2',
         'transforms3d',

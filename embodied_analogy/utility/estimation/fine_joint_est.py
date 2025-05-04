@@ -1,6 +1,5 @@
 import os
 import torch
-import napari 
 import numpy as np
 from PIL import Image
 from embodied_analogy.utility.estimation.icp_loss import icp_loss_torch
@@ -13,8 +12,10 @@ from embodied_analogy.utility.utils import (
     joint_data_to_transform_np,
     joint_data_to_transform_torch,
     napari_time_series_transform,
-    compute_normals
+    compute_normals,
+    initialize_napari
 )
+initialize_napari()
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.estimation.scheduler import Scheduler
 

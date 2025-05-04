@@ -19,7 +19,7 @@ def run_grounded_sam(
         image=rgb_image,
         obj_description=obj_description,
         dino_model=dino_model,
-        visualize=False
+        visualize=False,
     )
     # TODO: 这里也许可以有更复杂的 box 处理方式, 比如合并多个 box 以解决物体在操作过程中进行了分离的情况
     initial_bbox = initial_bboxs[0]
@@ -34,7 +34,7 @@ def run_grounded_sam(
         acceptable_thr=acceptable_thr,
         sam2_image_model=sam2_image_model,
         post_process=post_process_mask,
-        visualize=visualize
+        visualize=visualize,
     )
     torch.cuda.empty_cache()
     return initial_bbox, initial_mask

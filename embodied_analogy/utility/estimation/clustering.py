@@ -1,12 +1,13 @@
-import napari
 import numpy as np
 import sklearn.cluster as cluster
 from sklearn.cluster import SpectralClustering
 from embodied_analogy.utility.utils import (
     tracksNd_variance_np, 
     tracksNd_variance_torch,
-    napari_time_series_transform
+    napari_time_series_transform,
+    initialize_napari
 )
+initialize_napari()
 from embodied_analogy.utility.utils import vis_tracks2d_napari
 
 def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=False, viewer_title="napari"):

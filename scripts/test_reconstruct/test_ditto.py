@@ -5,9 +5,11 @@ import numpy as np
 from embodied_analogy.representation.basic_structure import Frame, Frames
 from embodied_analogy.representation.obj_repr import Obj_repr
 import os, sys
-sys.path.append('/home/zby/Programs/Embodied_Analogy/third_party/Ditto/src')
-sys.path.append('/home/zby/Programs/Embodied_Analogy/third_party/Ditto/')
-os.environ["PYOPENGL_PLATFORM"] = "egl"
+
+code_dir = os.path.dirname(os.path.abspath(__file__))
+relative_path = os.path.join(code_dir, "../../third_party", "Ditto/src")
+sys.path.append(relative_path)
+# os.environ["PYOPENGL_PLATFORM"] = "egl"
 
 import numpy as np
 import json

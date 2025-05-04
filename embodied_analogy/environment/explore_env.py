@@ -14,6 +14,7 @@ from embodied_analogy.utility.utils import (
 )
 initialize_napari()
 from embodied_analogy.environment.obj_env import ObjEnv
+from embodied_analogy.utility.constants import ASSET_PATH
 
 
 class ExploreEnv(ObjEnv):
@@ -149,7 +150,7 @@ class ExploreEnv(ObjEnv):
             use_anygrasp=self.cfg["use_anygrasp"],
             world_frame=True,
             visualize=visualize,
-            asset_path=self.cfg["asset_path"]
+            asset_path=ASSET_PATH
         )
         
         if cur_frame.grasp_group is None:
@@ -302,30 +303,30 @@ if __name__ == "__main__":
     
     exploreEnv = ExploreEnv(
         cfg={
-    "obj_folder_path_explore": "/media/zby/MyBook1/embody_analogy_data/assets/logs/explore_51/44781_1_revolute/",
-    "phy_timestep": 0.004,
-    "planner_timestep": 0.01,
-    "use_sapien2": True,
-    "fully_zeroshot": True,
-    "record_fps": 30,
-    "pertubation_distance": 0.1,
-    "valid_thresh": 0.5,
-    "max_tries": 10,
-    "update_sigma": 0.05,
-    "reserved_distance": 0.05,
-    "instruction": "open the cabinet",
-    "num_initial_pts": 1000,
-    "obj_description": "cabinet",
-    "joint_type": "revolute",
-    "obj_index": "44781",
-    "joint_index": "1",
-    "init_joint_state": "0",
-    "data_path": "dataset/one_door_cabinet/44781_link_1",
-    "active_link_name": "link_1",
-    "active_joint_name": "joint_1",
-    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets_zby",
-    "use_anygrasp": False
-}
+            "obj_folder_path_explore": "/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/assets/rubbish",
+            "phy_timestep": 0.004,
+            "planner_timestep": 0.01,
+            "use_sapien2": True,
+            "fully_zeroshot": False,
+            "record_fps": 30,
+            "pertubation_distance": 0.1,
+            "valid_thresh": 0.5,
+            "max_tries": 10,
+            "update_sigma": 0.05,
+            "reserved_distance": 0.05,
+            "instruction": "open the cabinet",
+            "num_initial_pts": 1000,
+            "obj_description": "cabinet",
+            "joint_type": "revolute",
+            "obj_index": "44781",
+            "joint_index": "1",
+            "init_joint_state": "0",
+            "data_path": "dataset/one_door_cabinet/44781_link_1",
+            "active_link_name": "link_1",
+            "active_joint_name": "joint_1",
+            "use_anygrasp": False,
+            "offscreen": True
+        }
     )
     exploreEnv.explore_stage(visualize=False)
     # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")

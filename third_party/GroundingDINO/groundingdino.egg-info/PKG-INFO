@@ -1,4 +1,4 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.4
 Name: groundingdino
 Version: 0.1.0
 Summary: open-set object detector
@@ -220,5 +220,6 @@ Requires-Dist: pycocotools
 Dynamic: author
 Dynamic: home-page
 Dynamic: license
+Dynamic: license-file
 Dynamic: requires-dist
 Dynamic: summary

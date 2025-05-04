@@ -10,6 +10,7 @@ from embodied_analogy.utility.utils import (
     rotation_matrix_between_vectors,
     find_correspondences
 )
+from embodied_analogy.utility.constants import ASSET_PATH
 
 def crop_grasp(grasp_group, contact_point, radius=0.1):
     """
@@ -64,7 +65,7 @@ def detect_grasp_anygrasp(
     dir_out, 
     augment=True, 
     visualize=False,
-    asset_path='/home/zby/Programs/Embodied_Analogy/assets_zby/'
+    asset_path=ASSET_PATH
 ):
     '''
     输入 a 坐标系下的 points 和 dir_out, 输出用 anygrasp 检测出的 grasp_group, 其中包含信息 Tgrasp2a

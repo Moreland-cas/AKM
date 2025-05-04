@@ -66,13 +66,6 @@ cd pointnet2
 python setup.py install
 cd ../
 
-# 安装 FeatUp TODO: 这个可能没必要
-echo "Installing FeatUp..."
-# git clone https://github.com/mhamilton723/FeatUp.git
-cd FeatUp
-pip install -e .
-cd ../
-
 # 安装 DIFT
 echo "Installing DIFT related support..."
 pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu121

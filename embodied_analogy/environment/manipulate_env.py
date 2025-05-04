@@ -324,7 +324,6 @@ if __name__ == '__main__':
     for k, v in cfg.items():
         if isinstance(v, str):
             cfg[k] = v.replace("MyBook*/", "MyBook1/")
-    # cfg["asset_path"] = cfg["asset_path"].replace("MyBook", "MyBook1")
     me = ManipulateEnv(cfg)
     # result = me.manipulate_close_loop_intermediate()
     result = me.manipulate_close_loop()

@@ -1,5 +1,4 @@
 import os
-import napari
 import pickle
 import numpy as np
 from graspnetAPI import GraspGroup
@@ -19,8 +18,10 @@ from embodied_analogy.utility.utils import (
     extract_tracked_depths,
     filter_tracks_by_consistency,
     filter_dynamic,
-    camera_to_world
+    camera_to_world,
+    initialize_napari
 )
+initialize_napari()
 from embodied_analogy.utility.perception.online_cotracker import track_any_points
 
 from embodied_analogy.utility.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
@@ -101,7 +102,7 @@ class Frame(Data):
         # NOTE: Tph2w 是在世界坐标系下的 (4, 4)
         self.Tph2w = Tph2w
         
-    def _visualize(self, viewer: napari.Viewer, prefix=""):
+    def _visualize(self, viewer, prefix=""):
         viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
         
         if self.dynamic_mask is not None:
@@ -351,7 +352,7 @@ class Frame(Data):
         obj_description=None,
         post_process_mask=True,
         filter=True,
-        visualize=False
+        visualize=False,
     ):
         from embodied_analogy.utility.perception.grounded_sam import run_grounded_sam
         obj_bbox, obj_mask = run_grounded_sam(
@@ -659,14 +660,14 @@ class Frames(Data):
     #     visualize=visualize
     # )
            
-    def _visualize_f(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
+    def _visualize_f(self, viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()
         viewer.add_image(rgb_seq, rgb=True)
         
         self.frame_list[0]._visualize(viewer, prefix="start_frame")
         self.frame_list[-1]._visualize(viewer, prefix="end_frame")
     
-    def _visualize_kf(self, viewer: napari.Viewer, prefix="", visualize_robot2d=False):
+    def _visualize_kf(self, viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()
         viewer.add_image(rgb_seq, rgb=True)
         

@@ -8,6 +8,7 @@ from embodied_analogy.utility.sapien_utils import (
     parse_urdf_config,
     check_urdf_config,
 )
+from embodied_analogy.utility.constants import ASSET_PATH
 
 class ObjEnv(RobotEnv):
     def __init__(
@@ -90,7 +91,7 @@ class ObjEnv(RobotEnv):
             p1 = r0 * p0 * r1 * r2
             return p1
         
-        path = os.path.join(cfg["asset_path"], cfg["data_path"])
+        path = os.path.join(ASSET_PATH, cfg["data_path"])
         bbox_path = os.path.join(path, "bounding_box.json")
         with open(bbox_path, "r") as f:
             bbox = json.load(f)
@@ -149,10 +150,9 @@ class ObjEnv(RobotEnv):
         load_config = parse_urdf_config(urdf_config, self.scene)
         check_urdf_config(load_config)
         
-        asset_path = obj_cfg["asset_path"]
         data_path = obj_cfg["data_path"]
         self.obj = loader.load(
-            filename=f"{asset_path}/{data_path}/mobility.urdf",
+            filename=f"{ASSET_PATH}/{data_path}/mobility.urdf",
             config=load_config
         )
         assert self.obj is not None

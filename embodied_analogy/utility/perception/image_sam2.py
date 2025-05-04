@@ -5,12 +5,15 @@ import random
 from sklearn.cluster import KMeans
 from skimage import morphology
 from scipy import ndimage
-
+import os
 import sys
-sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/sam2")
+code_dir = os.path.dirname(os.path.abspath(__file__))
+relative_path = os.path.join(code_dir, "../../../third_party", "sam2")
+sys.path.append(relative_path)
 
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
+from embodied_analogy.utility.constants import ASSET_PATH
 
 def select_farthest_point(unsatisfied_points, used_same_class_points, used_diff_class_points):
     if not used_same_class_points and not used_diff_class_points:
@@ -84,10 +87,9 @@ def select_cluster_center_point(points, return_k_points=1):
 
 def load_sam2_image_model():
      # 加载 SAM2 模型
-    sam2_proj_path = "/home/zby/Programs/Embodied_Analogy/third_party/sam2"
     sam2_model = build_sam2(
         config_file="configs/sam2.1/sam2.1_hiera_l.yaml",
-        ckpt_path=sam2_proj_path + "/checkpoints/sam2.1_hiera_large.pt",
+        ckpt_path=os.path.join(ASSET_PATH, "ckpts/sam2/sam2.1_hiera_large.pt"),
         device=torch.device("cuda")
     )
     return sam2_model
@@ -102,7 +104,7 @@ def sam2_on_image(
     acceptable_thr=0.9,
     sam2_image_model=None,
     post_process=False,
-    visualize=False
+    visualize=False,
 ):
     sam2_model = sam2_image_model
     if sam2_model is None:

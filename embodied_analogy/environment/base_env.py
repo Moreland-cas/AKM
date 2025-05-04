@@ -7,25 +7,24 @@ from scipy.spatial.transform import Rotation as R
 from embodied_analogy.representation.basic_structure import Frame
 
 from embodied_analogy.utility.utils import visualize_pc
+from embodied_analogy.utility.constants import ASSET_PATH
 
 class BaseEnv():
     def __init__(
             self,
             cfg,
-            offscreen=False
-            # offscreen=True
         ):        
         self.cfg = cfg
-        self.offscreen = offscreen
+        self.offscreen = cfg["offscreen"]
         phy_timestep = cfg["phy_timestep"]
         planner_timestep = cfg["planner_timestep"]
         use_sapien2 = cfg["use_sapien2"]
         
-        self.asset_prefix = cfg["asset_path"]
+        self.asset_prefix = ASSET_PATH
         self.cur_steps = 0
         
         self.engine = sapien.Engine()  # Create a physical simulation engine
-        self.renderer = sapien.SapienRenderer(offscreen_only=offscreen)  # Create a Vulkan renderer
+        self.renderer = sapien.SapienRenderer(offscreen_only=self.offscreen)  # Create a Vulkan renderer
         self.engine.set_renderer(self.renderer)  # Bind the renderer and the engine
         if False:
             from sapien.core import renderer as R
@@ -58,7 +57,7 @@ class BaseEnv():
         self.scene.add_point_light([1, -2, 2], [1, 1, 1], shadow=True)
         self.scene.add_point_light([-1, 0, 1], [1, 1, 1], shadow=True)
         
-        if not offscreen:
+        if not self.offscreen:
             self.viewer = Viewer(
                 renderer=self.renderer,
                 resolutions=(800, 600)

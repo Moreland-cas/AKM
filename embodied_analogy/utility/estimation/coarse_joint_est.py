@@ -1,9 +1,14 @@
-import napari
 import torch
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from embodied_analogy.utility.utils import napari_time_series_transform, fit_plane_normal, remove_dir_component
+from embodied_analogy.utility.utils import (
+    napari_time_series_transform,
+    fit_plane_normal,
+    remove_dir_component,
+    initialize_napari
+)
+initialize_napari()
 from embodied_analogy.utility.estimation.scheduler import Scheduler
 
 def coarse_t_from_tracks_3d(tracks_3d, visualize=False):

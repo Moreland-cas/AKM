@@ -1,5 +1,4 @@
 import os
-import napari
 import numpy as np
 import cv2
 import torch
@@ -9,10 +8,12 @@ import groundingdino.datasets.transforms as T
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 from groundingdino.util.inference import load_model, predict, annotate
+from embodied_analogy.utility.constants import ASSET_PATH
 
 def load_groundingDINO_model():
-    groundingDINO_home = "/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO"
-    WEIGHTS_PATH = os.path.join(groundingDINO_home, "weights", "groundingdino_swint_ogc.pth")
+    code_dir = os.path.dirname(os.path.abspath(__file__))
+    groundingDINO_home = os.path.join(code_dir, "../../../third_party", "GroundingDINO")
+    WEIGHTS_PATH = os.path.join(ASSET_PATH, "ckpts", "grounding_dino/groundingdino_swint_ogc.pth")
     CONFIG_PATH = os.path.join(groundingDINO_home, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
     model = load_model(CONFIG_PATH, WEIGHTS_PATH)
     return model
@@ -21,7 +22,7 @@ def run_groundingDINO(
     image,
     obj_description,
     dino_model=None,
-    visualize=False
+    visualize=False,
 ):
     assert image is not None
     model = dino_model
