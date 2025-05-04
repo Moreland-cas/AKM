@@ -21,7 +21,7 @@ class BaseEnv():
         planner_timestep = cfg["planner_timestep"]
         use_sapien2 = cfg["use_sapien2"]
         
-        self.asset_prefix = "/home/zby/Programs/Embodied_Analogy/assets"
+        self.asset_prefix = cfg["asset_path"]
         self.cur_steps = 0
         
         self.engine = sapien.Engine()  # Create a physical simulation engine

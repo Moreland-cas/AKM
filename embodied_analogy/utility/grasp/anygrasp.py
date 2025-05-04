@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import argparse
@@ -62,7 +63,8 @@ def detect_grasp_anygrasp(
     colors, 
     dir_out, 
     augment=True, 
-    visualize=False
+    visualize=False,
+    asset_path='/home/zby/Programs/Embodied_Analogy/assets_zby/'
 ):
     '''
     输入 a 坐标系下的 points 和 dir_out, 输出用 anygrasp 检测出的 grasp_group, 其中包含信息 Tgrasp2a
@@ -75,7 +77,7 @@ def detect_grasp_anygrasp(
     from gsnet import AnyGrasp # gsnet.so
     # get a argument namespace
     cfgs = argparse.Namespace()
-    cfgs.checkpoint_path = '/home/zby/Programs/Embodied_Analogy/assets/ckpts/checkpoint_detection.tar'
+    cfgs.checkpoint_path = os.path.join(asset_path, 'ckpts/anygrasp/checkpoint_detection.tar')
     cfgs.max_gripper_width = 0.04
     cfgs.gripper_height = 0.03
     cfgs.top_down_grasp = False
@@ -131,7 +133,7 @@ def detect_grasp_anygrasp(
             colors=colors,
             grasp=ggs,
             contact_point=np.array([0, 0, 0]),
-            post_contact_dirs=dir_outs
+            post_contact_dirs=[dir_outs]
         )
     import time
     time.sleep(0.5)

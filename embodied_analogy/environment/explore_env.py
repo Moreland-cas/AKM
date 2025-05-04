@@ -145,7 +145,12 @@ class ExploreEnv(ObjEnv):
         cur_frame.contact2d = contact_uv
         
         # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
-        cur_frame.detect_grasp(visualize=visualize)
+        cur_frame.detect_grasp(
+            use_anygrasp=self.cfg["use_anygrasp"],
+            world_frame=True,
+            visualize=visualize,
+            asset_path=self.cfg["asset_path"]
+        )
         
         if cur_frame.grasp_group is None:
             return False, contact_uv
@@ -154,8 +159,6 @@ class ExploreEnv(ObjEnv):
             point_camera=cur_frame.contact3d[None],
             extrinsic_matrix=Tw2c
         )[0]
-        
-        grasps_w = cur_frame.grasp_group.transform(Tc2w) # Tgrasp2w
         dir_out_w = Tc2w[:3, :3] @ cur_frame.dir_out # 3
         
         result_pre = None
@@ -166,7 +169,7 @@ class ExploreEnv(ObjEnv):
         )
         self.planner.update_point_cloud(pc_collision_w)
             
-        for grasp_w in grasps_w:
+        for grasp_w in cur_frame.grasp_group:
             # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
             grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
             Tph2w = self.anyGrasp2ph(grasp=grasp)        
@@ -317,9 +320,11 @@ if __name__ == "__main__":
     "obj_index": "44781",
     "joint_index": "1",
     "init_joint_state": "0",
-    "asset_path": "/media/zby/MyBook1/embody_analogy_data/assets/dataset/one_door_cabinet/44781_link_1",
+    "data_path": "dataset/one_door_cabinet/44781_link_1",
     "active_link_name": "link_1",
-    "active_joint_name": "joint_1"
+    "active_joint_name": "joint_1",
+    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets_zby",
+    "use_anygrasp": False
 }
     )
     exploreEnv.explore_stage(visualize=False)

@@ -3,7 +3,7 @@ import json
 
 cfg = {}
 
-asset_path = "/media/zby/MyBook1/embody_analogy_data/assets"
+asset_path = "/home/zby/Programs/Embodied_Analogy/assets_zby"
 pri_path = os.path.join(asset_path, "dataset/one_drawer_cabinet")
 for tmp_folder in os.listdir(pri_path):
     joint_index = tmp_folder.split("_")[-1]
@@ -11,7 +11,8 @@ for tmp_folder in os.listdir(pri_path):
     tmp_dict = {
         tmp_folder: {
             "joint_type": "prismatic",
-            "asset_path": os.path.join(pri_path, tmp_folder),
+            "asset_path": asset_path,
+            "data_path": os.path.join("dataset/one_drawer_cabinet", tmp_folder),
             "obj_index": obj_index,
             "joint_index": joint_index,
             "obj_description": "cabinet",
@@ -31,7 +32,8 @@ for tmp_folder in os.listdir(rev_path):
     tmp_dict = {
         tmp_folder: {
             "joint_type": "revolute",
-            "asset_path": os.path.join(rev_path, tmp_folder),
+            "asset_path": asset_path,
+            "data_path": os.path.join("dataset/one_drawer_cabinet", tmp_folder),
             "obj_index": obj_index,
             "joint_index": joint_index,
             "obj_description": "cabinet",

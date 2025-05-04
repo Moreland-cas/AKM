@@ -201,9 +201,10 @@ class Frame(Data):
             visualize_pc(obj_pc, pc_colors / 255)
         return obj_pc, pc_colors
         
-    def detect_grasp(self, visualize=False) -> GraspGroup:
+    def detect_grasp(self, use_anygrasp=True, world_frame=False, visualize=False, asset_path=None) -> GraspGroup:
         """
-        返回当前 frame 的点云上 contact2d 附近的一个 graspGroup
+        返回当前 frame 的点云上 contact2d 附近的一个 graspGroup, default frame is Tgrasp2c
+        if world_frame = True, return Tgrasp2w
         """
         assert (self.contact2d is not None) and (self.obj_mask is not None)
         c2d_int = self.contact2d.astype(np.int32)
@@ -253,13 +254,27 @@ class Frame(Data):
         #     visualize=False
         # )  
         # 2) 在完整的点云上检测 grasp
-        gg = detect_grasp_anygrasp(
-            points=obj_pc, 
-            colors=pc_colors / 255.,
-            dir_out=dir_out, 
-            augment=True,
-            visualize=False
-        )  
+        if use_anygrasp:
+            gg = detect_grasp_anygrasp(
+                points=obj_pc, 
+                colors=pc_colors / 255.,
+                dir_out=dir_out, 
+                augment=True,
+                visualize=False, # still have bug visualize this
+                asset_path=asset_path
+            )  
+        else: # use gsnet
+            from embodied_analogy.utility.grasp.gsnet import detect_grasp_gsnet
+            gg = detect_grasp_gsnet(
+                gsnet=None,
+                points=obj_pc,
+                colors=None,
+                nms=True,
+                keep=1e6,
+                visualize=visualize,
+                asset_path=asset_path
+            )
+            
         gg = crop_grasp(
             grasp_group=gg,
             contact_point=self.contact3d,
@@ -288,6 +303,10 @@ class Frame(Data):
                 contact_point=self.contact3d, 
                 post_contact_dirs=[self.dir_out]
             )
+        if world_frame:
+            # Tgrasp2w
+            Tc2w = np.linalg.inv(self.Tw2c)
+            self.grasp_group = self.grasp_group.transform(Tc2w) 
             
     def detect_grasp_moving(self, crop_thresh=0.1, visualize=False) -> GraspGroup:
         """
@@ -686,8 +705,20 @@ class Frames(Data):
 
 
 if __name__ == "__main__":
-    frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
+    # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
     # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_micro.npy")
     # frame.detect_grasp(True)
-    frame.segment_obj(obj_description="drawer", visualize=True, remove_robot=False)
-    pass
+    # frame.segment_obj(obj_description="drawer", visualize=True, remove_robot=False)
+    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy")
+    # print(obj_repr.frames.track2d_seq.shape)
+    # obj_repr.visualize()
+    
+    from embodied_analogy.utility.grasp.gsnet import detect_grasp_gsnet
+    from embodied_analogy.utility.utils import visualize_pc
+    pc = obj_repr.frames[0].get_env_pc(
+        use_robot_mask=True, 
+        use_height_filter=True,
+        world_frame=True,
+    )[0]
+    visualize_pc(pc)
+    detect_grasp_gsnet(None, pc, visualize=True)

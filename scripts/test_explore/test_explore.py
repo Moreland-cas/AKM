@@ -72,6 +72,10 @@ def update_cfg(base_cfg, args):
         base_cfg['init_joint_state'] = args.init_joint_state
     if args.asset_path is not None:
         base_cfg['asset_path'] = args.asset_path
+    if args.data_path is not None:
+        base_cfg['data_path'] = args.data_path
+    if args.use_anygrasp is not None:
+        base_cfg['use_anygrasp'] = args.use_anygrasp
     if args.load_scale is not None:
         base_cfg['load_scale'] = args.load_scale
     if args.load_pose is not None:
@@ -109,6 +113,8 @@ def read_cfg():
     
     # obj_cfg arguments
     parser.add_argument('--asset_path', type=str, help='Asset path')
+    parser.add_argument('--data_path', type=str, help='Data path')
+    parser.add_argument('--use_anygrasp', type=str2bool, help='whether to use anygrasp or graspnet')
     parser.add_argument('--joint_type', type=str, help='joint type')
     parser.add_argument('--obj_index', type=str, help='obj_index')
     parser.add_argument('--joint_index', type=str, help='joint_index')

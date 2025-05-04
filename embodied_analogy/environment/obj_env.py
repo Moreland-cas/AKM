@@ -90,7 +90,7 @@ class ObjEnv(RobotEnv):
             p1 = r0 * p0 * r1 * r2
             return p1
         
-        path = cfg["asset_path"]
+        path = os.path.join(cfg["asset_path"], cfg["data_path"])
         bbox_path = os.path.join(path, "bounding_box.json")
         with open(bbox_path, "r") as f:
             bbox = json.load(f)
@@ -150,10 +150,12 @@ class ObjEnv(RobotEnv):
         check_urdf_config(load_config)
         
         asset_path = obj_cfg["asset_path"]
+        data_path = obj_cfg["data_path"]
         self.obj = loader.load(
-            filename=f"{asset_path}/mobility.urdf",
+            filename=f"{asset_path}/{data_path}/mobility.urdf",
             config=load_config
         )
+        assert self.obj is not None
         
         self.obj.set_root_pose(sapien_pose)
         

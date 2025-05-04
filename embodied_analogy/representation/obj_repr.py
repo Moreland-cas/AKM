@@ -522,6 +522,19 @@ if __name__ == "__main__":
     # obj_repr = Obj_repr()
     # obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
     # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy")
-    print(obj_repr.frames.track2d_seq.shape)
-    # obj_repr.visualize()
+    obj_repr = Obj_repr.load(
+        "/home/zby/Programs/Embodied_Analogy/assets_zby/logs/explore_52/40147_1_prismatic/obj_repr.npy"
+    )
+    
+    from embodied_analogy.utility.grasp.gsnet import detect_grasp_gsnet
+    from embodied_analogy.utility.utils import visualize_pc
+    # pc = obj_repr.frames[0].get_env_pc(
+    #     use_robot_mask=True, 
+    #     use_height_filter=True,
+    #     world_frame=True,
+    # )[0]
+    # visualize_pc(pc)
+    # detect_grasp_gsnet(None, pc, visualize=True)
+    obj_repr.frames[0].detect_grasp(
+        use_anygrasp=True, world_frame=False, visualize=True
+    )

@@ -23,6 +23,7 @@ update_sigma=0.05
 reserved_distance=0.05
 num_initial_pts=1000
 fully_zeroshot=False
+use_anygrasp=False
 ####################################################
 
 # 读取 JSON 文件中的所有键
@@ -32,6 +33,7 @@ for test_data_cfg in $test_data_cfgs; do
     # 从 JSON 文件中提取相关信息
     joint_type=$(jq -r ".\"$test_data_cfg\".joint_type" "$test_data_cfg_path")
     asset_path=$(jq -r ".\"$test_data_cfg\".asset_path" "$test_data_cfg_path")
+    data_path=$(jq -r ".\"$test_data_cfg\".data_path" "$test_data_cfg_path")
     obj_description=$(jq -r ".\"$test_data_cfg\".obj_description" "$test_data_cfg_path")
     obj_index=$(jq -r ".\"$test_data_cfg\".obj_index" "$test_data_cfg_path")
     joint_index=$(jq -r ".\"$test_data_cfg\".joint_index" "$test_data_cfg_path")
@@ -43,7 +45,7 @@ for test_data_cfg in $test_data_cfgs; do
 
     # 提取数据名称及其他参数
     obj_folder_name="${obj_index}_${joint_index}_${joint_type}"
-    obj_folder_path_explore="$LOG_DIR/$run_name/${obj_folder_name}/"
+    obj_folder_path_explore="$LOG_DIR/$run_name/${obj_folder_name}"
     mkdir -p "$obj_folder_path_explore"
     output_file="${obj_folder_path_explore}/output.txt"
 
@@ -70,6 +72,7 @@ for test_data_cfg in $test_data_cfgs; do
         --instruction="open the $obj_description" \
         --obj_description="$obj_description" \
         --asset_path="$asset_path" \
+        --data_path="$data_path" \
         --joint_type="$joint_type" \
         --obj_index="$obj_index" \
         --joint_index="$joint_index" \
@@ -77,6 +80,7 @@ for test_data_cfg in $test_data_cfgs; do
         --load_scale="$load_scale" \
         --load_pose="$load_pose" \
         --load_quat="$load_quat" \
+        --use_anygrasp="$use_anygrasp" \
         --active_link_name="$active_link_name" \
         --active_joint_name="$active_joint_name" > "$output_file"  # 重定向输出
 done
