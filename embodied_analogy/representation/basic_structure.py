@@ -262,7 +262,6 @@ class Frame(Data):
                 dir_out=dir_out, 
                 augment=True,
                 visualize=False, # still have bug visualize this
-                asset_path=asset_path
             )  
         else: # use gsnet
             from embodied_analogy.utility.grasp.gsnet import detect_grasp_gsnet

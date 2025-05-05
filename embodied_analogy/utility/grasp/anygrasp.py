@@ -10,7 +10,8 @@ from embodied_analogy.utility.utils import (
     rotation_matrix_between_vectors,
     find_correspondences
 )
-from embodied_analogy.utility.constants import ASSET_PATH
+from embodied_analogy.utility.constants import ASSET_PATH, RUN_REMOTE_ANYGRASP
+from embodied_analogy.utility.server.client import run_anygrasp_remotely
 
 def crop_grasp(grasp_group, contact_point, radius=0.1):
     """
@@ -78,6 +79,7 @@ def detect_grasp_anygrasp(
     dir_out, 
     augment=True, 
     visualize=False,
+    run_remote=RUN_REMOTE_ANYGRASP,
 ):
     '''
     输入 a 坐标系下的 points 和 dir_out, 输出用 anygrasp 检测出的 grasp_group, 其中包含信息 Tgrasp2a
@@ -108,23 +110,30 @@ def detect_grasp_anygrasp(
         points_input = points_input.astype(np.float32)
         
         # Tgrasp2app
-        try:
-            model = prepare_any_grasp_model()
-            gg, _ = model.get_grasp(
-                points_input,
-                colors, 
-                lims,
-                apply_object_mask=True,
-                dense_grasp=False,
-                collision_detection=True
-            )
-        except Exception as e:
-            print(f"run anygrasp locally failed:{e}")
+        if not run_remote:
             try:
-                pass
+                model = prepare_any_grasp_model(ASSET_PATH)
+                gg, _ = model.get_grasp(
+                    points_input,
+                    colors, 
+                    lims,
+                    apply_object_mask=True,
+                    dense_grasp=False,
+                    collision_detection=True
+                )
+            except Exception as e:
+                print(f"run anygrasp locally failed:{e}")
+                assert False, "run anygrasp failed"
+        else:
+            try:
+                gg = run_anygrasp_remotely(
+                    points_input,
+                    colors, 
+                    lims
+                )
             except Exception as f:
                 print(f"run anygrasp remotely failed:{f}")
-                assert False, "run anygrasp failed"  # 如果 function_b 也
+                assert False, "run anygrasp failed"
         
         # print('grasp num:', len(gg))
         if gg == None or len(gg) == 0:

@@ -22,10 +22,10 @@ max_tries=10
 update_sigma=0.05
 reserved_distance=0.05
 num_initial_pts=1000
-fully_zeroshot=True
-use_anygrasp=False
+fully_zeroshot=False
+use_anygrasp=True
 offscreen=True
-GPU_ID=4
+GPU_ID=0
 ####################################################
 export CUDA_VISIBLE_DEVICES="$GPU_ID"
 
