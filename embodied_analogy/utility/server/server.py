@@ -7,6 +7,8 @@ from graspnetAPI import GraspGroup
 app = Flask(__name__)
 # 定义函数 y = f(x) = x^2
 def run_anygrasp_helper(points_input, colors, lims):
+    points_input = points_input.astype(np.float32)
+    colors = colors.astype(np.float32)
     model = prepare_any_grasp_model(
         asset_path="/media/zby/MyBook2/embody_analogy_data/assets/ckpts/anygrasp/checkpoint_detection.tar"
     )
@@ -40,7 +42,7 @@ def calculate():
     gg_array = gg.grasp_group_array
     
     response = {
-        "gg_array": gg_array.to_list()
+        "gg_array": gg_array.tolist()
     }
     return jsonify(response)
 
