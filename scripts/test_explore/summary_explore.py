@@ -9,7 +9,7 @@ args = parser.parse_args()
 
 # root_path = os.path.join("/media/zby/MyBook1/embody_analogy_data/assets/logs/", args.run_name)
 root_path = os.path.join("/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/assets/logs/", args.run_name)
-
+# TODO 把真正成功的那些也统计出来，额外需要一个“成功参数”
 
 results = []
 

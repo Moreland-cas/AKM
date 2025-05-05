@@ -11,13 +11,14 @@ recon_run_name="$3"
 # "recon_4_16"
 mkdir -p "$LOG_DIR/$recon_run_name"
 
-
+# TODO 仅对成功探索的重建，额外需要一个“成功参数”
 #################### 超参在这里!! ####################
 num_kframes=5
 fine_lr=1e-3
 save_memory=True
+GPU_ID=5
 ####################################################
-
+export CUDA_VISIBLE_DEVICES="$GPU_ID"
 
 # 遍历 LOG_DIR 下的文件夹
 for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
@@ -37,7 +38,7 @@ for obj_folder_path_explore in "$LOG_DIR/$explore_run_name"/*; do
         fi
 
         # 执行 Python 脚本
-        python /home/zby/Programs/Embodied_Analogy/scripts/test_reconstruct/test_reconstruct.py \
+        python test_reconstruct.py \
             --obj_folder_path_explore="$obj_folder_path_explore" \
             --obj_folder_path_reconstruct="$obj_folder_path_reconstruct" \
             --num_kframes=$num_kframes \
