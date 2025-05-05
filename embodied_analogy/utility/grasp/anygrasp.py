@@ -57,12 +57,12 @@ def filter_grasp_group(
     
     return grasp_group
 
-def prepare_any_grasp_model():
+def prepare_any_grasp_model(asset_path=ASSET_PATH):
     # load model
     from gsnet import AnyGrasp # gsnet.so
     # get a argument namespace
     cfgs = argparse.Namespace()
-    cfgs.checkpoint_path = os.path.join(ASSET_PATH, 'ckpts/anygrasp/checkpoint_detection.tar')
+    cfgs.checkpoint_path = os.path.join(asset_path, 'ckpts/anygrasp/checkpoint_detection.tar')
     cfgs.max_gripper_width = 0.04
     cfgs.gripper_height = 0.03
     cfgs.top_down_grasp = False

@@ -7,7 +7,9 @@ from graspnetAPI import GraspGroup
 app = Flask(__name__)
 # 定义函数 y = f(x) = x^2
 def run_anygrasp_helper(points_input, colors, lims):
-    model = prepare_any_grasp_model()
+    model = prepare_any_grasp_model(
+        asset_path="/media/zby/MyBook2/embody_analogy_data/assets/ckpts/anygrasp/checkpoint_detection.tar"
+    )
     gg, _ = model.get_grasp(
         points_input,
         colors, 
