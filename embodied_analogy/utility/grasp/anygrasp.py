@@ -57,6 +57,19 @@ def filter_grasp_group(
     
     return grasp_group
 
+def prepare_any_grasp_model():
+    # load model
+    from gsnet import AnyGrasp # gsnet.so
+    # get a argument namespace
+    cfgs = argparse.Namespace()
+    cfgs.checkpoint_path = os.path.join(ASSET_PATH, 'ckpts/anygrasp/checkpoint_detection.tar')
+    cfgs.max_gripper_width = 0.04
+    cfgs.gripper_height = 0.03
+    cfgs.top_down_grasp = False
+    cfgs.debug = False
+    model = AnyGrasp(cfgs)
+    model.load_net()
+    return model
 
 @torch.no_grad()
 def detect_grasp_anygrasp(
@@ -65,7 +78,6 @@ def detect_grasp_anygrasp(
     dir_out, 
     augment=True, 
     visualize=False,
-    asset_path=ASSET_PATH
 ):
     '''
     输入 a 坐标系下的 points 和 dir_out, 输出用 anygrasp 检测出的 grasp_group, 其中包含信息 Tgrasp2a
@@ -74,18 +86,6 @@ def detect_grasp_anygrasp(
         dir_out: (3, ), in a coordinate, 用于将 a 坐标系下的点进行变换, 以模拟 grasp detector network 所需的格式 (相机方向指向点云内部)
         augment: if True, 对 dir_out 进行多个绕动, 分别预测 grasp, 然后将不同 grasp 在合并到一个坐标系下返回
     '''
-    # load model
-    from gsnet import AnyGrasp # gsnet.so
-    # get a argument namespace
-    cfgs = argparse.Namespace()
-    cfgs.checkpoint_path = os.path.join(asset_path, 'ckpts/anygrasp/checkpoint_detection.tar')
-    cfgs.max_gripper_width = 0.04
-    cfgs.gripper_height = 0.03
-    cfgs.top_down_grasp = False
-    cfgs.debug = visualize
-    model = AnyGrasp(cfgs)
-    model.load_net()
-    
     dir_out = dir_out / np.linalg.norm(dir_out)
     # 接下来生成多个 dir_out
     if augment:
@@ -108,14 +108,24 @@ def detect_grasp_anygrasp(
         points_input = points_input.astype(np.float32)
         
         # Tgrasp2app
-        gg, _ = model.get_grasp(
-            points_input,
-            colors, 
-            lims,
-            apply_object_mask=True,
-            dense_grasp=False,
-            collision_detection=True
-        )
+        try:
+            model = prepare_any_grasp_model()
+            gg, _ = model.get_grasp(
+                points_input,
+                colors, 
+                lims,
+                apply_object_mask=True,
+                dense_grasp=False,
+                collision_detection=True
+            )
+        except Exception as e:
+            print(f"run anygrasp locally failed:{e}")
+            try:
+                pass
+            except Exception as f:
+                print(f"run anygrasp remotely failed:{f}")
+                assert False, "run anygrasp failed"  # 如果 function_b 也
+        
         # print('grasp num:', len(gg))
         if gg == None or len(gg) == 0:
             continue
