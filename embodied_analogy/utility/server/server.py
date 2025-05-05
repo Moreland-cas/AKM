@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from embodied_analogy.utility.grasp.anygrasp import prepare_any_grasp_model
+
+app = Flask(__name__)
 # 定义函数 y = f(x) = x^2
 def run_anygrasp_helper(points_input, colors, lims):
     model = prepare_any_grasp_model()
@@ -30,5 +32,4 @@ def calculate():
     return jsonify(response)
 
 if __name__ == '__main__':
-    app = Flask(__name__)
     app.run(host='0.0.0.0', port=5000)  # 0.0.0.0 表示允许外部访问
