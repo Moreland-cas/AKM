@@ -8,11 +8,10 @@ import groundingdino.datasets.transforms as T
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 from groundingdino.util.inference import load_model, predict, annotate
-from embodied_analogy.utility.constants import ASSET_PATH
+from embodied_analogy.utility.constants import ASSET_PATH, PROJECT_ROOT
 
 def load_groundingDINO_model():
-    code_dir = os.path.dirname(os.path.abspath(__file__))
-    groundingDINO_home = os.path.join(code_dir, "../../../third_party", "GroundingDINO")
+    groundingDINO_home = os.path.join(PROJECT_ROOT, "third_party", "GroundingDINO")
     WEIGHTS_PATH = os.path.join(ASSET_PATH, "ckpts", "grounding_dino/groundingdino_swint_ogc.pth")
     CONFIG_PATH = os.path.join(groundingDINO_home, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
     model = load_model(CONFIG_PATH, WEIGHTS_PATH)

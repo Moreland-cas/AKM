@@ -5,3 +5,4 @@ UNKNOWN_LABEL = 3
 ACTIVATE_NAPARI=False
 SEED=666
 ASSET_PATH="/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/assets"
+PROJECT_ROOT="/home/zhangchunhui/zby_nips_2025/Embodied_Analogy"

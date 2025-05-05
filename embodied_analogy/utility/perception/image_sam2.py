@@ -7,8 +7,8 @@ from skimage import morphology
 from scipy import ndimage
 import os
 import sys
-code_dir = os.path.dirname(os.path.abspath(__file__))
-relative_path = os.path.join(code_dir, "../../../third_party", "sam2")
+from embodied_analogy.utility.constants import PROJECT_ROOT
+relative_path = os.path.join(PROJECT_ROOT, "third_party", "sam2")
 sys.path.append(relative_path)
 
 from sam2.build_sam import build_sam2

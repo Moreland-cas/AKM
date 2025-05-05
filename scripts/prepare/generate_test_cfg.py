@@ -1,17 +1,15 @@
 import os
 import json
-
+from embodied_analogy.utility.constants import ASSET_PATH, PROJECT_ROOT
 cfg = {}
 
-asset_path = "/home/zby/Programs/Embodied_Analogy/assets_zby"
-pri_path = os.path.join(asset_path, "dataset/one_drawer_cabinet")
+pri_path = os.path.join(ASSET_PATH, "dataset/one_drawer_cabinet")
 for tmp_folder in os.listdir(pri_path):
     joint_index = tmp_folder.split("_")[-1]
     obj_index = tmp_folder.split("_")[0]
     tmp_dict = {
         tmp_folder: {
             "joint_type": "prismatic",
-            "asset_path": asset_path,
             "data_path": os.path.join("dataset/one_drawer_cabinet", tmp_folder),
             "obj_index": obj_index,
             "joint_index": joint_index,
@@ -25,15 +23,14 @@ for tmp_folder in os.listdir(pri_path):
     }
     cfg.update(tmp_dict)
 
-rev_path = os.path.join(asset_path, "dataset/one_door_cabinet")
+rev_path = os.path.join(ASSET_PATH, "dataset/one_door_cabinet")
 for tmp_folder in os.listdir(rev_path):
     joint_index = tmp_folder.split("_")[-1]
     obj_index = tmp_folder.split("_")[0]
     tmp_dict = {
         tmp_folder: {
             "joint_type": "revolute",
-            "asset_path": asset_path,
-            "data_path": os.path.join("dataset/one_drawer_cabinet", tmp_folder),
+            "data_path": os.path.join("dataset/one_door_cabinet", tmp_folder),
             "obj_index": obj_index,
             "joint_index": joint_index,
             "obj_description": "cabinet",
@@ -46,15 +43,13 @@ for tmp_folder in os.listdir(rev_path):
     }
     cfg.update(tmp_dict)
 
-use_subset = True
-if use_subset:
-    total_list = [(k, v) for k,v in cfg.items()]
-    import random
-    random.shuffle(total_list)
-    cfg = {k:v for k,v in total_list[:10]}
-    with open(os.path.join("/home/zby/Programs/Embodied_Analogy/scripts", "test_data_subset.json"), 'w', encoding='utf-8') as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=4)
-else:
-    with open(os.path.join("/home/zby/Programs/Embodied_Analogy/scripts", "test_data.json"), 'w', encoding='utf-8') as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=4)
+with open(os.path.join(PROJECT_ROOT, "scripts", "test_data.json"), 'w', encoding='utf-8') as f:
+    json.dump(cfg, f, ensure_ascii=False, indent=4)
+
+total_list = [(k, v) for k,v in cfg.items()]
+import random
+random.shuffle(total_list)
+cfg = {k:v for k,v in total_list[:10]}
+with open(os.path.join(PROJECT_ROOT, "scripts", "test_data_subset.json"), 'w', encoding='utf-8') as f:
+    json.dump(cfg, f, ensure_ascii=False, indent=4)    
     

@@ -5,8 +5,8 @@ import random
 import os
 import sys
 import cv2
-code_dir = os.path.dirname(os.path.abspath(__file__))
-relative_path = os.path.join(code_dir, "../../../third_party", "RAM_code")
+from embodied_analogy.utility.constants import PROJECT_ROOT
+relative_path = os.path.join(PROJECT_ROOT, "third_party", "RAM_code")
 sys.path.append(relative_path)
 from graspness_implementation.gsnet import GSNet, vis_save_grasp
 from graspnetAPI import GraspGroup, Grasp

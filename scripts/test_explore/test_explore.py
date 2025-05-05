@@ -60,6 +60,8 @@ def update_cfg(base_cfg, args):
         base_cfg['num_initial_pts'] = args.num_initial_pts
         
     # load obj information
+    if args.offscreen is not None:
+        base_cfg['offscreen'] = args.offscreen
     if args.obj_description is not None:
         base_cfg['obj_description'] = args.obj_description
     if args.joint_type is not None:
@@ -70,8 +72,8 @@ def update_cfg(base_cfg, args):
         base_cfg['joint_index'] = args.joint_index
     if args.init_joint_state is not None:
         base_cfg['init_joint_state'] = args.init_joint_state
-    if args.asset_path is not None:
-        base_cfg['asset_path'] = args.asset_path
+    # if args.asset_path is not None:
+    #     base_cfg['asset_path'] = args.asset_path
     if args.data_path is not None:
         base_cfg['data_path'] = args.data_path
     if args.use_anygrasp is not None:
@@ -96,6 +98,7 @@ def read_cfg():
     parser.add_argument('--phy_timestep', type=float, help='Physical timestep')
     parser.add_argument('--planner_timestep', type=float, help='Planner timestep')
     parser.add_argument('--use_sapien2', type=str2bool, default=True, help='Use Sapien2')
+    parser.add_argument('--offscreen', type=str2bool, help='Disable screen visualization')
 
     # explore_cfg arguments
     parser.add_argument('--record_fps', type=int, help='Record FPS')
@@ -112,7 +115,7 @@ def read_cfg():
     parser.add_argument('--obj_description', type=str, help='Object description')
     
     # obj_cfg arguments
-    parser.add_argument('--asset_path', type=str, help='Asset path')
+    # parser.add_argument('--asset_path', type=str, help='Asset path')
     parser.add_argument('--data_path', type=str, help='Data path')
     parser.add_argument('--use_anygrasp', type=str2bool, help='whether to use anygrasp or graspnet')
     parser.add_argument('--joint_type', type=str, help='joint type')

@@ -307,7 +307,8 @@ class Frame(Data):
         if world_frame:
             # Tgrasp2w
             Tc2w = np.linalg.inv(self.Tw2c)
-            self.grasp_group = self.grasp_group.transform(Tc2w) 
+            if self.grasp_group is not None and len(self.grasp_group) > 0:
+                self.grasp_group = self.grasp_group.transform(Tc2w) # TODO 解决是None的问题
             
     def detect_grasp_moving(self, crop_thresh=0.1, visualize=False) -> GraspGroup:
         """

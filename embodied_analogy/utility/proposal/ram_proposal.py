@@ -2,8 +2,8 @@ from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 import os
 import sys
-code_dir = os.path.dirname(os.path.abspath(__file__))
-relative_path = os.path.join(code_dir, "../../../third_party", "RAM_code")
+from embodied_analogy.utility.constants import PROJECT_ROOT
+relative_path = os.path.join(PROJECT_ROOT, "third_party", "RAM_code")
 sys.path.append(relative_path)
 
 import cv2
