@@ -1,5 +1,8 @@
 from flask import Flask, request, jsonify
 from embodied_analogy.utility.grasp.anygrasp import prepare_any_grasp_model
+import numpy as np
+from graspnetAPI import GraspGroup
+
 
 app = Flask(__name__)
 # 定义函数 y = f(x) = x^2
@@ -21,13 +24,21 @@ def calculate():
     # 获取请求中的数据
     data = request.json
     
+    # list
     points_input = data["points_input"]
     colors = data["colors"]
     lims = data["lims"]
     
+    # to np.array
+    points_input = np.array(points_input)
+    colors = np.array(colors)
+    lims = np.array(lims)
+    
     gg = run_anygrasp_helper(points_input, colors, lims)
+    gg_array = gg.grasp_group_array
+    
     response = {
-        "gg": gg
+        "gg_array": gg_array.to_list()
     }
     return jsonify(response)
 

@@ -1,23 +1,30 @@
 import requests
+import numpy as np
+from graspnetAPI import GraspGroup
+
 def run_anygrasp_remotely(
-    points_input,
+    points_input, # np.array
     colors, 
     lims
 ):
     # 服务端的地址和端口
     server_url = "http://10.1.100.36:5000/api/calculate"
 
+    # 将输入的 np.array 转换成 list
     # 要发送的数据
     data = {
-        "points_input": points_input,
-        "colors": colors, 
-        "lims": lims
+        "points_input": points_input.tolist(),
+        "colors": colors.tolist(), 
+        "lims": lims.tolist()
     }
 
     # 发送 POST 请求
     response = requests.post(server_url, json=data)
     result = response.json()
-    return result["gg"]
+    gg_array = np.array(result["gg_array"])
+    gg = GraspGroup()
+    gg.grasp_group_array = gg_array
+    return gg
 
 if __name__ == "__main__":
     from embodied_analogy.representation.obj_repr import Obj_repr
