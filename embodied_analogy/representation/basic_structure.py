@@ -544,6 +544,12 @@ class Frames(Data):
             consis_filter = filter_tracks_by_consistency(track3d_seq, threshold=0.02) # M
             
             filter_mask = robot_filter & consis_filter
+            
+            # 但是如果 filter_mask 过滤后的点实在太少, 那么就不进行过滤
+            if filter_mask.sum() < 100:
+                print(f"WARNING: too few points after filtering (original: {track3d_seq.shape[1]}, filtered: {filter_mask.sum()}), skip filtering")
+                filter_mask = np.ones(M, dtype=bool)
+                
             track2d_seq = track2d_seq[:, filter_mask]
             track3d_seq = track3d_seq[:, filter_mask]
             self.track2d_seq = track2d_seq

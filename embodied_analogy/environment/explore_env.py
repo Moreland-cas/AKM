@@ -303,30 +303,42 @@ if __name__ == "__main__":
     
     exploreEnv = ExploreEnv(
         cfg={
-            "obj_folder_path_explore": "/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/assets/rubbish",
-            "phy_timestep": 0.004,
-            "planner_timestep": 0.01,
-            "use_sapien2": True,
-            "fully_zeroshot": False,
-            "record_fps": 30,
-            "pertubation_distance": 0.1,
-            "valid_thresh": 0.5,
-            "max_tries": 10,
-            "update_sigma": 0.05,
-            "reserved_distance": 0.05,
-            "instruction": "open the cabinet",
-            "num_initial_pts": 1000,
-            "obj_description": "cabinet",
-            "joint_type": "revolute",
-            "obj_index": "44781",
-            "joint_index": "1",
-            "init_joint_state": "0",
-            "data_path": "dataset/one_door_cabinet/44781_link_1",
-            "active_link_name": "link_1",
-            "active_joint_name": "joint_1",
-            "use_anygrasp": False,
-            "offscreen": True
-        }
+        "obj_folder_path_explore": "/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/assets/logs/explore_58/45636_3_prismatic",
+        "phy_timestep": 0.004,
+        "planner_timestep": 0.01,
+        "use_sapien2": True,
+        "fully_zeroshot": True,
+        "record_fps": 30,
+        "pertubation_distance": 0.1,
+        "valid_thresh": 0.5,
+        "max_tries": 10,
+        "update_sigma": 0.05,
+        "reserved_distance": 0.05,
+        "instruction": "open the cabinet",
+        "num_initial_pts": 1000,
+        "offscreen": True,
+        "obj_description": "cabinet",
+        "joint_type": "prismatic",
+        "obj_index": "45636",
+        "joint_index": "3",
+        "init_joint_state": "0",
+        "data_path": "dataset/one_drawer_cabinet/45636_link_3",
+        "use_anygrasp": True,
+        "active_link_name": "link_3",
+        "active_joint_name": "joint_3",
+        "load_pose": [
+            0.8982505798339844,
+            0.0,
+            0.47468623518943787
+        ],
+        "load_quat": [
+            0.999930739402771,
+            0.008825333788990974,
+            -6.875664257677272e-05,
+            -0.007790286093950272
+        ],
+        "load_scale": 1
+    }
     )
     exploreEnv.explore_stage(visualize=False)
     # exploreEnv.save(file_path=f"/home/zby/Programs/Embodied_Analogy/assets/tmp/{obj_index}/explore/explore_data.pkl")

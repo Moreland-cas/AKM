@@ -21,10 +21,13 @@ def run_anygrasp_remotely(
     # 发送 POST 请求
     response = requests.post(server_url, json=data)
     result = response.json()
-    gg_array = np.array(result["gg_array"])
-    gg = GraspGroup()
-    gg.grasp_group_array = gg_array
-    return gg
+    gg_array = result["gg_array"]
+    if gg_array is None:
+        return None
+    else:
+        gg = GraspGroup()
+        gg.grasp_group_array = np.array(gg_array)
+        return gg
 
 if __name__ == "__main__":
     from embodied_analogy.representation.obj_repr import Obj_repr

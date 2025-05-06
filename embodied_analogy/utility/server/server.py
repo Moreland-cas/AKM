@@ -39,11 +39,15 @@ def calculate():
     lims = np.array(lims)
     
     gg = run_anygrasp_helper(points_input, colors, lims)
-    gg_array = gg.grasp_group_array
-    
-    response = {
-        "gg_array": gg_array.tolist()
-    }
+    if gg is None or len(gg) == 0:
+        response = {
+            "gg_array": None
+        }
+    else:
+        gg_array = gg.grasp_group_array
+        response = {
+            "gg_array": gg_array.tolist()
+        }
     return jsonify(response)
 
 if __name__ == '__main__':
