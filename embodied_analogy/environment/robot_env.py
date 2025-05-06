@@ -520,23 +520,31 @@ class RobotEnv(BaseEnv):
         deltas = np.linspace(0, moving_distance, num_interp)
         T_list = [T_with_delta(delta) for delta in deltas]
 
+        actually_moved = False
         # 然后依次执行这些位姿
         for Tph2w in T_list:
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
             if result is None:
-                # 一般是 reset_safe 的时候遇到
-                print("excounter None result when moving along axis, skip!")
+                print("WARNING: excounter None result when moving along axis, skip!")
+                continue
+            elif len(result["time"]) == 0:
+                print("WARNING: excounter len=0 result when moving along axis, skip!")
                 continue
             # 针对那种需要一个大的动作的操作, 直接不执行, 否则容易大幅度影响物体状态
-            # 直接去掉呢？
-            elif len(result["time"]) > 300: 
-                big_steps = len(result["time"])
-                print(f"Warning: encounter {big_steps} steps in move_along_axis")
-                if drop_large_move:
-                    print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
-                    # return
-            self.follow_path(result)
-
+            else:
+                if len(result["time"]) > 300: 
+                    big_steps = len(result["time"])
+                    print(f"WARNING: encounter large move ({big_steps} steps) in move_along_axis")
+                    if drop_large_move:
+                        print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
+                        continue
+                self.follow_path(result)
+                actually_moved = True
+        # NOTE: 这里需要判断到底是不是所有的 Tph2w 返回的 plan_result 都是 None, 如果那样不会有 RGBD frame 被录制, 需要额外跑一些 step
+        if not actually_moved:
+            for _ in range(int(1 / self.cfg["phy_timestep"])):
+                self.step()
+                
     def move_forward(self, moving_distance, drop_large_move):
         # 控制 panda_hand 沿着 moving_direction 行动 moving_distance 的距离
         _, ee_quat = self.get_ee_pose() # Tph2w

@@ -54,40 +54,40 @@ for test_data_cfg in $test_data_cfgs; do
 
     # TODO: 首先读取 output_file，若 output_file 不存在或者 output_file 的最后一行不是 "done", 那么才跑底下的python 脚本，否则continue
     if [ -f "$output_file" ] && [ "$(tail -n 1 "$output_file")" == "done" ]; then
-        # echo "Output file $output_file exists and the last line is 'done'. Skipping this exploration."
+        echo "Output file $output_file exists and the last line is 'done'. Skipping this exploration."
         continue
     else
         echo "Output file $output_file does not exist or the last line is not 'done'. Running the Python script."
     fi
 
     # 执行 Python 脚本
-    # python test_explore.py \
-    #     --obj_folder_path_explore="$obj_folder_path_explore" \
-    #     --phy_timestep="$phy_timestep" \
-    #     --planner_timestep="$planner_timestep" \
-    #     --use_sapien2="$use_sapien2" \
-    #     --record_fps="$record_fps" \
-    #     --pertubation_distance="$pertubation_distance" \
-    #     --valid_thresh="$valid_thresh" \
-    #     --fully_zeroshot="$fully_zeroshot" \
-    #     --max_tries="$max_tries" \
-    #     --update_sigma="$update_sigma" \
-    #     --reserved_distance="$reserved_distance" \
-    #     --num_initial_pts="$num_initial_pts" \
-    #     --instruction="open the $obj_description" \
-    #     --obj_description="$obj_description" \
-    #     --data_path="$data_path" \
-    #     --joint_type="$joint_type" \
-    #     --obj_index="$obj_index" \
-    #     --joint_index="$joint_index" \
-    #     --init_joint_state=0 \
-    #     --offscreen=$offscreen \
-    #     --load_scale="$load_scale" \
-    #     --load_pose="$load_pose" \
-    #     --load_quat="$load_quat" \
-    #     --use_anygrasp="$use_anygrasp" \
-    #     --active_link_name="$active_link_name" \
-    #     --active_joint_name="$active_joint_name" > "$output_file"  
+    python test_explore.py \
+        --obj_folder_path_explore="$obj_folder_path_explore" \
+        --phy_timestep="$phy_timestep" \
+        --planner_timestep="$planner_timestep" \
+        --use_sapien2="$use_sapien2" \
+        --record_fps="$record_fps" \
+        --pertubation_distance="$pertubation_distance" \
+        --valid_thresh="$valid_thresh" \
+        --fully_zeroshot="$fully_zeroshot" \
+        --max_tries="$max_tries" \
+        --update_sigma="$update_sigma" \
+        --reserved_distance="$reserved_distance" \
+        --num_initial_pts="$num_initial_pts" \
+        --instruction="open the $obj_description" \
+        --obj_description="$obj_description" \
+        --data_path="$data_path" \
+        --joint_type="$joint_type" \
+        --obj_index="$obj_index" \
+        --joint_index="$joint_index" \
+        --init_joint_state=0 \
+        --offscreen=$offscreen \
+        --load_scale="$load_scale" \
+        --load_pose="$load_pose" \
+        --load_quat="$load_quat" \
+        --use_anygrasp="$use_anygrasp" \
+        --active_link_name="$active_link_name" \
+        --active_joint_name="$active_joint_name" > "$output_file"  
 done
 
 echo "所有命令已执行完成！"
