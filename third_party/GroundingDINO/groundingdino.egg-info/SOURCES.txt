@@ -1,10 +1,10 @@
 LICENSE
 README.md
 setup.py
-/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/cuda_version.cu
-/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/vision.cpp
-/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cpu.cpp
-/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cuda.cu
+/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/cuda_version.cu
+/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/vision.cpp
+/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cpu.cpp
+/home/zby/Programs/Embodied_Analogy/third_party/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cuda.cu
 groundingdino/__init__.py
 groundingdino/version.py
 groundingdino.egg-info/PKG-INFO

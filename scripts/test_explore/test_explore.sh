@@ -8,8 +8,8 @@ run_name="$2"
 mkdir -p "$LOG_DIR/$run_name"
 
 # test_data_cfg_path="/home/zby/Programs/Embodied_Analogy/scripts/test_data.json"
-test_data_cfg_path="$3"
-# "/home/zby/Programs/Embodied_Analogy/scripts/test_data_subset.json"
+cfg_run_name="$3"
+# "/home/zby/Programs/Embodied_Analogy/assets/logs/cfg_512"
 
 #################### 超参在这里!! ####################
 phy_timestep=0.004
@@ -22,32 +22,19 @@ max_tries=10
 update_sigma=0.05
 reserved_distance=0.05
 num_initial_pts=1000
-fully_zeroshot=True
-use_anygrasp=True
+fully_zeroshot=False
+use_anygrasp=False
 offscreen=True
 GPU_ID=7
 ####################################################
 export CUDA_VISIBLE_DEVICES="$GPU_ID"
 
 # 读取 JSON 文件中的所有键
-test_data_cfgs=$(jq -r 'keys[]' "$test_data_cfg_path")
+# test_data_cfgs=$(jq -r 'keys[]' "$test_data_cfg_path")
 
-for test_data_cfg in $test_data_cfgs; do
-    # 从 JSON 文件中提取相关信息
-    joint_type=$(jq -r ".\"$test_data_cfg\".joint_type" "$test_data_cfg_path")
-    # asset_path=$(jq -r ".\"$test_data_cfg\".asset_path" "$test_data_cfg_path")
-    data_path=$(jq -r ".\"$test_data_cfg\".data_path" "$test_data_cfg_path")
-    obj_description=$(jq -r ".\"$test_data_cfg\".obj_description" "$test_data_cfg_path")
-    obj_index=$(jq -r ".\"$test_data_cfg\".obj_index" "$test_data_cfg_path")
-    joint_index=$(jq -r ".\"$test_data_cfg\".joint_index" "$test_data_cfg_path")
-    load_pose=$(jq -r ".\"$test_data_cfg\".load_pose" "$test_data_cfg_path")
-    load_quat=$(jq -r ".\"$test_data_cfg\".load_quat" "$test_data_cfg_path")
-    load_scale=$(jq -r ".\"$test_data_cfg\".load_scale" "$test_data_cfg_path")
-    active_link_name=$(jq -r ".\"$test_data_cfg\".active_link_name" "$test_data_cfg_path")
-    active_joint_name=$(jq -r ".\"$test_data_cfg\".active_joint_name" "$test_data_cfg_path")
-
+for obj_folder_path_cfg in "$LOG_DIR/$cfg_run_name"/*; do
     # 提取数据名称及其他参数
-    obj_folder_name="${obj_index}_${joint_index}_${joint_type}"
+    obj_folder_name="$(basename "$obj_folder_path_cfg")"
     obj_folder_path_explore="$LOG_DIR/$run_name/${obj_folder_name}"
     mkdir -p "$obj_folder_path_explore"
     output_file="${obj_folder_path_explore}/output.txt"
@@ -62,6 +49,7 @@ for test_data_cfg in $test_data_cfgs; do
 
     # 执行 Python 脚本
     python test_explore.py \
+        --obj_folder_path_cfg="$obj_folder_path_cfg" \
         --obj_folder_path_explore="$obj_folder_path_explore" \
         --phy_timestep="$phy_timestep" \
         --planner_timestep="$planner_timestep" \
@@ -74,20 +62,9 @@ for test_data_cfg in $test_data_cfgs; do
         --update_sigma="$update_sigma" \
         --reserved_distance="$reserved_distance" \
         --num_initial_pts="$num_initial_pts" \
-        --instruction="open the $obj_description" \
-        --obj_description="$obj_description" \
-        --data_path="$data_path" \
-        --joint_type="$joint_type" \
-        --obj_index="$obj_index" \
-        --joint_index="$joint_index" \
-        --init_joint_state=0 \
         --offscreen=$offscreen \
-        --load_scale="$load_scale" \
-        --load_pose="$load_pose" \
-        --load_quat="$load_quat" \
-        --use_anygrasp="$use_anygrasp" \
-        --active_link_name="$active_link_name" \
-        --active_joint_name="$active_joint_name" > "$output_file"  
+        --use_anygrasp="$use_anygrasp" > "$output_file"  
+    break
 done
 
 echo "所有命令已执行完成！"

@@ -27,6 +27,7 @@ class ObjEnv(RobotEnv):
     
     def load_object(self, obj_cfg, visualize=False):
         print("Loading Object ...")
+        print(obj_cfg)
         self.active_joint_idx = int(obj_cfg["joint_index"])
         self.active_joint_name = obj_cfg["active_joint_name"]
         active_link_name = obj_cfg["active_link_name"]

@@ -93,4 +93,5 @@ def randomize_obj(cfg: dict):
         "load_quat": sapien_pose.q.tolist(),
         "load_scale": 1,
     })
-    return sapien_pose
+    # return sapien_pose
+    return cfg

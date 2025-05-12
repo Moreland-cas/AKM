@@ -39,83 +39,72 @@ echo "Installing dependencies..."
 conda install openblas-devel -c anaconda -y
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 pip install ninja scipy numpy==1.24.4
+pip install pytorch-lightning==2.5.0.post0
+pip install flask requests
+# 升级，否则可能找不到torch
+pip install --upgrade pip setuptools
 
 # 设置 CUDA 相关变量
 export CUDA_HOME=/home/zby/Cudas/cuda-12.1
 export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH 
 
 # 安装 MinkowskiEngine
 echo "Installing MinkowskiEngine..."
-cp /home/zby/ProgramFiles/anaconda3/envs/$ENV_NAME/lib/libopenblas.so* /home/zby/ProgramFiles/anaconda3/envs/$ENV_NAME/lib/python3.10/site-packages/torch/lib/.
-cd third_party
-# git clone git@github.com:NVIDIA/MinkowskiEngine.git
-cd MinkowskiEngine
+cp $CONDA_PREFIX/lib/libopenblas.so* $CONDA_PREFIX/lib/python3.10/site-packages/torch/lib/.
+cd $EXPECTED_PATH/third_party/MinkowskiEngine
 python setup.py install --blas_include_dirs=${CONDA_PREFIX}/include --blas=openblas
-cd ../
 
 # 安装 graspnetAPI
 echo "Installing graspnetAPI..."
 # git clone git@github.com:graspnet/graspnetAPI.git
-cd graspnetAPI
+cd $EXPECTED_PATH/third_party/graspnetAPI
 pip install -e .
-cd ..
 
 # 安装 pointnet2
-cd pointnet2
+cd $EXPECTED_PATH/third_party/pointnet2
 python setup.py install
-cd ../
-
-# 安装 DIFT
-echo "Installing DIFT related support..."
-pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu121
-pip install jupyterlab ipympl triton transformers matplotlib diffusers==0.15.0 accelerate
-pip install huggingface_hub==0.26 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 安装 co-tracker
 echo "Installing co-tracker..."
 # git clone https://github.com/facebookresearch/co-tracker.git
-cd co-tracker
+cd $EXPECTED_PATH/third_party/co-tracker
 pip install -e .
-# pip install matplotlib flow_vis tqdm tensorboard 'imageio[ffmpeg]'
-cd ../
 
 # 安装 SAM 2
 echo "Installing SAM 2..."
 # git clone https://github.com/facebookresearch/sam2.git 
-cd sam2
+cd $EXPECTED_PATH/third_party/sam2
 pip install -e ".[notebooks]"
-cd ../
 
 # 安装 Grounding DINO
 echo "Installing Grounding DINO..."
 # git clone git@github.com:IDEA-Research/GroundingDINO.git
-cd GroundingDINO
-pip install -e .
-cd ..
+cd $EXPECTED_PATH/third_party/GroundingDINO
+# pip install -e .
+python3 setup.py install
+
+# 安装 RAM 相关包
+pip install diffusers==0.15.0 
+pip install transformers==4.49.0 
+pip install ipympl==0.9.6 
+pip install xformers==0.0.29.post1 
+pip install accelerate==1.4.0 
+pip install urllib3==2.3.0 
+pip install open_clip_torch==2.31.0 einops openai
 
 # 安装 Embodied Analogy
 echo "Installing Embodied Analogy..."
-cd ../
+cd $EXPECTED_PATH/
 pip install -e .
-
-# 修复 opencv-python qt5 bug
-echo "Replace opencv-python with its headless version..."
-pip uninstall opencv-python opencv-python-headless -y
-pip install opencv-python-headless
-
-# 安装 napari
-echo "Installing napari..."
-python -m pip install "napari[pyqt5]" numpy==1.24.4
-
-# 删除 opencv 中的 qt5 插件, 防止与 cv2 冲突
-# rm /home/zby/ProgramFiles/anaconda3/envs/$ENV_NAME/lib/python3.10/site-packages/cv2/qt/plugins/platforms/libqxcb.so
-
-# 安装 RAM 相关支持
-echo "Installing RAM..."
-pip install open_clip_torch einops openai
 
 echo "Setup complete!"
 
 # TROUBLE SHOOTING
+# 修复 opencv-python qt5 bug
+# echo "Replace opencv-python with its headless version..."
+# pip uninstall opencv-python opencv-python-headless -y
+# pip install opencv-python-headless
+# echo "Installing napari..."
+# python -m pip install "napari[pyqt5]" numpy==1.24.4
 # 1) 要确保 initialize_napari 函数和 sapien 的 renderer 函数在 import grounding_dino  之前执行 !!!
