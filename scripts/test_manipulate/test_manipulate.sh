@@ -72,13 +72,12 @@ for obj_folder_path_reconstruct in "$LOG_DIR/$recon_run_name"/*; do
                 echo "Executing Python script for $output_file"
                 echo $obj_folder_path_reconstruct
                 # 执行 Python 脚本
-                python /home/zby/Programs/Embodied_Analogy/scripts/test_manipulate/test_manipulate.py \
+                python test_manipulate.py \
                     --obj_folder_path_reconstruct="$obj_folder_path_reconstruct" \
                     --scale_dir="$scale_dir" \
                     --manipulate_type="$operation" \
                     --manipulate_distance="$distance" \
                     --whole_traj_close_loop=$whole_traj_close_loop \
-                    # --drop_large_move=$drop_large_move \
                     --reloc_lr=$reloc_lr \
                     --max_manip=$max_manip \
                     --prismatic_whole_traj_success_thresh=$prismatic_whole_traj_success_thresh \
@@ -88,8 +87,6 @@ for obj_folder_path_reconstruct in "$LOG_DIR/$recon_run_name"/*; do
                     --prismatic_reloc_tolerance=$prismatic_reloc_tolerance \
                     --revolute_reloc_interval=$revolute_reloc_interval \
                     --revolute_reloc_tolerance=$revolute_reloc_tolerance \
-                    --prismatic_recon_success_thresh=$prismatic_recon_success_thresh \
-                    --revolute_recon_success_thresh=$revolute_recon_success_thresh \
                     --max_distance="$max_distance" > "$output_file"  # 重定向输出
             done
         done

@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 from embodied_analogy.utility.proposal.affordance import Affordance_map_2d
 from embodied_analogy.utility.constants import *
 from embodied_analogy.utility.utils import (
-    seed_everything,
     draw_points_on_image,
 )
 
@@ -79,7 +78,6 @@ def get_ram_affordance_2d(
         instruction: open the drawer (task description)
         prompt: used to extract dift feature
     """
-    seed_everything(SEED)
     print("Initializing SubsetRetrievePipeline ...")
     subset_retrieve_pipeline = SubsetRetrievePipeline(
         subset_dir=os.path.join(ASSET_PATH, "RAM_memory"),

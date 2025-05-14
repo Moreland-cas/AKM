@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 import numpy as np
 import argparse
@@ -10,7 +11,7 @@ from embodied_analogy.utility.utils import (
     rotation_matrix_between_vectors,
     find_correspondences
 )
-from embodied_analogy.utility.constants import ASSET_PATH, RUN_REMOTE_ANYGRASP
+from embodied_analogy.utility.constants import ASSET_PATH, RUN_REMOTE_ANYGRASP, PROJECT_ROOT
 from embodied_analogy.utility.server.client import run_anygrasp_remotely
 
 def crop_grasp(grasp_group, contact_point, radius=0.1):
@@ -26,7 +27,7 @@ def crop_grasp(grasp_group, contact_point, radius=0.1):
     if mask.sum() == 0:
         return None
     
-    grasp_group_ =GraspGroup()
+    grasp_group_ = GraspGroup()
     grasp_group_.grasp_group_array = grasp_group.grasp_group_array[mask]
     
     return grasp_group_
@@ -59,6 +60,8 @@ def filter_grasp_group(
     return grasp_group
 
 def prepare_any_grasp_model(asset_path=ASSET_PATH):
+    relative_path = os.path.join(PROJECT_ROOT, "embodied_analogy", "utility/grasp")
+    sys.path.append(relative_path)
     # load model
     from gsnet import AnyGrasp # gsnet.so
     # get a argument namespace

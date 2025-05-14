@@ -23,9 +23,9 @@ update_sigma=0.05
 reserved_distance=0.05
 num_initial_pts=1000
 fully_zeroshot=False
-use_anygrasp=False
+use_anygrasp=True
 offscreen=True
-GPU_ID=7
+GPU_ID=0
 ####################################################
 export CUDA_VISIBLE_DEVICES="$GPU_ID"
 
@@ -64,7 +64,6 @@ for obj_folder_path_cfg in "$LOG_DIR/$cfg_run_name"/*; do
         --num_initial_pts="$num_initial_pts" \
         --offscreen=$offscreen \
         --use_anygrasp="$use_anygrasp" > "$output_file"  
-    break
 done
 
 echo "所有命令已执行完成！"

@@ -7,7 +7,6 @@ from embodied_analogy.utility.estimation.fine_joint_est import fine_estimation
 from embodied_analogy.utility.utils import (
     initialize_napari,   
     farthest_scale_sampling,
-    set_random_seed,
     joint_data_to_transform_np,
     get_depth_mask,
     camera_to_image,
@@ -16,7 +15,6 @@ from embodied_analogy.utility.utils import (
 )
 initialize_napari()
 from embodied_analogy.utility.constants import *
-set_random_seed(SEED)
 
 
 class Obj_repr(Data):

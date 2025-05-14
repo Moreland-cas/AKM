@@ -5,6 +5,8 @@ import argparse
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 from embodied_analogy.representation.obj_repr import Obj_repr
+from embodied_analogy.utility.utils import explore_actually_valid
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', '1'):
@@ -56,9 +58,12 @@ if __name__ == "__main__":
     
     # 如果没有成功的 explore, 则退出
     if not explore_result["has_valid_explore"]:
-        print("No valid explore, thus no need to run reconstruction...")
+        print("No pred valid explore, thus no need to run reconstruction...")
+    # 即便 explore 算法认为有 valid_explore, 还需要根据 gt 检查一下
+    elif not explore_actually_valid(explore_result):
+        print("No actual valid explore, thus no need to run reconstruction...")
     else:
-        print("Find valid explore, keep going...")
+        print("Find actually valid explore, keep going...")
         recon_save_folder = args.obj_folder_path_reconstruct
         
         recon_cfg = update_cfg(explore_cfg, args)

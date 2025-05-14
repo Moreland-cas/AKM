@@ -1,9 +1,1 @@
-BACKGROUND_LABEL = 0
-STATIC_LABEL = 1
-MOVING_LABEL = 2
-UNKNOWN_LABEL = 3
-ACTIVATE_NAPARI=False
-SEED=666
-ASSET_PATH="/home/zby/Programs/Embodied_Analogy/assets"
-PROJECT_ROOT="/home/zby/Programs/Embodied_Analogy"
-RUN_REMOTE_ANYGRASP=False
+from embodied_analogy.project_config import *

@@ -11,12 +11,11 @@ recon_run_name="$3"
 # "recon_4_16"
 mkdir -p "$LOG_DIR/$recon_run_name"
 
-# TODO 仅对成功探索的重建，额外需要一个“成功参数”
 #################### 超参在这里!! ####################
 num_kframes=5
 fine_lr=1e-3
 save_memory=True
-GPU_ID=5
+GPU_ID=0
 ####################################################
 export CUDA_VISIBLE_DEVICES="$GPU_ID"
 

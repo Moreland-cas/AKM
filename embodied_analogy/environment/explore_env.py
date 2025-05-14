@@ -303,41 +303,41 @@ if __name__ == "__main__":
     
     exploreEnv = ExploreEnv(
         cfg={
-    "obj_folder_path_explore": "/home/zhangchunhui/zby_nips_2025/Embodied_Analogy/assets/logs/explore_58/45168_0_prismatic",
+    "joint_type": "prismatic",
+    "data_path": "dataset/one_drawer_cabinet/40147_link_1",
+    "obj_index": "40147",
+    "joint_index": "1",
+    "obj_description": "cabinet",
+    "load_pose": [
+        0.9147002696990967,
+        0.0,
+        0.4520242512226105
+    ],
+    "load_quat": [
+        0.999747097492218,
+        0.022409481927752495,
+        -4.2135787225561216e-05,
+        -0.0018797904485836625
+    ],
+    "load_scale": 1,
+    "active_link_name": "link_1",
+    "active_joint_name": "joint_1",
+    "instruction": "open the cabinet",
+    "init_joint_state": 0.0,
+    "obj_folder_path_explore": "/home/zby/Programs/Embodied_Analogy/assets/logs/explore_512/40147_link_1",
     "phy_timestep": 0.004,
     "planner_timestep": 0.01,
     "use_sapien2": True,
-    "fully_zeroshot": True,
+    "fully_zeroshot": False,
     "record_fps": 30,
     "pertubation_distance": 0.1,
     "valid_thresh": 0.5,
     "max_tries": 10,
     "update_sigma": 0.05,
     "reserved_distance": 0.05,
-    "instruction": "open the cabinet",
     "num_initial_pts": 1000,
     "offscreen": True,
-    "obj_description": "cabinet",
-    "joint_type": "prismatic",
-    "obj_index": "45168",
-    "joint_index": "0",
-    "init_joint_state": "0",
-    "data_path": "dataset/one_drawer_cabinet/45168_link_0",
-    "use_anygrasp": True,
-    "active_link_name": "link_0",
-    "active_joint_name": "joint_0",
-    "load_pose": [
-        0.9742488265037537,
-        0.0,
-        0.5911185145378113
-    ],
-    "load_quat": [
-        0.999930739402771,
-        0.008825333788990974,
-        -6.875664257677272e-05,
-        -0.007790286093950272
-    ],
-    "load_scale": 1
+    "use_anygrasp": False
 }
     )
     exploreEnv.explore_stage(visualize=False)

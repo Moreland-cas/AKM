@@ -4,10 +4,12 @@ import json
 import pickle
 import argparse
 import numpy as np
-from embodied_analogy.utility.utils import initialize_napari
+from embodied_analogy.utility.utils import initialize_napari, set_random_seed
 initialize_napari()
-
 from embodied_analogy.environment.manipulate_env import ManipulateEnv
+from embodied_analogy.utility.constants import RECON_PRISMATIC_VALID, RECON_REVOLUTE_VALID, MANIP_SEED
+
+set_random_seed(MANIP_SEED)
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', '1'):
@@ -52,10 +54,6 @@ def update_cfg(recon_cfg, args):
     if args.revolute_reloc_interval is not None:
         recon_cfg['revolute_reloc_interval'] = args.revolute_reloc_interval
     
-    if args.prismatic_recon_success_thresh is not None:
-        recon_cfg['prismatic_recon_success_thresh'] = args.prismatic_recon_success_thresh
-    if args.revolute_recon_success_thresh is not None:
-        recon_cfg['revolute_recon_success_thresh'] = args.revolute_recon_success_thresh
     return recon_cfg
 
 def read_args():
@@ -79,9 +77,6 @@ def read_args():
     parser.add_argument('--prismatic_whole_traj_success_thresh', type=float, help='.')
     parser.add_argument('--revolute_whole_traj_success_thresh', type=float, help='.')
     
-    parser.add_argument('--prismatic_recon_success_thresh', type=float, help='.')
-    parser.add_argument('--revolute_recon_success_thresh', type=float, help='.')
-
     args = parser.parse_args()
 
     return args
@@ -89,14 +84,13 @@ def read_args():
 if __name__ == '__main__':
     args = read_args()
     
-    # obj_folder_path_reconstruct = args.obj_folder_path_reconstruct.replace("MyBook", "MyBook1")
     try:
         with open(os.path.join(args.obj_folder_path_reconstruct, "cfg.json"), 'r', encoding='utf-8') as file:
             recon_cfg = json.load(file)
             print(recon_cfg)
-            for k, v in recon_cfg.items():
-                if isinstance(v, str):
-                    recon_cfg[k] = v.replace("MyBook", "MyBook1")
+            # for k, v in recon_cfg.items():
+            #     if isinstance(v, str):
+            #         recon_cfg[k] = v.replace("MyBook", "MyBook1")
     except Exception as e:
         print(f"Error reading cfg file and obj_repr: ")
         print("\t", e)
@@ -117,12 +111,12 @@ if __name__ == '__main__':
         fine_pos_err = fine_loss['pos_err']
         
         if joint_type == "prismatic":
-            if not(fine_angle_err < np.deg2rad(args.revolute_recon_success_thresh) and fine_type_loss == 0):
+            if not(fine_angle_err < np.deg2rad(RECON_REVOLUTE_VALID) and fine_type_loss == 0):
                 print("Skip since the reconstruction is not good enough")
                 print("done")
                 sys.exit(0)
         else:
-            if not(fine_pos_err < args.prismatic_recon_success_thresh and fine_angle_err < np.deg2rad(args.revolute_recon_success_thresh) and fine_type_loss == 0):
+            if not(fine_pos_err < RECON_PRISMATIC_VALID and fine_angle_err < np.deg2rad(RECON_REVOLUTE_VALID) and fine_type_loss == 0):
                 print("Skip since the reconstruction is not good enough")
                 print("done")
                 sys.exit(0)

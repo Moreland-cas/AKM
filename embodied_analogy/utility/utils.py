@@ -1663,6 +1663,17 @@ def distance_between_transformation(mat1, mat2):
     return trans_dist + rot_dist  # 或者其他加权方式
 
 
+def explore_actually_valid(result):
+    joint_type = result["joint_type"]
+    joint_delta = result["joint_state_end"] - result["joint_state_start"]
+    if joint_type == "prismatic":
+        # if joint_delta < 0.09:
+        #     pass
+        return joint_delta >= EXPLORE_PRISMATIC_VALID
+    elif joint_type == "revolute":
+        return np.rad2deg(joint_delta) >= EXPLORE_REVOLUTE_VALID
+    
+    
 if __name__ == "__main__":
     print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]
     print(custom_linspace(0, 5, 1))      # [1., 2., 3., 4., 5.]
