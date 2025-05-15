@@ -14,9 +14,6 @@ revolute
 ########################### 超参数 ###########################
 prismatic_success_loss = 5 # cm
 revolute_success_loss = 10 # degree
-
-
-
 #############################################################
 
 import os
@@ -24,12 +21,13 @@ import pickle
 import argparse
 import json
 import numpy as np
+from embodied_analogy.utility.constants import ASSET_PATH
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run_name', type=str, help='Folder where things are stored')
 args = parser.parse_args()
 
-root_path = os.path.join("/media/zby/MyBook1/embody_analogy_data/assets/logs/", args.run_name)
+root_path = os.path.join(ASSET_PATH, "logs", args.run_name)
 
 summary_dict = {
     "prismatic": {
@@ -90,7 +88,8 @@ def scaled_loss_list_success(loss_list, joint_type):
 for object_folder in os.listdir(root_path):
     # /logs/manip_4_16/45135_1_prismatic
     object_path = os.path.join(root_path, object_folder)
-    joint_type = object_folder.split("_")[-1]
+    
+    # joint_type = object_folder.split("_")[-1] 
     manip_types = ["close", "open"]
     for manip_type in manip_types:
         # /logs/manip_4_16/45135_1_prismatic/open
@@ -110,6 +109,10 @@ for object_folder in os.listdir(root_path):
     
             # 因为有些文件夹（没有成功 explore 的那些）没有result.pkl，所以需要try
             try:
+                with open(os.path.join(scale_path, "cfg.json"), 'r', encoding='utf-8') as file:
+                    manip_cfg = json.load(file)
+                    joint_type = manip_cfg["joint_type"]
+                    
                 with open(os.path.join(scale_path, 'result.pkl'), 'rb') as result_file:
                     # 这个存储了多次操作后每次的 result
                     result_list = pickle.load(result_file)
@@ -163,7 +166,7 @@ def process_summary_dict(summary_dict):
                 for i, loss_list in enumerate(summary_dict[joint_type][manip_type][scale]["loss_lists"]):
                     num_manip += len(loss_list)
                     loss_list = [abs(loss) for loss in loss_list]
-                    loss_list = loss_list + [loss_list[-1]] * (max_tries - len(loss_list))
+                    loss_list = loss_list + [loss_list[-1]] * int(max_tries - len(loss_list))
                     summary_dict[joint_type][manip_type][scale]["loss_lists"][i] = loss_list
                 
                 # num_exp * close_loop_times    
@@ -179,7 +182,7 @@ def process_summary_dict(summary_dict):
                 print(f"Success rate: {num_success / (num_success + num_failed) * 100}")
                 print(f"avg manip: {num_manip / loss_array.shape[0]}")
                 print(f"final error: {loss_array[:, -1].mean():.3f} {unit}\n")
-                for i in range(max_tries):
+                for i in range(int(max_tries)):
                     print(f"\tclose loop {i+1}: {loss_array[:, i].mean():.3f} {unit}")
 
 process_summary_dict(summary_dict)

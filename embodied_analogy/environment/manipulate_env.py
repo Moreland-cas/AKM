@@ -135,7 +135,7 @@ class ManipulateEnv(ReconEnv):
             return abs(self.cur_state - self.target_state) > np.deg2rad(self.cfg["revolute_whole_traj_success_thresh"]) # 5 degree 
         
     def manipulate_close_loop(self, visualize=False):
-        self.max_manip = cfg["max_manip"]
+        self.max_manip = self.cfg["max_manip"]
         print("Start manipulation Loop ...")
         num_manip = 0
         results = []
@@ -315,19 +315,19 @@ if __name__ == '__main__':
     import json
     # close
     # cfg_path = "/media/zby/MyBook1/embody_analogy_data/assets/logs/manip_429/45243_0_prismatic/open/scale_0.15/cfg.json"
-    cfg_path = "/media/zby/MyBook1/embody_analogy_data/assets/logs/manip_429/45961_0_revolute/open/scale_30/cfg.json"
+    cfg_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/manip_513/40147_link_1/close/scale_10/cfg.json"
     
     # open
     with open(cfg_path, "r") as f:
         cfg = json.load(f)
     
-    for k, v in cfg.items():
-        if isinstance(v, str):
-            cfg[k] = v.replace("MyBook*/", "MyBook1/")
+    # for k, v in cfg.items():
+    #     if isinstance(v, str):
+    #         cfg[k] = v.replace("MyBook*/", "MyBook1/")
     me = ManipulateEnv(cfg)
     # result = me.manipulate_close_loop_intermediate()
     result = me.manipulate_close_loop()
     print(result)
-    while True:
-        me.base_step()
+    # while True:
+    #     me.base_step()
     

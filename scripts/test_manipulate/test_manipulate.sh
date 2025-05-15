@@ -20,9 +20,7 @@ revolute_manip_distances=(10 20 30)
 
 reloc_lr=3e-3
 whole_traj_close_loop=True
-# drop_large_move=True
-prismatic_recon_success_thresh=0.05
-revolute_recon_success_thresh=10
+# whole_traj_close_loop=False
 
 # used for whole-traj close-loop
 max_manip=5
@@ -35,7 +33,9 @@ prismatic_reloc_interval=0.05 # m
 prismatic_reloc_tolerance=0.01 # m
 revolute_reloc_interval=5  # degree
 revolute_reloc_tolerance=2 # degree
+GPU_ID=0
 ####################################################
+export CUDA_VISIBLE_DEVICES="$GPU_ID"
 
 # 遍历 LOG_DIR 下的重建文件夹
 for obj_folder_path_reconstruct in "$LOG_DIR/$recon_run_name"/*; do
@@ -47,9 +47,16 @@ for obj_folder_path_reconstruct in "$LOG_DIR/$recon_run_name"/*; do
             operation_dir="$LOG_DIR/$manip_run_name/$obj_folder_name/$operation"
             mkdir -p "$operation_dir"
 
-            # 根据 obj_folder_name 判断 joint_type
             # 如果是 prismatic, 则把 manipulate distances 设置为 prismatic_manip_distances
-            if [[ $obj_folder_name == *"prismatic"* ]]; then
+            recon_cfg_path="$obj_folder_path_reconstruct/cfg.json"
+
+            if [ ! -f "$recon_cfg_path" ]; then
+                echo "配置文件 $recon_cfg_path 不存在，跳过当前处理。"
+                continue
+            fi
+
+            joint_type=$(jq -r '.joint_type' "$recon_cfg_path")
+            if [[ $joint_type == *"prismatic"* ]]; then
                 manipulate_distances=("${prismatic_manip_distances[@]}")
                 max_distance=$prismatic_max_distance
             else
