@@ -275,18 +275,41 @@ class Frame(Data):
                 asset_path=asset_path
             )
             
-        gg = crop_grasp(
-            grasp_group=gg,
-            contact_point=self.contact3d,
-            radius=0.1,
-        )
+        # 初始化限制条件
+        max_radius = 0.5  # 最大可接受的 radius
+        max_degree_thre = 90  # 最大可接受的 degree_thre
+        radius_step = 0.05  # 每次增加的 radius 步长
+        degree_step = 10  # 每次增加的 degree_thre 步长
+        radius = 0.1  # 初始 radius
+        degree_thre = 30  # 初始 degree_thre
 
-        # 先用 dir_out 进行一个 hard filter, 保留角度在 30度 内的 grasp
-        gg_filtered = filter_grasp_group(
-            grasp_group=gg,
-            degree_thre=30,
-            dir_out=dir_out,
-        )
+        while True:
+            gg_cropped = crop_grasp(
+                grasp_group=gg,
+                contact_point=self.contact3d,
+                radius=radius,
+            )
+
+            gg_filtered = filter_grasp_group(
+                grasp_group=gg_cropped,
+                degree_thre=degree_thre,
+                dir_out=dir_out,
+            )
+
+            if gg_filtered is not None and len(gg_filtered) > 0:
+                break
+
+            # 如果没有找到 grasp，逐步放松限制
+            if radius < max_radius:
+                radius += radius_step
+            if degree_thre < max_degree_thre:
+                degree_thre += degree_step
+
+            # 如果已经达到了最大可接受的阈值，退出循环
+            if radius >= max_radius and degree_thre >= max_degree_thre:
+                break
+
+        gg = gg_filtered
 
         # 再用距离 contact3d 的距离和 detector 本身预测的分数做一个排序
         gg_sorted = sort_grasp_group(

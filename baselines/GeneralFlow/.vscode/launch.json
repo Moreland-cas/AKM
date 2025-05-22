@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Python: 当前文件",
+        "type": "python",
+        "request": "launch",
+        // "program": "aff_exec.py",
+        "program": "${file}",
+        "console":"integratedTerminal",
+        "justMyCode": false,  // 如果为 true，调试器将仅调试当前文件中的代码
+        "args": [
+            // "--input_dir",
+            // "demo/input/safe_0_hand",
+            // "--desc",
+            // "open_Safe",
+            // "close_Safe",
+            // "--pretrained_path",
+            // "log/kpst_hoi4d/ScaleGFlow-B/checkpoint/ckpt_best_train_scalegflow_b.pth"
+            // "log/kpst_hoi4d/ScaleGFlow-S/checkpoint/ckpt_best_train_scalegflow_s.pth"
+            // "log/kpst_hoi4d/ScaleGFlow-L/checkpoint/ckpt_best_train_scalegflow_l.pth"
+        ]
+      }
+    ]
+  }
