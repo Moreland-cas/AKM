@@ -64,6 +64,8 @@ class Frame(Data):
         K=None,
         Tw2c=None,
         joint_state=None,
+        gt_joint_state=None,
+        joint_state_offset=None,
         obj_bbox=None,
         obj_mask=None,
         dynamic_mask=None,
@@ -77,7 +79,11 @@ class Frame(Data):
         robot_mask=None,
         Tph2w=None
     ):
-        
+        """
+        joint_state: 重建算法预测的 joint_state
+        joint_state_offset: explore_video 的第一帧对应的 gt_joint_state
+        gt_joint_state: 真实的 joint_state, 如果预测的足够好, 那么应该有 joint_state + joint_state_offset = gt_joint_state
+        """
         self.rgb = rgb
         self.depth = depth
         self.K = K
@@ -87,6 +93,8 @@ class Frame(Data):
         self.obj_mask = obj_mask
         self.dynamic_mask = dynamic_mask
         self.joint_state = joint_state
+        self.gt_joint_state = gt_joint_state
+        self.joint_state_offset = joint_state_offset
         
         # NOTE: 这几个都在相机坐标系下
         self.track2d = track2d
@@ -570,7 +578,7 @@ class Frames(Data):
             
             # 但是如果 filter_mask 过滤后的点实在太少, 那么就不进行过滤
             if filter_mask.sum() < 100:
-                print(f"WARNING: too few points after filtering (original: {track3d_seq.shape[1]}, filtered: {filter_mask.sum()}), skip filtering")
+                # print(f"WARNING: too few points after filtering (original: {track3d_seq.shape[1]}, filtered: {filter_mask.sum()}), skip filtering")
                 filter_mask = np.ones(M, dtype=bool)
                 
             track2d_seq = track2d_seq[:, filter_mask]
@@ -740,7 +748,6 @@ if __name__ == "__main__":
     # frame.detect_grasp(True)
     # frame.segment_obj(obj_description="drawer", visualize=True, remove_robot=False)
     obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy")
-    # print(obj_repr.frames.track2d_seq.shape)
     # obj_repr.visualize()
     
     from embodied_analogy.utility.grasp.gsnet import detect_grasp_gsnet

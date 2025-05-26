@@ -1,4 +1,5 @@
 import os
+import logging
 import json
 import numpy as np
 import sapien.core as sapien
@@ -21,13 +22,13 @@ class ObjEnv(RobotEnv):
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)
         # TODO: 在这里获得 gt joint state, 并进行保存到 frame 中
+        frame.gt_joint_state = self.get_active_joint_state()
         if visualize:
             frame.visualize()
         return frame
     
     def load_object(self, obj_cfg, visualize=False):
-        print("Loading Object ...")
-        print(obj_cfg)
+        self.logger.log(logging.INFO, f"Loading Object: \n{obj_cfg}")
         self.active_joint_idx = int(obj_cfg["joint_index"])
         self.active_joint_name = obj_cfg["active_joint_name"]
         active_link_name = obj_cfg["active_link_name"]
@@ -84,12 +85,14 @@ class ObjEnv(RobotEnv):
         self.base_step()
         
         self.obj_repr = Obj_repr()
+        self.obj_repr.setup_logger(self.logger)
+        
         # 在这里要顺便把 gt_joint_param 也进行保存
         # 首先获取 parent link 的位置 
         # NOTE: parent link 一般是物体的主体部分, child link 一般是 mobing part 对应的 link
         # active_joint = self.obj.get_active_joints()[self.active_joint_idx]
         if active_link_name != self.active_joint.get_child_link().get_name():
-            print("active_link_name is not consistent with active_joint_name, there might be an error!")
+            self.logger.log(logging.ERROR, "active_link_name is not consistent with active_joint_name!")
         
         Tparent2w = self.active_joint.get_parent_link().get_pose().to_transformation_matrix() # Tparent2w
         joint_in_parent = self.active_joint.get_pose_in_parent().to_transformation_matrix()

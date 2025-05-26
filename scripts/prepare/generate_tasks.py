@@ -4,7 +4,7 @@ import json
 import numpy as np
 import argparse
 from embodied_analogy.utility.constants import ASSET_PATH, PROJECT_ROOT, SEED
-from embodied_analogy.utility.randomize_obj_pose import randomize_obj_load_pose, randomize_dof
+from embodied_analogy.utility.randomize_obj_pose import randomize_obj_load_pose
 from embodied_analogy.utility.utils import set_random_seed
 from embodied_analogy.utility.constants import (
     NUM_EXP_PER_SETTING,
@@ -33,7 +33,7 @@ args = parser.parse_args()
     
 task_cfgs = {}
 obj_cfgs = []
-
+# 首先遍历 prismatic 和 revolute folder, 得到所有 object 的信息
 pri_path = os.path.join(ASSET_PATH, "dataset/one_drawer_cabinet")
 # 44781_link_0
 for tmp_folder in os.listdir(pri_path):
@@ -86,8 +86,9 @@ for obj_cfg in obj_cfgs:
     elif joint_type == "revolute":
         max_joint_range = REVOLUTE_JOINT_MAX_RANGE
         test_joint_deltas = REVOLUTE_TEST_JOINT_DELTAS
-    
+    # 遍历 "打开" 和 "关闭"
     for manip_type in ["open", "close"]:
+        # 遍历所有尺度
         for test_delta in test_joint_deltas:
             assert max_joint_range >= test_delta
             if manip_type == "open":
@@ -102,6 +103,7 @@ for obj_cfg in obj_cfgs:
                 obj_init_dof_low = np.deg2rad(obj_init_dof_low)
                 obj_init_dof_high = np.deg2rad(obj_init_dof_high)
 
+            # 每一种 setting 下运行 NUM_EXP_PER_SETTING 遍, 且 load 状态会有所不同
             for _ in range(NUM_EXP_PER_SETTING):
                 base_obj_cfg = copy.copy(obj_cfg)
                 base_obj_cfg = randomize_obj_load_pose(
@@ -118,7 +120,8 @@ for obj_cfg in obj_cfgs:
 # for k, v in task_cfgs.items():
 #     print(k)
 #     print(v)
-    
+
+# 保存产生的 test_cfgs
 os.makedirs(args.save_dir, exist_ok=True)
 cfg_file_path = os.path.join(args.save_dir, "test_cfgs.json")
 with open(cfg_file_path, 'w', encoding='utf-8') as f:

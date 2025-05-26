@@ -42,8 +42,8 @@ def run_grounded_sam(
 if __name__ == "__main__":
     from PIL import Image
     import numpy as np
-    run_grounded_sam(
-        rgb_image=np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/sapien_test.png").convert("RGB")),
+    initial_bbox, initial_mask = run_grounded_sam(
+        rgb_image=np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/assets/unit_test/gsam/cat.jpeg").convert("RGB")),
         obj_description="drawer",
         positive_points=None, 
         negative_points=None,
@@ -52,5 +52,6 @@ if __name__ == "__main__":
         dino_model=load_groundingDINO_model(),
         sam2_image_model=load_sam2_image_model(),
         post_process_mask=True,
-        visualize=True
+        visualize=False
     )
+    print(initial_bbox, initial_mask)

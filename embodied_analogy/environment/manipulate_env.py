@@ -1,4 +1,5 @@
 import os
+import logging
 import numpy as np
 
 from embodied_analogy.utility.utils import (
@@ -26,7 +27,8 @@ class ManipulateEnv(ReconEnv):
         """
         self.cfg = cfg
         # 首先 load 物体
-        ObjEnv.__init__(self, cfg)
+        # ObjEnv.__init__(self, cfg)
+        super().__init__(cfg)
         
         self.reloc_lr = cfg["reloc_lr"]
         self.reserved_distance = cfg["reserved_distance"]
@@ -46,10 +48,9 @@ class ManipulateEnv(ReconEnv):
         self.target_state = None
         
         self.obj_description = cfg["obj_description"]
-        self.obj_repr = Obj_repr.load(os.path.join(cfg["obj_folder_path_reconstruct"], "obj_repr.npy"))
+        # self.obj_repr = Obj_repr.load(os.path.join(cfg["obj_folder_path_reconstruct"], "obj_repr.npy"))
         
     def manip_once(self):
-        print("Start one manipulation run ...")
         """
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
         
@@ -57,10 +58,11 @@ class ManipulateEnv(ReconEnv):
         
         移动到该位姿, 并根据 target_state 进行操作
         """
+        self.logger.log(logging.INFO, "Start one manipulation run ...")
         self.obj_repr : Obj_repr 
         
         # NOTE: 感觉每次失败的时候没必要完全 reset, 只要撤回一段距离, 然后再次尝试就好了
-        print("\topen gripper and move back a little bit...")
+        self.logger.log(logging.INFO, "\topen gripper and move back a little bit...")
         self.open_gripper()
         self.move_forward(
             moving_distance=-self.reserved_distance,
@@ -68,9 +70,9 @@ class ManipulateEnv(ReconEnv):
         )
         
         # 在这里是不是需要再跑一遍 reloc, 从而防止 open_gripper + move_backward 对于物体状态的影响
-        self.update_cur_frame()
+        self.update_cur_frame(init_guess=self.cur_state)
         
-        # print("reset robot safe...")
+        # "reset robot safe..."
         # self.reset_robot_safe()
         
         self.ref_ph_to_tgt(
@@ -92,7 +94,7 @@ class ManipulateEnv(ReconEnv):
         result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
         
         if result_pre is None:
-            print("Get None planning result in manip_once()...")
+            self.logger.log(logging.INFO, "Get None planning result in manip_once(), thus do nothing")
         else:
             # 实际执行
             self.follow_path(result_pre)
@@ -116,40 +118,62 @@ class ManipulateEnv(ReconEnv):
         
         # 这里进行重定位, 如果离自己的目标差太多, 就重新执行
         result_dict = self.evaluate()
-        # print(result_dict)
+        self.logger.log(logging.INFO, result_dict)
         return result_dict
         
     def not_good_enough(self, visualize=False):
-        print("Check if current state is good enough...")
+        self.logger.log(logging.INFO, "Check if current state is good enough...")
         # NOTE: cur_frame 代表刚开始一轮操作时捕获的 frame
         # 然后估计出 cur_state
-        self.update_cur_frame(visualize=visualize)
+        if self.target_state is None:
+            self.update_cur_frame(
+                init_guess=None,
+                visualize=visualize
+            )
+        else:
+            self.update_cur_frame(
+                init_guess=self.target_state,
+                visualize=visualize
+            )
         
         # NOTE: 仅在第一次调用 not_good_enough 的时候设置 target_state
         if self.target_state is None:
-            self.target_state = self.cur_state + self.goal_delta
+            # 这里不应该用 cur_state, 而是应该用 initial_frame 的 joint_state
+            self.obj_repr.reloc(
+                query_frame=self.obj_repr.initial_frame,
+                reloc_lr=self.cfg["reloc_lr"],
+                init_guess=None,
+                visualize=visualize
+            )
+            initial_joint_state = self.obj_repr.initial_frame.joint_state
+            self.target_state = initial_joint_state + self.goal_delta
         
         if self.obj_repr.fine_joint_dict["joint_type"] == "prismatic":
-            return abs(self.cur_state - self.target_state) > self.cfg["prismatic_whole_traj_success_thresh"] # 1cm
+            not_good = abs(self.cur_state - self.target_state) > self.cfg["prismatic_whole_traj_success_thresh"] # 1cm
         elif self.obj_repr.fine_joint_dict["joint_type"] == "revolute":
-            return abs(self.cur_state - self.target_state) > np.deg2rad(self.cfg["revolute_whole_traj_success_thresh"]) # 5 degree 
+            not_good = abs(self.cur_state - self.target_state) > np.deg2rad(self.cfg["revolute_whole_traj_success_thresh"]) # 5 degree 
+        if not_good:
+            self.logger.log(logging.INFO, "Not good enough")
+        else:
+            self.logger.log(logging.INFO, "Good enough")
+        self.logger.log(logging.INFO, f"cur_state: {self.cur_state}, target_state: {self.target_state}")
+        return not_good
         
     def manipulate_close_loop(self, visualize=False):
         self.max_manip = self.cfg["max_manip"]
-        print("Start manipulation Loop ...")
+        self.logger.log(logging.INFO, "Start manipulation Loop ...")
         num_manip = 0
         results = []
         while(self.not_good_enough(visualize=visualize) and (num_manip < self.max_manip)):
-            print(f"Start manipulating, round {num_manip + 1}...")
+            self.logger.log(logging.INFO, f"Start manipulating, round {num_manip + 1}...")
             result = self.manip_once()
             num_manip = num_manip + 1
-            print(result)
             results.append(result)
         
         if num_manip == self.max_manip:
-            print(f"After {num_manip} round, Stopped since num_manip reach max_manip...")
+            self.logger.log(logging.INFO, f"After {num_manip} round, Stopped since num_manip reach max_manip...")
         else:
-            print(f"After {num_manip} round, Stopped since the robot thinks it is good enough...")
+            self.logger.log(logging.INFO, f"After {num_manip} round, Stopped since the robot thinks it is good enough...")
         return results
         
     ###################################### 底下是新版本 ######################################
@@ -188,38 +212,37 @@ class ManipulateEnv(ReconEnv):
             # NOTE 在这里的状态应该是已经 close_gripper, 且 cur_state 已经更新为当前的 state
             # === 核心修改点1：每次循环都打印状态 ===
             # self.update_cur_frame(init_guess=self.init_guess) # 这句似乎在第一次不需要
-            print(f"\n[状态更新] 当前: {self.cur_state:.4f} | 目标: {self.target_state:.4f}")
+            self.logger.log(logging.INFO, f"\n[状态更新] 当前: {self.cur_state:.4f} | 目标: {self.target_state:.4f}")
             
             # 终止检查
             if abs(self.cur_state - self.target_state) <= tolerance:
-                print(">> 成功抵达最终目标！")
+                self.logger.log(logging.INFO, ">> 成功抵达最终目标！")
                 break
                 # return True
 
             # === 核心修改点2：显示中间点生成过程 ===
             intermediates = custom_linspace(self.cur_state, self.target_state, step)
-            print(f"[路径规划] 新路径长度: {len(intermediates)} 步, 首点: {intermediates[0]:.4f} 末点: {intermediates[-1]:.4f}")
+            self.logger.log(logging.INFO, f"[路径规划] 新路径长度: {len(intermediates)} 步, 首点: {intermediates[0]:.4f} 末点: {intermediates[-1]:.4f}")
 
             # 执行路径
             for target in intermediates:
-                print(f"\n[执行阶段] 当前目标: {target:.4f}")
+                self.logger.log(logging.INFO, f"\n[执行阶段] 当前目标: {target:.4f}")
                 if not self._execute_validate_step(target, tolerance):
                     # === 核心修改点3：恢复后强制重新生成路径 ===
-                    print("!! 步骤执行失败，执行恢复协议...")
+                    self.logger.log(logging.INFO, "!! 步骤执行失败，执行恢复协议...")
                     self._enhanced_recovery_protocol()
                     global_attempt += 1
-                    print(f"!! 全局尝试次数: {global_attempt}/{max_attempts}")
+                    self.logger.log(logging.INFO, f"!! 全局尝试次数: {global_attempt}/{max_attempts}")
                     break  # 退出当前路径循环，触发外层循环重新生成路径
             else:
-                print(">> 完整路径执行成功！")
+                self.logger.log(logging.INFO, ">> 完整路径执行成功！")
                 # return True
 
         if global_attempt == max_attempts:
-            print("## 超过最大尝试次数，操作终止")
+            self.logger.log(logging.INFO, "## 超过最大尝试次数，操作终止")
         # return False
         result_dict = self.evaluate()
-        print("result:")
-        print(result_dict)
+        self.logger.log(logging.INFO, f"result: {result_dict}")
         return result_dict
     
     def _move_to_grasp_and_close(self):
@@ -258,7 +281,7 @@ class ManipulateEnv(ReconEnv):
         
     def _execute_validate_step(self, target, tolerance):
         """执行并验证单个步骤"""
-        print(f"执行步骤 → {target:.4f}")
+        self.logger.log(logging.INFO, f"执行步骤 → {target:.4f}")
         
         # 获取运动参数
         joint_config = self.obj_repr.get_joint_param("fine", "world")
@@ -277,13 +300,13 @@ class ManipulateEnv(ReconEnv):
         self.update_cur_frame(init_guess=self.init_guess)
         self.init_guess = self.cur_state
         error = abs(self.cur_state - target)
-        print(f"预期：{target:.4f} | 实际：{self.cur_state:.4f} | 误差：{error:.4f}")
+        self.logger.log(logging.INFO, f"预期：{target:.4f} | 实际：{self.cur_state:.4f} | 误差：{error:.4f}")
     
         return error <= tolerance
     
     def _enhanced_recovery_protocol(self):
         """增强版恢复协议（明确状态刷新）"""
-        print("\n--- 开始恢复协议 ---")
+        self.logger.log(logging.INFO, "\n--- 开始恢复协议 ---")
         # 回撤操作
         self.open_gripper()
         self.move_forward(
@@ -292,13 +315,14 @@ class ManipulateEnv(ReconEnv):
         ) # 保持原有回撤逻辑
         
         # 核心修改点：强制状态刷新并验证
-        print("强制重新定位...")
+        self.logger.log(logging.INFO, "强制重新定位...")
         self.update_cur_frame(init_guess=self.init_guess)
         # 然后进行抓取 
         self._move_to_grasp_and_close()
-        print(f"恢复后最新状态: {self.cur_state:.4f}")
-        print("--- 恢复协议完成 ---\n")
-            
+        self.logger.log(logging.INFO, f"恢复后最新状态: {self.cur_state:.4f}")
+        self.logger.log(logging.INFO, "--- 恢复协议完成 ---\n")
+    
+    #############################################################
     def evaluate(self):
         # 评测 manipulate 的好坏
         actual_delta = self.get_active_joint_state() - self.init_joint_state
@@ -309,6 +333,16 @@ class ManipulateEnv(ReconEnv):
             "goal_delta": self.goal_delta
         }
         return result_dict
+    
+    def main(self):
+        super().main()
+        self.manip_result = self.manipulate_close_loop()
+        self.logger.log(logging.INFO, self.manip_result)
+        return {
+            "explore": self.explore_result,
+            "recon": self.recon_result,
+            "manip": self.manip_result
+        }
             
         
 if __name__ == '__main__':

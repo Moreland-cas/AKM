@@ -1,5 +1,4 @@
 import torch
-import napari 
 import numpy as np
 
 from embodied_analogy.utility.utils import (

@@ -1,6 +1,7 @@
 import os
 import json
 import pickle
+import logging
 import math
 import numpy as np
 import sklearn.cluster as cluster
@@ -24,7 +25,6 @@ class ExploreEnv(ObjEnv):
         ):        
         super().__init__(cfg=cfg)
         self.cfg = cfg
-        print("loading explore env, using cfg:", cfg)
         
         self.record_fps = cfg["record_fps"]
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
@@ -39,8 +39,8 @@ class ExploreEnv(ObjEnv):
         
         # 读取和保存所用的变量
         self.joint_type = cfg["joint_type"]
-        self.save_prefix = cfg["obj_folder_path_explore"]
-        os.makedirs(self.save_prefix, exist_ok=True)
+        # self.save_prefix = cfg["obj_folder_path_explore"]
+        # os.makedirs(self.save_prefix, exist_ok=True)
         
     def explore_stage(self, visualize=False):
         """
@@ -54,10 +54,10 @@ class ExploreEnv(ObjEnv):
         initial_frame = super().capture_frame()
         
         # 只在第一次进行 contact transfer, 之后直接进行复用
-        print("Start transfering 2d contact affordance map...")
+        self.logger.log(logging.INFO, "Start transfering 2d contact affordance map...")
         self.affordance_map_2d = get_ram_affordance_2d(
             query_rgb=initial_frame.rgb,
-            instruction=self.instruction,
+            instruction=self.cfg["instruction"],
             obj_description=self.obj_description,
             fully_zeroshot=self.cfg["fully_zeroshot"],
             visualize=visualize
@@ -74,7 +74,8 @@ class ExploreEnv(ObjEnv):
         self.obj_repr.frames.Tw2c = self.camera_extrinsic
         self.obj_repr.initial_frame = initial_frame
         
-        print(f"Start exploring..., you have {self.max_tries} chances to explore...")
+        self.max_tries = self.cfg["max_tries"]
+        self.logger.log(logging.INFO, f"Start exploring..., you have {self.max_tries} chances to explore...")
         self.num_tries = 0
         while self.num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
@@ -85,19 +86,19 @@ class ExploreEnv(ObjEnv):
             else:
                 self.reset_robot_safe()
             
-            print(f"[{self.num_tries + 1}|{self.max_tries}] Start exploring once...")
+            self.logger.log(logging.INFO, f"[{self.num_tries + 1}|{self.max_tries}] Start exploring once...")
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
             self.num_tries += 1
             if not actually_tried:
-                print("The planning path is not valid, update affordance map and try again...")
+                self.logger.log(logging.INFO, "The planning path is not valid, update affordance map and try again...")
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
             
             if self.check_valid(visualize=visualize):
-                print("good, check valid, break explore loop")
+                self.logger.log(logging.INFO, "Check valid, break explore loop")
                 break
             else:
-                print("bad, check invalid, update affordance map and try again...")
+                self.logger.log(logging.INFO, "Check invalid, update affordance map and try again...")
                 self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
         # save explore data
@@ -110,15 +111,14 @@ class ExploreEnv(ObjEnv):
             "has_valid_explore": self.has_valid_explore,
             "joint_type": self.joint_type,
             "joint_state_start": 0,
-            "joint_state_end": self.get_active_joint_state()
+            "joint_state_end": self.get_active_joint_state() - self.cfg["init_joint_state"]
         }
-        print("exploration stage result: ", result_dict)
+        self.logger.log(logging.INFO, f"exploration stage result: {result_dict}")
         
         if not self.has_valid_explore:
-            print("In summary, no valid exploration during explore phase!")
-            # raise Exception("No valid exploration during explore phase!")
+            self.logger.log(logging.INFO, "In summary, no valid exploration during explore phase!")
         else:
-            print("In summary, get valid exploration during explore phase!")
+            self.logger.log(logging.INFO, "In summary, get valid exploration during explore phase!")
         return result_dict
     
     def explore_once(
@@ -297,6 +297,11 @@ class ExploreEnv(ObjEnv):
             return True
         else:
             return False
+    
+    ###############################################
+    def main(self):
+        self.explore_result = self.explore_stage()
+        self.logger.log(logging.INFO, self.explore_result)
         
     
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from transforms3d.quaternions import qmult
 import sapien.core as sapien
@@ -10,10 +11,7 @@ from embodied_analogy.utility.utils import visualize_pc
 from embodied_analogy.utility.constants import ASSET_PATH
 
 class BaseEnv():
-    def __init__(
-            self,
-            cfg,
-        ):        
+    def __init__(self, cfg):        
         self.cfg = cfg
         self.offscreen = cfg["offscreen"]
         phy_timestep = cfg["phy_timestep"]
@@ -77,6 +75,27 @@ class BaseEnv():
             
         self.step = self.base_step
         self.load_camera()
+        
+        # 设置 logger
+        self.setup_logger(output_txt_path=cfg["output_txt_path"])
+    
+    def setup_logger(self, output_txt_path):
+        logger = logging.getLogger("ea_logger")
+        logger.setLevel(logging.INFO)
+        
+        # 设置格式化
+        # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)-8s] %(message)s')
+        
+        # 设置流
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+        file_handler = logging.FileHandler(output_txt_path)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        self.logger = logger
     
     def get_viewer_param(self):
         """

@@ -1,5 +1,6 @@
 import math
 import mplib
+import logging
 import numpy as np
 import sapien.core as sapien
 import transforms3d as t3d
@@ -178,7 +179,7 @@ class RobotEnv(BaseEnv):
         """
         reset_robot 不控制 gripper 的 open/close 状态, 只把其他关节进行 reset
         """
-        print("Reset robot ...")
+        self.logger.log(logging.INFO, "Reset robot ...")
         # 垂直的 pose
         init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         # 向后躺倒的 pose
@@ -203,22 +204,22 @@ class RobotEnv(BaseEnv):
         self.base_step()
 
         count = 0
-        while count < 100:
+        while count < 200:
             vel = self.robot.get_qvel()
             # 这里选用 vel_norm 作为 reset 进行同步的终止条件, 因为 vel 相对于 qpos 和 qacc 更加稳定
             # qpos 不知道要设置什么值, qacc 经常会突变
             vel_norm = np.linalg.norm(vel)
             if vel_norm < 2e-3: # 基本 vel 在 mm/s 的量级就是可以的
-                print(f"Break reset since small robot vel norm: {vel_norm}")
+                self.logger.log(logging.INFO,  f"Break reset since small robot vel norm: {vel_norm}")
                 break
             self.base_step()
             count += 1
 
-        if count == 100:
-            print("Break reset since reach max reset count")
+        if count == 200:
+            self.logger.log(logging.INFO,  "Break reset since reach max reset count")
 
     def reset_robot_safe(self):
-        print("Call safe robot reset ...")
+        self.logger.log(logging.INFO,  "Call safe robot reset ...")
         # 先打开 gripper, 再撤退一段距离
         self.open_gripper()
 
@@ -303,6 +304,7 @@ class RobotEnv(BaseEnv):
             return None
         return goal_qpos
     
+    
     def plan_path(self, target_pose, wrt_world: bool = True):
         # 传入的 target_pose 是 Tph2w
         if isinstance(target_pose, np.ndarray):
@@ -317,7 +319,7 @@ class RobotEnv(BaseEnv):
                 wrt_world=wrt_world
             )
         except Exception as e:
-            print(f"An error occurred during plan_path(): {e}")
+            self.logger.log(logging.WARNING, f"Encounter {e} during RobotEnv.plan_path()")
             return None
 
         if result['status'] != "Success":
@@ -327,7 +329,7 @@ class RobotEnv(BaseEnv):
 
     def follow_path(self, result):
         n_step = result['position'].shape[0]
-        print("n_step:", n_step)
+        self.logger.log(logging.INFO, f"n_step: {n_step}")
         for i in range(n_step):
             position_target = result['position'][i]
             velocity_target = result['velocity'][i]
@@ -349,7 +351,7 @@ class RobotEnv(BaseEnv):
         if result is not None:
             self.follow_path(result)
         else:
-            print("Get None result in move_to_pose function, not executing...")
+            self.logger.log(logging.WARNING, "Get None result in move_to_pose function, not executing...")
 
     def move_to_pose_safe(self, Tph2w, reserved_distance=0.05):
         """
@@ -372,7 +374,7 @@ class RobotEnv(BaseEnv):
         result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
 
         if result_pre is None:
-            print("Warning in move_to_pose_safe: planning to pre_grasp_pose failed")
+            self.logger.log(logging.WARNING, "move_to_pose_safe(): planning to pre_grasp_pose failed")
             return None
         else:
             self.follow_path(result_pre)
@@ -404,7 +406,7 @@ class RobotEnv(BaseEnv):
         plan_result = self.plan_qpos(goal_qpos=qpos)
 
         if plan_result is None:
-            print("Warning in move_to_qpos_safe: planning to goal_qpos failed, do_nothing")
+            self.logger.log(logging.WARNING, "move_to_qpos_safe(): planning to goal_qpos failed")
         else:
             self.follow_path(plan_result)
         
@@ -480,7 +482,7 @@ class RobotEnv(BaseEnv):
         控制 panda_hand 沿着某个轴移动一定距离, 或者绕着某个轴移动一定角度, 并保持 panda_hand 与物体的相对位姿保持不变
         joint_axis: 1) NOTE 在世界坐标系下!! 2) 满足右手定则, 沿着 joint_axis 的方向是打开
         """
-        print("Start move_along_axis function...")
+        self.logger.log(logging.INFO, "Start move_along_axis() ...")
         assert joint_type in ["prismatic", "revolute"]
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
@@ -489,7 +491,7 @@ class RobotEnv(BaseEnv):
         else:
             num_interp = max(3, int(moving_distance / 0.02))
 
-        print(f"Need {num_interp} interpolations to execute the manipulate traj...")
+        self.logger.log(logging.INFO, f"move_along_axis(): Need {num_interp} interpolations to execute...")
         ee_pose, ee_quat = self.get_ee_pose() # Tph2w
         # scalar_first means quat in (w, x, y, z) order
         Rph2w = R.from_quat(ee_quat, scalar_first=True).as_matrix() # 3, 3
@@ -525,18 +527,18 @@ class RobotEnv(BaseEnv):
         for Tph2w in T_list:
             result = self.plan_path(target_pose=Tph2w, wrt_world=True)
             if result is None:
-                print("WARNING: excounter None result when moving along axis, skip!")
+                self.logger.log(logging.WARNING, "move_along_axis(): skip None planning result")
                 continue
             elif len(result["time"]) == 0:
-                print("WARNING: excounter len=0 result when moving along axis, skip!")
+                self.logger.log(logging.WARNING, "move_along_axis(): skip len()=0 planning result")
                 continue
             # 针对那种需要一个大的动作的操作, 直接不执行, 否则容易大幅度影响物体状态
             else:
                 if len(result["time"]) > 300: 
                     big_steps = len(result["time"])
-                    print(f"WARNING: encounter large move ({big_steps} steps) in move_along_axis")
+                    self.logger.log(logging.WARNING, f"move_along_axis(): encounter large move ({big_steps} steps)")
                     if drop_large_move:
-                        print(f"break from move_along_axis since big movement is detected, which require {big_steps} steps")
+                        self.logger.log(logging.WARNING, f"move_along_axis(): drop large move")
                         continue
                 self.follow_path(result)
                 actually_moved = True

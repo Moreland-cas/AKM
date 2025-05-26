@@ -1,4 +1,5 @@
 import copy
+import logging
 import numpy as np
 from embodied_analogy.representation.basic_structure import Data, Frame, Frames
 from embodied_analogy.utility.estimation.coarse_joint_est import coarse_estimation
@@ -50,6 +51,9 @@ class Obj_repr(Data):
             "joint_start": None,
             "joint_states": None
         }
+    
+    def setup_logger(self, logger):
+        self.logger = logger
     
     def get_joint_param(self, resolution="coarse", frame="world"):
         assert resolution in ["coarse", "fine", "gt"]
@@ -208,7 +212,6 @@ class Obj_repr(Data):
         
     def reconstruct(
         self,
-        # num_initial_pts=1000,
         num_kframes=5,
         obj_description="drawer",
         fine_lr=1e-3,
@@ -216,21 +219,11 @@ class Obj_repr(Data):
         evaluate=False,
         save_memory=True,
         visualize=True,
+        logger=None
     ):
         """
             从 frames 中恢复出 joint state dict
         """
-        # self.frames[0].segment_obj(
-        #     obj_description=obj_description,
-        #     post_process_mask=True,
-        #     filter=True,
-        #     visualize=visualize
-        # )
-        # self.frames[0].sample_points(num_points=num_initial_pts, visualize=visualize)
-        # self.frames.track_points(visualize=visualize)
-        # self.frames.track2d_to_3d(filter=True, visualize=visualize)
-        # self.frames.cluster_track3d(visualize=visualize)
-        
         self.coarse_joint_estimation(visualize=visualize)
         self.initialize_kframes(num_kframes=num_kframes, save_memory=save_memory)
         self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
@@ -242,7 +235,6 @@ class Obj_repr(Data):
         self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
            
         if file_path is not None:
-            # self.visualize()
             self.save(file_path)
         
         result = None
@@ -250,12 +242,12 @@ class Obj_repr(Data):
             if self.gt_joint_dict["joint_type"] is None:
                 return 
             result = self.compute_joint_error()
-            print("Reconstruction Result:")
+            self.logger.log(logging.INFO, "Reconstruction Result:")
             for k, v in result.items():
-                print(k, v)
+                self.logger.log(logging.INFO, f"{k}, {v}")
         return result
     
-    def update_state(self, query_frame: Frame, visualize=False):
+    def update_state(self, query_frame: Frame):
         """
         给 query_frame 的 joint_state 做一个粗略的估值
         策略是 sample 多个 joint state, 然后依次得到多个 transformed_moving_pc
@@ -303,11 +295,7 @@ class Obj_repr(Data):
                 best_matched_idx = i
         query_state = sampled_states[best_matched_idx] 
         
-        if visualize:
-            # TODO
-            pass
-        
-        print("Guessed query state:", query_state)
+        self.logger.log(logging.INFO, f"Guess query state through sampling: {query_state}")
         query_frame.joint_state = query_state
     
     def update_dynamic(self, query_frame: Frame, visualize=False):
@@ -381,12 +369,13 @@ class Obj_repr(Data):
         query_frame:
             需包含 query_depth, query_dynamic
         """
+        self.logger.log(logging.INFO, "Strat Relocalizing...")
         # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
         num_ref = len(self.kframes)
         
         if init_guess is not None:
             query_frame.joint_state = init_guess
-            print("Given Guessed query state:", init_guess)
+            self.logger.log(logging.INFO, f"Guess query state through history: {init_guess}")
         else:
             # 初始化 query_frame 的 joint 状态
             self.update_state(query_frame, visualize=visualize)
@@ -413,18 +402,19 @@ class Obj_repr(Data):
         # 然后在这里把 query_frame 从 keyframes 中吐出来
         query_frame = self.kframes.frame_list.pop(0)
         if fine_joint_dict == {}:
-            print("Fine estimation failed, return state as 0 or initial_guess if given")
+            self.logger.log(logging.ERROR, "Fine estimation failed, return state as 0 or initial_guess if given")
+            
             if init_guess is not None:
                 query_frame.joint_state = init_guess
             else:
                 query_frame.joint_state = 0
             return query_frame
+        
         query_frame.joint_state = fine_joint_dict["joint_states"][0]
-        print(f"Fine estimated joint state: {query_frame.joint_state}")
+        self.logger.log(logging.INFO, f"Fine estimated joint state: {query_frame.joint_state}")
         
         # 估计完后再更新一次 dynamic 估计
         self.update_dynamic(query_frame, visualize=visualize)
-            
         return query_frame
     
     def visualize_joint(self):

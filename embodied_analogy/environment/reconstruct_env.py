@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from embodied_analogy.utility.utils import (
     initialize_napari,
@@ -29,8 +30,9 @@ class ReconEnv(ExploreEnv):
         )
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
-        print("Extimated Current State: ", self.cur_state)
-        print("GT Current State: ", self.get_active_joint_state())
+        # 这里打印的 Extimated Current State 是 recon 算法预测的 offset + init_joint_state 得到的
+        self.logger.log(logging.DEBUG, f"Extimated Current State: {self.cur_state + self.cfg["init_joint_state"]}")
+        self.logger.log(logging.DEBUG, f"GT Current State: {self.get_active_joint_state()}")
         
     def transform_grasp(self, Tph2w_ref, ref_state, tgt_state):
         """
@@ -95,17 +97,21 @@ class ReconEnv(ExploreEnv):
             self.obj_repr = Obj_repr.load(load_path)
         
         self.obj_repr.reconstruct(
-            # num_initial_pts=self.num_initial_pts,
             num_kframes=self.num_kframes,
             obj_description=self.obj_description,
             fine_lr=self.fine_lr,
             file_path=None,
-            gt_joint_dir_w=None,
             visualize=visualize,
         )
         
         if save_path is not None:
             self.obj_repr.save(save_path)
+    
+    ###########################################################
+    def main(self):
+        super().main()
+        self.recon_result = self.recon_stage()
+        self.logger.log(logging.DEBUG, self.recon_result)
                     
     
 if __name__ == "__main__":
