@@ -15,8 +15,14 @@ PROJECT_ROOT="/home/zby/Programs/Embodied_Analogy"
 RUN_REMOTE_ANYGRASP=False
 
 # SEED
-LOAD_OBJ_SEED=666
-ALGO_SEED=666
+SEED=666
+
+# test cfg generation
+NUM_EXP_PER_SETTING=5
+PRISMATIC_JOINT_MAX_RANGE=0.3   # m
+PRISMATIC_TEST_JOINT_DELTAS=(0.1, 0.15, 0.2)
+REVOLUTE_JOINT_MAX_RANGE=35     # degree
+REVOLUTE_TEST_JOINT_DELTAS=(10, 20, 30)
 
 # explore (for filtering valid explore traj)
 EXPLORE_PRISMATIC_VALID=0.09    # m
@@ -27,4 +33,3 @@ RECON_PRISMATIC_VALID=0.05    # m
 RECON_REVOLUTE_VALID=10  # degree
 
 # manipulation
-MANIP_SEED=666

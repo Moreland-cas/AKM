@@ -4,6 +4,13 @@ import numpy as np
 import sapien.core as sapien
 from embodied_analogy.utility.constants import ASSET_PATH
 
+
+def randomize_dof(dof_low, dof_high) :
+    if dof_low == 'None' or dof_high == 'None' :
+        return None
+    return np.random.uniform(dof_low, dof_high)
+
+    
 def axis_angle_to_quat(axis, angle):
     '''
     axis: [[x, y, z]] or [x, y, z]
@@ -22,6 +29,7 @@ def axis_angle_to_quat(axis, angle):
     quat1 = np.concatenate([np.cos(angle/2), axis[:, 0:1]*np.sin(angle/2), axis[:, 1:2]*np.sin(angle/2), axis[:, 2:3]*np.sin(angle/2)], axis=-1)
     return quat1.reshape(*shape[:-1], 4)
 
+
 def randomize_pose(ang_low, ang_high, zrot_low, zrot_high, xrot_low, xrot_high, dis_low, dis_high, height_low, height_high) :
 
     ang = np.random.uniform(ang_low, ang_high)
@@ -38,7 +46,12 @@ def randomize_pose(ang_low, ang_high, zrot_low, zrot_high, xrot_low, xrot_high, 
     p1 = r0 * p0 * r1 * r2
     return p1
     
-def randomize_obj(cfg: dict):
+    
+def randomize_obj_load_pose(
+    cfg: dict,
+    dof_low,
+    dof_high
+):
     """
     对于 obj_cfg 中的 pose 进行随机化
     根据 tack_cfg 中的 open/close 以及 delta 值, 计算物体的 active_link 的初始状态的范围, 并随机选取一个值进行初始化
@@ -55,20 +68,18 @@ def randomize_obj(cfg: dict):
     # obj_init_dof_low = 0.0
     # obj_init_dof_high = 0.0
     
-    obj_init_pos_angle_low = -0.
-    obj_init_pos_angle_high = 0.
-    obj_init_zrot_low = -0.1
+    obj_init_pos_angle_low = 0.
+    obj_init_pos_angle_high = 0.2
+    obj_init_zrot_low = -0.2
     obj_init_zrot_high = -0.
     
     obj_init_xrot_low = -0.05
     obj_init_xrot_high = 0.05
     
     obj_init_dis_low = 0.5
-    obj_init_dis_high = 0.6
-    obj_init_height_low = 0.0
-    obj_init_height_high = 0.0
-    # obj_init_dof_low = 0.0
-    # obj_init_dof_high = 0.0
+    obj_init_dis_high = 0.7
+    obj_init_height_low = 0.01
+    obj_init_height_high = 0.05
     
     path = os.path.join(ASSET_PATH, cfg["data_path"])
     bbox_path = os.path.join(path, "bounding_box.json")
@@ -91,7 +102,14 @@ def randomize_obj(cfg: dict):
     cfg.update({
         "load_pose": sapien_pose.p.tolist(),
         "load_quat": sapien_pose.q.tolist(),
-        "load_scale": 1,
+        "load_scale": np.random.uniform(0.9, 1.1),
     })
-    # return sapien_pose
+    
+    cfg.update({
+        "init_joint_state": 
+            randomize_dof(
+                dof_low,
+                dof_high
+            )
+    })
     return cfg

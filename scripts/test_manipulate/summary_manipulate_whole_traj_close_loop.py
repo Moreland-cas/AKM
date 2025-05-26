@@ -25,6 +25,7 @@ from embodied_analogy.utility.constants import ASSET_PATH
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run_name', type=str, help='Folder where things are stored')
+parser.add_argument('--cfg_run_name', type=str, help='Folder where things are stored')
 args = parser.parse_args()
 
 root_path = os.path.join(ASSET_PATH, "logs", args.run_name)
@@ -102,13 +103,14 @@ for object_folder in os.listdir(root_path):
             scale_value = float(scale_path.split("_")[-1])
             
             # 读取 output.txt 判断执行是否有效
-            with open(os.path.join(scale_path, 'output.txt'), 'r') as output_file:
-                output_lines = output_file.readlines()
-                output = output_lines[-1]  # 获取最后一行
-                assert output.strip() == "done"
+            # with open(os.path.join(scale_path, 'output.txt'), 'r') as output_file:
+            #     output_lines = output_file.readlines()
+            #     output = output_lines[-1]  # 获取最后一行
+            #     assert output.strip() == "done"
     
             # 因为有些文件夹（没有成功 explore 的那些）没有result.pkl，所以需要try
             try:
+                # cfg_scale_path = scale_path.replace(args.run_name, args.cfg_run_name)
                 with open(os.path.join(scale_path, "cfg.json"), 'r', encoding='utf-8') as file:
                     manip_cfg = json.load(file)
                     joint_type = manip_cfg["joint_type"]

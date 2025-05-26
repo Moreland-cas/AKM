@@ -25,7 +25,7 @@ from embodied_analogy.environment.manipulate_env import ManipulateEnv
 from embodied_analogy.utility.estimation.coarse_joint_est import coarse_t_from_tracks_3d, coarse_R_from_tracks_3d, coarse_estimation
 from embodied_analogy.utility.utils import visualize_pc, set_random_seed
 
-set_random_seed(ALGO_SEED)
+set_random_seed(SEED)
 
 
 class KPSTExecutor(object):

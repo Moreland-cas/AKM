@@ -7,9 +7,9 @@ import numpy as np
 from embodied_analogy.utility.utils import initialize_napari, set_random_seed
 initialize_napari()
 from embodied_analogy.environment.manipulate_env import ManipulateEnv
-from embodied_analogy.utility.constants import RECON_PRISMATIC_VALID, RECON_REVOLUTE_VALID, MANIP_SEED
+from embodied_analogy.utility.constants import RECON_PRISMATIC_VALID, RECON_REVOLUTE_VALID, SEED
 
-set_random_seed(MANIP_SEED)
+set_random_seed(SEED)
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', '1'):
@@ -130,7 +130,7 @@ if __name__ == '__main__':
     print(f"Since manipulate_type is {manipulate_type}")
     if manip_cfg["manipulate_type"] == "open":
         obj_init_dof_low = 0
-        obj_init_dof_high = manip_cfg["manipulate_distance"]
+        obj_init_dof_high = manip_cfg["max_distance"] - manip_cfg["manipulate_distance"]
     else:
         obj_init_dof_low = manip_cfg["manipulate_distance"]
         obj_init_dof_high = manip_cfg["max_distance"]

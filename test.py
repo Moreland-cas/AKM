@@ -21,9 +21,9 @@ def occupy_gpu_memory(x, device='cuda'):
     
     # 无限循环
     while True:
-        time.sleep(1)
+        time.sleep(0.1)
         # 执行一些低计算量的运算（例如加法）
-        tensor = tensor + 0.0
+        tensor = (tensor + 100) / 2.
         
         # 可以在这里添加一些日志输出，以便观察程序运行状态
         # print(f"持续占用 {x} GB 显存，进行低计算量运算...")

@@ -21,9 +21,10 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run_name', type=str, help='Folder where things are stored')
+parser.add_argument('--cfg_run_name', type=str, help='Folder where things are stored')
 args = parser.parse_args()
-
-root_path = os.path.join("/media/zby/MyBook1/embody_analogy_data/assets/logs/", args.run_name)
+from embodied_analogy.utility.constants import PROJECT_ROOT
+root_path = os.path.join(PROJECT_ROOT, "assets/logs/", args.run_name)
 
 summary_dict = {
     "prismatic": {
@@ -84,7 +85,7 @@ def scaled_loss_success(loss, joint_type):
 for object_folder in os.listdir(root_path):
     # /logs/manip_4_16/45135_1_prismatic
     object_path = os.path.join(root_path, object_folder)
-    joint_type = object_folder.split("_")[-1]
+    
     manip_types = ["close", "open"]
     for manip_type in manip_types:
         # /logs/manip_4_16/45135_1_prismatic/open
@@ -104,6 +105,12 @@ for object_folder in os.listdir(root_path):
     
             # 因为有些文件夹（没有成功 explore 的那些）没有result.pkl，所以需要try
             try:
+            # if True:
+                cfg_scale_path = scale_path.replace(args.run_name, args.cfg_run_name)
+                with open(os.path.join(cfg_scale_path, "cfg.json"), 'r', encoding='utf-8') as file:
+                    manip_cfg = json.load(file)
+                    joint_type = manip_cfg["joint_type"]
+                
                 with open(os.path.join(scale_path, 'result.pkl'), 'rb') as result_file:
                     # 这个存储了多次操作后每次的 result
                     result = pickle.load(result_file)
@@ -132,6 +139,7 @@ for object_folder in os.listdir(root_path):
                 # with open(os.path.join(scale_path, "cfg.json"), 'r', encoding='utf-8') as file:
                 #     manip_cfg = json.load(file)
                 #     summary_dict["max_tries"] = manip_cfg["max_manip"]
+                
             except Exception as e:
                 print(f"Skip {scale_path}: {e}, Since no result.pkl")
                 continue  # 出现异常时跳过当前文件夹
@@ -169,7 +177,10 @@ def process_summary_dict(summary_dict):
                 num_failed = summary_dict[joint_type][manip_type][scale]["failed"]
                 print(f"Success rate: {num_success / (num_success + num_failed) * 100}")
                 # print(f"avg manip: {num_manip / loss_array.shape[0]}")
-                print(f"final error: {loss_list[-1]:.3f} {unit}")
+                if len(loss_list) > 0:
+                    print(f"final error: {loss_list[-1]:.3f} {unit}")
+                else:
+                    print("Skip since len(loss_list) is 0.")
                 # for i in range(max_tries):
                 #     print(f"\tclose loop {i+1}: {loss_array[:, i].mean():.3f} {unit}")
 

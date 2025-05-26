@@ -126,42 +126,15 @@ class ObjEnv(RobotEnv):
 
 
 if __name__ == "__main__":
-    
-    cfg = {
-    "phy_timestep": 0.004,
-    "planner_timestep": 0.01,
-    "use_sapien2": True,
-    "record_fps": 30,
-    "pertubation_distance": 0.1,
-    "max_tries": 10,
-    "update_sigma": 0.05,
-    "reserved_distance": 0.05,
-    "logs_path": "/home/zby/Programs/Embodied_Analogy/assets/logs",
-    "run_name": "test_explore",
-    "valid_thresh": 0.5,
-    "instruction": "open the cabinet",
-    "obj_description": "cabinet",
-    "joint_type": "revolute",
-    "obj_index": "44781",
-    "joint_index": "0",
-    "init_joint_state": 0.2,
-    "asset_path": "/home/zby/Programs/Embodied_Analogy/assets/dataset/one_door_cabinet/44781_link_0",
-    "active_link_name": "link_0",
-    "active_joint_name": "joint_0",
-    "load_pose": [
-        0.8304692506790161,
-        0.0,
-        0.5423032641410828
-    ],
-    "load_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
-    ],
-    "load_scale": 1
-}
-    objEnv = ObjEnv(cfg)
-    while True:
-        objEnv.step()
+    test_cfgs_path = "/home/zby/Programs/Embodied_Analogy/scripts/test_cfgs.json"
+    with open(test_cfgs_path, 'r', encoding='utf-8') as f:
+        test_cfgs = json.load(f)
+        
+    for test_cfg in test_cfgs:
+        objEnv = ObjEnv(test_cfg)
+        for i in range(200):
+            objEnv.step()
+        objEnv.delete()
+        # 这里写 del 没用, 必须用 objEnv.viewer.close()
+        # del objEnv
         

@@ -11,6 +11,12 @@
         // "env": {
         //     "PYTHONPATH": "${workspaceFolder}/third_party/RAM_code"
         // }
+        // "args": [
+        //   "--run_name",
+        //   "gflow_522",
+        //   "--cfg_run_name",
+        //   "manip_512"
+        // ] 
       }
     ]
   }

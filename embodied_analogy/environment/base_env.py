@@ -280,7 +280,10 @@ class BaseEnv():
         if not self.offscreen:
             self.viewer.render()
         self.cur_steps += 1
-
+    
+    def delete(self):
+        self.viewer.close()
+        
 
 if __name__ == "__main__":
     env = BaseEnv()
