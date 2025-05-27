@@ -1,8 +1,11 @@
+import json
+import os
 import logging
 import numpy as np
 from embodied_analogy.utility.utils import (
     initialize_napari,
-    joint_data_to_transform_np
+    joint_data_to_transform_np,
+    numpy_to_json
 )
 initialize_napari()
 from embodied_analogy.representation.obj_repr import Obj_repr
@@ -10,13 +13,13 @@ from embodied_analogy.environment.explore_env import ExploreEnv
 from embodied_analogy.representation.basic_structure import Frame
 
 class ReconEnv(ExploreEnv):
-    def __init__(
-            self,
-            cfg
-        ):        
+    def __init__(self, cfg):     
         super().__init__(cfg=cfg)
-        self.num_kframes = cfg["num_kframes"]
-        self.fine_lr = cfg["fine_lr"]
+        self.recon_env_cfg = cfg["recon_env_cfg"]
+        
+        self.num_kframes = self.recon_env_cfg["num_kframes"]
+        self.fine_lr = self.recon_env_cfg["fine_lr"]
+        self.reloc_lr = self.recon_env_cfg["reloc_lr"]
     
     def update_cur_frame(self, init_guess=None, visualize=False):
         self.obj_repr: Obj_repr
@@ -24,14 +27,14 @@ class ReconEnv(ExploreEnv):
         cur_frame = self.capture_frame()
         cur_frame = self.obj_repr.reloc(
             query_frame=cur_frame,
-            reloc_lr=self.cfg["reloc_lr"],
+            reloc_lr=self.reloc_lr,
             init_guess=init_guess,
             visualize=visualize
         )
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
         # 这里打印的 Extimated Current State 是 recon 算法预测的 offset + init_joint_state 得到的
-        self.logger.log(logging.DEBUG, f"Extimated Current State: {self.cur_state + self.cfg["init_joint_state"]}")
+        self.logger.log(logging.DEBUG, f'Extimated Current State: {self.cur_state + self.obj_env_cfg["init_joint_state"]}')
         self.logger.log(logging.DEBUG, f"GT Current State: {self.get_active_joint_state()}")
         
     def transform_grasp(self, Tph2w_ref, ref_state, tgt_state):
@@ -92,28 +95,41 @@ class ReconEnv(ExploreEnv):
         Tph2w_tgt = np.linalg.inv(self.obj_repr.Tw2c) @ Tph2c_tgt
         return Tph2w_tgt
 
-    def recon_stage(self, load_path=None, save_path=None, visualize=False):
+    def recon_stage(self, load_path=None, visualize=False):
         if load_path is not None:
             self.obj_repr = Obj_repr.load(load_path)
         
-        self.obj_repr.reconstruct(
+        self.recon_result = self.obj_repr.reconstruct(
             num_kframes=self.num_kframes,
             obj_description=self.obj_description,
             fine_lr=self.fine_lr,
-            file_path=None,
             visualize=visualize,
+            evaluate=True
         )
+        self.logger.log(logging.INFO, self.recon_result)
         
-        if save_path is not None:
+        if self.exp_cfg["save_obj_repr"]:
+            save_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "obj_repr.npy"
+            )
             self.obj_repr.save(save_path)
+        return self.recon_result
     
     ###########################################################
     def main(self):
         super().main()
         self.recon_result = self.recon_stage()
-        self.logger.log(logging.DEBUG, self.recon_result)
-                    
-    
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "recon_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+        
 if __name__ == "__main__":
     cfg = {
         "num_kframes": 5,

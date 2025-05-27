@@ -1672,7 +1672,16 @@ def explore_actually_valid(result):
         return joint_delta >= EXPLORE_PRISMATIC_VALID
     elif joint_type == "revolute":
         return np.rad2deg(joint_delta) >= EXPLORE_REVOLUTE_VALID
-    
+
+def numpy_to_json(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()  # 将 NumPy 数组转换为列表
+    elif isinstance(obj, np.float32):
+        return float(obj)  # 将 NumPy float32 转换为 Python float
+    elif isinstance(obj, np.int32):
+        return int(obj)  # 将 NumPy int32 转换为 Python int
+    raise TypeError(f"Type {type(obj)} not serializable")
+
     
 if __name__ == "__main__":
     print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]

@@ -99,7 +99,7 @@ def get_ram_affordance_2d(
         visualize=False
     )
     retrieve_end = time.time()
-    logger.INFO(logging.INFO, f"retrieve time: {retrieve_end - retrieve_start}")
+    logger.log(logging.INFO, f"retrieve time: {retrieve_end - retrieve_start}")
     
     ref_trajs = topk_retrieved_data_dict['traj']
     ref_imgs_np = topk_retrieved_data_dict['masked_img']

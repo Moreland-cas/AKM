@@ -1,15 +1,15 @@
 import os
+import json
 import logging
 import numpy as np
 
 from embodied_analogy.utility.utils import (
     initialize_napari,
-    joint_data_to_transform_np,
-    custom_linspace
+    custom_linspace,
+    numpy_to_json
 )
 initialize_napari()
 
-from embodied_analogy.environment.obj_env import ObjEnv
 from embodied_analogy.environment.reconstruct_env import ReconEnv
 from embodied_analogy.utility.constants import *
 
@@ -18,38 +18,25 @@ from embodied_analogy.representation.obj_repr import Obj_repr
 
 
 class ManipulateEnv(ReconEnv):
-    def __init__(
-        self, 
-        cfg
-    ):       
-        """
-        TODO: 还可能需要一些 ICP 的参数, 尤其是 ICP range 之类的
-        """
-        self.cfg = cfg
-        # 首先 load 物体
-        # ObjEnv.__init__(self, cfg)
+    def __init__(self, cfg):       
         super().__init__(cfg)
+        self.manip_env_cfg = cfg["manip_env_cfg"]
+        self.setup_manip()
         
-        self.reloc_lr = cfg["reloc_lr"]
-        self.reserved_distance = cfg["reserved_distance"]
+    def setup_manip(self):
+        self.manip_type = self.manip_env_cfg["manip_type"]
+        self.manip_distance = self.manip_env_cfg["manip_distance"]
         
-        if cfg["manipulate_type"] == "close":
-            self.goal_delta = -cfg["manipulate_distance"]
-        elif cfg["manipulate_type"] == "open":
-            self.goal_delta = cfg["manipulate_distance"]
+        self.goal_delta = self.manip_distance
+        if self.manip_type == "close":
+            self.goal_delta *= -1
             
-        if cfg["joint_type"] == "revolute":
+        if self.obj_env_cfg["joint_type"] == "revolute":
             self.goal_delta = np.deg2rad(self.goal_delta)
-        
-        # NOTE: 在 ObjEnv.__init__() 中会对 cfg 中的这个值进行修改
-        self.init_joint_state = cfg["init_joint_state"] 
         
         # NOTE: 这里要将 target_state 初始化为 None, 然后在第一次调用 not_good_enough 的时候进行设置
         self.target_state = None
-        
-        self.obj_description = cfg["obj_description"]
-        # self.obj_repr = Obj_repr.load(os.path.join(cfg["obj_folder_path_reconstruct"], "obj_repr.npy"))
-        
+          
     def manip_once(self):
         """
         首先重定位出 initial frame 的状态, 并根据 instruction 得到 target state
@@ -71,10 +58,6 @@ class ManipulateEnv(ReconEnv):
         
         # 在这里是不是需要再跑一遍 reloc, 从而防止 open_gripper + move_backward 对于物体状态的影响
         self.update_cur_frame(init_guess=self.cur_state)
-        
-        # "reset robot safe..."
-        # self.reset_robot_safe()
-        
         self.ref_ph_to_tgt(
             ref_frame=self.obj_repr.kframes[0],
             tgt_frame=self.cur_frame
@@ -141,7 +124,7 @@ class ManipulateEnv(ReconEnv):
             # 这里不应该用 cur_state, 而是应该用 initial_frame 的 joint_state
             self.obj_repr.reloc(
                 query_frame=self.obj_repr.initial_frame,
-                reloc_lr=self.cfg["reloc_lr"],
+                reloc_lr=self.recon_env_cfg["reloc_lr"],
                 init_guess=None,
                 visualize=visualize
             )
@@ -149,9 +132,9 @@ class ManipulateEnv(ReconEnv):
             self.target_state = initial_joint_state + self.goal_delta
         
         if self.obj_repr.fine_joint_dict["joint_type"] == "prismatic":
-            not_good = abs(self.cur_state - self.target_state) > self.cfg["prismatic_whole_traj_success_thresh"] # 1cm
+            not_good = abs(self.cur_state - self.target_state) > self.manip_env_cfg["prismatic_whole_traj_success_thresh"] # 1cm
         elif self.obj_repr.fine_joint_dict["joint_type"] == "revolute":
-            not_good = abs(self.cur_state - self.target_state) > np.deg2rad(self.cfg["revolute_whole_traj_success_thresh"]) # 5 degree 
+            not_good = abs(self.cur_state - self.target_state) > np.deg2rad(self.manip_env_cfg["revolute_whole_traj_success_thresh"]) # 5 degree 
         if not_good:
             self.logger.log(logging.INFO, "Not good enough")
         else:
@@ -160,7 +143,7 @@ class ManipulateEnv(ReconEnv):
         return not_good
         
     def manipulate_close_loop(self, visualize=False):
-        self.max_manip = self.cfg["max_manip"]
+        self.max_manip = self.manip_env_cfg["max_manip"]
         self.logger.log(logging.INFO, "Start manipulation Loop ...")
         num_manip = 0
         results = []
@@ -174,6 +157,7 @@ class ManipulateEnv(ReconEnv):
             self.logger.log(logging.INFO, f"After {num_manip} round, Stopped since num_manip reach max_manip...")
         else:
             self.logger.log(logging.INFO, f"After {num_manip} round, Stopped since the robot thinks it is good enough...")
+        self.logger.log(logging.INFO, results)
         return results
         
     ###################################### 底下是新版本 ######################################
@@ -192,13 +176,13 @@ class ManipulateEnv(ReconEnv):
         # 配置参数（保持不变）
         self.joint_type = self.obj_repr.fine_joint_dict["joint_type"]
         if self.joint_type == "prismatic":
-            step = self.cfg["prismatic_reloc_interval"]
-            tolerance = self.cfg["prismatic_reloc_tolerance"]
+            step = self.manip_env_cfg["prismatic_reloc_interval"]
+            tolerance = self.manip_env_cfg["prismatic_reloc_tolerance"]
         else:
-            step = np.deg2rad(self.cfg["revolute_reloc_interval"])
-            tolerance = np.deg2rad(self.cfg["revolute_reloc_tolerance"])
+            step = np.deg2rad(self.manip_env_cfg["revolute_reloc_interval"])
+            tolerance = np.deg2rad(self.manip_env_cfg["revolute_reloc_tolerance"])
         
-        max_attempts = self.cfg["max_attempts"]
+        max_attempts = self.manip_env_cfg["max_attempts"]
         global_attempt = 0
         
         self.init_guess = None
@@ -257,7 +241,7 @@ class ManipulateEnv(ReconEnv):
         )
         pre_Tph2w_tgt = self.get_translated_ph(
             Tph2w=Tph2w_tgt,
-            distance=-self.cfg["reserved_distance"]
+            distance=-self.reserved_distance
         )
         self.planner.update_point_cloud(
             self.cur_frame.get_env_pc(
@@ -337,7 +321,16 @@ class ManipulateEnv(ReconEnv):
     def main(self):
         super().main()
         self.manip_result = self.manipulate_close_loop()
-        self.logger.log(logging.INFO, self.manip_result)
+        
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "manip_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                
         return {
             "explore": self.explore_result,
             "recon": self.recon_result,

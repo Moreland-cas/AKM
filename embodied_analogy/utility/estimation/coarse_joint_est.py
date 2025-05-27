@@ -230,7 +230,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False, logger=None):
         optimizer.zero_grad()
         loss = loss_function_torch(joint_dir, joint_states, joint_start)
         if i % 10 == 0:
-            logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+            logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse R loss: {loss.item()}")
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
         joint_states_tmp = np.insert(joint_states_tmp, 0, 0)

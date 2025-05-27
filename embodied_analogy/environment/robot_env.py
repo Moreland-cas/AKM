@@ -15,10 +15,7 @@ from embodied_analogy.utility.sapien_utils import (
 from embodied_analogy.representation.basic_structure import Frame
 
 class RobotEnv(BaseEnv):
-    def __init__(
-            self,
-            cfg
-        ):
+    def __init__(self, cfg):
         super().__init__(cfg)
         self.load_robot()
 
@@ -33,7 +30,7 @@ class RobotEnv(BaseEnv):
             frame.visualize()
         return frame
 
-    def load_robot(self, robot_cfg=None):
+    def load_robot(self):
         # Robot config
         urdf_config = dict(
             _materials=dict(
@@ -544,7 +541,7 @@ class RobotEnv(BaseEnv):
                 actually_moved = True
         # NOTE: 这里需要判断到底是不是所有的 Tph2w 返回的 plan_result 都是 None, 如果那样不会有 RGBD frame 被录制, 需要额外跑一些 step
         if not actually_moved:
-            for _ in range(int(1 / self.cfg["phy_timestep"])):
+            for _ in range(int(1 / self.base_env_cfg["phy_timestep"])):
                 self.step()
                 
     def move_forward(self, moving_distance, drop_large_move):

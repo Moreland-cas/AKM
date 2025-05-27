@@ -140,7 +140,7 @@ def detect_grasp_anygrasp(
                 logger.log(logging.DEBUG, f"run anygrasp remotely failed: {e}")
                 raise f
         
-        logger.log(logging.DEBUG, 'grasp num:', len(gg))
+        logger.log(logging.DEBUG, f'grasp num: {len(gg)}')
         if gg == None or len(gg) == 0:
             continue
         

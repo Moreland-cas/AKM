@@ -12,16 +12,18 @@ from embodied_analogy.utility.sapien_utils import (
 from embodied_analogy.utility.constants import ASSET_PATH
 
 class ObjEnv(RobotEnv):
-    def __init__(
-            self,
-            cfg
-        ):        
+    def __init__(self, cfg):        
         super().__init__(cfg)
-        self.load_object(cfg)
+        
+        self.obj_env_cfg = cfg["obj_env_cfg"]
+        self.obj_description = self.obj_env_cfg["obj_description"]
+        self.init_joint_state = self.obj_env_cfg["init_joint_state"]
+        
+        self.load_object(self.obj_env_cfg)
 
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)
-        # TODO: 在这里获得 gt joint state, 并进行保存到 frame 中
+        # 在这里获得 gt joint state, 并进行保存到 frame 中
         frame.gt_joint_state = self.get_active_joint_state()
         if visualize:
             frame.visualize()
@@ -61,7 +63,10 @@ class ObjEnv(RobotEnv):
             filename=f"{ASSET_PATH}/{data_path}/mobility.urdf",
             config=load_config
         )
-        assert self.obj is not None
+        
+        if self.obj is None:
+            self.logger.log(logging.ERROR, f'{ASSET_PATH}/{data_path}/mobility.urdf load None')
+            raise Exception("obj asset load failed.")
         
         # 改为 load obj_cfg 中的 load_pose, load_quat, load_scale
         sapien_pose = sapien.Pose(p=obj_cfg["load_pose"], q=obj_cfg["load_quat"])
@@ -93,13 +98,14 @@ class ObjEnv(RobotEnv):
         # active_joint = self.obj.get_active_joints()[self.active_joint_idx]
         if active_link_name != self.active_joint.get_child_link().get_name():
             self.logger.log(logging.ERROR, "active_link_name is not consistent with active_joint_name!")
+            raise Exception("active_link_name is not consistent with active_joint_name!")
         
         Tparent2w = self.active_joint.get_parent_link().get_pose().to_transformation_matrix() # Tparent2w
         joint_in_parent = self.active_joint.get_pose_in_parent().to_transformation_matrix()
         Tjoint2w = Tparent2w @ joint_in_parent
         # 不管是 prismatic joint 还是 revolute joint, joint_dir 都是由 joint 坐标系的 x 轴决定的
         self.obj_repr.gt_joint_dict = {
-            "joint_type": self.cfg["joint_type"],
+            "joint_type": obj_cfg["joint_type"],
             "joint_dir": Tjoint2w[:3, 0],
             "joint_start": Tjoint2w[:3, 3],
             "joint_states": None

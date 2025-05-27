@@ -1,3 +1,5 @@
+import yaml
+import os
 import logging
 import numpy as np
 from transforms3d.quaternions import qmult
@@ -11,12 +13,26 @@ from embodied_analogy.utility.utils import visualize_pc
 from embodied_analogy.utility.constants import ASSET_PATH
 
 class BaseEnv():
-    def __init__(self, cfg):        
+    def __init__(self, cfg):     
         self.cfg = cfg
-        self.offscreen = cfg["offscreen"]
-        phy_timestep = cfg["phy_timestep"]
-        planner_timestep = cfg["planner_timestep"]
-        use_sapien2 = cfg["use_sapien2"]
+        self.exp_cfg = cfg["exp_cfg"]
+        self.task_cfg = cfg["task_cfg"]
+        self.base_env_cfg = cfg["base_env_cfg"]
+        
+        if self.exp_cfg["save_cfg"]:
+            save_cfg_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                f'{self.task_cfg["task_id"]}.yaml'
+            )
+            os.makedirs(os.path.dirname(save_cfg_path), exist_ok=True)
+            with open(save_cfg_path, "w") as f:
+                yaml.dump(self.cfg, f, default_flow_style=False, sort_keys=False)
+                
+        self.offscreen = self.base_env_cfg["offscreen"]
+        phy_timestep = self.base_env_cfg["phy_timestep"]
+        planner_timestep = self.base_env_cfg["planner_timestep"]
+        use_sapien2 = self.base_env_cfg["use_sapien2"]
         
         self.asset_prefix = ASSET_PATH
         self.cur_steps = 0
@@ -24,9 +40,6 @@ class BaseEnv():
         self.engine = sapien.Engine()  # Create a physical simulation engine
         self.renderer = sapien.SapienRenderer(offscreen_only=self.offscreen)  # Create a Vulkan renderer
         self.engine.set_renderer(self.renderer)  # Bind the renderer and the engine
-        if False:
-            from sapien.core import renderer as R
-            self.renderer_context: R.Context = self.renderer._internal_context
         
         scene_config = sapien.SceneConfig()
         # follow video axis aligned (or RGBManip?)
@@ -34,7 +47,7 @@ class BaseEnv():
         scene_config.default_static_friction = 1.0
         scene_config.default_restitution = 0.0
         # scene_config.contact_offset = 0.0001 # 0.1 mm
-        scene_config.contact_offset = 0.02 # TODO: RGBManip 设置的为 0.02
+        scene_config.contact_offset = 0.02 
         scene_config.enable_pcm = False
         scene_config.solver_iterations = 25
         scene_config.solver_velocity_iterations = 1
@@ -77,14 +90,34 @@ class BaseEnv():
         self.load_camera()
         
         # 设置 logger
-        self.setup_logger(output_txt_path=cfg["output_txt_path"])
+        self.setup_logger(
+            cfg=cfg, 
+            txt_path=os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "log.txt"
+            )
+        )
     
-    def setup_logger(self, output_txt_path):
+    def setup_logger(self, cfg, txt_path):
+        # 将 txt_path 生成
+        os.makedirs(os.path.dirname(txt_path), exist_ok=True)
+        
         logger = logging.getLogger("ea_logger")
-        logger.setLevel(logging.INFO)
+        
+        level = cfg["logging"]["level"]
+        if level == "DEBUG":
+            logger.setLevel(logging.DEBUG)
+        elif level == "INFO":            
+            logger.setLevel(logging.INFO)
+        elif level == "WARNING":            
+            logger.setLevel(logging.WARNING)
+        elif level == "ERROR":            
+            logger.setLevel(logging.ERROR)
+        elif level == "CRITICAL":            
+            logger.setLevel(logging.CRITICAL)
         
         # 设置格式化
-        # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         formatter = logging.Formatter('[%(asctime)s][%(levelname)-8s] %(message)s')
         
         # 设置流
@@ -92,7 +125,7 @@ class BaseEnv():
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
-        file_handler = logging.FileHandler(output_txt_path)
+        file_handler = logging.FileHandler(txt_path)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         self.logger = logger
@@ -301,7 +334,8 @@ class BaseEnv():
         self.cur_steps += 1
     
     def delete(self):
-        self.viewer.close()
+        if not self.offscreen:
+            self.viewer.close()
         
 
 if __name__ == "__main__":

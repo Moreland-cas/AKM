@@ -1,17 +1,14 @@
 import os
 import json
-import pickle
 import logging
 import math
 import numpy as np
 import sklearn.cluster as cluster
 from embodied_analogy.utility.utils import (
-    depth_image_to_pointcloud,
     camera_to_world,
     initialize_napari,
-    image_to_camera,
     visualize_pc,
-    get_depth_mask
+    numpy_to_json
 )
 initialize_napari()
 from embodied_analogy.environment.obj_env import ObjEnv
@@ -19,28 +16,27 @@ from embodied_analogy.utility.constants import ASSET_PATH
 
 
 class ExploreEnv(ObjEnv):
-    def __init__(
-            self,
-            cfg
-        ):        
+    def __init__(self, cfg):    
         super().__init__(cfg=cfg)
-        self.cfg = cfg
+            
+        self.explore_env_cfg = cfg["explore_env_cfg"]
+        # self.task_cfg = cfg["task_cfg"]
+        self.algo_cfg = cfg["algo_cfg"]
         
-        self.record_fps = cfg["record_fps"]
+        self.record_fps = self.explore_env_cfg["record_fps"]
         self.record_interval = math.ceil(1.0 / self.phy_timestep / self.record_fps)
-        self.pertubation_distance = cfg["pertubation_distance"]
-        self.valid_thresh = cfg["valid_thresh"]
-        self.instruction = cfg["instruction"]
+        self.pertubation_distance = self.explore_env_cfg["pertubation_distance"]
+        self.reserved_distance = self.explore_env_cfg["reserved_distance"]
+        self.valid_thresh = self.explore_env_cfg["valid_thresh"]
+        self.instruction = self.task_cfg["instruction"]
         
-        self.update_sigma = cfg["update_sigma"]
-        self.max_tries = cfg["max_tries"]
-        self.obj_description = cfg["obj_description"]
+        self.update_sigma = self.explore_env_cfg["update_sigma"]
+        self.max_tries = self.explore_env_cfg["max_tries"]
+        self.obj_description = self.obj_env_cfg["obj_description"]
         self.has_valid_explore = False
         
         # 读取和保存所用的变量
-        self.joint_type = cfg["joint_type"]
-        # self.save_prefix = cfg["obj_folder_path_explore"]
-        # os.makedirs(self.save_prefix, exist_ok=True)
+        self.joint_type = self.obj_env_cfg["joint_type"]
         
     def explore_stage(self, visualize=False):
         """
@@ -57,16 +53,13 @@ class ExploreEnv(ObjEnv):
         self.logger.log(logging.INFO, "Start transfering 2d contact affordance map...")
         self.affordance_map_2d = get_ram_affordance_2d(
             query_rgb=initial_frame.rgb,
-            instruction=self.cfg["instruction"],
+            instruction=self.task_cfg["instruction"],
             obj_description=self.obj_description,
-            fully_zeroshot=self.cfg["fully_zeroshot"],
+            fully_zeroshot=self.explore_env_cfg["fully_zeroshot"],
             visualize=visualize,
             logger=self.logger
         )
-        # self.affordance_map_2d.fit_GMM(
-        #     data=self.affordance_map_2d.sample_prob(alpha=30, num_samples=3000, return_rgb_frame=False, visualize=False),
-        #     visualize=True
-        # )
+        
         # 在这里保存 first frame
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
@@ -75,7 +68,7 @@ class ExploreEnv(ObjEnv):
         self.obj_repr.frames.Tw2c = self.camera_extrinsic
         self.obj_repr.initial_frame = initial_frame
         
-        self.max_tries = self.cfg["max_tries"]
+        self.max_tries = self.explore_env_cfg["max_tries"]
         self.logger.log(logging.INFO, f"Start exploring..., you have {self.max_tries} chances to explore...")
         self.num_tries = 0
         while self.num_tries < self.max_tries:
@@ -112,7 +105,7 @@ class ExploreEnv(ObjEnv):
             "has_valid_explore": self.has_valid_explore,
             "joint_type": self.joint_type,
             "joint_state_start": 0,
-            "joint_state_end": self.get_active_joint_state() - self.cfg["init_joint_state"]
+            "joint_state_end": self.get_active_joint_state() - self.obj_env_cfg["init_joint_state"]
         }
         self.logger.log(logging.INFO, f"exploration stage result: {result_dict}")
         
@@ -124,8 +117,6 @@ class ExploreEnv(ObjEnv):
     
     def explore_once(
         self, 
-        reserved_distance=0.05,
-        pertubation_distance=0.1,
         visualize=False      
     ):
         """
@@ -148,7 +139,7 @@ class ExploreEnv(ObjEnv):
         
         # 这里 rgb_np, depth_np 可能和 affordance_map_2d 中存储的不太一样, 不过应该不会差太多
         cur_frame.detect_grasp(
-            use_anygrasp=self.cfg["use_anygrasp"],
+            use_anygrasp=self.algo_cfg["use_anygrasp"],
             world_frame=True,
             visualize=visualize,
             asset_path=ASSET_PATH,
@@ -176,7 +167,7 @@ class ExploreEnv(ObjEnv):
             # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
             grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
             Tph2w = self.anyGrasp2ph(grasp=grasp)        
-            Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
+            Tph2w_pre = self.get_translated_ph(Tph2w, -self.reserved_distance)
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             # TODO 这里可能需要更改
             if result_pre is not None:
@@ -198,7 +189,7 @@ class ExploreEnv(ObjEnv):
         self.open_gripper()
         self.clear_planner_pc()
         self.move_forward(
-            moving_distance=reserved_distance,
+            moving_distance=self.reserved_distance,
             drop_large_move=False
         )
         self.close_gripper()
@@ -210,7 +201,7 @@ class ExploreEnv(ObjEnv):
             joint_type="prismatic",
             joint_axis=dir_out_w,
             joint_start=None,
-            moving_distance=pertubation_distance,
+            moving_distance=self.pertubation_distance,
             drop_large_move=False
         )
         
@@ -280,12 +271,12 @@ class ExploreEnv(ObjEnv):
         # 这个函数相比于 deprecated 版本, 可以更好的处理 "柜子开一个缝隙, joint state 没有大的变化, 但是缝隙的深度有突变" 的情况
         # 这个函数会写入 obj_repr 的 tracks2d, tracks3d 和 moving mask
         self.obj_repr.frames[0].segment_obj(
-            obj_description=self.cfg["obj_description"],
+            obj_description=self.obj_env_cfg["obj_description"],
             post_process_mask=True,
             filter=True,
             visualize=visualize
         )
-        self.obj_repr.frames[0].sample_points(num_points=self.cfg["num_initial_pts"], visualize=visualize)
+        self.obj_repr.frames[0].sample_points(num_points=self.explore_env_cfg["num_initial_pts"], visualize=visualize)
         self.obj_repr.frames.track_points(visualize=visualize)
         self.obj_repr.frames.track2d_to_3d(filter=True, visualize=visualize)
         self.obj_repr.frames.cluster_track3d(visualize=visualize)
@@ -303,7 +294,18 @@ class ExploreEnv(ObjEnv):
     ###############################################
     def main(self):
         self.explore_result = self.explore_stage()
-        self.logger.log(logging.INFO, self.explore_result)
+        
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "explore_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                
+        if not self.has_valid_explore:
+            raise Exception("No valid explore found!")
         
     
 if __name__ == "__main__":

@@ -217,9 +217,8 @@ class Obj_repr(Data):
         num_kframes=5,
         obj_description="drawer",
         fine_lr=1e-3,
-        file_path=None,
         evaluate=False,
-        save_memory=True,
+        save_memory=False,
         visualize=True,
     ):
         """
@@ -235,13 +234,10 @@ class Obj_repr(Data):
         )
         self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
            
-        if file_path is not None:
-            self.save(file_path)
-        
         result = None
         if evaluate:
             if self.gt_joint_dict["joint_type"] is None:
-                return 
+                raise Exception("evaluate=True in obj_repr.reconstruct() but no gt_joint_dict found!")
             result = self.compute_joint_error()
             self.logger.log(logging.INFO, "Reconstruction Result:")
             for k, v in result.items():
@@ -379,7 +375,7 @@ class Obj_repr(Data):
             self.logger.log(logging.INFO, f"Guess query state through history: {init_guess}")
         else:
             # 初始化 query_frame 的 joint 状态
-            self.update_state(query_frame, visualize=visualize)
+            self.update_state(query_frame)
         
         # 对 query_frame 的 dynamic_mask 进行估计
         self.update_dynamic(query_frame, visualize=visualize)
