@@ -1,4 +1,5 @@
 import os
+import logging
 import sys
 import torch
 import numpy as np
@@ -83,6 +84,7 @@ def detect_grasp_anygrasp(
     augment=True, 
     visualize=False,
     run_remote=RUN_REMOTE_ANYGRASP,
+    logger=None,
 ):
     '''
     输入 a 坐标系下的 points 和 dir_out, 输出用 anygrasp 检测出的 grasp_group, 其中包含信息 Tgrasp2a
@@ -125,8 +127,8 @@ def detect_grasp_anygrasp(
                     collision_detection=True
                 )
             except Exception as e:
-                print(f"run anygrasp locally failed:{e}")
-                assert False, "run anygrasp failed"
+                logger.log(logging.DEBUG, f"run anygrasp locally failed: {e}")
+                raise e
         else:
             try:
                 gg = run_anygrasp_remotely(
@@ -135,10 +137,10 @@ def detect_grasp_anygrasp(
                     lims
                 )
             except Exception as f:
-                print(f"run anygrasp remotely failed:{f}")
-                assert False, "run anygrasp failed"
+                logger.log(logging.DEBUG, f"run anygrasp remotely failed: {e}")
+                raise f
         
-        # print('grasp num:', len(gg))
+        logger.log(logging.DEBUG, 'grasp num:', len(gg))
         if gg == None or len(gg) == 0:
             continue
         
@@ -158,8 +160,8 @@ def detect_grasp_anygrasp(
             contact_point=np.array([0, 0, 0]),
             post_contact_dirs=[dir_outs]
         )
-    import time
-    time.sleep(0.5)
+    # import time
+    # time.sleep(0.5)
     return ggs
 
 
@@ -276,7 +278,6 @@ if __name__ == '__main__':
         visualize=False
     )
     end_time = time.time()
-    print("time used:", end_time - start_time)
     
     ggs_filtered = filter_grasp_group(
         grasp_group=gg,

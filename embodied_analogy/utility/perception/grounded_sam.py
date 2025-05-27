@@ -54,4 +54,3 @@ if __name__ == "__main__":
         post_process_mask=True,
         visualize=False
     )
-    print(initial_bbox, initial_mask)

@@ -568,7 +568,6 @@ class RobotEnv(BaseEnv):
         ee_quat: np.array([4, ]), scalar_first=True, in (w, x, y, z) order
         """
         ee_link = self.robot.get_links()[9] # panda_hand
-        # print(ee_link.name)
         ee_pos = ee_link.get_pose().p
         ee_quat = ee_link.get_pose().q
 
@@ -663,15 +662,11 @@ if __name__ == "__main__":
         moving_distance=np.deg2rad(30)
     )
     Tph2w = env.get_ee_pose(as_matrix=True)
-    print(Tph2w)
     goal_qpos_list = env.IK(Tph2w)
-    print("found ", len(goal_qpos_list), " avaliable goal_qpos")
     
     for i, goal_qpos in enumerate(goal_qpos_list):
-        print(f"[{i + 1}/{len(goal_qpos_list)}] Trying goal_qpos ", goal_qpos)
         plan_result = env.plan_qpos(goal_qpos)
         if plan_result is None:
-            print("This qpos is not reachable, skip!")
             continue
         env.follow_path(plan_result)
         env.reset_robot()

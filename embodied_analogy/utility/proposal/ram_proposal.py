@@ -1,3 +1,4 @@
+import logging
 from embodied_analogy.utility.utils import initialize_napari
 initialize_napari()
 import os
@@ -72,13 +73,14 @@ def get_ram_affordance_2d(
     instruction, # open the drawwer
     obj_description, # drawer
     fully_zeroshot=False,
-    visualize=False
+    visualize=False,
+    logger=None
 ):
     """
         instruction: open the drawer (task description)
         prompt: used to extract dift feature
     """
-    print("Initializing SubsetRetrievePipeline ...")
+    logger.log(logging.INFO, "Initializing SubsetRetrievePipeline ...")
     subset_retrieve_pipeline = SubsetRetrievePipeline(
         subset_dir=os.path.join(ASSET_PATH, "RAM_memory"),
         lang_mode='clip',
@@ -97,7 +99,7 @@ def get_ram_affordance_2d(
         visualize=False
     )
     retrieve_end = time.time()
-    print(f"retrieve time: {retrieve_end - retrieve_start}")
+    logger.INFO(logging.INFO, f"retrieve time: {retrieve_end - retrieve_start}")
     
     ref_trajs = topk_retrieved_data_dict['traj']
     ref_imgs_np = topk_retrieved_data_dict['masked_img']
@@ -119,7 +121,7 @@ def get_ram_affordance_2d(
         break
 
     # 进一步将 cos_map 转换为一个概率分布
-    print("Initializing Affordance_map_2d from DIFT similarity ...")
+    logger.log(logging.INFO, "Initializing Affordance_map_2d from DIFT similarity ...")
     affordance_map_2d = Affordance_map_2d(
         rgb_img=query_rgb,
         cos_map=cos_map,

@@ -60,7 +60,8 @@ class ExploreEnv(ObjEnv):
             instruction=self.cfg["instruction"],
             obj_description=self.obj_description,
             fully_zeroshot=self.cfg["fully_zeroshot"],
-            visualize=visualize
+            visualize=visualize,
+            logger=self.logger
         )
         # self.affordance_map_2d.fit_GMM(
         #     data=self.affordance_map_2d.sample_prob(alpha=30, num_samples=3000, return_rgb_frame=False, visualize=False),
@@ -150,7 +151,8 @@ class ExploreEnv(ObjEnv):
             use_anygrasp=self.cfg["use_anygrasp"],
             world_frame=True,
             visualize=visualize,
-            asset_path=ASSET_PATH
+            asset_path=ASSET_PATH,
+            logger=self.logger
         )
         
         if cur_frame.grasp_group is None:

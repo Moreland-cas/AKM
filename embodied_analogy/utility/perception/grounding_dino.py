@@ -87,4 +87,3 @@ if __name__ == "__main__":
         dino_model=load_groundingDINO_model(),
         visualize=True
     )
-    print(bbox_scaled, bbox_score)

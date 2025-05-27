@@ -594,7 +594,8 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             instruction=self.cfg["instruction"],
             obj_description=self.obj_description,
             fully_zeroshot=self.cfg["fully_zeroshot"],
-            visualize=visualize
+            visualize=visualize,
+            logger=self.logger
         )
         obj_mask = self.affordance_map_2d.get_obj_mask(visualize=False)
         contact_uv = self.affordance_map_2d.sample_highest(visualize=visualize)
@@ -620,13 +621,13 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         if gt_joint_type:
             joint_type = self.obj_repr.gt_joint_dict["joint_type"]
             if joint_type == "revolute":
-                joint_dict, _ = coarse_R_from_tracks_3d(tracks_3d=general_flow, visualize=False)
+                joint_dict, _ = coarse_R_from_tracks_3d(tracks_3d=general_flow, visualize=False, logger=self.logger)
                 joint_dict["joint_type"] = "revolute"
             elif joint_type == "prismatic":
-                joint_dict, _ = coarse_t_from_tracks_3d(tracks_3d=general_flow, visualize=False)
+                joint_dict, _ = coarse_t_from_tracks_3d(tracks_3d=general_flow, visualize=False, logger=self.logger)
                 joint_dict["joint_type"] = "prismatic"
         else:
-            joint_dict = coarse_estimation(tracks_3d=general_flow, visualize=False)
+            joint_dict = coarse_estimation(tracks_3d=general_flow, visualize=False, logger=self.logger)
         
         # 将 joint_dict 转换到世界坐标系下
         self.obj_repr.coarse_joint_dict = joint_dict
@@ -640,7 +641,8 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             use_anygrasp=self.cfg["use_anygrasp"],
             world_frame=True,
             visualize=visualize,
-            asset_path=ASSET_PATH
+            asset_path=ASSET_PATH,
+            logger=self.logger
         )
         # 
         pc_collision_w, pc_colors = self.initial_frame.get_env_pc(

@@ -210,7 +210,7 @@ class Frame(Data):
             visualize_pc(obj_pc, pc_colors / 255)
         return obj_pc, pc_colors
         
-    def detect_grasp(self, use_anygrasp=True, world_frame=False, visualize=False, asset_path=None) -> GraspGroup:
+    def detect_grasp(self, use_anygrasp=True, world_frame=False, visualize=False, asset_path=None, logger=None) -> GraspGroup:
         """
         返回当前 frame 的点云上 contact2d 附近的一个 graspGroup, default frame is Tgrasp2c
         if world_frame = True, return Tgrasp2w
@@ -270,6 +270,7 @@ class Frame(Data):
                 dir_out=dir_out, 
                 augment=True,
                 visualize=False, # still have bug visualize this
+                logger=logger
             )  
         else: # use gsnet
             from embodied_analogy.utility.grasp.gsnet import detect_grasp_gsnet
@@ -280,7 +281,8 @@ class Frame(Data):
                 nms=True,
                 keep=1e6,
                 visualize=visualize,
-                asset_path=asset_path
+                asset_path=asset_path,
+                logger=logger
             )
             
         # 初始化限制条件
@@ -340,7 +342,7 @@ class Frame(Data):
             if self.grasp_group is not None and len(self.grasp_group) > 0:
                 self.grasp_group = self.grasp_group.transform(Tc2w) # TODO 解决是None的问题
             
-    def detect_grasp_moving(self, crop_thresh=0.1, visualize=False) -> GraspGroup:
+    def detect_grasp_moving(self, crop_thresh=0.1, visualize=False, logger=None) -> GraspGroup:
         """
         返回当前 frame 的点云上 moving_part 附近的一个 graspGroup
         """
@@ -359,7 +361,8 @@ class Frame(Data):
             colors=pc_colors / 255.,
             dir_out=dir_out, 
             augment=True,
-            visualize=False
+            visualize=False,
+            logger=logger
         )  
         # 这是在所有物体点云上检测得到的 grasp, 我们需要把距离 dynamic_mask 中 moving_mask 近的裁剪出来
         gg = crop_grasp_by_moving(
@@ -578,7 +581,7 @@ class Frames(Data):
             
             # 但是如果 filter_mask 过滤后的点实在太少, 那么就不进行过滤
             if filter_mask.sum() < 100:
-                # print(f"WARNING: too few points after filtering (original: {track3d_seq.shape[1]}, filtered: {filter_mask.sum()}), skip filtering")
+                # (f"WARNING: too few points after filtering (original: {track3d_seq.shape[1]}, filtered: {filter_mask.sum()}), skip filtering")
                 filter_mask = np.ones(M, dtype=bool)
                 
             track2d_seq = track2d_seq[:, filter_mask]

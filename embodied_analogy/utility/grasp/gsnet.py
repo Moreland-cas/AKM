@@ -1,3 +1,4 @@
+import logging
 import open3d as o3d
 import numpy as np
 import torch
@@ -46,7 +47,7 @@ def inference_gsnet(gsnet: GSNet, pcs, keep=1e6, nms=True):
         gg = gg[:keep]
     return gg
     
-def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize=False, asset_path=None):
+def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize=False, asset_path=None, logger=None):
     '''GSNet'''
     # need to preprocess point cloud
     pcs_input = points.copy()
@@ -57,7 +58,7 @@ def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize
         keep=keep,
         nms=nms,
     )
-    print('grasp num:', len(gg))
+    logger.log(logging.DEBUG, f'grasp num: {len(gg)}')
     if visualize:
         grippers = gg.to_open3d_geometry_list()
         cloud = o3d.geometry.PointCloud()

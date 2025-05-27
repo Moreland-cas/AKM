@@ -1,4 +1,5 @@
 import torch
+import logging
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
@@ -11,7 +12,7 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 from embodied_analogy.utility.estimation.scheduler import Scheduler
 
-def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
+def coarse_t_from_tracks_3d(tracks_3d, visualize=False, logger=None):
     """
     通过所有时间帧的位移变化估计平移方向，并计算每帧沿该方向的位移标量
     :param tracks_3d: 形状为(T, M, 3)的numpy数组, T是时间步数, M是点的数量
@@ -63,7 +64,8 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(joint_states, joint_dir)
-        print(f"[{i}/{num_iterations}] coarse t loss: ", loss.item())
+        if i % 10 == 0:
+            logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse t loss: {loss.item()}")
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
         # 给最开始插入 0
@@ -78,10 +80,11 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        print(f"\t lr:", cur_lr)
+        if i % 10 == 0:
+            logger.log(logging.DEBUG, f"\t lr: {cur_lr}")
         
         if should_early_stop:
-            print("EARLY STOP")
+            logger.log(logging.INFO, "Early stop in coarse_t_estimation")
             break
         
         loss.backward()
@@ -126,7 +129,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False):
     return scheduler.best_state_dict, scheduler.best_loss
 
 
-def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
+def coarse_R_from_tracks_3d(tracks_3d, visualize=False, logger=None):
     # 使用一个 frame 的点云估计一整个 normal
     """
     通过所有时间帧的点轨迹估计旋转轴，并通过优化方法求解每帧的旋转角度
@@ -157,7 +160,6 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     min_idx = np.argmin(np.linalg.norm(tracks_3d_diff, axis=-1).mean(0))
     joint_start = tracks_3d[0, min_idx]
     joint_start = remove_dir_component(joint_start, joint_dir)
-    # print(joint_dir, joint_start)
     
     # 接着估计出每一帧对应的 angle, 这里可能需要进行一个方向的对齐
     joint_states = np.zeros(T)  # 初始化角度数组，第一帧角度为0
@@ -185,11 +187,6 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         if t == T-1:
             if np.dot(np.cross(diff_0, diff_t), joint_dir) < 0:
                 joint_dir = -joint_dir
-        
-    # print("before torch optimization")
-    # print("joint_dir: ", joint_dir)
-    # print("joint_start: ", joint_start)
-    # print("joint_states: ", joint_states)
     
     # 初始化 joint_states 和 joint_start，并设置优化器
     joint_states = torch.from_numpy(joint_states[1:]).float().cuda().requires_grad_() # T-1
@@ -220,16 +217,6 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         return est_loss 
 
     optimizer = torch.optim.Adam([joint_states, joint_dir, joint_start], lr=1e-2) # 1 cm
-    
-    # lr = 1e-2
-    # dir_lr = 1e-2
-    # optimizer = torch.optim.Adam(
-    #     params=[
-    #         {'params': joint_states, 'lr': lr},
-    #         {'params': joint_dir, 'lr': dir_lr},
-    #         {'params': joint_start, 'lr': lr}
-    #     ]
-    # )
     scheduler = Scheduler(
         optimizer=optimizer,
         lr_update_factor=0.5,
@@ -242,7 +229,8 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     for i in range(num_iterations):
         optimizer.zero_grad()
         loss = loss_function_torch(joint_dir, joint_states, joint_start)
-        print(f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
+        if i % 10 == 0:
+            logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse R loss: ", loss.item())
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
         joint_states_tmp = np.insert(joint_states_tmp, 0, 0)
@@ -257,20 +245,16 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        print(f"\t lr:", cur_lr)
+        if i % 10 == 0:
+            logger.log(logging.DEBUG, f"\t lr: {cur_lr}")
         
         if should_early_stop:
-            print("EARLY STOP")
+            logger.log(logging.INFO, "EARLY STOP")
             break
         
         loss.backward()
         optimizer.step()
         
-    # print("after torch optimization")
-    # print("joint_dir: ", scheduler.best_state_dict["joint_dir"])
-    # print("joint_start: ", scheduler.best_state_dict["joint_start"])
-    # print("joint_states: ", scheduler.best_state_dict["joint_states"])
-    
     if visualize:
         # NOTE: 由于 napari 的显示是左手坐标系, 因此需要把所有三维数据的 z 轴乘 -1
         joint_states = np.copy(scheduler.best_state_dict["joint_states"])
@@ -337,23 +321,23 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False):
     return scheduler.best_state_dict, scheduler.best_loss
 
 
-def coarse_estimation(tracks_3d, visualize=False):
+def coarse_estimation(tracks_3d, visualize=False, logger=None):
     """
     根据 tracks3d 估计出初始的 joint 状态, 要求 joint_state 的初始值是0, 且随着轨迹增加
     (如果是旋转的话需要满足右手定则)
     tracks_3d: (T, M, 3)
     """
-    t_state_dict, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize)
-    R_state_dict, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize)
+    t_state_dict, t_est_loss = coarse_t_from_tracks_3d(tracks_3d, visualize, logger)
+    R_state_dict, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize, logger)
     
-    print(f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
+    logger.log(logging.INFO, f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
     torch.cuda.empty_cache()
     if t_est_loss < R_est_loss:
-        print("select as prismatic joint")
+        logger.log(logging.INFO, "Thus, select as prismatic joint")
         t_state_dict["joint_type"] = "prismatic"
         return t_state_dict
     else:
-        print("select as revolute joint")
+        logger.log(logging.INFO, "Thus, select as revolute joint")
         R_state_dict["joint_type"] = "revolute"
         return R_state_dict
 

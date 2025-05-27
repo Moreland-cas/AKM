@@ -174,7 +174,8 @@ class Obj_repr(Data):
     def coarse_joint_estimation(self, visualize=False):
         coarse_joint_dict = coarse_estimation(
             tracks_3d=self.frames.track3d_seq[:, self.frames.moving_mask, :], 
-            visualize=visualize
+            visualize=visualize,
+            logger=self.logger
         )
         self.coarse_joint_dict = coarse_joint_dict
         self.frames.write_joint_states(coarse_joint_dict["joint_states"])
@@ -195,13 +196,14 @@ class Obj_repr(Data):
             # update_dynamic_mask=None,
             lr=lr, # 1mm
             gt_joint_dict=self.get_joint_param(resolution="gt", frame="camera"),
-            visualize=visualize
+            visualize=visualize,
+            logger=self.logger
         )
         # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
         self.kframes.write_joint_states(fine_joint_dict["joint_states"])
         self.fine_joint_dict = fine_joint_dict
         
-        # TODO: 默认在 explore 阶段是打开的轨迹
+        # 默认在 explore 阶段是打开的轨迹
         track_type = "open"
         self.track_type = track_type
         
@@ -219,7 +221,6 @@ class Obj_repr(Data):
         evaluate=False,
         save_memory=True,
         visualize=True,
-        logger=None
     ):
         """
             从 frames 中恢复出 joint state dict
@@ -397,7 +398,8 @@ class Obj_repr(Data):
             opti_joint_start=False,
             opti_joint_states_mask=np.arange(num_ref+1)==0,
             lr=reloc_lr,
-            visualize=visualize
+            visualize=visualize,
+            logger=self.logger
         )
         # 然后在这里把 query_frame 从 keyframes 中吐出来
         query_frame = self.kframes.frame_list.pop(0)

@@ -1,3 +1,4 @@
+import logging
 import os
 import torch
 import numpy as np
@@ -166,7 +167,8 @@ def fine_estimation(
     # update_dynamic_mask=None,
     lr = 1e-3, # 1mm
     gt_joint_dict=None, # should be in camera frame
-    visualize=False
+    visualize=False,
+    logger=None
 ):
     """
     NOTE: 在相机坐标系下进行优化的
@@ -306,7 +308,7 @@ def fine_estimation(
         
         if cur_icp_loss.item() == 0:
             # TODO 如果等于 0, 说明就根本没有有效的数据 pair, 这时候选择更改 icp_range 的参数, 或者直接退出
-            print("No valid data pair, exit ICP loop")
+            logger.log(logging.DEBUG, "No valid data pair, exit ICP loop")
             break
         
         # 在这里进行 scheduler.step()
@@ -321,11 +323,11 @@ def fine_estimation(
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
         
         if k % 10 == 0:
-            print(f"[{k}/{max_icp_iters}] ICP loss:", cur_icp_loss.item())
-            print(f"\t lr:", cur_lr)
+            logger.log(logging.DEBUG, f"[{k}/{max_icp_iters}] ICP loss: {cur_icp_loss.item()}")
+            logger.log(logging.DEBUG, f"\t lr: {cur_lr}")
         
         if should_early_stop:
-            print("EARLY STOP")
+            logger.log(logging.INFO, "Early stop in fine_estimation")
             break
         
         # otherwise 继续优化
