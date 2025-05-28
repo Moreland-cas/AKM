@@ -27,7 +27,7 @@ class ManipulateEnv(ReconEnv):
         self.manip_type = self.manip_env_cfg["manip_type"]
         self.manip_distance = self.manip_env_cfg["manip_distance"]
         
-        self.goal_delta = self.manip_distance
+        self.goal_delta = abs(self.manip_distance)
         if self.manip_type == "close":
             self.goal_delta *= -1
             
@@ -319,23 +319,30 @@ class ManipulateEnv(ReconEnv):
         return result_dict
     
     def main(self):
-        super().main()
-        self.manip_result = self.manipulate_close_loop()
-        
-        if self.exp_cfg["save_result"]:
-            save_json_path = os.path.join(
-                self.exp_cfg["exp_folder"],
-                str(self.task_cfg["task_id"]),
-                "manip_result.json"
-            )
-            with open(save_json_path, 'w', encoding='utf-8') as json_file:
-                json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
-                
-        return {
-            "explore": self.explore_result,
-            "recon": self.recon_result,
-            "manip": self.manip_result
-        }
+        try:
+            self.manip_result = None
+            super().main()
+            self.manip_result = self.manipulate_close_loop()
+        except Exception as e:
+            self.logger.log(logging.DEBUG, f'Encouter {e} when manipulating, thus only save current state')
+        finally:
+            if self.manip_result == None:
+                self.manip_result = [self.evaluate()]
+            
+            if self.exp_cfg["save_result"]:
+                save_json_path = os.path.join(
+                    self.exp_cfg["exp_folder"],
+                    str(self.task_cfg["task_id"]),
+                    "manip_result.json"
+                )
+                with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                    json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                    
+            # return {
+            #     "explore": self.explore_result,
+            #     "recon": self.recon_result,
+            #     "manip": self.manip_result
+            # }
             
         
 if __name__ == '__main__':

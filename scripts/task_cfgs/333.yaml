@@ -1,0 +1,24 @@
+obj_env_cfg:
+  joint_type: prismatic
+  data_path: dataset/one_drawer_cabinet/44781_link_2
+  obj_index: 44781
+  joint_index: 2
+  obj_description: cabinet
+  active_link_name: link_2
+  active_joint_name: joint_2
+  load_pose:
+  - 0.9663454294204712
+  - 0.09023573994636536
+  - 0.5845490097999573
+  load_quat:
+  - 0.9996536374092102
+  - 0.01574897952377796
+  - 0.0003321171388961375
+  - 0.02108086459338665
+  load_scale: 1.0111464073464218
+  init_joint_state: 0.14088712232546155
+task_cfg:
+  instruction: close the cabinet
+manip_env_cfg:
+  manip_type: close
+  manip_distance: 0.1

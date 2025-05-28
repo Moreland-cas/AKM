@@ -120,6 +120,7 @@ class ReconEnv(ExploreEnv):
     ###########################################################
     def main(self):
         super().main()
+        self.recon_result = None
         self.recon_result = self.recon_stage()
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(

@@ -81,7 +81,7 @@ def randomize_obj_load_pose(
     obj_init_height_low = 0.01
     obj_init_height_high = 0.05
     
-    path = os.path.join(ASSET_PATH, cfg["data_path"])
+    path = os.path.join(ASSET_PATH, cfg["obj_env_cfg"]["data_path"])
     bbox_path = os.path.join(path, "bounding_box.json")
     with open(bbox_path, "r") as f:
         bbox = json.load(f)
@@ -99,13 +99,13 @@ def randomize_obj_load_pose(
         obj_init_height_high - bbox["min"][1]*0.75
     )
     
-    cfg.update({
+    cfg["obj_env_cfg"].update({
         "load_pose": sapien_pose.p.tolist(),
         "load_quat": sapien_pose.q.tolist(),
         "load_scale": np.random.uniform(0.9, 1.1),
     })
     
-    cfg.update({
+    cfg["obj_env_cfg"].update({
         "init_joint_state": 
             randomize_dof(
                 dof_low,

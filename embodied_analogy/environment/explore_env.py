@@ -113,6 +113,9 @@ class ExploreEnv(ObjEnv):
             self.logger.log(logging.INFO, "In summary, no valid exploration during explore phase!")
         else:
             self.logger.log(logging.INFO, "In summary, get valid exploration during explore phase!")
+        
+        if not self.has_valid_explore:
+            raise Exception("No valid explore found!")
         return result_dict
     
     def explore_once(
@@ -294,7 +297,6 @@ class ExploreEnv(ObjEnv):
     ###############################################
     def main(self):
         self.explore_result = self.explore_stage()
-        
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(
                 self.exp_cfg["exp_folder"],
@@ -303,9 +305,6 @@ class ExploreEnv(ObjEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
-                
-        if not self.has_valid_explore:
-            raise Exception("No valid explore found!")
         
     
 if __name__ == "__main__":

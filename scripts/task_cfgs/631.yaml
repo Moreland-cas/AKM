@@ -1,0 +1,24 @@
+obj_env_cfg:
+  joint_type: revolute
+  data_path: dataset/one_door_cabinet/47570_link_0
+  obj_index: 47570
+  joint_index: 0
+  obj_description: cabinet
+  active_link_name: link_0
+  active_joint_name: joint_0
+  load_pose:
+  - 1.0139892101287842
+  - 0.11378413438796997
+  - 0.6145296692848206
+  load_quat:
+  - 0.9998055100440979
+  - 0.018382422626018524
+  - -0.00013132067397236824
+  - -0.007142428308725357
+  load_scale: 1.0933117526575422
+  init_joint_state: 0.09795258262648458
+task_cfg:
+  instruction: open the cabinet
+manip_env_cfg:
+  manip_type: open
+  manip_distance: 20

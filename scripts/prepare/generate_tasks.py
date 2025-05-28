@@ -1,6 +1,6 @@
+import yaml
 import os
 import copy
-import json
 import numpy as np
 import argparse
 from embodied_analogy.utility.constants import ASSET_PATH, PROJECT_ROOT, SEED
@@ -28,7 +28,7 @@ set_random_seed(SEED)
 确定好这些后, 再确定 init_joint_state 和 load_pose, 一共随机 n 个
 """
 parser = argparse.ArgumentParser(description='Folder to save the cfg files')
-parser.add_argument('--save_dir', type=str, default=os.path.join(PROJECT_ROOT, "scripts"), help='folder to save the test cfg')
+parser.add_argument('--save_dir', type=str, default=os.path.join(PROJECT_ROOT, "scripts", "task_cfgs"), help='folder to save the test cfg')
 args = parser.parse_args()
     
 task_cfgs = {}
@@ -37,48 +37,42 @@ obj_cfgs = []
 pri_path = os.path.join(ASSET_PATH, "dataset/one_drawer_cabinet")
 # 44781_link_0
 for tmp_folder in os.listdir(pri_path):
-    joint_index = tmp_folder.split("_")[-1]
-    obj_index = tmp_folder.split("_")[0]
+    joint_index = int(tmp_folder.split("_")[-1])
+    obj_index = int(tmp_folder.split("_")[0])
     tmp_dict = {
-        "joint_type": "prismatic",
-        "data_path": os.path.join("dataset/one_drawer_cabinet", tmp_folder),
-        "obj_index": obj_index,
-        "joint_index": joint_index,
-        "obj_description": "cabinet",
-        "load_pose": None,
-        "load_quat": None,
-        "load_scale": None,
-        "active_link_name": f"link_{joint_index}",
-        "active_joint_name": f"joint_{joint_index}",
-        "instruction": None,
-        "init_joint_state": None
+        "obj_env_cfg": {
+            "joint_type": "prismatic",
+            "data_path": os.path.join("dataset/one_drawer_cabinet", tmp_folder),
+            "obj_index": obj_index,
+            "joint_index": joint_index,
+            "obj_description": "cabinet",
+            "active_link_name": f"link_{joint_index}",
+            "active_joint_name": f"joint_{joint_index}",
+        }
     }
     obj_cfgs.append(tmp_dict)
 
 rev_path = os.path.join(ASSET_PATH, "dataset/one_door_cabinet")
 for tmp_folder in os.listdir(rev_path):
-    joint_index = tmp_folder.split("_")[-1]
-    obj_index = tmp_folder.split("_")[0]
+    joint_index = int(tmp_folder.split("_")[-1])
+    obj_index = int(tmp_folder.split("_")[0])
     tmp_dict = {
-        "joint_type": "revolute",
-        "data_path": os.path.join("dataset/one_door_cabinet", tmp_folder),
-        "obj_index": obj_index,
-        "joint_index": joint_index,
-        "obj_description": "cabinet",
-        "load_pose": None,
-        "load_quat": None,
-        "load_scale": None,
-        "active_link_name": f"link_{joint_index}",
-        "active_joint_name": f"joint_{joint_index}",
-        "instruction": None,
-        "init_joint_state": None
+        "obj_env_cfg": {
+            "joint_type": "revolute",
+            "data_path": os.path.join("dataset/one_door_cabinet", tmp_folder),
+            "obj_index": obj_index,
+            "joint_index": joint_index,
+            "obj_description": "cabinet",
+            "active_link_name": f"link_{joint_index}",
+            "active_joint_name": f"joint_{joint_index}"
+        }
     }
     obj_cfgs.append(tmp_dict)
 
 # 这里得到了完整的 obj_cfgs, 接下来需要遍历
 global_task_idx = 0
 for obj_cfg in obj_cfgs:
-    joint_type = obj_cfg["joint_type"]
+    joint_type = obj_cfg["obj_env_cfg"]["joint_type"]
     # 根据 joint_type 确定 manip 的区间大小和 obj_init_dof_low 和 obj_init_dof_high
     if joint_type == "prismatic":
         max_joint_range = PRISMATIC_JOINT_MAX_RANGE
@@ -105,13 +99,22 @@ for obj_cfg in obj_cfgs:
 
             # 每一种 setting 下运行 NUM_EXP_PER_SETTING 遍, 且 load 状态会有所不同
             for _ in range(NUM_EXP_PER_SETTING):
-                base_obj_cfg = copy.copy(obj_cfg)
+                base_obj_cfg = copy.deepcopy(obj_cfg)
                 base_obj_cfg = randomize_obj_load_pose(
                     cfg=base_obj_cfg,
                     dof_low=obj_init_dof_low,
                     dof_high=obj_init_dof_high
                 )
-                base_obj_cfg["instruction"] = manip_type + " the " + base_obj_cfg["obj_description"]
+                base_obj_cfg["task_cfg"] = {}
+                base_obj_cfg["task_cfg"]["instruction"] = manip_type + " the " + base_obj_cfg["obj_env_cfg"]["obj_description"]
+                
+                # 写入 manip_type 和 manip_distance
+                base_obj_cfg["manip_env_cfg"] = {}
+                base_obj_cfg["manip_env_cfg"].update({
+                    "manip_type": manip_type,
+                    "manip_distance": test_delta
+                })
+                
                 # 将新产生的 task_cfg 进行保存
                 task_cfgs[global_task_idx] = base_obj_cfg
                 global_task_idx += 1
@@ -121,9 +124,17 @@ for obj_cfg in obj_cfgs:
 #     print(k)
 #     print(v)
 
-# 保存产生的 test_cfgs
+# 保存为 .json
+# os.makedirs(args.save_dir, exist_ok=True)
+# cfg_file_path = os.path.join(args.save_dir, "test_cfgs.json")
+# with open(cfg_file_path, 'w', encoding='utf-8') as f:
+#     json.dump(task_cfgs, f, ensure_ascii=False, indent=4)
+# print("Generate cfg files done.")
+
+# 保存为多个 yaml 文件
 os.makedirs(args.save_dir, exist_ok=True)
-cfg_file_path = os.path.join(args.save_dir, "test_cfgs.json")
-with open(cfg_file_path, 'w', encoding='utf-8') as f:
-    json.dump(task_cfgs, f, ensure_ascii=False, indent=4)
+for task_id, task_cfg in task_cfgs.items():
+    yaml_file_path = os.path.join(args.save_dir, f"{task_id}.yaml")
+    with open(yaml_file_path, 'w', encoding='utf-8') as f:
+        yaml.safe_dump(task_cfg, f, default_flow_style=False, sort_keys=False)
 print("Generate cfg files done.")
