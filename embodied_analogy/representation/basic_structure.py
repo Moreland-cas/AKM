@@ -508,6 +508,11 @@ class Frames(Data):
         joint_states = np.array([self.frame_list[i].joint_state for i in range(self.num_frames())]) 
         return joint_states
     
+    def get_gt_joint_states(self):
+        # T
+        joint_states = np.array([self.frame_list[i].gt_joint_state for i in range(self.num_frames())]) 
+        return joint_states
+    
     def get_dynamic_seq(self):
         # T
         dynamic_seq = np.array([self.frame_list[i].dynamic_mask for i in range(self.num_frames())]) 

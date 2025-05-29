@@ -12,6 +12,7 @@ from embodied_analogy.representation.obj_repr import Obj_repr
 from embodied_analogy.environment.explore_env import ExploreEnv
 from embodied_analogy.representation.basic_structure import Frame
 
+
 class ReconEnv(ExploreEnv):
     def __init__(self, cfg):     
         super().__init__(cfg=cfg)
@@ -120,16 +121,31 @@ class ReconEnv(ExploreEnv):
     ###########################################################
     def main(self):
         super().main()
-        self.recon_result = None
-        self.recon_result = self.recon_stage()
-        if self.exp_cfg["save_result"]:
-            save_json_path = os.path.join(
-                self.exp_cfg["exp_folder"],
-                str(self.task_cfg["task_id"]),
-                "recon_result.json"
-            )
-            with open(save_json_path, 'w', encoding='utf-8') as json_file:
-                json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+        
+        try:
+            self.recon_result = {}
+            
+            if self.explore_result is not None and self.explore_result["has_valid_explore"]:
+                self.recon_result = self.recon_stage()
+                self.recon_result["has_valid_reconstruct"] = True
+            else:
+                self.recon_result["has_valid_reconstruct"] = False
+                self.recon_result["failed_reason"] = "Skip reconstruction since no valid explore or None explore result dict."
+                
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}") 
+            self.recon_result["has_valid_reconstruct"] = False
+            self.recon_result["failed_reason"] = f"Skip reconstruction since {e}."
+            
+        finally:
+            if self.exp_cfg["save_result"]:
+                save_json_path = os.path.join(
+                    self.exp_cfg["exp_folder"],
+                    str(self.task_cfg["task_id"]),
+                    "recon_result.json"
+                )
+                with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                    json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
 if __name__ == "__main__":
     cfg = {

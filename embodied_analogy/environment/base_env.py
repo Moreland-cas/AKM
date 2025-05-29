@@ -102,8 +102,7 @@ class BaseEnv():
     def setup_logger(self, cfg, txt_path):
         # 将 txt_path 生成
         os.makedirs(os.path.dirname(txt_path), exist_ok=True)
-        
-        logger = logging.getLogger("ea_logger")
+        logger = logging.getLogger(f'logger_{cfg["task_cfg"]["task_id"]}')
         
         level = cfg["logging"]["level"]
         if level == "DEBUG":
@@ -118,14 +117,14 @@ class BaseEnv():
             logger.setLevel(logging.CRITICAL)
         
         # 设置格式化
-        formatter = logging.Formatter('[%(asctime)s][%(levelname)-8s] %(message)s')
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s')
         
         # 设置流
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
-        file_handler = logging.FileHandler(txt_path)
+        file_handler = logging.FileHandler(txt_path, mode="w")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         self.logger = logger

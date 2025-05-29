@@ -19,6 +19,7 @@ obj_env_cfg:
   init_joint_state: 0.03739983638063457
 task_cfg:
   instruction: open the cabinet
+  task_id: 120
 manip_env_cfg:
   manip_type: open
   manip_distance: 0.1

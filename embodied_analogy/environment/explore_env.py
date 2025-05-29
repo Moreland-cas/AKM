@@ -105,7 +105,9 @@ class ExploreEnv(ObjEnv):
             "has_valid_explore": self.has_valid_explore,
             "joint_type": self.joint_type,
             "joint_state_start": 0,
-            "joint_state_end": self.get_active_joint_state() - self.obj_env_cfg["init_joint_state"]
+            # NOTE: 这里应该减去 manip_first_frame 的 joint_state 而不是 init_joint_state
+            # "joint_state_end": self.get_active_joint_state() - self.obj_env_cfg["init_joint_state"]
+            "joint_state_end": self.get_active_joint_state() - self.obj_repr.frames[0].gt_joint_state
         }
         self.logger.log(logging.INFO, f"exploration stage result: {result_dict}")
         
@@ -114,8 +116,9 @@ class ExploreEnv(ObjEnv):
         else:
             self.logger.log(logging.INFO, "In summary, get valid exploration during explore phase!")
         
-        if not self.has_valid_explore:
-            raise Exception("No valid explore found!")
+        # if not self.has_valid_explore:
+        #     raise Exception("No valid explore found!")
+        
         return result_dict
     
     def explore_once(
@@ -296,15 +299,21 @@ class ExploreEnv(ObjEnv):
     
     ###############################################
     def main(self):
-        self.explore_result = self.explore_stage()
-        if self.exp_cfg["save_result"]:
-            save_json_path = os.path.join(
-                self.exp_cfg["exp_folder"],
-                str(self.task_cfg["task_id"]),
-                "explore_result.json"
-            )
-            with open(save_json_path, 'w', encoding='utf-8') as json_file:
-                json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+        try:
+            self.explore_result = {}
+            self.explore_result = self.explore_stage()
+            
+            if self.exp_cfg["save_result"]:
+                save_json_path = os.path.join(
+                    self.exp_cfg["exp_folder"],
+                    str(self.task_cfg["task_id"]),
+                    "explore_result.json"
+                )
+                with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                    json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                    
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Explore exception occured: {e}")
         
     
 if __name__ == "__main__":

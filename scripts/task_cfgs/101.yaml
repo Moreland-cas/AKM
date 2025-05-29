@@ -19,6 +19,7 @@ obj_env_cfg:
   init_joint_state: 0.23176739211204436
 task_cfg:
   instruction: close the cabinet
+  task_id: 101
 manip_env_cfg:
   manip_type: close
   manip_distance: 0.2

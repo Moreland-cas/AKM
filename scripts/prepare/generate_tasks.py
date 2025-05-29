@@ -107,6 +107,7 @@ for obj_cfg in obj_cfgs:
                 )
                 base_obj_cfg["task_cfg"] = {}
                 base_obj_cfg["task_cfg"]["instruction"] = manip_type + " the " + base_obj_cfg["obj_env_cfg"]["obj_description"]
+                base_obj_cfg["task_cfg"]["task_id"] = global_task_idx
                 
                 # 写入 manip_type 和 manip_distance
                 base_obj_cfg["manip_env_cfg"] = {}

@@ -136,6 +136,26 @@ class Obj_repr(Data):
                 P2=gt_w["joint_start"],
                 d2=gt_w["joint_dir"]
             )
+        
+        # 新增加一个逻辑, 用于判断 coarse estimation 和 fine estimation
+        # 首先得到 coarse joint state, fine joint state 等信息
+        coarse_joint_state_recon = self.coarse_joint_dict["joint_states"]
+        fine_joint_state_recon = self.fine_joint_dict["joint_states"]
+        
+        coarse_joint_state_gt = self.frames.get_gt_joint_states()
+        coarse_joint_state_gt -= coarse_joint_state_gt[0]
+        
+        fine_joint_state_gt = self.kframes.get_gt_joint_states()
+        fine_joint_state_gt -= fine_joint_state_gt[0]
+        
+        # 首先进行一个保存
+        result["gt_w"]["fine_joint_states"] = fine_joint_state_gt
+        result["gt_w"]["coarse_joint_states"] = coarse_joint_state_gt
+        
+        # 然后对 state_err 进行计算, 为 l1 loss 的平均值
+        result["coarse_loss"]["state_err"] = np.abs(coarse_joint_state_recon - coarse_joint_state_gt).mean()
+        result["fine_loss"]["state_err"] = np.abs(fine_joint_state_recon - fine_joint_state_gt).mean()
+        
         return result
     
     def clear_frames(self):
@@ -366,7 +386,7 @@ class Obj_repr(Data):
         query_frame:
             需包含 query_depth, query_dynamic
         """
-        self.logger.log(logging.INFO, "Strat Relocalizing...")
+        self.logger.log(logging.INFO, "Start Relocalizing...")
         # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
         num_ref = len(self.kframes)
         

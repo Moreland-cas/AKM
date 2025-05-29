@@ -146,12 +146,15 @@ class ManipulateEnv(ReconEnv):
         self.max_manip = self.manip_env_cfg["max_manip"]
         self.logger.log(logging.INFO, "Start manipulation Loop ...")
         num_manip = 0
-        results = []
+        # 针对不用 manipulate 就成功的情况, 加一个 result 进去
+        results = {
+            num_manip: self.evaluate()
+        }
         while(self.not_good_enough(visualize=visualize) and (num_manip < self.max_manip)):
             self.logger.log(logging.INFO, f"Start manipulating, round {num_manip + 1}...")
             result = self.manip_once()
             num_manip = num_manip + 1
-            results.append(result)
+            results[num_manip] = result
         
         if num_manip == self.max_manip:
             self.logger.log(logging.INFO, f"After {num_manip} round, Stopped since num_manip reach max_manip...")
@@ -319,15 +322,15 @@ class ManipulateEnv(ReconEnv):
         return result_dict
     
     def main(self):
+        super().main()
+        
         try:
             self.manip_result = None
-            super().main()
-            self.manip_result = self.manipulate_close_loop()
-        except Exception as e:
-            self.logger.log(logging.DEBUG, f'Encouter {e} when manipulating, thus only save current state')
-        finally:
-            if self.manip_result == None:
-                self.manip_result = [self.evaluate()]
+            
+            if self.recon_result["has_valid_reconstruct"]:
+                self.manip_result = self.manipulate_close_loop()
+            else:
+                self.manip_result = {-1: self.evaluate()}
             
             if self.exp_cfg["save_result"]:
                 save_json_path = os.path.join(
@@ -338,11 +341,8 @@ class ManipulateEnv(ReconEnv):
                 with open(save_json_path, 'w', encoding='utf-8') as json_file:
                     json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
                     
-            # return {
-            #     "explore": self.explore_result,
-            #     "recon": self.recon_result,
-            #     "manip": self.manip_result
-            # }
+        except Exception as e:
+            self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state')
             
         
 if __name__ == '__main__':

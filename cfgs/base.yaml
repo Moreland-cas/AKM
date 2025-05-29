@@ -7,7 +7,7 @@ exp_cfg:
   save_result: True
 
 logging:
-  level: DEBUG
+  level: INFO
 
 base_env_cfg:
   offscreen: True
@@ -58,7 +58,7 @@ manip_env_cfg:
   max_manip: 5
   # for whole traj closed-loop
   prismatic_whole_traj_success_thresh: 0.01
-  revolute_whole_traj_success_thresh: 5
+  revolute_whole_traj_success_thresh: 3
   # for intermediate closed-loop
   prismatic_reloc_interval: 0.005
   prismatic_reloc_tolerance: 0.001
