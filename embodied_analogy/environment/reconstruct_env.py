@@ -125,19 +125,13 @@ class ReconEnv(ExploreEnv):
         try:
             self.recon_result = {}
             
-            if self.explore_result is not None and self.explore_result["has_valid_explore"]:
+            if self.explore_result["has_valid_explore"]:
                 self.recon_result = self.recon_stage()
                 self.recon_result["has_valid_reconstruct"] = True
             else:
                 self.recon_result["has_valid_reconstruct"] = False
-                self.recon_result["failed_reason"] = "Skip reconstruction since no valid explore or None explore result dict."
-                
-        except Exception as e:
-            self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}") 
-            self.recon_result["has_valid_reconstruct"] = False
-            self.recon_result["failed_reason"] = f"Skip reconstruction since {e}."
+                self.recon_result["failed_reason"] = "Skip reconstruction since no valid explore."
             
-        finally:
             if self.exp_cfg["save_result"]:
                 save_json_path = os.path.join(
                     self.exp_cfg["exp_folder"],
@@ -146,6 +140,9 @@ class ReconEnv(ExploreEnv):
                 )
                 with open(save_json_path, 'w', encoding='utf-8') as json_file:
                     json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                    
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}") 
         
 if __name__ == "__main__":
     cfg = {

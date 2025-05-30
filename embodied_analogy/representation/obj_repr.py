@@ -85,12 +85,11 @@ class Obj_repr(Data):
                 joint_dict["joint_start"] = Tw2c[:3, :3] @ joint_dict["joint_start"] + Tw2c[:3, 3]
         return joint_dict
     
-    def compute_joint_error(self, omit_positive_dir=True):
+    def compute_joint_error(self):
         """
         分别计算 coarse_joint_dict, fine_joint_dict 与 gt_joint_dict 的差距, 并打印, 保存
         还要分别计算 frames 和 kframes 的 joint_state_error
         
-        omit_positive_dir: 是否忽略 joint_axis 的正负方向
         """
         coarse_w = self.get_joint_param(resolution="coarse", frame="world")
         fine_w = self.get_joint_param(resolution="fine", frame="world")
@@ -431,6 +430,11 @@ class Obj_repr(Data):
         query_frame.joint_state = fine_joint_dict["joint_states"][0]
         self.logger.log(logging.INFO, f"Fine estimated joint state: {query_frame.joint_state}")
         
+        if self.frames is not None:
+            manip_first_frame_gt_joint_state = self.frames[0].gt_joint_state
+        else:
+            manip_first_frame_gt_joint_state = self.kframes[0].gt_joint_state
+        self.logger.log(logging.INFO, f"GT joint state: {query_frame.gt_joint_state - manip_first_frame_gt_joint_state}")
         # 估计完后再更新一次 dynamic 估计
         self.update_dynamic(query_frame, visualize=visualize)
         return query_frame

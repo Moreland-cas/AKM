@@ -1,3 +1,4 @@
+import heapq
 import os
 # import napari
 # import pygame
@@ -1663,16 +1664,6 @@ def distance_between_transformation(mat1, mat2):
     return trans_dist + rot_dist  # 或者其他加权方式
 
 
-def explore_actually_valid(result):
-    joint_type = result["joint_type"]
-    joint_delta = result["joint_state_end"] - result["joint_state_start"]
-    if joint_type == "prismatic":
-        # if joint_delta < 0.09:
-        #     pass
-        return joint_delta >= EXPLORE_PRISMATIC_VALID
-    elif joint_type == "revolute":
-        return np.rad2deg(joint_delta) >= EXPLORE_REVOLUTE_VALID
-
 def numpy_to_json(obj):
     if isinstance(obj, np.ndarray):
         return obj.tolist()  # 将 NumPy 数组转换为列表
@@ -1682,6 +1673,51 @@ def numpy_to_json(obj):
         return int(obj)  # 将 NumPy int32 转换为 Python int
     raise TypeError(f"Type {type(obj)} not serializable")
 
+
+class MinKNumbers:
+    def __init__(self):
+        """
+        初始化一个空的数字存储容器
+        """
+        self.numbers = []
+    
+    def add_number(self, num):
+        """
+        添加一个数字到存储容器中
+        :param num: 要添加的数字
+        """
+        self.numbers.append(num)
+    
+    def add_numbers(self, nums):
+        """
+        批量添加多个数字到存储容器中
+        :param nums: 包含多个数字的可迭代对象
+        """
+        self.numbers.extend(nums)
+    
+    def get_min_k(self, k):
+        """
+        返回存储的数字中最小的k个数字
+        :param k: 要返回的最小数字的数量
+        :return: 包含最小k个数字的列表
+        """
+        if k <= 0:
+            return []
+        if k >= len(self.numbers):
+            return sorted(self.numbers.copy())
+        
+        # 使用堆结构来高效获取最小的k个数字
+        return heapq.nsmallest(k, self.numbers)
+    
+    def clear(self):
+        """
+        清空存储的所有数字
+        """
+        self.numbers.clear()
+    
+    def __str__(self):
+        return f"MinKNumbers(currently storing {len(self.numbers)} numbers)"
+    
     
 if __name__ == "__main__":
     print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]

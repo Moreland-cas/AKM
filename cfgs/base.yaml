@@ -16,21 +16,21 @@ base_env_cfg:
   planner_timestep: 0.01
 
 task_cfg:
-  task_id: 0
-  instruction: "open the cabinet"
+  task_id: null
+  instruction: null
 
 obj_env_cfg:
-  data_path: "dataset/one_drawer_cabinet/41083_link_3"
-  joint_type: "prismatic"
-  joint_index: 3
-  obj_index: 41083
-  init_joint_state: 0.24
-  active_joint_name: "joint_3"
-  active_link_name: "link_3"
-  load_scale: 1
-  load_pose: [0.8528176546096802, 0.0, 0.5067352652549744]
-  load_quat: [0.9986352920532227, 0.01783677004277706, -0.0008765950915403664, -0.0490783266723156]
-  obj_description: "cabinet"
+  data_path: null
+  joint_type: null
+  joint_index: null
+  obj_index: null
+  init_joint_state: null
+  active_joint_name: null
+  active_link_name: null
+  load_scale: null
+  load_pose: null
+  load_quat: null
+  obj_description: null
 
 algo_cfg:
   use_anygrasp: True
@@ -51,9 +51,9 @@ recon_env_cfg:
   reloc_lr: 0.003
 
 manip_env_cfg:
-  manip_type: "open"
+  manip_type: null
   # manip_distance is the abs of manip distance, m for prismatic and degree for revolute
-  manip_distance: 0.1
+  manip_distance: null
   # max number of manipulations used for closed-loop control
   max_manip: 5
   # for whole traj closed-loop

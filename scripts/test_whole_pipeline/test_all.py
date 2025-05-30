@@ -32,7 +32,7 @@ def test_all(base_yaml_path, test_yaml_folder):
         update_dict(task_cfg, specific_cfg)
         
         # temporary test
-        if task_cfg["task_cfg"]["task_id"] != 388:
+        if task_cfg["task_cfg"]["task_id"] != 60:
             continue
               
         

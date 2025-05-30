@@ -4,10 +4,20 @@ import json
 import pickle
 import numpy as np
 import argparse
-from embodied_analogy.utility.utils import explore_actually_valid
 from embodied_analogy.utility.constants import ASSET_PATH, EXPLORE_PRISMATIC_VALID, EXPLORE_REVOLUTE_VALID
 
 
+def explore_actually_valid(result):
+    joint_type = result["joint_type"]
+    joint_delta = result["joint_state_end"] - result["joint_state_start"]
+    if joint_type == "prismatic":
+        # if joint_delta < 0.09:
+        #     pass
+        return joint_delta >= EXPLORE_PRISMATIC_VALID
+    elif joint_type == "revolute":
+        return np.rad2deg(joint_delta) >= EXPLORE_REVOLUTE_VALID
+    
+    
 class MinKNumbers:
     def __init__(self):
         """
@@ -165,7 +175,3 @@ for tries in range(1, max_tries + 1):
 
 # print("for valid explore, prismatic joint delta min: ", prismatic_joint_delta_min, "cm, revolute joint delta min: ", revolute_joint_delta_min, "degree")
 
-# min_k = MinKNumbers()
-# min_k.add_numbers([5, 2, 8, 3, 1, 9, 4, 6])
-# print("当前所有数字:", min_k.numbers)  # 检查存储的数字是否正确
-# print("最小的3个数字:", min_k.get_min_k(3))  # 检查输出
