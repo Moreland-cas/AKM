@@ -84,7 +84,38 @@ def scaled_loss_list_success(loss_list, joint_type):
     else:
         # return abs(final_loss) < np.deg2rad(10)
         return abs(final_loss) < revolute_success_loss
-        
+
+def print_summary_dict(summary_dict):
+    print("prismatic")
+    print("\topen")
+    for scale in summary_dict["prismatic"]["open"]:
+        print(f"\t\tscale {scale}:")
+        for loss_list in summary_dict["prismatic"]["open"][scale]["loss_lists"]:
+            loss_list = [f"{loss:.2f}cm" for loss in loss_list]
+            print(f"\t\t\t{loss_list}:")
+    
+    print("\tclose")
+    for scale in summary_dict["prismatic"]["close"]:
+        print(f"\t\tscale {scale}:")
+        for loss_list in summary_dict["prismatic"]["close"][scale]["loss_lists"]:
+            loss_list = [f"{loss:.2f}cm" for loss in loss_list]
+            print(f"\t\t\t{loss_list}")
+
+    print("revolute")
+    print("\topen")
+    for scale in summary_dict["revolute"]["open"]:
+        print(f"\t\tscale {scale}:")
+        for loss_list in summary_dict["revolute"]["open"][scale]["loss_lists"]:
+            loss_list = [f"{loss:.2f}dg" for loss in loss_list]
+            print(f"\t\t\t{loss_list}")
+
+    print("\tclose")
+    for scale in summary_dict["revolute"]["close"]:
+        print(f"\t\tscale {scale}:")
+        for loss_list in summary_dict["revolute"]["close"][scale]["loss_lists"]:
+            loss_list = [f"{loss:.2f}dg" for loss in loss_list]
+            print(f"\t\t\t{loss_list}")
+              
 # 遍历文件夹
 for object_folder in os.listdir(root_path):
     # /logs/manip_4_16/45135_1_prismatic
