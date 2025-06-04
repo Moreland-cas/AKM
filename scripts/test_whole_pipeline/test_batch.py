@@ -58,13 +58,14 @@ def test_batch(base_yaml_path, yaml_path_list):
     # 这里直接跑个 10 遍, 由于我们的程序会检测是否已经跑完特定任务, 所以不用担心重复跑, 跑 10 遍可以有效降低系统问题导致的程序崩溃
     # for i in range(10):
     for specific_yaml_path in yaml_path_list:
-        try:
+        # try:
+        if True:
             test_one(
                 base_yaml_path=base_yaml_path,
                 specific_yaml_path=specific_yaml_path
             )
-        except Exception as e:
-            print(f"Task {specific_yaml_path} failed: {str(e)}")
+        # except Exception as e:
+        #     print(f"Task {specific_yaml_path} failed: {str(e)}")
         
 
 def distribute_tasks(tasks, num_groups):
@@ -83,6 +84,8 @@ def distribute_tasks(tasks, num_groups):
         start = end
     
     return distributed
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 if __name__ == "__main__":
     import argparse
@@ -109,6 +112,7 @@ if __name__ == "__main__":
     test_batch(
         base_yaml_path=args.base_yaml_path,
         yaml_path_list=current_group
+        # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs/321.yaml"]
     )
-    print("All done")
+    print("All done!")
     

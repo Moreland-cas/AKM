@@ -574,7 +574,7 @@ class Frames(Data):
                         u, v = pixel_tracks[t, m]
                         u, v = int(u), int(v)
                         # 检查坐标 (u, v) 是否在布尔掩码中为 True
-                        if u < 0 or u >= H or v < 0 or v >= W or not boolean_mask[t, v, u]:
+                        if u < 0 or u >= W or v < 0 or v >= H or not boolean_mask[t, v, u]:
                             output_mask[m] = False
                             break  # 一旦发现不满足条件，就可以停止检查
                 return output_mask

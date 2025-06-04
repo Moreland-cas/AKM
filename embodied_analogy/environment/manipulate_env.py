@@ -325,24 +325,33 @@ class ManipulateEnv(ReconEnv):
         super().main()
         
         try:
+        # if True:
             self.manip_result = None
             
-            if self.recon_result["has_valid_reconstruct"]:
+            if self.recon_result["has_valid_recon"]:
+                self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
                 self.manip_result = self.manipulate_close_loop()
+                self.recon_result["has_valid_manip"] = True
             else:
+                self.logger.log(logging.INFO, f'No valid reconstruction, thus skip manipulation...')
+                self.recon_result["has_valid_manip"] = False
+                self.manip_result["exception"] = "No valid reconstruct."
                 self.manip_result = {-1: self.evaluate()}
             
-            if self.exp_cfg["save_result"]:
-                save_json_path = os.path.join(
-                    self.exp_cfg["exp_folder"],
-                    str(self.task_cfg["task_id"]),
-                    "manip_result.json"
-                )
-                with open(save_json_path, 'w', encoding='utf-8') as json_file:
-                    json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
-                    
         except Exception as e:
-            self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state')
+            self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
+            self.recon_result["has_valid_manip"] = False
+            self.manip_result["exception"] = str(e)
+            self.manip_result = {-1: self.evaluate()}
+        
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "manip_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
             
         
 if __name__ == '__main__':

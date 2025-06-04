@@ -58,6 +58,10 @@ def run_groundingDINO(
         text_threshold=0.25
     )
 
+    # 在这里添加异常处理
+    if len(boxes) == 0:
+        raise Exception("No bbox returned in run_groundingDino")
+    
     if visualize:
         annotated_frame_BGR = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
         annotated_frame_RGB = cv2.cvtColor(annotated_frame_BGR, cv2.COLOR_BGR2RGB)

@@ -119,29 +119,29 @@ def detect_grasp_anygrasp(
         
         # Tgrasp2app
         if not run_remote:
-            try:
-                model = prepare_any_grasp_model(ASSET_PATH)
-                gg, _ = model.get_grasp(
-                    points_input,
-                    colors, 
-                    lims,
-                    apply_object_mask=True,
-                    dense_grasp=False,
-                    collision_detection=True
-                )
-            except Exception as e:
-                logger.log(logging.DEBUG, f"run anygrasp locally failed: {e}")
-                raise e
+            # try:
+            model = prepare_any_grasp_model(ASSET_PATH)
+            gg, _ = model.get_grasp(
+                points_input,
+                colors, 
+                lims,
+                apply_object_mask=True,
+                dense_grasp=False,
+                collision_detection=True
+            )
+            # except Exception as e:
+            #     logger.log(logging.DEBUG, f"run anygrasp locally failed: {e}")
+            #     raise e
         else:
-            try:
-                gg = run_anygrasp_remotely(
-                    points_input,
-                    colors, 
-                    lims
-                )
-            except Exception as f:
-                logger.log(logging.DEBUG, f"run anygrasp remotely failed: {e}")
-                raise f
+            # try:
+            gg = run_anygrasp_remotely(
+                points_input,
+                colors, 
+                lims
+            )
+            # except Exception as f:
+            #     logger.log(logging.DEBUG, f"run anygrasp remotely failed: {e}")
+            #     raise f
         
         
         if gg == None or len(gg) == 0:

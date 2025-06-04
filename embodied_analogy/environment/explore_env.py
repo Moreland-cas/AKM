@@ -99,15 +99,17 @@ class ExploreEnv(ObjEnv):
         if visualize:
             self.obj_repr.visualize()
         
+        if self.obj_repr.frames.num_frames() == 0:
+            joint_state_end = 0
+        else:
+            joint_state_end = self.get_active_joint_state() - self.obj_repr.frames[0].gt_joint_state
         result_dict = {
             # 算法认为的是否有成功的探索
             "num_tries": self.num_tries,
             "has_valid_explore": self.has_valid_explore,
             "joint_type": self.joint_type,
             "joint_state_start": 0,
-            # NOTE: 这里应该减去 manip_first_frame 的 joint_state 而不是 init_joint_state
-            # "joint_state_end": self.get_active_joint_state() - self.obj_env_cfg["init_joint_state"]
-            "joint_state_end": self.get_active_joint_state() - self.obj_repr.frames[0].gt_joint_state
+            "joint_state_end": joint_state_end
         }
         self.logger.log(logging.INFO, f"exploration stage result: {result_dict}")
         
@@ -276,6 +278,9 @@ class ExploreEnv(ObjEnv):
         # 对于 frames 进行 tracking, 然后根据聚类结果判断 moving_part 动的多不多, 多的话就认为 valid
         # 这个函数相比于 deprecated 版本, 可以更好的处理 "柜子开一个缝隙, joint state 没有大的变化, 但是缝隙的深度有突变" 的情况
         # 这个函数会写入 obj_repr 的 tracks2d, tracks3d 和 moving mask
+        if self.obj_repr.frames.num_frames() == 0:
+            return False
+        
         self.obj_repr.frames[0].segment_obj(
             obj_description=self.obj_env_cfg["obj_description"],
             post_process_mask=True,
@@ -300,22 +305,25 @@ class ExploreEnv(ObjEnv):
     ###############################################
     def main(self):
         try:
+        # if True:
             self.explore_result = {}
             self.explore_result = self.explore_stage()
-            
-            if self.exp_cfg["save_result"]:
-                save_json_path = os.path.join(
-                    self.exp_cfg["exp_folder"],
-                    str(self.task_cfg["task_id"]),
-                    "explore_result.json"
-                )
-                with open(save_json_path, 'w', encoding='utf-8') as json_file:
-                    json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
                     
         except Exception as e:
-            self.logger.log(logging.ERROR, f"Explore exception occured: {e}")
-        
-    
+            self.logger.log(logging.ERROR, f"Explore exception occured: {e}", exc_info=True)
+            
+            self.explore_result["has_valid_explore"] = False
+            self.explore_result["exception"] = str(e)
+
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "explore_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                    
 if __name__ == "__main__":
     
     exploreEnv = ExploreEnv(
