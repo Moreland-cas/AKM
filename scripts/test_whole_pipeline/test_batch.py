@@ -55,6 +55,8 @@ def test_one(base_yaml_path, specific_yaml_path):
     
     
 def test_batch(base_yaml_path, yaml_path_list):
+    # 这里直接跑个 10 遍, 由于我们的程序会检测是否已经跑完特定任务, 所以不用担心重复跑, 跑 10 遍可以有效降低系统问题导致的程序崩溃
+    # for i in range(10):
     for specific_yaml_path in yaml_path_list:
         try:
             test_one(
@@ -64,7 +66,6 @@ def test_batch(base_yaml_path, yaml_path_list):
         except Exception as e:
             print(f"Task {specific_yaml_path} failed: {str(e)}")
         
-        # break
 
 def distribute_tasks(tasks, num_groups):
     """将任务列表均匀分配到指定数量的组中"""
