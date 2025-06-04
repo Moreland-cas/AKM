@@ -58,7 +58,8 @@ def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize
         keep=keep,
         nms=nms,
     )
-    logger.log(logging.DEBUG, f'grasp num: {len(gg)}')
+    if gg is not None:
+        logger.log(logging.DEBUG, f'grasp num: {len(gg)}')
     if visualize:
         grippers = gg.to_open3d_geometry_list()
         cloud = o3d.geometry.PointCloud()

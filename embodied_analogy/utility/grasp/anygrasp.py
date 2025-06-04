@@ -96,7 +96,10 @@ def detect_grasp_anygrasp(
     dir_out = dir_out / np.linalg.norm(dir_out)
     # 接下来生成多个 dir_out
     if augment:
+        np.random.seed(666)
         random_perturb = np.random.randn(20, 3) 
+        # 将原始的 dir_out 进行保留
+        random_perturb[0] = random_perturb[0] * 0
         dir_outs = dir_out + random_perturb * 0.5 # N, 3
         dir_outs = dir_outs / np.linalg.norm(dir_outs, axis=1, keepdims=True)
     else:
@@ -140,9 +143,10 @@ def detect_grasp_anygrasp(
                 logger.log(logging.DEBUG, f"run anygrasp remotely failed: {e}")
                 raise f
         
-        logger.log(logging.DEBUG, f'grasp num: {len(gg)}')
+        
         if gg == None or len(gg) == 0:
             continue
+        logger.log(logging.DEBUG, f'grasp num: {len(gg)}')
         
         # Tgrasp2w
         zero_translation = np.array([[0], [0], [0]])
