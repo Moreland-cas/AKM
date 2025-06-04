@@ -318,7 +318,9 @@ MANIP_REVOLUTE_VALID = 5 # degree
 
 def is_manip_success(joint_type, manip_result):
     time_steps = manip_result.keys()
-    max_time_step = str(max(list(time_steps)))
+    time_steps = list(time_steps)
+    time_steps = [int(time_step) for time_step in time_steps]
+    max_time_step = str(max(time_steps))
     last_result = manip_result[max_time_step]
     last_loss = abs(last_result["diff"])
     

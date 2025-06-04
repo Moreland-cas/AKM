@@ -13,7 +13,7 @@ from embodied_analogy.utility.constants import (
     REVOLUTE_JOINT_MAX_RANGE,
     REVOLUTE_TEST_JOINT_DELTAS
 )
-set_random_seed(SEED)
+set_random_seed(SEED) # 666
 
 """
 返回一个 dict, 存储 task_idx: task_info
@@ -28,7 +28,7 @@ set_random_seed(SEED)
 确定好这些后, 再确定 init_joint_state 和 load_pose, 一共随机 n 个
 """
 parser = argparse.ArgumentParser(description='Folder to save the cfg files')
-parser.add_argument('--save_dir', type=str, default=os.path.join(PROJECT_ROOT, "scripts", "task_cfgs"), help='folder to save the test cfg')
+parser.add_argument('--save_dir', type=str, default=os.path.join(PROJECT_ROOT, "cfgs", "task_cfgs"), help='folder to save the test cfg')
 args = parser.parse_args()
     
 task_cfgs = {}
