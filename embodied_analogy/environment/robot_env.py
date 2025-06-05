@@ -178,9 +178,10 @@ class RobotEnv(BaseEnv):
         """
         self.logger.log(logging.INFO, "Reset robot ...")
         # 垂直的 pose
-        init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
+        # init_panda_hand = mplib.Pose(p=[0.111, 0, 0.92], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
         # 向后躺倒的 pose
-        # init_panda_hand = mplib.Pose(p=[-0.3, 0, 0.9], q=t3d.euler.euler2quat(np.deg2rad(0), np.deg2rad(180), np.deg2rad(0), axes="syxz"))
+        init_panda_hand = mplib.Pose(p=[-0.5, 0, 1], q=t3d.euler.euler2quat(np.deg2rad(-90), np.deg2rad(0), np.deg2rad(0), axes="syxz"))
+        
         self.move_to_pose(pose=init_panda_hand, wrt_world=True)
 
         # self.robot.set_qpos(
@@ -201,7 +202,7 @@ class RobotEnv(BaseEnv):
         self.base_step()
 
         count = 0
-        while count < 200:
+        while count < 400:
             vel = self.robot.get_qvel()
             # 这里选用 vel_norm 作为 reset 进行同步的终止条件, 因为 vel 相对于 qpos 和 qacc 更加稳定
             # qpos 不知道要设置什么值, qacc 经常会突变
@@ -212,7 +213,7 @@ class RobotEnv(BaseEnv):
             self.base_step()
             count += 1
 
-        if count == 200:
+        if count == 400:
             self.logger.log(logging.INFO,  "Break reset since reach max reset count")
 
     def reset_robot_safe(self):
@@ -230,7 +231,7 @@ class RobotEnv(BaseEnv):
         )
 
         self.move_forward(
-            moving_distance=-0.05,
+            moving_distance=-self.cfg["explore_env_cfg"]["reserved_distance"],
             drop_large_move=False
         ) # 向后撤退 5 cm
 

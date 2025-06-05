@@ -21,23 +21,20 @@ run_folders = os.listdir(log_folder)
 for run_folder in run_folders:
     run_path = os.path.join(log_folder, run_folder)
     
-    try: # TODO 之后把 try-except 去掉
-        saved_result[int(run_folder)] = {}
-        
-        with open(os.path.join(run_path, "explore_result.json"), "r") as f:
-            explore_result = json.load(f)
-            saved_result[int(run_folder)]["explore"] = explore_result
-        
-        with open(os.path.join(run_path, "recon_result.json"), "r") as f:
-            recon_result = json.load(f)
-            saved_result[int(run_folder)]["recon"] = recon_result
-        
-        with open(os.path.join(run_path, "manip_result.json"), "r") as f:
-            manip_result = json.load(f)
-            saved_result[int(run_folder)]["manip"] = manip_result
+    saved_result[int(run_folder)] = {}
     
-    except Exception as e:
-        pass
+    with open(os.path.join(run_path, "explore_result.json"), "r") as f:
+        explore_result = json.load(f)
+        saved_result[int(run_folder)]["explore"] = explore_result
+    
+    with open(os.path.join(run_path, "recon_result.json"), "r") as f:
+        recon_result = json.load(f)
+        saved_result[int(run_folder)]["recon"] = recon_result
+    
+    with open(os.path.join(run_path, "manip_result.json"), "r") as f:
+        manip_result = json.load(f)
+        saved_result[int(run_folder)]["manip"] = manip_result
+    
 
 # 这里要确保每个 run 的结果都读取进来了
 assert len(saved_result.keys()) == len(run_folders)
@@ -47,12 +44,12 @@ assert len(saved_result.keys()) == len(run_folders)
 EXPLORE_PRISMATIC_VALID = 0.05
 EXPLORE_REVOLUTE_VALID = 5
 
-def explore_actually_valid(result):
+def explore_actually_valid(explore_result):
     """
-    输入的是一个 explore 的 result dict, 判断该 result 是否有效
+    输入的是一个 has_valid_explore 为 True 的 explore_result, 本函数判断该 result 是否是真的 valid
     """
-    joint_type = result["joint_type"]
-    joint_delta = result["joint_state_end"] - result["joint_state_start"]
+    joint_type = explore_result["joint_type"]
+    joint_delta = explore_result["joint_state_end"] - explore_result["joint_state_start"]
     
     if joint_type == "prismatic":
         return joint_delta >= EXPLORE_PRISMATIC_VALID
@@ -61,11 +58,13 @@ def explore_actually_valid(result):
         return np.rad2deg(joint_delta) >= EXPLORE_REVOLUTE_VALID
 
 # 写的时候直接把函数的输入改为 saved_result 这个 dict, 方便假如我们只想跑 explore 以及 explore 的 summary
-def summary_explore(saved_result, task_yaml):
+def summary_explore(saved_result, task_yaml, verbose=False):
     max_tries = task_yaml["explore_env_cfg"]["max_tries"]
 
     # 到此为止把所有有 result 的读取进来了
     num_total_exp = len(saved_result.keys()) # 所有的实验
+    
+    # NOTE: num_total_tries 记录了对于那些 pred_valid 的案例一共使用了多少次尝试
     num_total_tries = 0
 
     # 记录下 tries 从 1 到 MAX_TRIES 个的 pred_valid 个数和 actual_valid 个数
@@ -76,16 +75,18 @@ def summary_explore(saved_result, task_yaml):
     prismatic_heap = MinKNumbers()
     revolute_heap = MinKNumbers()
 
-    # 转换为之前代码可复用的格式
-    # TODO 这里到时候记得改回去
-    # results = [saved_result[k]["explore"] for k in saved_result.keys()]
-    results = [saved_result[k]["explore"] for k in saved_result.keys() if "explore" in saved_result[k].keys()]
+    results = [saved_result[k]["explore"] for k in saved_result.keys()]
+    # results = [saved_result[k]["explore"] for k in saved_result.keys() if "explore" in saved_result[k].keys()]
     for i, result in enumerate(results):
-        num_tries = result["num_tries"]
-        num_total_tries += num_tries
         has_valid_explore = result["has_valid_explore"]
         
-        if has_valid_explore:
+        if not has_valid_explore:
+            continue
+        
+        num_tries = result["num_tries"]
+        num_total_tries += num_tries
+        
+        if verbose:
             joint_delta = result["joint_state_end"] - result["joint_state_start"]
             if result["joint_type"] == "prismatic":
                 prismatic_heap.add_number(abs(joint_delta))
@@ -100,20 +101,25 @@ def summary_explore(saved_result, task_yaml):
                     num_actual_valid[i] += 1
                     
     # 打印结果
-    print(f"Total successful (actual): {num_actual_valid[max_tries]} / {num_total_exp} = {num_actual_valid[max_tries] / num_total_exp:.2f}")
-    print(f"Total successful (pred): {num_pred_valid[max_tries]} / {num_total_exp} = {num_pred_valid[max_tries] / num_total_exp:.2f}")
-    print(f"Average number of triess: {num_total_tries} / {num_total_exp} = {num_total_tries / num_total_exp:.2f}")
+    print("\n************** Explore Stage Analysis **************")
+    
+    print(f"Success Rate (actual): {num_actual_valid[max_tries]} / {num_total_exp} = {num_actual_valid[max_tries] / num_total_exp:.2f}")
+    print(f"Success Rate (pred): {num_pred_valid[max_tries]} / {num_total_exp} = {num_pred_valid[max_tries] / num_total_exp:.2f}")
+    print(f"Average tries (pred): {num_total_tries} / {num_pred_valid[max_tries]} = {num_total_tries / num_pred_valid[max_tries]:.2f}")
 
-    print("jonit delta statistic (for pred as valid):")
-    print("prismatic:", prismatic_heap.get_min_k(10))
-    print("revolute:", revolute_heap.get_min_k(10))
+    if verbose:
+        print("jonit delta statistic (for pred as valid):")
+        print("prismatic:", prismatic_heap.get_min_k(10))
+        print("revolute:", revolute_heap.get_min_k(10))
 
     # 打印每个尝试次数的成功率
     print("Detailed Results:")
     for tries in range(1, max_tries + 1):
         success_rate_pred = num_pred_valid[tries] / num_total_exp
         success_rate_actual = num_actual_valid[tries] / num_total_exp
-        print(f"tries={tries} | actual success rate: {success_rate_actual:.2f} | pred success rate {success_rate_pred:.2f}")
+        print(f"tries={tries} | success rate (actual): {success_rate_actual:.2f} | success rate (pred): {success_rate_pred:.2f}")
+    
+    print("****************************************************\n")
 
 
 ############### summary_reconstruct ###############
@@ -144,7 +150,15 @@ def is_reconstruct_valid(explore_result, recon_result):
     pivot_loss_f, angle_loss_f = None, None
     
     # 如果都没有 explore_think_valid, 直接返回
-    if not recon_result["has_valid_reconstruct"]:
+    # TODO 记得把这里改回去
+    if "has_valid_recon" in recon_result:
+        has_valid_recon = recon_result["has_valid_recon"]
+    elif "has_valid_reconstruct" in recon_result:
+        has_valid_recon = recon_result["has_valid_reconstruct"]
+    else:
+        assert "no has_valid_recon or has_valid_reconstruct in recon_result"
+    
+    if not has_valid_recon:
         recon_valid = False
         failed_reason[0] = 1
         return recon_valid, failed_reason, joint_type, None
@@ -198,7 +212,7 @@ def is_reconstruct_valid(explore_result, recon_result):
         return recon_valid, failed_reason, joint_type, None
 
 
-def print_recon_result(saved_result):
+def summary_recon(saved_result):
     """
     分析一下重建失败的原因:
     1) 来自 explore 的问题
@@ -212,17 +226,14 @@ def print_recon_result(saved_result):
     
     (NOTE 因为那些 type_loss 不为 0 的定量 loss 是没有意义的)
     """
+    
     explore_results = []
     recon_results = []
     for k, v in saved_result.items():
-        # TODO 这里的 "explore" 和 "recon" 都应该有的
-        if ("recon" in v.keys()) and ("explore" in v.keys()):
-            explore_results.append(v["explore"])
-            recon_results.append(v["recon"])
+        explore_results.append(v["explore"])
+        recon_results.append(v["recon"])
             
-    # num_exp = len(saved_result.keys())
-    # TODO 记得改回来
-    num_exp = len(explore_results)
+    num_exp = len(saved_result.keys())
     num_prismatic = 0
     num_revolute = 0
     
@@ -268,50 +279,63 @@ def print_recon_result(saved_result):
                 revolute_failed_reason_array += failed_reason
     
     assert num_prismatic + num_revolute == num_exp
-    # print(prismatic_angle_err_coarse)
     # 打印结果
-    print(f"Printing results under pris_thresh={PIVOT_THRESH} m and rev_thresh={ANGLE_THRESH} degree")
-    print(f"Reconstruct Success Rate: {num_prismatic_success + num_revolute_success} / {num_exp} = {(num_prismatic_success + num_revolute_success) / num_exp:.4f}")
+    print("\n************** Reconstruct Stage Analysis **************")
+    
+    print(f"Success Rate: {num_prismatic_success + num_revolute_success} / {num_exp} = {(num_prismatic_success + num_revolute_success) / num_exp:.2f}")
+    print(f"(Reconstruction loss under PIVOT_THRESH: {PIVOT_THRESH} m and ANGLE_THRESH: {ANGLE_THRESH} degree is considered valid.)")
     
     # 具体打印下两种关节的成功率
-    print("Detailed Results: ")
-    print(f"prismatic success rate: {num_prismatic_success}/{num_prismatic}, {num_prismatic_success/max(num_prismatic, 1):.4f}")
-    prismatic_angle_err_coarse_mean = sum(prismatic_angle_err_coarse) / max(num_prismatic_success, 1)
-    prismatic_angle_err_fine_mean = sum(prismatic_angle_err_fine) / max(num_prismatic_success, 1)
-    print(f"\tcoarse angle loss: {np.rad2deg(prismatic_angle_err_coarse_mean):.4f} degree")
-    print(f"\tfine   angle loss: {np.rad2deg(prismatic_angle_err_fine_mean):.4f} degree") 
-
-    print(f"revolute success rate: {num_revolute_success}/{num_revolute}, {num_revolute_success/max(num_revolute, 1):.4f}")
-    revolute_angle_err_coarse_mean = sum(revolute_angle_err_coarse) / max(num_revolute_success, 1)
-    revolute_angle_err_fine_mean = sum(revolute_angle_err_fine) / max(num_revolute_success, 1)
-    print(f"\tcoarse angle loss: {np.rad2deg(revolute_angle_err_coarse_mean):.4f} degree")
-    print(f"\tfine   angle loss: {np.rad2deg(revolute_angle_err_fine_mean):.4f} degree")
-
-    revolute_pos_err_coarse_mean = sum(revolute_pos_err_coarse) / max(num_revolute_success, 1)
-    revolute_pos_err_fine_mean = sum(revolute_pos_err_fine) / max(num_revolute_success, 1)
-    print(f"\tcoarse pose loss: {revolute_pos_err_coarse_mean * 100:.4f} cm")
-    print(f"\tfine   pose loss: {revolute_pos_err_fine_mean * 100:.4f} cm")
+    print("\nDetailed Results: ")
+    print("PRISMATIC:")
+    print(f"Success Rate: {num_prismatic_success}/{num_prismatic}, {num_prismatic_success/max(num_prismatic, 1):.2f}")
+    prismatic_angle_err_coarse_mean_rad = sum(prismatic_angle_err_coarse) / max(num_prismatic_success, 1)
+    prismatic_angle_err_coarse_mean_degree = np.rad2deg(prismatic_angle_err_coarse_mean_rad)
     
-    # 打印那些 recon 失败的原因
-    print("Failed reasons:")
-    """
-    think_explore_invalid
-    think_explore_valid_actually_not
-    type_loss == 1
-    type_loss == 0, but recon_loss is high
-    """
-    print("prismatic failed: ")
-    print(f"\tthink_explore_invalid: {prismatic_failed_reason_array[0]}")
-    print(f"\tthink_explore_valid_actually_not: {prismatic_failed_reason_array[1]}")
-    print(f"\ttype classification failed: {prismatic_failed_reason_array[2]}")
-    print(f"\toptimization failed: {prismatic_failed_reason_array[3]}")
+    prismatic_angle_err_fine_mean_rad = sum(prismatic_angle_err_fine) / max(num_prismatic_success, 1)
+    prismatic_angle_err_fine_mean_degree = np.rad2deg(prismatic_angle_err_fine_mean_rad)
     
-    print("revolute failed: ")
-    print(f"\tthink_explore_invalid: {revolute_failed_reason_array[0]}")
-    print(f"\tthink_explore_valid_actually_not: {revolute_failed_reason_array[1]}")
-    print(f"\ttype classification failed: {revolute_failed_reason_array[2]}")
-    print(f"\toptimization failed: {revolute_failed_reason_array[3]}")
+    print(f"Angle Loss (coarse -> fine): {prismatic_angle_err_coarse_mean_degree:.2f} degree -> {prismatic_angle_err_fine_mean_degree:.2f} degree")
 
+    # 打印 prismatic failed 的原因
+    print(f"Failed Rate: {num_prismatic- num_prismatic_success}/{num_prismatic}, {(num_prismatic-num_prismatic_success)/max(num_prismatic, 1):.2f}")
+    print(f"pred_invalid_explore/false_positive/wrong_joint_type/bad_optimize: {prismatic_failed_reason_array[0]}/{prismatic_failed_reason_array[1]}/{prismatic_failed_reason_array[2]}/{prismatic_failed_reason_array[3]}")
+    # print(f"\tthink_explore_invalid: {prismatic_failed_reason_array[0]}")
+    # print(f"\tthink_explore_valid_actually_not: {prismatic_failed_reason_array[1]}")
+    # print(f"\ttype classification failed: {prismatic_failed_reason_array[2]}")
+    # print(f"\toptimization failed: {prismatic_failed_reason_array[3]}")
+    
+    
+    print("\nREVOLUTE:")
+    print(f"Success Rate: {num_revolute_success}/{num_revolute}, {num_revolute_success/max(num_revolute, 1):.2f}")
+    
+    revolute_angle_err_coarse_mean_rad = sum(revolute_angle_err_coarse) / max(num_revolute_success, 1)
+    revolute_angle_err_coarse_mean_degree = np.rad2deg(revolute_angle_err_coarse_mean_rad)
+    
+    revolute_angle_err_fine_mean_rad = sum(revolute_angle_err_fine) / max(num_revolute_success, 1)
+    revolute_angle_err_fine_mean_degree = np.rad2deg(revolute_angle_err_fine_mean_rad)
+    
+    print(f"Angle Loss (coarse -> fine): {revolute_angle_err_coarse_mean_degree:.2f} degree -> {revolute_angle_err_fine_mean_degree:.2f} degree")
+
+    revolute_pos_err_coarse_mean_m = sum(revolute_pos_err_coarse) / max(num_revolute_success, 1)
+    revolute_pos_err_coarse_mean_cm = revolute_pos_err_coarse_mean_m * 100
+    
+    revolute_pos_err_fine_mean_m = sum(revolute_pos_err_fine) / max(num_revolute_success, 1)
+    revolute_pos_err_fine_mean_cm = revolute_pos_err_fine_mean_m * 100
+    
+    print(f"Pivot Loss (coarse -> fine): {revolute_pos_err_coarse_mean_cm:.2f} cm -> {revolute_pos_err_fine_mean_cm:.2f} cm")
+    
+    # 打印 revolute 失败的原因
+    print(f"Failed Rate: {num_revolute- num_revolute_success}/{num_revolute}, {(num_revolute-num_revolute_success)/max(num_revolute, 1):.2f}")
+    print(f"pred_invalid_explore/false_positive/wrong_joint_type/bad_optimize: {revolute_failed_reason_array[0]}/{revolute_failed_reason_array[1]}/{revolute_failed_reason_array[2]}/{revolute_failed_reason_array[3]}")
+    
+    # print(f"\tthink_explore_invalid: {revolute_failed_reason_array[0]}")
+    # print(f"\tthink_explore_valid_actually_not: {revolute_failed_reason_array[1]}")
+    # print(f"\ttype classification failed: {revolute_failed_reason_array[2]}")
+    # print(f"\toptimization failed: {revolute_failed_reason_array[3]}")
+
+    print("****************************************************\n")
+    
 ############### summary_manipulate ###############
 MANIP_PRISMATIC_VALID = 0.05 # m
 MANIP_REVOLUTE_VALID = 5 # degree
@@ -325,8 +349,10 @@ def is_manip_success(joint_type, manip_result):
     last_loss = abs(last_result["diff"])
     
     loss_list = []
+    # TODO 更新后的版本的 manip_result 里不应该有 "-1", 取而代之的是 "0"
     if "-1" in manip_result.keys():
         loss_list.append(abs(manip_result["-1"]["diff"]))
+        
     for i in range(int(max_time_step) + 1):
         loss_list.append(abs(manip_result[str(i)]["diff"]))
     
@@ -338,7 +364,7 @@ def is_manip_success(joint_type, manip_result):
             return True, loss_list
     return False, loss_list
 
-def print_summary_dict(summary_dict):
+def print_manip_summary_dict(summary_dict):
     print("prismatic")
     print("\topen")
     for scale in summary_dict["prismatic"]["open"]:
@@ -394,9 +420,10 @@ def print_summary_dict(summary_dict):
             loss_list = [f"{np.rad2deg(loss):.2f}dg" for loss in loss_list]
             print(f"\t\t\t{loss_list}")
 
-def process_summary_dict(summary_dict, task_yaml):
+
+def process_manip_summary_dict(summary_dict, task_yaml):
     # NOTE 这里 +1 是因为 loss_list 的第一个是未操作的状态, 也进行了存储
-    max_tries = task_yaml["manip_env_cfg"]["max_manip"] + 1
+    max_tries_plus_one = task_yaml["manip_env_cfg"]["max_manip"] + 1
     
     # NOTE: summary_dict 中存储的 loss 已经是 cm 或者 degree, 但是有正有负
     joint_types = ("prismatic", "revolute")
@@ -408,7 +435,7 @@ def process_summary_dict(summary_dict, task_yaml):
             for scale in summary_dict[joint_type][manip_type]:
                 # print(f"{joint_type} {manip_type} {scale}")
                 num_manip = 0
-                # 将所有 loss_list 补全到 max_tries 长度, 用原本数组的最后一个元素进行 pad
+                # 将所有 loss_list 补全到 max_tries_plus_one 长度, 用原本数组的最后一个元素进行 pad
                 for i, loss_list in enumerate(summary_dict[joint_type][manip_type][scale]["loss_lists"]):
                     # NOTE 这里需要减去 1
                     num_manip += (len(loss_list) - 1)
@@ -417,7 +444,7 @@ def process_summary_dict(summary_dict, task_yaml):
                         loss_list = [abs(loss * 100) for loss in loss_list]
                     else:
                         loss_list = [abs(np.rad2deg(loss)) for loss in loss_list]
-                    loss_list = loss_list + [loss_list[-1]] * int(max_tries - len(loss_list))
+                    loss_list = loss_list + [loss_list[-1]] * int(max_tries_plus_one - len(loss_list))
                     summary_dict[joint_type][manip_type][scale]["loss_lists"][i] = loss_list
                 
                 # num_exp * close_loop_times    
@@ -427,19 +454,26 @@ def process_summary_dict(summary_dict, task_yaml):
                     # 处理 num_exp == 1 的情况
                     loss_array = loss_array.reshape(1, -1)
                 
-                print(f"\n{joint_type} {manip_type} {scale}")
+                print(f"\n{manip_type} {scale} {unit} ({joint_type}):")
                 num_success = summary_dict[joint_type][manip_type][scale]["success"]
                 num_failed_recon = summary_dict[joint_type][manip_type][scale]["failed_recon"]
                 num_failed_manip = summary_dict[joint_type][manip_type][scale]["failed_manip"]
-                print(f"\tSuccess rate: {num_success}/{num_success + num_failed_recon + num_failed_manip}, {num_success / (num_success + num_failed_recon + num_failed_manip) * 100}")
-                print(f"\tfailed-recon: {num_failed_recon}/{num_success + num_failed_recon + num_failed_manip}, {num_failed_recon / (num_success + num_failed_recon + num_failed_manip) * 100}")
-                print(f"\tfailed-manip: {num_failed_manip}/{num_success + num_failed_recon + num_failed_manip}, {num_failed_manip / (num_success + num_failed_recon + num_failed_manip) * 100}")
-                print(f"avg manip: {num_manip / loss_array.shape[0]}")
-                print(f"final error: {loss_array[:, -1].mean():.3f} {unit}\n")
-                for i in range(int(max_tries)):
-                    print(f"\tclose loop {i}: {loss_array[:, i].mean():.3f} {unit}")
+                
+                print(f"\tSuccess/Failed-recon/Failed-manip: {num_success}/{num_failed_recon}/{num_failed_manip}")
+                      
+                # print(f"\tSuccess rate: {num_success}/{num_success + num_failed_recon + num_failed_manip}, {num_success / (num_success + num_failed_recon + num_failed_manip) * 100}")
+                # print(f"\tfailed-recon: {num_failed_recon}/{num_success + num_failed_recon + num_failed_manip}, {num_failed_recon / (num_success + num_failed_recon + num_failed_manip) * 100}")
+                # print(f"\tfailed-manip: {num_failed_manip}/{num_success + num_failed_recon + num_failed_manip}, {num_failed_manip / (num_success + num_failed_recon + num_failed_manip) * 100}")
+                print(f"\tAvg Manips: {(num_manip / loss_array.shape[0]):.2f}")
+                print(f"\tFinal Error: {loss_array[:, -1].mean():.2f} {unit}")
+                
+                closed_loop_error_string = "->".join([f"[{i}] {loss_array[:, i].mean():.2f} {unit}" for i in range(int(max_tries_plus_one))])
+                print(f"\tClosed-loop Error: {closed_loop_error_string}")
+                # for i in range(int(max_tries_plus_one)):
+                #     print(f"\tclose loop {i}: {loss_array[:, i].mean():.2f} {unit}")
                        
-def print_manip_result(saved_result, task_yaml):
+def summary_manip(saved_result, task_yaml, verbose=False):
+    print("\n************** Manipulation Stage Analysis **************")
     # 用一个 dict 来记录
     success_dict = {
         "prismatic": {
@@ -456,8 +490,6 @@ def print_manip_result(saved_result, task_yaml):
     }
     # for i in manip_success_idx:
     for task_id, v in saved_result.items():
-        if not (("recon" in v.keys()) and ("explore" in v.keys()) and ("manip" in v.keys())):
-            continue
         
         explore_result = v["explore"]
         recon_result = v["recon"]
@@ -493,12 +525,13 @@ def print_manip_result(saved_result, task_yaml):
             else:
                 success_dict[joint_type][manip_type][manip_distance]["failed_recon"] += 1
             
-    # print_summary_dict(success_dict)
-    process_summary_dict(success_dict, task_yaml)
+    if verbose:
+        print_manip_summary_dict(success_dict)
+    process_manip_summary_dict(success_dict, task_yaml)
+    print("****************************************************\n")
     
     
 if __name__ == "__main__":
     summary_explore(saved_result, task_yaml)
-    # summary_recon(saved_result, task_yaml)
-    print_recon_result(saved_result)
-    print_manip_result(saved_result, task_yaml)
+    summary_recon(saved_result)
+    summary_manip(saved_result, task_yaml)

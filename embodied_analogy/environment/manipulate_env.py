@@ -326,7 +326,7 @@ class ManipulateEnv(ReconEnv):
         
         try:
         # if True:
-            self.manip_result = None
+            self.manip_result = {}
             
             if self.recon_result["has_valid_recon"]:
                 self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
@@ -336,13 +336,13 @@ class ManipulateEnv(ReconEnv):
                 self.logger.log(logging.INFO, f'No valid reconstruction, thus skip manipulation...')
                 self.recon_result["has_valid_manip"] = False
                 self.manip_result["exception"] = "No valid reconstruct."
-                self.manip_result = {-1: self.evaluate()}
+                self.manip_result = {0: self.evaluate()}
             
         except Exception as e:
             self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
             self.recon_result["has_valid_manip"] = False
             self.manip_result["exception"] = str(e)
-            self.manip_result = {-1: self.evaluate()}
+            self.manip_result = {0: self.evaluate()}
         
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(

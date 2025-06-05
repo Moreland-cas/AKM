@@ -81,6 +81,7 @@ class ExploreEnv(ObjEnv):
                 self.reset_robot_safe()
             
             self.logger.log(logging.INFO, f"[{self.num_tries + 1}|{self.max_tries}] Start exploring once...")
+            # TODO
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
             self.num_tries += 1
             if not actually_tried:
@@ -123,10 +124,7 @@ class ExploreEnv(ObjEnv):
         
         return result_dict
     
-    def explore_once(
-        self, 
-        visualize=False      
-    ):
+    def explore_once(self, visualize=False):
         """
             在当前状态下进行一次探索, 默认此时的 robot arm 处于 reset 状态
             返回 explore_ok, explore_uv:
@@ -164,7 +162,7 @@ class ExploreEnv(ObjEnv):
         dir_out_w = Tc2w[:3, :3] @ cur_frame.dir_out # 3
         
         result_pre = None
-        # NOTE: 这里没有使用 get_obj_pc, 因为每次 explore 都会有新的 cur_frame, 因此并不总有 obj_mask 信息
+        # NOTE: 这里没有使用 get_obj_pc, 因为每次 explore 都会有新的 cur_frame, 因此并不总有最新的 obj_mask 信息
         pc_collision_w, pc_colors = cur_frame.get_env_pc(
             use_height_filter=False,
             world_frame=True
@@ -313,6 +311,7 @@ class ExploreEnv(ObjEnv):
             self.logger.log(logging.ERROR, f"Explore exception occured: {e}", exc_info=True)
             
             self.explore_result["has_valid_explore"] = False
+            self.explore_result["joint_type"] = self.obj_env_cfg["joint_type"]
             self.explore_result["exception"] = str(e)
 
         if self.exp_cfg["save_result"]:

@@ -70,6 +70,9 @@ def test_batch(base_yaml_path, yaml_path_list):
 
 def distribute_tasks(tasks, num_groups):
     """将任务列表均匀分配到指定数量的组中"""
+    # 首先对于 tasks 这个 list 进行 sort
+    tasks.sort()
+    
     # 计算每组的基本大小和余数
     base_size = len(tasks) // num_groups
     remainder = len(tasks) % num_groups
