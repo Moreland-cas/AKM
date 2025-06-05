@@ -337,10 +337,14 @@ def summary_recon(saved_result):
     print("****************************************************\n")
     
 ############### summary_manipulate ###############
-MANIP_PRISMATIC_VALID = 0.05 # m
-MANIP_REVOLUTE_VALID = 5 # degree
+# 相对误差在 10 % 内的视为成功, 如打开 10 cm, 最终误差在 1 cm 内的
+MANIP_RELATIVE_VALID_THRESH = 0.1
 
-def is_manip_success(joint_type, manip_result):
+def is_manip_success(joint_type, manip_result, manip_distance):
+    """
+    manip_distance: 该任务实际需要 manip 的 delta joint state
+    NOTE 对于 revolute 来说, manip_distance 的单位是 degree, 需要转换成 rad
+    """
     time_steps = manip_result.keys()
     time_steps = list(time_steps)
     time_steps = [int(time_step) for time_step in time_steps]
@@ -356,13 +360,13 @@ def is_manip_success(joint_type, manip_result):
     for i in range(int(max_time_step) + 1):
         loss_list.append(abs(manip_result[str(i)]["diff"]))
     
-    if joint_type == "prismatic":
-        if last_loss < MANIP_PRISMATIC_VALID:
-            return True, loss_list
-    else:
-        if np.rad2deg(last_loss) < MANIP_REVOLUTE_VALID:
-            return True, loss_list
+    if joint_type == "revolute":
+        manip_distance = np.deg2rad(manip_distance)
+        
+    if last_loss < MANIP_RELATIVE_VALID_THRESH * manip_distance:
+        return True, loss_list
     return False, loss_list
+
 
 def print_manip_summary_dict(summary_dict):
     print("prismatic")
@@ -488,7 +492,10 @@ def summary_manip(saved_result, task_yaml, verbose=False):
             "close": {},
         },
     }
-    # for i in manip_success_idx:
+    # 统计一下整体的成功率
+    num_total_exp = len(saved_result.keys())
+    num_success_manip = 0
+    
     for task_id, v in saved_result.items():
         
         explore_result = v["explore"]
@@ -514,8 +521,9 @@ def summary_manip(saved_result, task_yaml, verbose=False):
             }
         
         # 判断 manip 是否成功
-        manip_success, loss_list = is_manip_success(joint_type, manip_result)
+        manip_success, loss_list = is_manip_success(joint_type, manip_result, manip_distance)
         if manip_success:
+            num_success_manip += 1
             success_dict[joint_type][manip_type][manip_distance]["success"] += 1
             success_dict[joint_type][manip_type][manip_distance]["loss_lists"].append(loss_list)
         else:
@@ -527,6 +535,8 @@ def summary_manip(saved_result, task_yaml, verbose=False):
             
     if verbose:
         print_manip_summary_dict(success_dict)
+    
+    print(f"Success Rate: {num_success_manip}/{num_total_exp} = {(num_success_manip / num_total_exp * 100):.2f}%")
     process_manip_summary_dict(success_dict, task_yaml)
     print("****************************************************\n")
     
