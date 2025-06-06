@@ -1674,49 +1674,7 @@ def numpy_to_json(obj):
     raise TypeError(f"Type {type(obj)} not serializable")
 
 
-class MinKNumbers:
-    def __init__(self):
-        """
-        初始化一个空的数字存储容器
-        """
-        self.numbers = []
-    
-    def add_number(self, num):
-        """
-        添加一个数字到存储容器中
-        :param num: 要添加的数字
-        """
-        self.numbers.append(num)
-    
-    def add_numbers(self, nums):
-        """
-        批量添加多个数字到存储容器中
-        :param nums: 包含多个数字的可迭代对象
-        """
-        self.numbers.extend(nums)
-    
-    def get_min_k(self, k):
-        """
-        返回存储的数字中最小的k个数字
-        :param k: 要返回的最小数字的数量
-        :return: 包含最小k个数字的列表
-        """
-        if k <= 0:
-            return []
-        if k >= len(self.numbers):
-            return sorted(self.numbers.copy())
-        
-        # 使用堆结构来高效获取最小的k个数字
-        return heapq.nsmallest(k, self.numbers)
-    
-    def clear(self):
-        """
-        清空存储的所有数字
-        """
-        self.numbers.clear()
-    
-    def __str__(self):
-        return f"MinKNumbers(currently storing {len(self.numbers)} numbers)"
+
     
     
 if __name__ == "__main__":

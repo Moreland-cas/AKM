@@ -55,17 +55,17 @@ def test_one(base_yaml_path, specific_yaml_path):
     
     
 def test_batch(base_yaml_path, yaml_path_list):
-    # 这里直接跑个 10 遍, 由于我们的程序会检测是否已经跑完特定任务, 所以不用担心重复跑, 跑 10 遍可以有效降低系统问题导致的程序崩溃
-    # for i in range(10):
+    failed_list = []
     for specific_yaml_path in yaml_path_list:
-        # try:
-        if True:
+        try:
             test_one(
                 base_yaml_path=base_yaml_path,
                 specific_yaml_path=specific_yaml_path
             )
-        # except Exception as e:
-        #     print(f"Task {specific_yaml_path} failed: {str(e)}")
+        except Exception as e:
+            print(f"Task {specific_yaml_path} failed: {str(e)}")
+            failed_list.append(specific_yaml_path)
+    return failed_list
         
 
 def distribute_tasks(tasks, num_groups):
@@ -94,28 +94,33 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     # parser.add_argument('--cuda_idx', type=str)
-    parser.add_argument('--total_split', help="Split the tasks into #total_split splits, e.g. 4 split", type=int, default=4)
-    parser.add_argument('--current_split', help="run #current_split of total splits, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
+    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
+    parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
     
     parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base.yaml")
-    parser.add_argument('--specific_yaml_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs")
+    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs")
     args = parser.parse_args()
     
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_idx
     
     yaml_path_list = []
-    for yaml_path in os.listdir(args.specific_yaml_folder): 
-        yaml_path_list.append(os.path.join(args.specific_yaml_folder, yaml_path))
+    for yaml_path in os.listdir(args.task_cfgs_folder): 
+        yaml_path_list.append(os.path.join(args.task_cfgs_folder, yaml_path))
         
     task_groups = distribute_tasks(yaml_path_list, args.total_split)
     
     assert (args.current_split >= 0) and (args.current_split < args.total_split)
     current_group = task_groups[args.current_split]
     
-    test_batch(
+    failed_list = test_batch(
         base_yaml_path=args.base_yaml_path,
         yaml_path_list=current_group
         # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs/321.yaml"]
     )
-    print("All done!")
+    if len(failed_list) == 0:
+        print("All done!")
+    else:
+        print(f"There are {len(failed_list)} failed case:")
+        for failed_case in failed_list:
+            print(failed_case)
     
