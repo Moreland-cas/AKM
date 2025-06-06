@@ -12,6 +12,104 @@ from embodied_analogy.utility.utils import (
 initialize_napari()
 from embodied_analogy.utility.estimation.scheduler import Scheduler
 
+
+def random_rotation_matrix(angle_range=60):
+    """
+    angle_range: 旋转的角度值大小, in degree
+    
+    生成一个随机的旋转矩阵    
+    """
+    axis = np.random.randn(3)
+    axis /= np.linalg.norm(axis)
+    angle = np.random.uniform(0, angle_range)
+    angle = np.deg2rad(angle)
+    
+    rotation_vector = angle * axis
+    rotation = R.from_rotvec(rotation_vector)
+    rotation_matrix = rotation.as_matrix()
+    return rotation_matrix
+
+
+def sample_around_joint_dict(joint_start, joint_dir, num_sample=100):
+    """
+    在 joint_dict 附近进行一些采样, 返回一系列新的 joint_dict
+    
+    对于 pivot point 来说, 在该点附近进行采样
+    对于 joint_dir 来说, 
+    """
+    assert num_sample >= 1
+    np.random.seed(666)
+    joint_starts, joint_dirs = [joint_start], [joint_dir]
+    
+    for _ in range(num_sample - 1):
+        tmp_joint_start = joint_start + np.random.uniform(low=-0.5, high=0.5, size=(3, ))
+        tmp_joint_dir = random_rotation_matrix(angle_range=60) @ joint_dir
+        joint_starts.append(tmp_joint_start)
+        joint_dirs.append(tmp_joint_dir)
+    
+    joint_starts, joint_dirs = np.array(joint_starts), np.array(joint_dirs)
+    return joint_starts, joint_dirs
+
+
+def get_init_joint_param(tracks_3d, joint_type):
+    """
+    tracks_3d: np.array([T, M, 3])
+    
+    根据 tracks_3d 先猜一个 joint_start 和 joint_dir 出来
+    """
+    T, M, _ = tracks_3d.shape
+    if joint_type == "prismatic":
+        centers = tracks_3d.mean(axis=1) # T, 3
+        joint_dir = centers[-1] - centers[0]
+        joint_dir = joint_dir / np.linalg.norm(joint_dir)
+        joint_start = tracks_3d[0].mean(axis=0) 
+    else:
+        pass
+    
+    return joint_start, joint_dir
+
+
+def estimate_joint_state_given_joint_param(joint_start, joint_dir, joint_type, tracks_3d):
+    """
+    joint_start
+    joint_dir
+    joint_type: prismatic or revolute
+    tracks_3d: np.array([T, M, 3])
+    
+    估计的策略是: 将每一帧抽象为一个点, 根据这个点计算 joint_state
+    
+    return joint_dict, but with estimated joint_states
+    """
+    T, M, _ = tracks_3d.shape
+    centers = tracks_3d.mean(axis = 1) # T, 3
+    
+    if joint_type == "prismatic":
+        joint_states = np.array([np.dot(centers[i] - centers[0], joint_dir) for i in range(T)])
+    else:
+        joint_states = np.zeros(T)
+        for t in range(1, T):
+            # 计算初始帧和当前帧的点云中心
+            center_0 = tracks_3d[0].mean(axis=0)
+            center_t = tracks_3d[t].mean(axis=0)
+            
+            # 减去 joint_start 向量
+            diff_0 = center_0 - joint_start
+            diff_t = center_t - joint_start
+            
+            # 并减去 joint_dir 分量
+            diff_0 = remove_dir_component(diff_0, joint_dir)
+            diff_t = remove_dir_component(diff_t, joint_dir)
+            
+            # 进行归一化
+            diff_0 /= np.linalg.norm(diff_0)
+            diff_t /= np.linalg.norm(diff_t)
+            
+            # NOTE diff_0 * diff_t = cos(angle)
+            angle = np.arccos(np.clip(np.dot(diff_0, diff_t), -1.0, 1.0)) # [0, pi]
+            joint_states[t] = angle
+    return joint_states
+
+
 def coarse_t_from_tracks_3d(tracks_3d, visualize=False, logger=None):
     """
     通过所有时间帧的位移变化估计平移方向，并计算每帧沿该方向的位移标量
@@ -141,25 +239,26 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False, logger=None):
     
     tracks_3d = np.copy(tracks_3d)
     T, M, _ = tracks_3d.shape
-    tracks_3d_mean = tracks_3d.mean(axis=1) # T, 1, 3
+    # tracks_3d_mean = tracks_3d.mean(axis=1) # T, 3
     
     # 注意 joint_dir 应该满足垂直于所有 tracks_3d_diff 的方向, 因此可以复用 fit_normal 函数来求解
-    tracks_3d_diff = tracks_3d_mean[1:, ...] - tracks_3d_mean[:-1, ...] # (T-1), M, 3
-    tracks_3d_flow = tracks_3d_diff.reshape(-1, 3) # N, 3
+    tracks_3d_diff = tracks_3d[1:, ...] - tracks_3d[:-1, ...] # (T-1), M, 3
+    tracks_3d_flow = tracks_3d_diff.reshape(-1, 3) # (T-1) * M, 3
     _, joint_dir = fit_plane_normal(tracks_3d_flow)
     
     # 对于 joint_start 应该满足 (joint_start - tracks_3d_mid) 垂直于 tracks_3d_diff
     # 可以通过最小二乘对 joint_start 直接求解， 即 (joint_start - tracks_3d_mid) * tracks_3d_diff = 0
     # 即 tracks_3d_diff @ joint_start = (tracks_3d_mid * tracks_3d_diff).sum(axis=-1)
-    tracks_3d_mid = (tracks_3d_mean[1:, ...] + tracks_3d_mean[:-1, ...]) / 2.0
-    tracks_3d_mid = tracks_3d_mid.reshape(-1, 3) # N, 3
+    # tracks_3d_mid = (tracks_3d_mean[1:, ...] + tracks_3d_mean[:-1, ...]) / 2.0
+    # tracks_3d_mid = tracks_3d_mid.reshape(-1, 3) # N, 3
     # old way of estimating joint_start, not stable!
     # joint_start, _, _, _ = np.linalg.lstsq(tracks_3d_flow, (tracks_3d_flow * tracks_3d_mid).sum(axis=-1), rcond=None)
     # New way of estimating joint_start, stable!
     # 即找到运动轨迹最小的点, 那样的点是最接近旋转轴的
+    # TODO 这一步有 bug, 底下这句的 tracks_3d_diff 应该用所有点的, 而不是平均点的
     min_idx = np.argmin(np.linalg.norm(tracks_3d_diff, axis=-1).mean(0))
     joint_start = tracks_3d[0, min_idx]
-    joint_start = remove_dir_component(joint_start, joint_dir)
+    # joint_start = remove_dir_component(joint_start, joint_dir)
     
     # 接着估计出每一帧对应的 angle, 这里可能需要进行一个方向的对齐
     joint_states = np.zeros(T)  # 初始化角度数组，第一帧角度为0

@@ -88,7 +88,7 @@ def distribute_tasks(tasks, num_groups):
     
     return distributed
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 if __name__ == "__main__":
     import argparse
@@ -97,8 +97,8 @@ if __name__ == "__main__":
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
     
-    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base.yaml")
-    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs")
+    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_6.yaml")
+    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4")
     args = parser.parse_args()
     
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_idx
@@ -107,15 +107,15 @@ if __name__ == "__main__":
     for yaml_path in os.listdir(args.task_cfgs_folder): 
         yaml_path_list.append(os.path.join(args.task_cfgs_folder, yaml_path))
         
-    task_groups = distribute_tasks(yaml_path_list, args.total_split)
+    task_groups = distribute_tasks(yaml_path_list, args.ts)
     
-    assert (args.current_split >= 0) and (args.current_split < args.total_split)
-    current_group = task_groups[args.current_split]
+    assert (args.cs >= 0) and (args.cs < args.ts)
+    current_group = task_groups[args.cs]
     
     failed_list = test_batch(
         base_yaml_path=args.base_yaml_path,
         yaml_path_list=current_group
-        # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs/321.yaml"]
+        # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/672.yaml"]
     )
     if len(failed_list) == 0:
         print("All done!")

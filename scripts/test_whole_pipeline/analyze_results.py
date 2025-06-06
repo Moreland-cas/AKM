@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import yaml
 import heapq 
@@ -58,35 +59,8 @@ def print_array(array, prefix=""):
     print(f"{prefix}{'/'.join(percentages)} ({'/'.join(array_str)})")
     
     
-############### 读取数据 ###############
-task_yaml_path = "/home/zby/Programs/Embodied_Analogy/cfgs/base_6_4.yaml"
-with open(task_yaml_path, "r") as f:
-    task_yaml = yaml.safe_load(f)
-# "/home/zby/Programs/Embodied_Analogy/assets/logs/test"
-log_folder = task_yaml["exp_cfg"]["exp_folder"]
+#############################################
 
-saved_result = {}
-run_folders = os.listdir(log_folder)
-for run_folder in run_folders:
-    run_path = os.path.join(log_folder, run_folder)
-    
-    saved_result[int(run_folder)] = {}
-    
-    with open(os.path.join(run_path, "explore_result.json"), "r") as f:
-        explore_result = json.load(f)
-        saved_result[int(run_folder)]["explore"] = explore_result
-    
-    with open(os.path.join(run_path, "recon_result.json"), "r") as f:
-        recon_result = json.load(f)
-        saved_result[int(run_folder)]["recon"] = recon_result
-    
-    with open(os.path.join(run_path, "manip_result.json"), "r") as f:
-        manip_result = json.load(f)
-        saved_result[int(run_folder)]["manip"] = manip_result
-    
-
-# 这里要确保每个 run 的结果都读取进来了
-assert len(saved_result.keys()) == len(run_folders)
 
 ############### summary_explore ###############
 # 直接把一些判断是否成功的超参放到这里, 方便修改
@@ -591,6 +565,41 @@ def summary_manip(saved_result, task_yaml, verbose=False):
     
     
 if __name__ == "__main__":
-    # summary_explore(saved_result, task_yaml)
-    # summary_recon(saved_result)
-    summary_manip(saved_result, task_yaml)
+    run_name = "6_4"
+    task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
+    
+    with open(task_yaml_path, "r") as f:
+        task_yaml = yaml.safe_load(f)
+    # "/home/zby/Programs/Embodied_Analogy/assets/logs/test"
+    log_folder = task_yaml["exp_cfg"]["exp_folder"]
+
+    saved_result = {}
+    run_folders = os.listdir(log_folder)
+    for run_folder in run_folders:
+        run_path = os.path.join(log_folder, run_folder)
+        
+        saved_result[int(run_folder)] = {}
+        
+        with open(os.path.join(run_path, "explore_result.json"), "r") as f:
+            explore_result = json.load(f)
+            saved_result[int(run_folder)]["explore"] = explore_result
+        
+        with open(os.path.join(run_path, "recon_result.json"), "r") as f:
+            recon_result = json.load(f)
+            saved_result[int(run_folder)]["recon"] = recon_result
+        
+        with open(os.path.join(run_path, "manip_result.json"), "r") as f:
+            manip_result = json.load(f)
+            saved_result[int(run_folder)]["manip"] = manip_result
+        
+
+    # 这里要确保每个 run 的结果都读取进来了
+    assert len(saved_result.keys()) == len(run_folders)
+
+    save_analysis_path = f"/home/zby/Programs/Embodied_Analogy/analysis/{run_name}.txt"
+    with open(save_analysis_path, "w") as f:
+        sys.stdout = f
+        summary_explore(saved_result, task_yaml)
+        summary_recon(saved_result)
+        summary_manip(saved_result, task_yaml)
+        
