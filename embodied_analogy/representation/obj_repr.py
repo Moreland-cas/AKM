@@ -190,11 +190,12 @@ class Obj_repr(Data):
         if save_memory:
             self.clear_frames()
     
-    def coarse_joint_estimation(self, visualize=False):
+    def coarse_joint_estimation(self, visualize=False, num_R_augmented=100):
         coarse_joint_dict = coarse_estimation(
             tracks_3d=self.frames.track3d_seq[:, self.frames.moving_mask, :], 
             visualize=visualize,
-            logger=self.logger
+            logger=self.logger,
+            num_R_augmented=num_R_augmented
         )
         self.coarse_joint_dict = coarse_joint_dict
         self.frames.write_joint_states(coarse_joint_dict["joint_states"])
@@ -239,11 +240,12 @@ class Obj_repr(Data):
         evaluate=False,
         save_memory=False,
         visualize=True,
+        num_R_augmented=100
     ):
         """
             从 frames 中恢复出 joint state dict
         """
-        self.coarse_joint_estimation(visualize=visualize)
+        self.coarse_joint_estimation(visualize=visualize, num_R_augmented=num_R_augmented)
         self.initialize_kframes(num_kframes=num_kframes, save_memory=save_memory)
         self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
         self.kframes.classify_dynamics(

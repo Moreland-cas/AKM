@@ -565,7 +565,8 @@ def summary_manip(saved_result, task_yaml, verbose=False):
     
     
 if __name__ == "__main__":
-    run_name = "6_4"
+    # run_name = "6_4"
+    run_name = "6_6"
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:

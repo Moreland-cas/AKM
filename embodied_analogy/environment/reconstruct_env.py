@@ -105,6 +105,7 @@ class ReconEnv(ExploreEnv):
             obj_description=self.obj_description,
             fine_lr=self.fine_lr,
             visualize=visualize,
+            num_R_augmented=self.recon_env_cfg["num_R_augmented"],
             evaluate=True
         )
         self.logger.log(logging.INFO, self.recon_result)
