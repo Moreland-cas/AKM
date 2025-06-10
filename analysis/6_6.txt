@@ -3,7 +3,16 @@
 Success Rate (actual): 568 / 696 = 81.61%
 Success Rate (pred): 596 / 696 = 85.63%
 Average tries (pred): 1992 / 596 = 3.34
-Detailed Results:
+
+Prismatic Joints (n=360):
+  Actual Success: 84.72%
+  Predicted Success: 88.33%
+
+Revolute Joints (n=336):
+  Actual Success: 78.27%
+  Predicted Success: 82.74%
+
+Detailed Results (All Joints):
 tries=1 | success rate (actual): 24.57% | success rate (pred): 25.72%
 tries=2 | success rate (actual): 39.37% | success rate (pred): 41.67%
 tries=3 | success rate (actual): 50.43% | success rate (pred): 53.16%
@@ -14,6 +23,16 @@ tries=7 | success rate (actual): 74.57% | success rate (pred): 78.02%
 tries=8 | success rate (actual): 77.44% | success rate (pred): 81.18%
 tries=9 | success rate (actual): 80.46% | success rate (pred): 84.34%
 tries=10 | success rate (actual): 81.61% | success rate (pred): 85.63%
+
+Bin Success Rates:
+prismatic_bin_0: 83.15% (89 samples)
+prismatic_bin_1: 92.39% (92 samples)
+prismatic_bin_2: 84.52% (84 samples)
+prismatic_bin_3: 78.95% (95 samples)
+revolute_bin_0: 91.51% (106 samples)
+revolute_bin_1: 83.64% (55 samples)
+revolute_bin_2: 78.87% (71 samples)
+revolute_bin_3: 61.54% (104 samples)
 ****************************************************
 
 

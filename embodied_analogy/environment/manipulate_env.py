@@ -119,7 +119,7 @@ class ManipulateEnv(ReconEnv):
                 visualize=visualize
             )
         
-        # NOTE: 仅在第一次调用 not_good_enough 的时候设置 target_state
+        # NOTE: 仅在 target_state 为 None 的时候设置 target_state
         if self.target_state is None:
             # 这里不应该用 cur_state, 而是应该用 initial_frame 的 joint_state
             self.obj_repr.reloc(
@@ -128,8 +128,10 @@ class ManipulateEnv(ReconEnv):
                 init_guess=None,
                 visualize=visualize
             )
-            initial_joint_state = self.obj_repr.initial_frame.joint_state
-            self.target_state = initial_joint_state + self.goal_delta
+            # initial_joint_state = self.obj_repr.initial_frame.joint_state
+            # self.target_state = initial_joint_state + self.goal_delta
+            # NOTE 这里需要修改 重定位 为使用当前 frame 而不是 initial frame
+            self.target_state = self.cur_state + self.goal_delta
         
         if self.obj_repr.fine_joint_dict["joint_type"] == "prismatic":
             not_good = abs(self.cur_state - self.target_state) > self.manip_env_cfg["prismatic_whole_traj_success_thresh"] # 1cm
@@ -312,7 +314,7 @@ class ManipulateEnv(ReconEnv):
     #############################################################
     def evaluate(self):
         # 评测 manipulate 的好坏
-        actual_delta = self.get_active_joint_state() - self.init_joint_state
+        actual_delta = self.get_active_joint_state() - self.manip_start_state
         diff = actual_delta - self.goal_delta
         result_dict = {
             "diff": diff,
@@ -321,6 +323,27 @@ class ManipulateEnv(ReconEnv):
         }
         return result_dict
     
+    def main_helper(self, manip_start_state, manip_end_state):
+        """
+        在 explore 和 reconstruct 结束后执行一次 manipulate 任务
+        manip_start_state: 物体关节被初始化到这个值 (完全关闭的 joint_state = 0)
+        manip_end_state: 算法要操作物体使得其关节变到这个值
+        """
+        self.logger.log(logging.INFO, f"Start manip task: {manip_start_state:.2f} -> {manip_end_state:.2f}")
+        self.manip_start_state = manip_start_state
+        self.manip_end_state = manip_end_state
+        
+        self.set_active_joint_state(joint_state=manip_start_state)
+        self.goal_delta = manip_end_state - manip_start_state
+        # NOTE 需要在 manipulate_close_loop 前将 target_state 设置为 None
+        self.target_state = None
+        
+        manip_result = self.manipulate_close_loop()
+        manip_result["manip_start_state"] = manip_start_state
+        manip_result["manip_end_state"] = manip_end_state
+        return manip_result
+    
+    
     def main(self):
         super().main()
         
@@ -328,19 +351,20 @@ class ManipulateEnv(ReconEnv):
         # if True:
             self.manip_result = {}
             
+            # TODO: 在这里改为执行多个任务
             if self.recon_result["has_valid_recon"]:
                 self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
                 self.manip_result = self.manipulate_close_loop()
-                self.recon_result["has_valid_manip"] = True
+                self.manip_result["has_valid_manip"] = True
             else:
                 self.logger.log(logging.INFO, f'No valid reconstruction, thus skip manipulation...')
-                self.recon_result["has_valid_manip"] = False
+                self.manip_result["has_valid_manip"] = False
                 self.manip_result["exception"] = "No valid reconstruct."
                 self.manip_result = {0: self.evaluate()}
             
         except Exception as e:
             self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
-            self.recon_result["has_valid_manip"] = False
+            self.manip_result["has_valid_manip"] = False
             self.manip_result["exception"] = str(e)
             self.manip_result = {0: self.evaluate()}
         

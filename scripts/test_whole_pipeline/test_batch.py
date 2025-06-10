@@ -45,8 +45,15 @@ def test_one(base_yaml_path, specific_yaml_path):
             break
     
     if all_exist:
-        print("Skip since all result files already exists.")
-        return 
+        # 如果 explore 中的 exception 是 CUDA out of memory, 那么还需要跑
+        with open(os.path.join(saved_prefix, "explore_result.json"), "r") as f:
+            explore_dict = json.load(f)
+        if "exception" in explore_dict.keys():
+            if not explore_dict["exception"].startswith("CUDA out of memory."):
+                return 
+        else:
+            print("Skip since all result files already exists.")
+            return 
     
     # 否则执行
     manipulateEnv = ManipulateEnv(cfg=task_cfg)
@@ -88,7 +95,7 @@ def distribute_tasks(tasks, num_groups):
     
     return distributed
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 if __name__ == "__main__":
     import argparse
@@ -97,8 +104,8 @@ if __name__ == "__main__":
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
     
-    # parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_4.yaml")
-    parser.add_argument('--base_yaml_path', type=str)
+    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_10.yaml")
+    # parser.add_argument('--base_yaml_path', type=str)
     parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4")
     # parser.add_argument('--task_cfgs_folder', type=str)
     args = parser.parse_args()
@@ -117,12 +124,8 @@ if __name__ == "__main__":
     failed_list = test_batch(
         base_yaml_path=args.base_yaml_path,
         yaml_path_list=current_group
-        # yaml_path_list=[
-            # "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/3.yaml",
-            # "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/693.yaml",
-            # "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/681.yaml"
-        # ]
-        # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/681.yaml"]
+        # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/47.yaml",
+        #                 "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/567.yaml"]
     )
     if len(failed_list) == 0:
         print("All done!")

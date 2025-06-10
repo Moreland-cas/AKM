@@ -17,7 +17,7 @@ class ObjEnv(RobotEnv):
         
         self.obj_env_cfg = cfg["obj_env_cfg"]
         self.obj_description = self.obj_env_cfg["obj_description"]
-        self.init_joint_state = self.obj_env_cfg["init_joint_state"]
+        self.load_joint_state = self.obj_env_cfg["load_joint_state"]
         
         self.load_object(self.obj_env_cfg)
 
@@ -80,7 +80,7 @@ class ObjEnv(RobotEnv):
             # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
             if joint.get_name() == obj_cfg["active_joint_name"]:
                 self.active_joint = joint
-                initial_states.append(obj_cfg["init_joint_state"])
+                initial_states.append(obj_cfg["load_joint_state"])
             else:
                 initial_states.append(0)
                 joint.set_limits(np.array([[0, 0]]))
@@ -124,12 +124,18 @@ class ObjEnv(RobotEnv):
                 contact_point=self.obj_repr.gt_joint_dict["joint_start"],
                 post_contact_dirs=[self.obj_repr.gt_joint_dict["joint_dir"]],
             )
-            
+    
+    def set_active_joint_state(self, joint_state):
+        """
+        对 active joint state 进行设置
+        """
+        self.obj.set_qpos(joint_state)
+        
     def get_active_joint_state(self):
         """
         获取我们关心的关节的状态值
         """
-        # TODO: 如果是对于 RGBManip 的数据集, 只有一个关节不是 fixed, 因此直接读取就行
+        # NOTE: 对于 RGBManip 的数据集, 只有一个关节不是 fixed, 因此直接读取就行
         # return self.obj.get_qpos()[self.active_joint_idx]
         return self.obj.get_qpos()[0]
 

@@ -74,12 +74,15 @@ global_task_idx = 0
 for obj_cfg in obj_cfgs:
     joint_type = obj_cfg["obj_env_cfg"]["joint_type"]
     # 根据 joint_type 确定 manip 的区间大小和 obj_init_dof_low 和 obj_init_dof_high
-    if joint_type == "prismatic":
-        max_joint_range = PRISMATIC_JOINT_MAX_RANGE
-        test_joint_deltas = PRISMATIC_TEST_JOINT_DELTAS
-    elif joint_type == "revolute":
-        max_joint_range = REVOLUTE_JOINT_MAX_RANGE
-        test_joint_deltas = REVOLUTE_TEST_JOINT_DELTAS
+    # if joint_type == "prismatic":
+    #     max_joint_range = PRISMATIC_JOINT_MAX_RANGE
+    #     test_joint_deltas = PRISMATIC_TEST_JOINT_DELTAS
+    # elif joint_type == "revolute":
+    #     max_joint_range = REVOLUTE_JOINT_MAX_RANGE
+    #     test_joint_deltas = REVOLUTE_TEST_JOINT_DELTAS
+    # NOTE 将 load_joint_state 设置为 0
+    obj_cfg["obj_env_cfg"]["load_joint_state"] = 0
+    
     # 遍历 "打开" 和 "关闭"
     for manip_type in ["open", "close"]:
         # 遍历所有尺度

@@ -3,7 +3,12 @@ import sys
 import json
 import yaml
 import heapq 
+from collections import defaultdict
 import numpy as np
+from embodied_analogy.project_config import (
+    PRISMATIC_JOINT_MAX_RANGE,
+    REVOLUTE_JOINT_MAX_RANGE
+)
 
 ############### utils ###############
 class MinKNumbers:
@@ -58,7 +63,6 @@ def print_array(array, prefix=""):
     array_str = [str(x) for x in array]
     print(f"{prefix}{'/'.join(percentages)} ({'/'.join(array_str)})")
     
-    
 #############################################
 
 
@@ -80,70 +84,206 @@ def explore_actually_valid(explore_result):
     elif joint_type == "revolute":
         return np.rad2deg(joint_delta) >= EXPLORE_REVOLUTE_VALID
 
-# 写的时候直接把函数的输入改为 saved_result 这个 dict, 方便假如我们只想跑 explore 以及 explore 的 summary
-def summary_explore(saved_result, task_yaml, verbose=False):
+
+def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
+    """分析探索阶段的结果，包括按初始关节状态分区的成功率"""
     max_tries = task_yaml["explore_env_cfg"]["max_tries"]
-
-    # 到此为止把所有有 result 的读取进来了
-    num_total_exp = len(saved_result.keys()) # 所有的实验
+    exp_folder = task_yaml["exp_cfg"]["exp_folder"]
     
-    # NOTE: num_total_tries 记录了对于那些 pred_valid 的案例一共使用了多少次尝试
+    # 定义关节范围
+    prismatic_joint_range = [0, PRISMATIC_JOINT_MAX_RANGE]
+    revolute_joint_range = [0, np.deg2rad(REVOLUTE_JOINT_MAX_RANGE)]
+    
+    # 创建区间划分
+    prismatic_bins = np.linspace(prismatic_joint_range[0], prismatic_joint_range[1], num_bins+1)
+    revolute_bins = np.linspace(revolute_joint_range[0], revolute_joint_range[1], num_bins+1)
+    
+    # 初始化统计数据结构
+    num_total_exp = len(saved_result.keys())
     num_total_tries = 0
-
-    # 记录下 tries 从 1 到 MAX_TRIES 个的 pred_valid 个数和 actual_valid 个数
+    
+    # 全局成功率统计
     num_pred_valid = {i: 0 for i in range(1, max_tries + 1)}
     num_actual_valid = {i: 0 for i in range(1, max_tries + 1)}
-
-    # 用于记录实际的状态变化最小的 k 个, 用于确定 explore valid 的阈值
+    
+    # 按关节类型统计
+    num_pred_valid_prismatic = {i: 0 for i in range(1, max_tries + 1)}
+    num_actual_valid_prismatic = {i: 0 for i in range(1, max_tries + 1)}
+    num_pred_valid_revolute = {i: 0 for i in range(1, max_tries + 1)}
+    num_actual_valid_revolute = {i: 0 for i in range(1, max_tries + 1)}
+    
+    # 按初始关节状态分区统计
+    bin_success_rates = defaultdict(list)
+    bin_counts = defaultdict(int)  # 记录每个区间的实验数量
+    
+    # 最小变化统计
     prismatic_heap = MinKNumbers()
     revolute_heap = MinKNumbers()
+    
+    # 关节类型计数
+    total_prismatic = 0
+    total_revolute = 0
 
-    results = [saved_result[k]["explore"] for k in saved_result.keys()]
-    # results = [saved_result[k]["explore"] for k in saved_result.keys() if "explore" in saved_result[k].keys()]
-    for i, result in enumerate(results):
+    # 处理每个任务的结果
+    results = [(k, saved_result[k]["explore"]) for k in saved_result.keys()]
+    for key, result in results:
         has_valid_explore = result["has_valid_explore"]
+        joint_type = result["joint_type"]
         
+        # 更新关节类型计数
+        if joint_type == "prismatic":
+            total_prismatic += 1
+        elif joint_type == "revolute":
+            total_revolute += 1
+            
+        # 读取该任务的具体YAML文件获取初始关节状态
+        yaml_path = os.path.join(exp_folder, str(key), f"{key}.yaml")
+        # if not os.path.exists(yaml_path):
+        #     print(f"Warning: YAML file not found for key {key}: {yaml_path}")
+        #     continue
+            
+        # try:
+        with open(yaml_path, "r") as f:
+            specific_yaml = yaml.safe_load(f)
+        init_joint_state = specific_yaml["obj_env_cfg"]["init_joint_state"]
+        # except Exception as e:
+        #     print(f"Error loading YAML for key {key}: {str(e)}")
+        #     continue
+        
+        # 确定初始状态所属的区间
+        bin_key = None
+        if joint_type == "prismatic":
+            bin_idx = np.digitize(init_joint_state, prismatic_bins) - 1
+            bin_key = f"prismatic_bin_{bin_idx}"
+        elif joint_type == "revolute":
+            bin_idx = np.digitize(init_joint_state, revolute_bins) - 1
+            bin_key = f"revolute_bin_{bin_idx}"
+        
+        # 记录该实验是否成功
+        actual_valid = False
+        if has_valid_explore:
+            actual_valid = explore_actually_valid(result)
+        
+        # 更新分区统计
+        # if bin_key is not None:
+        bin_success_rates[bin_key].append(1 if actual_valid else 0)
+        bin_counts[bin_key] += 1
+        
+        # 只统计有有效探索的实验
         if not has_valid_explore:
             continue
         
+        # 更新全局统计
         num_tries = result["num_tries"]
         num_total_tries += num_tries
         
+        # 更新尝试次数统计
+        for i in range(num_tries, max_tries + 1):
+            num_pred_valid[i] += 1
+            if actual_valid:
+                num_actual_valid[i] += 1
+            
+            # 更新按关节类型的统计
+            if joint_type == "prismatic":
+                num_pred_valid_prismatic[i] += 1
+                if actual_valid:
+                    num_actual_valid_prismatic[i] += 1
+            elif joint_type == "revolute":
+                num_pred_valid_revolute[i] += 1
+                if actual_valid:
+                    num_actual_valid_revolute[i] += 1
+        
+        # 更新最小变化统计
         if verbose:
             joint_delta = result["joint_state_end"] - result["joint_state_start"]
-            if result["joint_type"] == "prismatic":
+            if joint_type == "prismatic":
                 prismatic_heap.add_number(abs(joint_delta))
-            elif result["joint_type"] == "revolute":
+            elif joint_type == "revolute":
                 revolute_heap.add_number(np.rad2deg(abs(joint_delta)))
         
-        for i in range(num_tries, max_tries + 1):
-            if has_valid_explore:
-                num_pred_valid[i] += 1
-            
-                if explore_actually_valid(result):
-                    num_actual_valid[i] += 1
-                    
-    # 打印结果
+    # 打印总体结果
     print("\n************** Explore Stage Analysis **************")
-    
     print(f"Success Rate (actual): {num_actual_valid[max_tries]} / {num_total_exp} = {(num_actual_valid[max_tries] / num_total_exp * 100):.2f}%")
     print(f"Success Rate (pred): {num_pred_valid[max_tries]} / {num_total_exp} = {(num_pred_valid[max_tries] / num_total_exp * 100):.2f}%")
     print(f"Average tries (pred): {num_total_tries} / {num_pred_valid[max_tries]} = {num_total_tries / num_pred_valid[max_tries]:.2f}")
-
-    if verbose:
-        print("jonit delta statistic (for pred as valid):")
-        print("prismatic:", prismatic_heap.get_min_k(10))
-        print("revolute:", revolute_heap.get_min_k(10))
-
-    # 打印每个尝试次数的成功率
-    print("Detailed Results:")
+    
+    # 分别打印prismatic和revolute的结果
+    if total_prismatic > 0:
+        prismatic_actual_rate = num_actual_valid_prismatic[max_tries] / total_prismatic * 100
+        prismatic_pred_rate = num_pred_valid_prismatic[max_tries] / total_prismatic * 100
+        print(f"\nPrismatic Joints (n={total_prismatic}):")
+        print(f"  Actual Success: {prismatic_actual_rate:.2f}%")
+        print(f"  Predicted Success: {prismatic_pred_rate:.2f}%")
+    
+    if total_revolute > 0:
+        revolute_actual_rate = num_actual_valid_revolute[max_tries] / total_revolute * 100
+        revolute_pred_rate = num_pred_valid_revolute[max_tries] / total_revolute * 100
+        print(f"\nRevolute Joints (n={total_revolute}):")
+        print(f"  Actual Success: {revolute_actual_rate:.2f}%")
+        print(f"  Predicted Success: {revolute_pred_rate:.2f}%")
+    
+    # 打印详细尝试次数结果
+    print("\nDetailed Results (All Joints):")
     for tries in range(1, max_tries + 1):
         success_rate_pred = num_pred_valid[tries] / num_total_exp
         success_rate_actual = num_actual_valid[tries] / num_total_exp
         print(f"tries={tries} | success rate (actual): {(success_rate_actual * 100):.2f}% | success rate (pred): {(success_rate_pred * 100):.2f}%")
     
+    # 打印分区统计信息
+    print("\nBin Success Rates:")
+    for bin_key in sorted(bin_success_rates.keys()):
+        success_list = bin_success_rates[bin_key]
+        if success_list:
+            success_rate = sum(success_list) / len(success_list) * 100
+            print(f"{bin_key}: {success_rate:.2f}% ({len(success_list)} samples)")
+    
+    # 绘制初始关节状态分区的箱形图
+    # if bin_success_rates:
+    #     plt.figure(figsize=(14, 7))
+        
+    #     # 准备箱形图数据
+    #     bin_labels = []
+    #     success_data = []
+        
+    #     # 处理prismatic分区
+    #     for i in range(num_bins):
+    #         bin_key = f"prismatic_bin_{i}"
+    #         if bin_key in bin_success_rates and bin_success_rates[bin_key]:
+    #             bin_labels.append(f"P-Bin{i+1}")
+    #             success_data.append(bin_success_rates[bin_key])
+        
+    #     # 处理revolute分区
+    #     for i in range(num_bins):
+    #         bin_key = f"revolute_bin_{i}"
+    #         if bin_key in bin_success_rates and bin_success_rates[bin_key]:
+    #             bin_labels.append(f"R-Bin{i+1}")
+    #             success_data.append(bin_success_rates[bin_key])
+        
+    #     # 绘制箱形图
+    #     plt.boxplot(success_data, labels=bin_labels)
+    #     plt.title("Success Rate Distribution by Initial Joint State Bins")
+    #     plt.ylabel("Success Rate (1=Success, 0=Failure)")
+    #     plt.xlabel("Joint State Bins (P=Prismatic, R=Revolute)")
+    #     plt.xticks(rotation=45)
+    #     plt.grid(True, linestyle='--', alpha=0.7)
+        
+    #     # 添加分区边界信息
+    #     prismatic_bin_edges = [f"{x:.2f}" for x in prismatic_bins]
+    #     revolute_bin_edges_deg = [f"{np.rad2deg(x):.1f}" for x in revolute_bins]
+        
+    #     plt.figtext(0.1, 0.02, f"Prismatic bins (m): {', '.join(prismatic_bin_edges)}", fontsize=9)
+    #     plt.figtext(0.1, 0.00, f"Revolute bins (deg): {', '.join(revolute_bin_edges_deg)}", fontsize=9)
+        
+    #     plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # 为底部文本留出空间
+    #     plt.show()
+    
+    # 打印最小变化统计
+    if verbose:
+        print("\nJoint delta statistic (for pred as valid):")
+        print("Prismatic:", prismatic_heap.get_min_k(10))
+        print("Revolute:", revolute_heap.get_min_k(10))
+    
     print("****************************************************\n")
-
 
 ############### summary_reconstruct ###############
 PIVOT_THRESH = 0.05 # m
@@ -566,7 +706,9 @@ def summary_manip(saved_result, task_yaml, verbose=False):
     
 if __name__ == "__main__":
     # run_name = "6_4"
-    run_name = "6_6"
+    # run_name = "6_6"
+    # run_name = "6_8"
+    run_name = "6_10"
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:

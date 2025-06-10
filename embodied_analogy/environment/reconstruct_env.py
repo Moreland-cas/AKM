@@ -23,6 +23,9 @@ class ReconEnv(ExploreEnv):
         self.reloc_lr = self.recon_env_cfg["reloc_lr"]
     
     def update_cur_frame(self, init_guess=None, visualize=False):
+        """
+        会更新 self.cur_frame 和 self.cur_state
+        """
         self.obj_repr: Obj_repr
         self.base_step()
         cur_frame = self.capture_frame()
@@ -34,8 +37,8 @@ class ReconEnv(ExploreEnv):
         )
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
-        # 这里打印的 Extimated Current State 是 recon 算法预测的 offset + init_joint_state 得到的
-        self.logger.log(logging.DEBUG, f'Extimated Current State: {self.cur_state + self.obj_env_cfg["init_joint_state"]}')
+        # 这里打印的 Extimated Current State 是 recon 算法预测的 offset + load_joint_state 得到的
+        self.logger.log(logging.DEBUG, f'Estimated Current State: {self.cur_state + self.obj_env_cfg["load_joint_state"]}')
         self.logger.log(logging.DEBUG, f"GT Current State: {self.get_active_joint_state()}")
         
     def transform_grasp(self, Tph2w_ref, ref_state, tgt_state):

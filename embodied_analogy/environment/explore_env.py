@@ -347,7 +347,7 @@ if __name__ == "__main__":
     "active_link_name": "link_1",
     "active_joint_name": "joint_1",
     "instruction": "open the cabinet",
-    "init_joint_state": 0.0,
+    "load_joint_state": 0.0,
     "obj_folder_path_explore": "/home/zby/Programs/Embodied_Analogy/assets/logs/explore_512/40147_link_1",
     "phy_timestep": 0.004,
     "planner_timestep": 0.01,
