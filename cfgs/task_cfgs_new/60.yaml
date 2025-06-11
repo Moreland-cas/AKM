@@ -1,0 +1,59 @@
+obj_env_cfg:
+  joint_type: revolute
+  data_path: dataset/one_door_cabinet/49042_link_0
+  obj_index: 49042
+  joint_index: 0
+  obj_description: cabinet
+  active_link_name: link_0
+  active_joint_name: joint_0
+  load_joint_state: 0
+  load_pose:
+  - 0.8641992807388306
+  - 0.12993648648262024
+  - 0.5014253854751587
+  load_quat:
+  - 0.9996359944343567
+  - -0.010246464051306248
+  - -0.0002558175183366984
+  - 0.024957332760095596
+  load_scale: 1.024422883485945
+task_cfg:
+  instruction: open the cabinet
+  task_id: 60
+manip_env_cfg:
+  '0_1':
+    manip_start_state: 0.16663999132664328
+    manip_end_state: 0.34117291652607623
+  '0_2':
+    manip_start_state: 0.10542940262194045
+    manip_end_state: 0.45449525302080634
+  '0_3':
+    manip_start_state: 0.007370612993425057
+    manip_end_state: 0.5309693885917239
+  '1_0':
+    manip_start_state: 0.22678361392915372
+    manip_end_state: 0.052250688729720766
+  '1_2':
+    manip_start_state: 0.21135297918676002
+    manip_end_state: 0.38588590438619297
+  '1_3':
+    manip_start_state: 0.18357282457699414
+    manip_end_state: 0.53263867497586
+  '2_0':
+    manip_start_state: 0.36508568709040523
+    manip_end_state: 0.016019836691539318
+  '2_1':
+    manip_start_state: 0.44738809510513833
+    manip_end_state: 0.2728551699057054
+  '2_3':
+    manip_start_state: 0.38765645052760905
+    manip_end_state: 0.562189375727042
+  '3_0':
+    manip_start_state: 0.6959710764670693
+    manip_end_state: 0.17237230086877042
+  '3_1':
+    manip_start_state: 0.6764783820846794
+    manip_end_state: 0.3274125316858134
+  '3_2':
+    manip_start_state: 0.6659102988544052
+    manip_end_state: 0.4913773736549723

@@ -21,21 +21,21 @@ class ManipulateEnv(ReconEnv):
     def __init__(self, cfg):       
         super().__init__(cfg)
         self.manip_env_cfg = cfg["manip_env_cfg"]
-        self.setup_manip()
+        # self.setup_manip()
         
-    def setup_manip(self):
-        self.manip_type = self.manip_env_cfg["manip_type"]
-        self.manip_distance = self.manip_env_cfg["manip_distance"]
+    # def setup_manip(self):
+    #     self.manip_type = self.manip_env_cfg["manip_type"]
+    #     self.manip_distance = self.manip_env_cfg["manip_distance"]
         
-        self.goal_delta = abs(self.manip_distance)
-        if self.manip_type == "close":
-            self.goal_delta *= -1
+    #     self.goal_delta = abs(self.manip_distance)
+    #     if self.manip_type == "close":
+    #         self.goal_delta *= -1
             
-        if self.obj_env_cfg["joint_type"] == "revolute":
-            self.goal_delta = np.deg2rad(self.goal_delta)
+    #     if self.obj_env_cfg["joint_type"] == "revolute":
+    #         self.goal_delta = np.deg2rad(self.goal_delta)
         
-        # NOTE: 这里要将 target_state 初始化为 None, 然后在第一次调用 not_good_enough 的时候进行设置
-        self.target_state = None
+    #     # NOTE: 这里要将 target_state 初始化为 None, 然后在第一次调用 not_good_enough 的时候进行设置
+    #     self.target_state = None
           
     def manip_once(self):
         """
