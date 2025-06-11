@@ -45,16 +45,18 @@ class ManipulateEnv(ReconEnv):
         
         移动到该位姿, 并根据 target_state 进行操作
         """
-        self.logger.log(logging.INFO, "Start one manipulation run ...")
+        self.logger.log(logging.INFO, "Run manip_once()...")
         self.obj_repr : Obj_repr 
         
         # NOTE: 感觉每次失败的时候没必要完全 reset, 只要撤回一段距离, 然后再次尝试就好了
-        self.logger.log(logging.INFO, "\topen gripper and move back a little bit...")
-        self.open_gripper()
-        self.move_forward(
-            moving_distance=-self.reserved_distance,
-            drop_large_move=False
-        )
+        # self.logger.log(logging.INFO, "\topen gripper and move back a little bit...")
+        # self.open_gripper()
+        # self.move_forward(
+        #     moving_distance=-self.reserved_distance,
+        #     drop_large_move=False
+        # )
+        # 或者简单点, 直接 reset
+        self.reset_robot_safe()
         
         # 在这里是不是需要再跑一遍 reloc, 从而防止 open_gripper + move_backward 对于物体状态的影响
         self.update_cur_frame(init_guess=self.cur_state)
@@ -323,7 +325,7 @@ class ManipulateEnv(ReconEnv):
         }
         return result_dict
     
-    def main_helper(self, manip_start_state, manip_end_state):
+    def prepare_task_env(self, manip_start_state, manip_end_state):
         """
         在 explore 和 reconstruct 结束后执行一次 manipulate 任务
         manip_start_state: 物体关节被初始化到这个值 (完全关闭的 joint_state = 0)
@@ -333,41 +335,52 @@ class ManipulateEnv(ReconEnv):
         self.manip_start_state = manip_start_state
         self.manip_end_state = manip_end_state
         
+        # 进行 robot 的 reset
+        self.reset_robot()
+        
         self.set_active_joint_state(joint_state=manip_start_state)
         self.goal_delta = manip_end_state - manip_start_state
         # NOTE 需要在 manipulate_close_loop 前将 target_state 设置为 None
         self.target_state = None
         
-        manip_result = self.manipulate_close_loop()
-        manip_result["manip_start_state"] = manip_start_state
-        manip_result["manip_end_state"] = manip_end_state
-        return manip_result
-    
-    
     def main(self):
         super().main()
+        self.manip_result = {}
         
-        try:
-        # if True:
-            self.manip_result = {}
+        for k, v in self.manip_env_cfg["tasks"].items():
+            manip_start_state = v["manip_start_state"]
+            manip_end_state = v["manip_end_state"]
+            tmp_manip_result = {
+                "manip_start_state": manip_start_state,
+                "manip_end_state": manip_end_state
+            }
+            self.prepare_task_env(
+                manip_start_state=manip_start_state,
+                manip_end_state=manip_end_state
+            )
+            tmp_manip_result.update({0: self.evaluate()})
+            try:
+            # if True:
+                if self.recon_result["has_valid_recon"]:
+                    self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
+                    tmp_manip_result.update(self.manipulate_close_loop())
+                    
+                else:
+                    self.logger.log(logging.INFO, f'No valid reconstruction, thus skip manipulation...')
+                    # self.manip_result["has_valid_manip"] = False
+                    tmp_manip_result["exception"] = "No valid reconstruct."
+                    
+                
+            except Exception as e:
+                self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
+                # self.manip_result["has_valid_manip"] = False
+                tmp_manip_result["exception"] = str(e)
+                # tmp_manip_result.update({0: self.evaluate()})
+
+            self.manip_result.update({
+                k: tmp_manip_result
+            })
             
-            # TODO: 在这里改为执行多个任务
-            if self.recon_result["has_valid_recon"]:
-                self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
-                self.manip_result = self.manipulate_close_loop()
-                self.manip_result["has_valid_manip"] = True
-            else:
-                self.logger.log(logging.INFO, f'No valid reconstruction, thus skip manipulation...')
-                self.manip_result["has_valid_manip"] = False
-                self.manip_result["exception"] = "No valid reconstruct."
-                self.manip_result = {0: self.evaluate()}
-            
-        except Exception as e:
-            self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
-            self.manip_result["has_valid_manip"] = False
-            self.manip_result["exception"] = str(e)
-            self.manip_result = {0: self.evaluate()}
-        
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(
                 self.exp_cfg["exp_folder"],

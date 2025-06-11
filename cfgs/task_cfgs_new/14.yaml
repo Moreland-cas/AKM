@@ -21,39 +21,40 @@ task_cfg:
   instruction: open the cabinet
   task_id: 14
 manip_env_cfg:
-  '0_1':
-    manip_start_state: 0.049586035923280015
-    manip_end_state: 0.14958603592328001
-  '0_2':
-    manip_start_state: 0.09384059406715015
-    manip_end_state: 0.29384059406715013
-  '0_3':
-    manip_start_state: 0.026103985926255735
-    manip_end_state: 0.3261039859262558
-  '1_0':
-    manip_start_state: 0.1464913601948798
-    manip_end_state: 0.04649136019487979
-  '1_2':
-    manip_start_state: 0.19137581737244197
-    manip_end_state: 0.291375817372442
-  '1_3':
-    manip_start_state: 0.10991255768489011
-    manip_end_state: 0.3099125576848901
-  '2_0':
-    manip_start_state: 0.2646237784214752
-    manip_end_state: 0.06462377842147521
-  '2_1':
-    manip_start_state: 0.24209284048656243
-    manip_end_state: 0.14209284048656243
-  '2_3':
-    manip_start_state: 0.25679437972097563
-    manip_end_state: 0.3567943797209756
-  '3_0':
-    manip_start_state: 0.3846457301925664
-    manip_end_state: 0.08464573019256638
-  '3_1':
-    manip_start_state: 0.31713787188661285
-    manip_end_state: 0.11713787188661284
-  '3_2':
-    manip_start_state: 0.3642782007594722
-    manip_end_state: 0.26427820075947217
+  tasks:
+    '0_1':
+      manip_start_state: 0.049586035923280015
+      manip_end_state: 0.14958603592328001
+    '0_2':
+      manip_start_state: 0.09384059406715015
+      manip_end_state: 0.29384059406715013
+    '0_3':
+      manip_start_state: 0.026103985926255735
+      manip_end_state: 0.3261039859262558
+    '1_0':
+      manip_start_state: 0.1464913601948798
+      manip_end_state: 0.04649136019487979
+    '1_2':
+      manip_start_state: 0.19137581737244197
+      manip_end_state: 0.291375817372442
+    '1_3':
+      manip_start_state: 0.10991255768489011
+      manip_end_state: 0.3099125576848901
+    '2_0':
+      manip_start_state: 0.2646237784214752
+      manip_end_state: 0.06462377842147521
+    '2_1':
+      manip_start_state: 0.24209284048656243
+      manip_end_state: 0.14209284048656243
+    '2_3':
+      manip_start_state: 0.25679437972097563
+      manip_end_state: 0.3567943797209756
+    '3_0':
+      manip_start_state: 0.3846457301925664
+      manip_end_state: 0.08464573019256638
+    '3_1':
+      manip_start_state: 0.31713787188661285
+      manip_end_state: 0.11713787188661284
+    '3_2':
+      manip_start_state: 0.3642782007594722
+      manip_end_state: 0.26427820075947217

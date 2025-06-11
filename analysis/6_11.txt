@@ -1,0 +1,54 @@
+
+************** Explore Stage Analysis **************
+Success Rate (actual): 98 / 116 = 84.48%
+Success Rate (pred): 99 / 116 = 85.34%
+Average tries (pred): 292 / 99 = 2.95
+
+Prismatic Joints (n=60):
+  Actual Success: 80.00%
+  Predicted Success: 80.00%
+
+Revolute Joints (n=56):
+  Actual Success: 89.29%
+  Predicted Success: 91.07%
+
+Detailed Results (All Joints):
+tries=1 | success rate (actual): 28.45% | success rate (pred): 28.45%
+tries=2 | success rate (actual): 46.55% | success rate (pred): 46.55%
+tries=3 | success rate (actual): 57.76% | success rate (pred): 57.76%
+tries=4 | success rate (actual): 68.97% | success rate (pred): 69.83%
+tries=5 | success rate (actual): 71.55% | success rate (pred): 72.41%
+tries=6 | success rate (actual): 76.72% | success rate (pred): 77.59%
+tries=7 | success rate (actual): 80.17% | success rate (pred): 81.03%
+tries=8 | success rate (actual): 81.90% | success rate (pred): 82.76%
+tries=9 | success rate (actual): 84.48% | success rate (pred): 85.34%
+tries=10 | success rate (actual): 84.48% | success rate (pred): 85.34%
+
+Bin Success Rates:
+prismatic_bin_0: 80.00% (60 samples)
+revolute_bin_0: 89.29% (56 samples)
+****************************************************
+
+
+************** Reconstruct Stage Analysis **************
+Success Rate: 94 / 116 = 81.03%
+note: Reconstruction loss under PIVOT_THRESH: 0.03 m and ANGLE_THRESH: 5 degree is considered valid.
+
+Detailed Results: 
+PRISMATIC: 
+	60 in total
+Success/invalid_explore/false_positive/wrong_type/bad_optimize: 
+	80%/20%/0%/0%/0% (48/12/0/0/0)
+Angle loss: 
+	1.54 degree -> 0.68 degree (coarse -> fine)
+
+REVOLUTE: 
+	56 in total
+Success/invalid_explore/false_positive/wrong_type/bad_optimize: 
+	82%/9%/2%/0%/7% (46/5/1/0/4)
+Angle loss: 
+	1.72 degree -> 0.85 degree (coarse -> fine)
+Pivot loss: 
+	0.54 cm -> 0.17 cm (coarse -> fine)
+****************************************************
+

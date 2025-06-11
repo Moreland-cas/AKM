@@ -145,7 +145,7 @@ def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
         # try:
         with open(yaml_path, "r") as f:
             specific_yaml = yaml.safe_load(f)
-        init_joint_state = specific_yaml["obj_env_cfg"]["init_joint_state"]
+        load_joint_state = specific_yaml["obj_env_cfg"]["load_joint_state"]
         # except Exception as e:
         #     print(f"Error loading YAML for key {key}: {str(e)}")
         #     continue
@@ -153,10 +153,10 @@ def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
         # 确定初始状态所属的区间
         bin_key = None
         if joint_type == "prismatic":
-            bin_idx = np.digitize(init_joint_state, prismatic_bins) - 1
+            bin_idx = np.digitize(load_joint_state, prismatic_bins) - 1
             bin_key = f"prismatic_bin_{bin_idx}"
         elif joint_type == "revolute":
-            bin_idx = np.digitize(init_joint_state, revolute_bins) - 1
+            bin_idx = np.digitize(load_joint_state, revolute_bins) - 1
             bin_key = f"revolute_bin_{bin_idx}"
         
         # 记录该实验是否成功
@@ -286,8 +286,11 @@ def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
     print("****************************************************\n")
 
 ############### summary_reconstruct ###############
-PIVOT_THRESH = 0.05 # m
-ANGLE_THRESH = 10 # degree
+# PIVOT_THRESH = 0.05 # m
+# ANGLE_THRESH = 10 # degree
+
+PIVOT_THRESH = 0.03 # m
+ANGLE_THRESH = 5 # degree
 
 def is_reconstruct_valid(explore_result, recon_result):
     """
@@ -708,7 +711,8 @@ if __name__ == "__main__":
     # run_name = "6_4"
     # run_name = "6_6"
     # run_name = "6_8"
-    run_name = "6_10"
+    # run_name = "6_10"
+    run_name = "6_11"
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:
@@ -744,5 +748,5 @@ if __name__ == "__main__":
         sys.stdout = f
         summary_explore(saved_result, task_yaml)
         summary_recon(saved_result)
-        summary_manip(saved_result, task_yaml)
+        # summary_manip(saved_result, task_yaml)
         

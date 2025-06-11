@@ -109,18 +109,20 @@ class Obj_repr(Data):
                 "pos_err": 0,
             }
         }
-        # TODO: 这里可能要对 angle_err 取一个 minimum
+        # NOTE: 这里要对 angle_err 取一个 minimum
         result["coarse_loss"]["type_err"] = 1 if coarse_w["joint_type"] != gt_w["joint_type"] else 0
-        if np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"])) > np.pi / 2:
-            result["coarse_loss"]["angle_err"] = np.pi - np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]))
+        coarse_dir_dot = np.clip(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]), -1, 1)
+        if np.arccos(coarse_dir_dot) > np.pi / 2:
+            result["coarse_loss"]["angle_err"] = np.pi - np.arccos(coarse_dir_dot)
         else:
-            result["coarse_loss"]["angle_err"] = np.arccos(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]))
+            result["coarse_loss"]["angle_err"] = np.arccos(coarse_dir_dot)
         
         result["fine_loss"]["type_err"] = 1 if fine_w["joint_type"] != gt_w["joint_type"] else 0
-        if np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"])) > np.pi / 2:
-            result["fine_loss"]["angle_err"] = np.pi - np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]))
+        fine_dir_dot = np.clip(np.dot(fine_w["joint_dir"], fine_w["joint_dir"]), -1, 1)
+        if np.arccos(fine_dir_dot) > np.pi / 2:
+            result["fine_loss"]["angle_err"] = np.pi - np.arccos(fine_dir_dot)
         else:
-            result["fine_loss"]["angle_err"] = np.arccos(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]))
+            result["fine_loss"]["angle_err"] = np.arccos(fine_dir_dot)
         
         if gt_w["joint_type"] == "revolute":
             result["coarse_loss"]["pos_err"] = line_to_line_distance(
@@ -391,7 +393,8 @@ class Obj_repr(Data):
         # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
         num_ref = len(self.kframes)
         
-        if init_guess is not None:
+        # if init_guess is not None:
+        if False:
             query_frame.joint_state = init_guess
             self.logger.log(logging.INFO, f"Guess query state through history: {init_guess}")
         else:

@@ -7,7 +7,7 @@ from embodied_analogy.utility.constants import ASSET_PATH, PROJECT_ROOT, SEED
 from embodied_analogy.utility.randomize_obj_pose import randomize_obj_load_pose
 from embodied_analogy.utility.utils import set_random_seed
 from embodied_analogy.utility.constants import (
-    NUM_EXP_PER_SETTING,
+    # NUM_EXP_PER_SETTING,
     PRISMATIC_JOINT_MAX_RANGE,
     # PRISMATIC_TEST_JOINT_DELTAS,
     REVOLUTE_JOINT_MAX_RANGE,
@@ -100,7 +100,7 @@ for obj_cfg in obj_cfgs:
     # NOTE 这里 task_cfg 中的 instruction 仅用在 explore 阶段, 因此默认用 "open"
     obj_cfg["task_cfg"]["instruction"] = "open the " + obj_cfg["obj_env_cfg"]["obj_description"]
     obj_cfg["task_cfg"]["task_id"] = global_task_idx
-    obj_cfg["manip_env_cfg"] = {}
+    obj_cfg["manip_env_cfg"] = {"tasks": {}}
     
     for start_grid_idx in range(num_grid):
         for end_grid_idx in range(num_grid):
@@ -122,7 +122,7 @@ for obj_cfg in obj_cfgs:
                 manip_start_state = np.deg2rad(manip_start_state)
                 manip_end_state = np.deg2rad(manip_end_state)
 
-            obj_cfg["manip_env_cfg"].update({
+            obj_cfg["manip_env_cfg"]["tasks"].update({
                 f"{start_grid_idx}_{end_grid_idx}": {
                 # (start_grid_idx, end_grid_idx): {
                     "manip_start_state": float(manip_start_state),
