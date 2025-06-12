@@ -1,4 +1,5 @@
 import os
+import copy
 import sys
 import json
 import yaml
@@ -488,9 +489,9 @@ def summary_recon(saved_result):
     
 ############### summary_manipulate ###############
 # 相对误差在 10 % 内的视为成功, 如打开 10 cm, 最终误差在 1 cm 内的
-MANIP_RELATIVE_VALID_THRESH = 0.1
+MANIP_RELATIVE_VALID_THRESH = 0.5
 
-def is_manip_success(joint_type, manip_result, manip_distance):
+def is_manip_success(manip_result):
     """
     manip_distance: 该任务实际需要 manip 的 delta joint state
     NOTE 对于 revolute 来说, manip_distance 的单位是 degree, 需要转换成 rad
@@ -500,8 +501,17 @@ def is_manip_success(joint_type, manip_result, manip_distance):
         loss_list: 多次闭环操作后的误差变化, 最少有一个, 最小的 key 为 0, 最大的 key 为 MAX_TRIES
         relative_error: last_loss / manip_distance
     """
+    manip_distance = abs(manip_result["manip_end_state"] - manip_result["manip_start_state"])
+    
     time_steps = manip_result.keys()
     time_steps = list(time_steps)
+    # delete 两个字符串的 key
+    try:
+        time_steps.remove("manip_start_state")
+        time_steps.remove("manip_end_state")
+        time_steps.remove("exception")
+    except Exception as e:
+        pass
     time_steps = [int(time_step) for time_step in time_steps]
     max_time_step = str(max(time_steps))
     last_result = manip_result[max_time_step]
@@ -510,14 +520,14 @@ def is_manip_success(joint_type, manip_result, manip_distance):
     
     loss_list = []
     # TODO 更新后的版本的 manip_result 里不应该有 "-1", 取而代之的是 "0"
-    if "-1" in manip_result.keys():
-        loss_list.append(abs(manip_result["-1"]["diff"]))
+    # if "-1" in manip_result.keys():
+    #     loss_list.append(abs(manip_result["-1"]["diff"]))
         
     for i in range(int(max_time_step) + 1):
         loss_list.append(abs(manip_result[str(i)]["diff"]))
     
-    if joint_type == "revolute":
-        manip_distance = np.deg2rad(manip_distance)
+    # if joint_type == "revolute":
+    #     manip_distance = np.deg2rad(manip_distance)
         
     if last_loss < MANIP_RELATIVE_VALID_THRESH * manip_distance:
         return True, loss_list, relative_error
@@ -580,81 +590,118 @@ def print_manip_summary_dict(summary_dict):
             loss_list = [f"{np.rad2deg(loss):.2f}dg" for loss in loss_list]
             print(f"\t\t\t{loss_list}")
 
-def process_manip_summary_dict(summary_dict, task_yaml):
+
+def process_manip_grid_dict(summary_dict, task_yaml, joint_type):
+    """
+    这里的 grid_dict 包含多个 "i_j" 的 key, 每个 key 下存储一个 base_dict:
+    {
+        "loss_lists": [],
+        "success": 0,
+        "failed_manip": 0,
+        "failed_recon": 0
+    }
+    返回一个 matrix 信息, 需要包含：
+        Success/Failed-recon/Failed-manip
+        #avg_manip
+        final_error
+        error_traj
+    """
     # NOTE 这里 +1 是因为 loss_list 的第一个是未操作的状态, 也进行了存储
     max_tries_plus_one = task_yaml["manip_env_cfg"]["max_manip"] + 1
     
     # NOTE: summary_dict 中存储的 loss 已经是 cm 或者 degree, 但是有正有负
-    joint_types = ("prismatic", "revolute")
-    manip_types = ("open", "close")
+    # unit = "cm" if joint_type == "prismatic" else "degree"
     
-    for joint_type in joint_types:
-        unit = "cm" if joint_type == "prismatic" else "degree"
-        for manip_type in manip_types:
-            for scale in summary_dict[joint_type][manip_type]:
-                # print(f"{joint_type} {manip_type} {scale}")
-                num_manip = 0
-                # 将所有 loss_list 补全到 max_tries_plus_one 长度, 用原本数组的最后一个元素进行 pad
-                for i, loss_list in enumerate(summary_dict[joint_type][manip_type][scale]["loss_lists"]):
-                    # NOTE 这里需要减去 1
-                    num_manip += (len(loss_list) - 1)
-                    # 进行单位转换
-                    if joint_type == "prismatic":
-                        loss_list = [abs(loss * 100) for loss in loss_list]
-                    else:
-                        loss_list = [abs(np.rad2deg(loss)) for loss in loss_list]
-                    loss_list = loss_list + [loss_list[-1]] * int(max_tries_plus_one - len(loss_list))
-                    summary_dict[joint_type][manip_type][scale]["loss_lists"][i] = loss_list
-                
-                # num_exp * close_loop_times    
-                loss_array = np.array(summary_dict[joint_type][manip_type][scale]["loss_lists"]) 
-                
-                if loss_array.ndim == 1:
-                    # 处理 num_exp == 1 的情况
-                    loss_array = loss_array.reshape(1, -1)
-                
-                if joint_type == "prismatic":
-                    scale_str = str(scale * 100)
-                else:
-                    scale_str = scale
-                    
-                print(f"\n{manip_type} {scale_str} {unit} ({joint_type}):")
-                num_success = summary_dict[joint_type][manip_type][scale]["success"]
-                num_failed_recon = summary_dict[joint_type][manip_type][scale]["failed_recon"]
-                num_failed_manip = summary_dict[joint_type][manip_type][scale]["failed_manip"]
-                
-                print(f"\tSuccess/Failed-recon/Failed-manip:")
-                print_array(prefix="\t\t", array=[num_success, num_failed_recon, num_failed_manip])
-                      
-                # print(f"\tSuccess rate: {num_success}/{num_success + num_failed_recon + num_failed_manip}, {num_success / (num_success + num_failed_recon + num_failed_manip) * 100}")
-                # print(f"\tfailed-recon: {num_failed_recon}/{num_success + num_failed_recon + num_failed_manip}, {num_failed_recon / (num_success + num_failed_recon + num_failed_manip) * 100}")
-                # print(f"\tfailed-manip: {num_failed_manip}/{num_success + num_failed_recon + num_failed_manip}, {num_failed_manip / (num_success + num_failed_recon + num_failed_manip) * 100}")
-                print(f"\tAvg Manips: {(num_manip / loss_array.shape[0]):.2f}")
-                print(f"\tFinal Error: {loss_array[:, -1].mean():.2f} {unit}")
-                
-                closed_loop_error_string = "->".join([f"[{i}] {loss_array[:, i].mean():.2f} {unit}" for i in range(int(max_tries_plus_one))])
-                print(f"\tClosed-loop Error: {closed_loop_error_string}")
-                # for i in range(int(max_tries_plus_one)):
-                #     print(f"\tclose loop {i}: {loss_array[:, i].mean():.2f} {unit}")
-                       
+    for i_j, base_dict in summary_dict.items():
+        num_manip = 0
+        # 将所有 loss_list 补全到 max_tries_plus_one 长度, 用原本数组的最后一个元素进行 pad
+        for i, loss_list in enumerate(base_dict["loss_lists"]):
+            # NOTE 这里需要减去 1
+            num_manip += (len(loss_list) - 1)
+            # 进行单位转换
+            if joint_type == "prismatic":
+                loss_list = [abs(loss * 100) for loss in loss_list]
+            else:
+                loss_list = [abs(np.rad2deg(loss)) for loss in loss_list]
+            loss_list = loss_list + [loss_list[-1]] * int(max_tries_plus_one - len(loss_list))
+            base_dict["loss_lists"][i] = loss_list
+        
+        # num_exp * close_loop_times    
+        loss_array = np.array(base_dict["loss_lists"]) 
+        
+        if loss_array.ndim == 1:
+            # 处理 num_exp == 1 的情况
+            loss_array = loss_array.reshape(1, -1)
+        
+        # num_success = base_dict["success"]
+        # num_failed_recon = base_dict["failed_recon"]
+        # num_failed_manip = base_dict["failed_manip"]
+        
+        # print(f"\tSuccess/Failed-recon/Failed-manip:")
+        # print_array(prefix="\t\t", array=[num_success, num_failed_recon, num_failed_manip])
+        
+        if loss_array.shape[-1] == 0:
+            base_dict["avg_manips"] = None
+            base_dict["final_error"] = None
+            base_dict["error_traj"] = None
+            
+            base_dict["loss_lists"] = []
+            continue
+        
+        base_dict["avg_manips"] = num_manip / loss_array.shape[0]
+        # print(f"\tAvg Manips: {(num_manip / loss_array.shape[0]):.2f}")
+        base_dict["final_error"] = loss_array[:, -1].mean()
+        # print(f"\tFinal Error: {loss_array[:, -1].mean():.2f} {unit}")
+        
+        base_dict["error_traj"] = [loss_array[:, i].mean() for i in range(int(max_tries_plus_one))]
+        # closed_loop_error_string = "->".join([f"[{i}] {loss_array[:, i].mean():.2f} {unit}" for i in range(int(max_tries_plus_one))])
+        # print(f"\tClosed-loop Error: {closed_loop_error_string}")
+        
+        # base_dict["print_str"] = f'{base_dict["success"]}/{base_dict["failed_recon"]}/{base_dict["failed_manip"]/{base_dict["avg_manips"]}/{base_dict["final_error"]}/{base_dict["error_traj"]}}'
+        base_dict["loss_lists"] = []
+
+def print_matrix_string(matrix):
+    """
+    以网格形式打印二维矩阵中的字符串
+    :param matrix: 二维列表，每个元素是字符串
+    """
+    # 获取矩阵的行数和列数
+    m = len(matrix)
+    n = len(matrix[0]) if m > 0 else 0
+    
+    # 打印每行
+    for i in range(m):
+        # 打印每列
+        for j in range(n):
+            # 打印元素，使用制表符分隔
+            print(f"{matrix[i][j]}", end="\t")
+        # 每行结束后换行
+        print()
+        
+                           
 def summary_manip(saved_result, task_yaml, verbose=False):
     print("\n************** Manipulation Stage Analysis **************")
-    # 用一个 dict 来记录
-    success_dict = {
-        "prismatic": {
-            # "open": {"scale": scale_dict}
-            # 这里只存储 success 对应的 loss_list
-            # scale_dict: {"loss_lists": [], success: 10, failed: 20}
-            "open": {}, 
-            "close": {},
-        },
-        "revolute": {
-            "open": {}, 
-            "close": {},
-        },
+    # 针对每个 grid 存储一系列信息
+    keys = saved_result[0]["manip"].keys()
+    prismatic_grid_dicts = {}
+    revolute_grid_dicts = {}
+    
+    base_dict = {
+        # loss_lists 存储 list of loss_traj
+        "loss_lists": [],
+        "success": 0,
+        # 这里将 failed 的分为 重建有问题 和 manip 两类
+        "failed_manip": 0,
+        "failed_recon": 0
     }
+    
+    for key in list(keys):
+        # 对于每个 grid, 维护一个 success_dict
+        prismatic_grid_dicts[key] = copy.deepcopy(base_dict)
+        revolute_grid_dicts[key] = copy.deepcopy(base_dict)
+    
     # 统计一下整体的成功率
-    num_total_exp = len(saved_result.keys())
+    num_total_exp = len(saved_result.keys()) * len(saved_result[0]["manip"].keys())
     num_success_manip = 0
     relative_error_list = []
     
@@ -662,48 +709,52 @@ def summary_manip(saved_result, task_yaml, verbose=False):
         
         explore_result = v["explore"]
         recon_result = v["recon"]
-        manip_result = v["manip"]
+        joint_type = explore_result["joint_type"]
+        
+        grid_dicts = prismatic_grid_dicts if joint_type == "prismatic" else revolute_grid_dicts
         
         # 确定任务类型
-        yaml_path = os.path.join(log_folder, str(task_id), f"{task_id}.yaml")
-        with open(yaml_path, "r") as f:
-            yaml_dict = yaml.safe_load(f)
-        
-        joint_type = explore_result["joint_type"]
-        manip_type = yaml_dict["manip_env_cfg"]["manip_type"]
-        manip_distance = yaml_dict["manip_env_cfg"]["manip_distance"]
-        
-        if manip_distance not in success_dict[joint_type][manip_type]:
-            success_dict[joint_type][manip_type][manip_distance] = {
-                "loss_lists": [],
-                "success": 0,
-                # 这里将 failed 的分为 重建有问题 和 manip 两类
-                "failed_manip": 0,
-                "failed_recon": 0
-            }
-        
-        # 判断 manip 是否成功
-        manip_success, loss_list, relative_error = is_manip_success(joint_type, manip_result, manip_distance)
-        if manip_success:
-            num_success_manip += 1
-            # 在这里再统计一下平均相对误差
-            relative_error_list.append(relative_error)
-            
-            success_dict[joint_type][manip_type][manip_distance]["success"] += 1
-            success_dict[joint_type][manip_type][manip_distance]["loss_lists"].append(loss_list)
-        else:
-            # 判断是哪种原因导致的 manip 失败
-            if is_reconstruct_valid(explore_result, recon_result)[0]:
-                success_dict[joint_type][manip_type][manip_distance]["failed_manip"] += 1
+        # yaml_path = os.path.join(log_folder, str(task_id), f"{task_id}.yaml")
+        # with open(yaml_path, "r") as f:
+        #     yaml_dict = yaml.safe_load(f)
+
+        for key, manip_result in v["manip"].items():
+            # 判断 manip 是否成功
+            manip_success, loss_list, relative_error = is_manip_success(manip_result)
+            if manip_success:
+                num_success_manip += 1
+                # 在这里再统计一下平均相对误差
+                relative_error_list.append(relative_error)
+                
+                grid_dicts[key]["success"] += 1
+                grid_dicts[key]["loss_lists"].append(loss_list)
+
             else:
-                success_dict[joint_type][manip_type][manip_distance]["failed_recon"] += 1
+                # 判断是哪种原因导致的 manip 失败
+                if is_reconstruct_valid(explore_result, recon_result)[0]:
+                    grid_dicts[key]["failed_manip"] += 1
+                else:
+                    grid_dicts[key]["failed_recon"] += 1
             
-    if verbose:
-        print_manip_summary_dict(success_dict)
-    
     print(f"Success Rate: {num_success_manip}/{num_total_exp} = {(num_success_manip / num_total_exp * 100):.2f}%")
     print(f"Relative Error (mean): {(sum(relative_error_list) / len(relative_error_list) * 100):.2f}%")
-    process_manip_summary_dict(success_dict, task_yaml)
+    
+    # 对于 prismatic_grid_dicts 和 revolute_grid_dicts 进行处理
+    process_manip_grid_dict(prismatic_grid_dicts, task_yaml, joint_type="prismatic")
+    process_manip_grid_dict(revolute_grid_dicts, task_yaml, joint_type="revolute")
+    
+    # TODO print dict
+    print("Revolute manip summary:")
+    for k, v in revolute_grid_dicts.items():
+        print(k)
+        print(v)
+    # print(revolute_grid_dicts)
+    
+    print("Prismatic manip summary:")
+    for k, v in prismatic_grid_dicts.items():
+        print(k)
+        print(v)
+    # print(prismatic_grid_dicts)
     print("****************************************************\n")
     
     
@@ -712,7 +763,8 @@ if __name__ == "__main__":
     # run_name = "6_6"
     # run_name = "6_8"
     # run_name = "6_10"
-    run_name = "6_11"
+    # run_name = "6_11"
+    run_name = "6_12"
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:
@@ -748,5 +800,5 @@ if __name__ == "__main__":
         sys.stdout = f
         summary_explore(saved_result, task_yaml)
         summary_recon(saved_result)
-        # summary_manip(saved_result, task_yaml)
+        summary_manip(saved_result, task_yaml)
         
