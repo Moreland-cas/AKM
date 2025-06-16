@@ -764,7 +764,8 @@ if __name__ == "__main__":
     # run_name = "6_8"
     # run_name = "6_10"
     # run_name = "6_11"
-    run_name = "6_12"
+    # run_name = "6_12"
+    run_name = "6_13"
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:

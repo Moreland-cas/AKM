@@ -1,0 +1,130 @@
+
+************** Explore Stage Analysis **************
+Success Rate (actual): 102 / 116 = 87.93%
+Success Rate (pred): 106 / 116 = 91.38%
+Average tries (pred): 473 / 106 = 4.46
+
+Prismatic Joints (n=60):
+  Actual Success: 85.00%
+  Predicted Success: 86.67%
+
+Revolute Joints (n=56):
+  Actual Success: 91.07%
+  Predicted Success: 96.43%
+
+Detailed Results (All Joints):
+tries=1 | success rate (actual): 24.14% | success rate (pred): 24.14%
+tries=2 | success rate (actual): 43.97% | success rate (pred): 45.69%
+tries=3 | success rate (actual): 52.59% | success rate (pred): 54.31%
+tries=4 | success rate (actual): 61.21% | success rate (pred): 62.93%
+tries=5 | success rate (actual): 64.66% | success rate (pred): 67.24%
+tries=6 | success rate (actual): 68.97% | success rate (pred): 71.55%
+tries=7 | success rate (actual): 71.55% | success rate (pred): 74.14%
+tries=8 | success rate (actual): 75.86% | success rate (pred): 78.45%
+tries=9 | success rate (actual): 76.72% | success rate (pred): 79.31%
+tries=10 | success rate (actual): 81.03% | success rate (pred): 84.48%
+tries=11 | success rate (actual): 81.03% | success rate (pred): 84.48%
+tries=12 | success rate (actual): 81.03% | success rate (pred): 84.48%
+tries=13 | success rate (actual): 81.90% | success rate (pred): 85.34%
+tries=14 | success rate (actual): 82.76% | success rate (pred): 86.21%
+tries=15 | success rate (actual): 83.62% | success rate (pred): 87.07%
+tries=16 | success rate (actual): 83.62% | success rate (pred): 87.07%
+tries=17 | success rate (actual): 85.34% | success rate (pred): 88.79%
+tries=18 | success rate (actual): 86.21% | success rate (pred): 89.66%
+tries=19 | success rate (actual): 86.21% | success rate (pred): 89.66%
+tries=20 | success rate (actual): 86.21% | success rate (pred): 89.66%
+tries=21 | success rate (actual): 86.21% | success rate (pred): 89.66%
+tries=22 | success rate (actual): 87.07% | success rate (pred): 90.52%
+tries=23 | success rate (actual): 87.07% | success rate (pred): 90.52%
+tries=24 | success rate (actual): 87.93% | success rate (pred): 91.38%
+tries=25 | success rate (actual): 87.93% | success rate (pred): 91.38%
+tries=26 | success rate (actual): 87.93% | success rate (pred): 91.38%
+tries=27 | success rate (actual): 87.93% | success rate (pred): 91.38%
+tries=28 | success rate (actual): 87.93% | success rate (pred): 91.38%
+tries=29 | success rate (actual): 87.93% | success rate (pred): 91.38%
+tries=30 | success rate (actual): 87.93% | success rate (pred): 91.38%
+
+Bin Success Rates:
+prismatic_bin_0: 85.00% (60 samples)
+revolute_bin_0: 91.07% (56 samples)
+****************************************************
+
+
+************** Reconstruct Stage Analysis **************
+Success Rate: 101 / 116 = 87.07%
+note: Reconstruction loss under PIVOT_THRESH: 0.03 m and ANGLE_THRESH: 5 degree is considered valid.
+
+Detailed Results: 
+PRISMATIC: 
+	60 in total
+Success/invalid_explore/false_positive/wrong_type/bad_optimize: 
+	80%/17%/2%/2%/0% (48/10/1/1/0)
+Angle loss: 
+	1.76 degree -> 0.01 degree (coarse -> fine)
+
+REVOLUTE: 
+	56 in total
+Success/invalid_explore/false_positive/wrong_type/bad_optimize: 
+	95%/4%/0%/0%/2% (53/2/0/0/1)
+Angle loss: 
+	1.97 degree -> 0.01 degree (coarse -> fine)
+Pivot loss: 
+	0.98 cm -> 0.31 cm (coarse -> fine)
+****************************************************
+
+
+************** Manipulation Stage Analysis **************
+Success Rate: 1047/1392 = 75.22%
+Relative Error (mean): 5.07%
+Revolute manip summary:
+0_1
+{'loss_lists': [], 'success': 42, 'failed_manip': 12, 'failed_recon': 2, 'avg_manips': 1.1666666666666667, 'final_error': 0.550051458106826, 'error_traj': [10.000000008935944, 1.407258672688411, 1.1301996201224316, 0.8251652143272074, 0.550051458106826, 0.550051458106826]}
+0_2
+{'loss_lists': [], 'success': 41, 'failed_manip': 13, 'failed_recon': 2, 'avg_manips': 1.1951219512195121, 'final_error': 0.8653991075761334, 'error_traj': [20.000000000412303, 2.9019030141010624, 1.7157735672424508, 1.2522580235460201, 1.3860412095277768, 0.8653991075761334]}
+0_3
+{'loss_lists': [], 'success': 42, 'failed_manip': 12, 'failed_recon': 2, 'avg_manips': 1.6904761904761905, 'final_error': 1.4463689665710004, 'error_traj': [30.00000001306332, 9.689522758349908, 3.292867850800473, 2.6714559917082963, 1.5387029601775937, 1.4463689665710004]}
+1_0
+{'loss_lists': [], 'success': 47, 'failed_manip': 7, 'failed_recon': 2, 'avg_manips': 1.0425531914893618, 'final_error': 0.680377819170144, 'error_traj': [10.000000046918336, 0.8082873143627314, 0.680377819170144, 0.680377819170144, 0.680377819170144, 0.680377819170144]}
+1_2
+{'loss_lists': [], 'success': 43, 'failed_manip': 11, 'failed_recon': 2, 'avg_manips': 1.3255813953488371, 'final_error': 0.7647973253656295, 'error_traj': [9.999999959545578, 3.5831763773611893, 1.2707998577741721, 0.8897703687902108, 0.7378847507011872, 0.7647973253656295]}
+1_3
+{'loss_lists': [], 'success': 42, 'failed_manip': 12, 'failed_recon': 2, 'avg_manips': 1.5238095238095237, 'final_error': 1.1843685918947697, 'error_traj': [20.00000002873328, 4.5936945315691835, 1.7216412764403994, 1.2516184718391636, 1.1645851706661188, 1.1843685918947697]}
+2_0
+{'loss_lists': [], 'success': 49, 'failed_manip': 5, 'failed_recon': 2, 'avg_manips': 1.2857142857142858, 'final_error': 1.0072506016934955, 'error_traj': [20.00000011318112, 1.5548804579901323, 1.0688020105517553, 0.9892530027955154, 1.0245729712059461, 1.0072506016934955]}
+2_1
+{'loss_lists': [], 'success': 45, 'failed_manip': 9, 'failed_recon': 2, 'avg_manips': 1.0444444444444445, 'final_error': 0.9216916354744872, 'error_traj': [9.99999992365044, 1.2092529667091694, 0.9216916354744872, 0.9216916354744872, 0.9216916354744872, 0.9216916354744872]}
+2_3
+{'loss_lists': [], 'success': 40, 'failed_manip': 13, 'failed_recon': 3, 'avg_manips': 1.6, 'final_error': 0.860574566797984, 'error_traj': [9.999999930996697, 4.21395938163187, 2.290054722713046, 1.3600622824123902, 1.668363348927771, 0.860574566797984]}
+3_0
+{'loss_lists': [], 'success': 46, 'failed_manip': 8, 'failed_recon': 2, 'avg_manips': 1.4565217391304348, 'final_error': 1.4322477081123375, 'error_traj': [30.000000013790363, 5.569875416206356, 2.7314978245164565, 1.5234919341464768, 1.523491978112655, 1.4322477081123375]}
+3_1
+{'loss_lists': [], 'success': 45, 'failed_manip': 9, 'failed_recon': 2, 'avg_manips': 1.2, 'final_error': 1.1867590571044189, 'error_traj': [19.99999983712477, 4.060124786712835, 1.1867590571044189, 1.1867590571044189, 1.1867590571044189, 1.1867590571044189]}
+3_2
+{'loss_lists': [], 'success': 42, 'failed_manip': 12, 'failed_recon': 2, 'avg_manips': 1.3095238095238095, 'final_error': 0.9865709891137746, 'error_traj': [9.999999924992549, 2.2384679281399147, 1.6995666731716177, 1.2307051239061428, 1.383284028624963, 0.9865709891137746]}
+Prismatic manip summary:
+0_1
+{'loss_lists': [], 'success': 48, 'failed_manip': 1, 'failed_recon': 11, 'avg_manips': 1.1875, 'final_error': 0.3917004938215582, 'error_traj': [9.9999999999952, 1.395180652115377, 0.41681398219282695, 0.4169060589513706, 0.40280782199318477, 0.3917004938215582]}
+0_2
+{'loss_lists': [], 'success': 46, 'failed_manip': 3, 'failed_recon': 11, 'avg_manips': 1.4565217391304348, 'final_error': 0.6370794942812991, 'error_traj': [20.000000007430405, 4.169625655278832, 1.0294914858731252, 1.4092109576750074, 0.77872760023435, 0.6370794942812991]}
+0_3
+{'loss_lists': [], 'success': 46, 'failed_manip': 3, 'failed_recon': 11, 'avg_manips': 1.673913043478261, 'final_error': 1.1855922149090998, 'error_traj': [29.999999987748225, 6.876728379564832, 2.8244687985529913, 1.1703073488145106, 1.1855775728985356, 1.1855922149090998]}
+1_0
+{'loss_lists': [], 'success': 46, 'failed_manip': 2, 'failed_recon': 12, 'avg_manips': 1.1956521739130435, 'final_error': 0.3227305296449869, 'error_traj': [9.999999970031327, 1.830672583704021, 0.3135693807288298, 0.3227305296449869, 0.3227305296449869, 0.3227305296449869]}
+1_2
+{'loss_lists': [], 'success': 44, 'failed_manip': 4, 'failed_recon': 12, 'avg_manips': 1.1590909090909092, 'final_error': 0.4948707037431925, 'error_traj': [9.999999908203783, 2.0223515314652456, 1.1749349245631697, 0.629954843773013, 0.4948707037431925, 0.4948707037431925]}
+1_3
+{'loss_lists': [], 'success': 43, 'failed_manip': 5, 'failed_recon': 12, 'avg_manips': 1.4186046511627908, 'final_error': 0.4423786490999883, 'error_traj': [20.00000001870223, 3.8333107122032737, 0.8928084199355986, 0.9262613882003335, 0.4423786490999883, 0.4423786490999883]}
+2_0
+{'loss_lists': [], 'success': 46, 'failed_manip': 2, 'failed_recon': 12, 'avg_manips': 1.2608695652173914, 'final_error': 0.4190777280406232, 'error_traj': [19.999999921476334, 1.035444420635669, 0.8486416281870263, 0.41907836050311525, 0.41907823645285724, 0.4190777280406232]}
+2_1
+{'loss_lists': [], 'success': 44, 'failed_manip': 4, 'failed_recon': 12, 'avg_manips': 1.2045454545454546, 'final_error': 0.4191656255427263, 'error_traj': [10.000000133693915, 0.909513115002159, 0.6521796486360706, 0.5482994948439154, 0.5483286875733452, 0.4191656255427263]}
+2_3
+{'loss_lists': [], 'success': 43, 'failed_manip': 5, 'failed_recon': 12, 'avg_manips': 1.5348837209302326, 'final_error': 0.579265859070086, 'error_traj': [10.000000153735357, 4.238650155883574, 1.9250385507747296, 0.7963955996742205, 0.5790315989545735, 0.579265859070086]}
+3_0
+{'loss_lists': [], 'success': 40, 'failed_manip': 8, 'failed_recon': 12, 'avg_manips': 1.3, 'final_error': 0.9789014713432167, 'error_traj': [30.000000144611967, 2.552683745083055, 0.9108205967176233, 0.9665080777894233, 0.9859684369207813, 0.9789014713432167]}
+3_1
+{'loss_lists': [], 'success': 39, 'failed_manip': 9, 'failed_recon': 12, 'avg_manips': 1.3846153846153846, 'final_error': 0.660690679358631, 'error_traj': [19.999999993990922, 2.7868149315188977, 1.6082974066716174, 1.099390951845391, 1.099390951845391, 0.660690679358631]}
+3_2
+{'loss_lists': [], 'success': 38, 'failed_manip': 10, 'failed_recon': 12, 'avg_manips': 1.2894736842105263, 'final_error': 0.33654905565502197, 'error_traj': [9.9999999002281, 2.917149807279111, 1.2216942162783555, 0.3690978486180338, 0.3363977696553223, 0.33654905565502197]}
+****************************************************
+
