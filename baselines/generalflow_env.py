@@ -6,10 +6,17 @@ import numpy as np
 import open3d as o3d
 import scipy.ndimage
 import matplotlib.pyplot as plt 
+import json
+import logging
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # from transformers import CLIPTokenizer, CLIPModel
 # from openpoints.dataset.data_util import crop_pc
 # from inference import load_model
+
+import sys
+sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/GeneralFlow")
 
 from openpoints.transforms import build_transforms_from_cfg
 from util import save_pickle, load_pickle, load_easyconfig_from_yaml
@@ -22,8 +29,17 @@ from PIL import Image
 from embodied_analogy.utility.constants import *
 from embodied_analogy.representation.basic_structure import Frame
 from embodied_analogy.environment.manipulate_env import ManipulateEnv
-from embodied_analogy.utility.estimation.coarse_joint_est import coarse_t_from_tracks_3d, coarse_R_from_tracks_3d, coarse_estimation
-from embodied_analogy.utility.utils import visualize_pc, set_random_seed
+from embodied_analogy.utility.estimation.coarse_joint_est import (
+    coarse_t_from_tracks_3d,
+    coarse_R_from_tracks_3d,
+    coarse_estimation,
+    coarse_R_from_tracks_3d_augmented
+)
+from embodied_analogy.utility.utils import (
+    visualize_pc,
+    set_random_seed,
+    numpy_to_json
+)
 
 set_random_seed(SEED)
 
@@ -514,6 +530,7 @@ def get_generalFlow(
     )
 
     # 获取 contact_3d 附近的点, (Q, 3)
+    # TODO 在这里改为从 obj_mask 里均匀采样
     kps_3d, weights = exec_model.get_kps_3d(
         pcd=pcd,
         gripper_3d_pos=gripper_3d_pos,
@@ -570,6 +587,10 @@ def test_get_generalFlow():
 
 
 class GeneralFlow_ManipEnv(ManipulateEnv):
+    """
+    GeneralFlow baseline 的策略是在 joint_state = 0 的情况下进行一次的 contact transfer, 并进行 joint param 的估计
+    之后操作时通过一次 contact transfer 得到抓取位姿, 然后按照 joint state = 0 时估计的 model 进行操作
+    """
     def __init__(self, cfg):
         """
         这里的 cfg 来自于 embodied_analogy 测试的那些 cfg
@@ -578,39 +599,54 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         ManipulateEnv.__init__(self, cfg)
         
         # 清空来自 embodied analogy 的 obj_repr 中的 joint_dict
+        self.obj_repr.Tw2c = self.camera_extrinsic
         self.obj_repr.coarse_joint_dict = None
         self.obj_repr.fine_joint_dict = None
     
-    def contact_2d_general_flow(self, visualize=False):
+    def get_contact_2d(self, frame, manip_type, visualize=False):
+        """
+        获取当前帧上的 contact 2d
+        manip_type: "open" or "close"
+        """
         from embodied_analogy.utility.proposal.ram_proposal import get_ram_affordance_2d
         
-        self.base_step()
-        self.initial_frame = self.capture_frame()
+        # frame: Frame
+        # self.base_step()
+        # self.initial_frame = self.capture_frame()
         
         # 只在第一次进行 contact transfer, 之后直接进行复用
-        print("Start transfering 2d contact affordance map...")
-        self.affordance_map_2d = get_ram_affordance_2d(
-            query_rgb=self.initial_frame.rgb,
-            instruction=self.cfg["instruction"],
+        self.logger.log(logging.INFO, "Start transfering 2d contact pount to current frame...")
+        
+        # self.task_cfg["instruction"]
+        modified_instruction = manip_type + " the " + self.obj_env_cfg["obj_description"]
+        affordance_map_2d = get_ram_affordance_2d(
+            query_rgb=frame.rgb,
+            instruction=modified_instruction,  
             obj_description=self.obj_description,
-            fully_zeroshot=self.cfg["fully_zeroshot"],
+            fully_zeroshot=self.explore_env_cfg["fully_zeroshot"],
             visualize=visualize,
             logger=self.logger
         )
-        obj_mask = self.affordance_map_2d.get_obj_mask(visualize=False)
-        contact_uv = self.affordance_map_2d.sample_highest(visualize=visualize)
+        obj_mask = affordance_map_2d.get_obj_mask(visualize=False)
+        contact_uv = affordance_map_2d.sample_highest(visualize=visualize)
         
-        self.initial_frame.obj_mask = obj_mask
-        self.initial_frame.contact2d = contact_uv
+        frame.obj_mask = obj_mask
+        frame.contact2d = contact_uv
         
-    def reconstruct_general_flow(self, visualize=False, gt_joint_type=False):
+    def recon_stage_general_flow(self, visualize=False, gt_joint_type=False):
         """
-        从初始 frame + 初始 contact point 得到的 flow 预测物体模型
+        基于当前帧运行 generalFlow, 并得到 joint model 的估计
         """
+        self.base_step()
+        frame = self.capture_frame()
+        
+        if frame.contact2d is None or frame.obj_mask is None:
+            self.get_contact_2d(frame=frame, manip_type="open", visualize=visualize)
+            
         # (M, T, 3) in camera frame
         general_flow = get_generalFlow(
-            frame=self.initial_frame, 
-            # TODO 这里设置为固定的 instruction
+            frame=frame, 
+            # 由于 coarse estimation 本身就是假设轨迹是 open 的, 所以这里设置为固定的 open instruction
             instruction="open_Storage_Furniture", 
             visualize=visualize
         )
@@ -621,66 +657,136 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         if gt_joint_type:
             joint_type = self.obj_repr.gt_joint_dict["joint_type"]
             if joint_type == "revolute":
-                joint_dict, _ = coarse_R_from_tracks_3d(tracks_3d=general_flow, visualize=False, logger=self.logger)
+                joint_dict, _ = coarse_R_from_tracks_3d_augmented(
+                    tracks_3d=general_flow,
+                    visualize=False,
+                    logger=self.logger,
+                    num_R_augmented=self.recon_env_cfg["num_R_augmented"]
+                )
                 joint_dict["joint_type"] = "revolute"
             elif joint_type == "prismatic":
                 joint_dict, _ = coarse_t_from_tracks_3d(tracks_3d=general_flow, visualize=False, logger=self.logger)
                 joint_dict["joint_type"] = "prismatic"
         else:
-            joint_dict = coarse_estimation(tracks_3d=general_flow, visualize=False, logger=self.logger)
+            joint_dict = coarse_estimation(
+                tracks_3d=general_flow,
+                visualize=False,
+                logger=self.logger,
+                num_R_augmented=self.recon_env_cfg["num_R_augmented"]
+            )
         
         # 将 joint_dict 转换到世界坐标系下
         self.obj_repr.coarse_joint_dict = joint_dict
         self.obj_repr.fine_joint_dict = joint_dict
+        
+        result = self.obj_repr.compute_joint_error(skip_states=True)
+        self.logger.log(logging.INFO, "Reconstruction Result:")
+        for k, v in result.items():
+            self.logger.log(logging.INFO, f"{k}, {v}")
+        return result
+    
+    def recon_main(self):
+        # super().main()
+        self.explore_result = {
+            "num_tries": 1,
+            "has_valid_explore": True,
+            "joint_type": self.obj_env_cfg["joint_type"],
+            "joint_state_start": 0,
+            # 设置为 1, 方便 manipulate 认定 explore 一定成功
+            "joint_state_end": 1 
+        }
+        
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "explore_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                
+        try:
+        # if True:
+            self.recon_result = {}
             
-    def manip_general_flow(self, visualize=False):
+            if self.explore_result["has_valid_explore"]:
+                self.logger.log(logging.INFO, f"Valid explore detected, thus start reconstruction...") 
+                self.recon_result = self.recon_stage_general_flow()
+                self.recon_result["has_valid_recon"] = True
+            else:
+                self.logger.log(logging.INFO, f"No Valid explore, thus skip reconstruction...") 
+                self.recon_result["has_valid_recon"] = False
+                self.recon_result["exception"] = "No valid explore."
+            
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}", exc_info=True)
+            self.recon_result["has_valid_recon"] = False
+            self.recon_result["exception"] = str(e)
+        
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "recon_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                
+    def manip_general_flow(self, manip_type, visualize=False):
         """
-        根据 joint_dict 和 initial_frame 进行 manipulation
+        根据当前帧的 contact 2d 获得 grasp pose, 并按照 articulation mdoel 进行操作
         """
-        self.initial_frame.detect_grasp(
-            use_anygrasp=self.cfg["use_anygrasp"],
+        self.base_step()
+        frame: Frame = self.capture_frame()
+        
+        if frame.contact2d is None or frame.obj_mask is None:
+            self.get_contact_2d(frame=frame, manip_type=manip_type, visualize=visualize)
+            
+        # 确保 frame 的 contact2d 和 obj_mask 已经准备好
+        frame.detect_grasp(
+            use_anygrasp=self.cfg["algo_cfg"]["use_anygrasp"],
             world_frame=True,
             visualize=visualize,
             asset_path=ASSET_PATH,
             logger=self.logger
         )
         # 
-        pc_collision_w, pc_colors = self.initial_frame.get_env_pc(
+        pc_collision_w, pc_colors = frame.get_env_pc(
             use_height_filter=False,
             world_frame=True
         )
         self.planner.update_point_cloud(pc_collision_w)
             
-        if self.initial_frame.grasp_group is None or len(self.initial_frame.grasp_group) == 0: 
-            return False
+        if frame.grasp_group is None or len(frame.grasp_group) == 0: 
+            raise Exception("No grasp_group found for current frame in manipulation stage.")
         
-        for grasp_w in self.initial_frame.grasp_group:
+        for grasp_w in frame.grasp_group:
             # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
             # 从 general_flow_c 中找到 dir_out_c
             first_frame_flow_c = self.general_flow_c[1, :, :] - self.general_flow_c[0, :, :] # M, 3
             # 由于已经运行了 detect_grasp, 所以 contact_3d 已经被设置过了
             nearest_flow = np.argmin(
-                np.linalg.norm(self.initial_frame.contact3d - self.general_flow_c[0], axis=-1) # M
+                np.linalg.norm(frame.contact3d - self.general_flow_c[0], axis=-1) # M
             ) # M
             # 由于我们产生 flow 的 prompt 固定是 open, 所以现在的 flow 天然的就是 out 
             dir_out_c = first_frame_flow_c[nearest_flow]
             dir_out_c = dir_out_c / max(np.linalg.norm(dir_out_c), 1e-8)
-            dir_out_w = np.linalg.inv(self.initial_frame.Tw2c)[:3, :3] @ dir_out_c
+            dir_out_w = np.linalg.inv(frame.Tw2c)[:3, :3] @ dir_out_c
             
             grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
             Tph2w = self.anyGrasp2ph(grasp=grasp)        
-            Tph2w_pre = self.get_translated_ph(Tph2w, -self.cfg["reserved_distance"])
+            Tph2w_pre = self.get_translated_ph(Tph2w, -self.explore_env_cfg["reserved_distance"])
             result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             
             if result_pre is not None:
                 if visualize:
-                    obj_pc, pc_colors = self.initial_frame.get_obj_pc(
+                    obj_pc, pc_colors = frame.get_obj_pc(
                         use_robot_mask=True,
                         use_height_filter=True,
                         world_frame=True
                     )
-                    Tc2w = np.linalg.inv(self.initial_frame.Tw2c)
-                    contact3d_w = Tc2w[:3, :3] @ self.initial_frame.contact3d + Tc2w[:3, -1]
+                    Tc2w = np.linalg.inv(frame.Tw2c)
+                    contact3d_w = Tc2w[:3, :3] @ frame.contact3d + Tc2w[:3, -1]
                     visualize_pc(
                         points=obj_pc, 
                         colors=pc_colors / 255,
@@ -692,13 +798,13 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         
         # 没有成功的 planning 结果, 直接返回 False
         if result_pre is None:
-            return False
+            raise Exception("No valid planning result for detected grasp_group during manipulation stage...")
         
         self.follow_path(result_pre)
         self.open_gripper()
         self.clear_planner_pc()
         self.move_forward(
-            moving_distance=self.cfg["reserved_distance"],
+            moving_distance=self.explore_env_cfg["reserved_distance"],
             drop_large_move=False
         )
         self.close_gripper()
@@ -712,70 +818,65 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             drop_large_move=False
         )
         
-    def main_general_flow(self, visualize=False, gt_joint_type=False):
-        self.contact_2d_general_flow(visualize=visualize)
-        self.reconstruct_general_flow(visualize=False, gt_joint_type=gt_joint_type)
-        self.manip_general_flow(visualize=visualize)
+        result_dict = {
+            "1": self.evaluate()
+        }
+        self.logger.log(logging.INFO, result_dict)
+        return result_dict
+
+    def main(self):
+        # skip exploration and reconstruction
+        # 此时的 joint_state = 0, 在这里进行一个 reconstruct 获取 obj_repr, 并保存 reconstruct dict
+        self.recon_main()
         
-        manip_result = self.evaluate()
-        return manip_result
+        self.manip_result = {}
+        
+        for k, v in self.manip_env_cfg["tasks"].items():
+            manip_start_state = v["manip_start_state"]
+            manip_end_state = v["manip_end_state"]
+            tmp_manip_result = {
+                "manip_start_state": manip_start_state,
+                "manip_end_state": manip_end_state
+            }
+            self.prepare_task_env(
+                manip_start_state=manip_start_state,
+                manip_end_state=manip_end_state
+            )
+            tmp_manip_result.update({0: self.evaluate()})
+            try:
+            # if True:
+                if self.recon_result["has_valid_recon"]:
+                    self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
+                    manip_type = "open" if manip_end_state > manip_start_state else "close"
+                    tmp_manip_result.update(self.manip_general_flow(manip_type=manip_type))
+                
+            except Exception as e:
+                self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
+                # self.manip_result["has_valid_manip"] = False
+                tmp_manip_result["exception"] = str(e)
+                # tmp_manip_result.update({0: self.evaluate()})
+
+            self.manip_result.update({
+                k: tmp_manip_result
+            })
+            
+        if self.exp_cfg["save_result"]:
+            save_json_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "manip_result.json"
+            )
+            with open(save_json_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
     
     
 if __name__ == "__main__":
-    cfg = {
-    "joint_type": "revolute",
-    "data_path": "dataset/one_door_cabinet/46859_link_0",
-    "obj_index": "46859",
-    "joint_index": "0",
-    "obj_description": "cabinet",
-    "load_pose": [
-        0.930869460105896,
-        0.0,
-        0.6496312618255615
-    ],
-    "load_quat": [
-        0.9989797472953796,
-        0.008722164668142796,
-        -0.0003868725325446576,
-        -0.04430985078215599
-    ],
-    "load_scale": 1,
-    "active_link_name": "link_0",
-    "active_joint_name": "joint_0",
-    "instruction": "open the cabinet",
-    "init_joint_state": 0.4801562746897319,
-    "obj_folder_path_explore": "/home/zby/Programs/Embodied_Analogy/assets/logs/explore_512/46859_link_0",
-    "phy_timestep": 0.004,
-    "planner_timestep": 0.01,
-    "use_sapien2": True,
-    "fully_zeroshot": False,
-    "record_fps": 30,
-    "pertubation_distance": 0.1,
-    "valid_thresh": 0.5,
-    "max_tries": 10,
-    "update_sigma": 0.05,
-    "reserved_distance": 0.05,
-    "num_initial_pts": 1000,
-    "offscreen": True,
-    "use_anygrasp": True,
-    "obj_folder_path_reconstruct": "/home/zby/Programs/Embodied_Analogy/assets/logs/recon_512/46859_link_0",
-    "num_kframes": 5,
-    "fine_lr": 0.001,
-    "save_memory": True,
-    "scale_dir": "/home/zby/Programs/Embodied_Analogy/assets/logs/manip_512/46859_link_0/close/scale_10",
-    "manipulate_type": "close",
-    "manipulate_distance": 10.0,
-    "reloc_lr": 0.003,
-    "whole_traj_close_loop": True,
-    "max_manip": 5.0,
-    "prismatic_whole_traj_success_thresh": 0.01,
-    "revolute_whole_traj_success_thresh": 5.0,
-    "max_attempts": 5,
-    "max_distance": 35.0,
-    "prismatic_reloc_interval": 0.05,
-    "prismatic_reloc_tolerance": 0.01,
-    "revolute_reloc_interval": 5.0
-}
+    yaml_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/6_11/115/115.yaml"
+    with open(yaml_path, "r") as f:
+        import yaml
+        cfg = yaml.safe_load(f)
+    
+    cfg["exp_cfg"]["exp_folder"] = "/home/zby/Programs/Embodied_Analogy/assets/logs/6_17"
     env = GeneralFlow_ManipEnv(cfg=cfg)
-    print(env.main_general_flow(visualize=False, gt_joint_type=True))
+    env.main()
     

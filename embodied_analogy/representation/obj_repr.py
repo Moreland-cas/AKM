@@ -85,7 +85,7 @@ class Obj_repr(Data):
                 joint_dict["joint_start"] = Tw2c[:3, :3] @ joint_dict["joint_start"] + Tw2c[:3, 3]
         return joint_dict
     
-    def compute_joint_error(self):
+    def compute_joint_error(self, skip_states=False):
         """
         分别计算 coarse_joint_dict, fine_joint_dict 与 gt_joint_dict 的差距, 并打印, 保存
         还要分别计算 frames 和 kframes 的 joint_state_error
@@ -118,7 +118,7 @@ class Obj_repr(Data):
             result["coarse_loss"]["angle_err"] = np.arccos(coarse_dir_dot)
         
         result["fine_loss"]["type_err"] = 1 if fine_w["joint_type"] != gt_w["joint_type"] else 0
-        fine_dir_dot = np.clip(np.dot(fine_w["joint_dir"], fine_w["joint_dir"]), -1, 1)
+        fine_dir_dot = np.clip(np.dot(fine_w["joint_dir"], gt_w["joint_dir"]), -1, 1)
         if np.arccos(fine_dir_dot) > np.pi / 2:
             result["fine_loss"]["angle_err"] = np.pi - np.arccos(fine_dir_dot)
         else:
@@ -137,6 +137,8 @@ class Obj_repr(Data):
                 P2=gt_w["joint_start"],
                 d2=gt_w["joint_dir"]
             )
+        if skip_states:
+            return result
         
         # 新增加一个逻辑, 用于判断 coarse estimation 和 fine estimation
         # 首先得到 coarse joint state, fine joint state 等信息

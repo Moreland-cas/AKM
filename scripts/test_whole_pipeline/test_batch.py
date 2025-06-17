@@ -1,3 +1,4 @@
+import sys
 import json
 import os
 import copy
@@ -5,7 +6,6 @@ import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import yaml
 
-from embodied_analogy.environment.manipulate_env import ManipulateEnv
 from embodied_analogy.utility.constants import *
 
 def update_dict(a, b):
@@ -19,7 +19,7 @@ def update_dict(a, b):
             a[key] = value
             
             
-def test_one(base_yaml_path, specific_yaml_path):
+def test_one(base_yaml_path, specific_yaml_path, method_name):
     
     with open(base_yaml_path, "r") as f:
         base_cfg = yaml.safe_load(f)
@@ -56,18 +56,28 @@ def test_one(base_yaml_path, specific_yaml_path):
             return 
     
     # 否则执行
-    manipulateEnv = ManipulateEnv(cfg=task_cfg)
+    if method_name == "ours":
+        from embodied_analogy.environment.manipulate_env import ManipulateEnv as env_class
+    elif method_name == "gflow":
+        sys.path.append(PROJECT_ROOT)
+        from baselines.generalflow_env import GeneralFlow_ManipEnv as env_class
+    elif method_name == "gpnet":
+        pass
+    # elif method_name == "a3vlm":
+        
+    manipulateEnv = env_class(cfg=task_cfg)
     manipulateEnv.main()
     manipulateEnv.delete()
     
     
-def test_batch(base_yaml_path, yaml_path_list):
+def test_batch(base_yaml_path, yaml_path_list, method_name="ours"):
     failed_list = []
     for specific_yaml_path in yaml_path_list:
         try:
             test_one(
                 base_yaml_path=base_yaml_path,
-                specific_yaml_path=specific_yaml_path
+                specific_yaml_path=specific_yaml_path,
+                method_name=method_name
             )
         except Exception as e:
             print(f"Task {specific_yaml_path} failed: {str(e)}")
@@ -103,10 +113,12 @@ if __name__ == "__main__":
     # parser.add_argument('--cuda_idx', type=str)
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
+    parser.add_argument('--method', type=str, default="gflow") # ours, gpnet
     
-    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_13.yaml")
+    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_17.yaml")
     # parser.add_argument('--base_yaml_path', type=str)
     parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new")
+    
     # parser.add_argument('--task_cfgs_folder', type=str)
     args = parser.parse_args()
     
@@ -123,9 +135,10 @@ if __name__ == "__main__":
     
     failed_list = test_batch(
         base_yaml_path=args.base_yaml_path,
-        yaml_path_list=current_group
+        yaml_path_list=current_group,
         # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/47.yaml",
         #                 "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/567.yaml"]
+        method_name=args.method
     )
     if len(failed_list) == 0:
         print("All done!")
