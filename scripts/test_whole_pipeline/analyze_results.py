@@ -489,7 +489,7 @@ def summary_recon(saved_result):
     
 ############### summary_manipulate ###############
 # 相对误差在 10 % 内的视为成功, 如打开 10 cm, 最终误差在 1 cm 内的
-MANIP_RELATIVE_VALID_THRESH = 0.5
+MANIP_RELATIVE_VALID_THRESH = 0.1
 
 def is_manip_success(manip_result):
     """
@@ -765,7 +765,11 @@ if __name__ == "__main__":
     # run_name = "6_10"
     # run_name = "6_11"
     # run_name = "6_12"
-    run_name = "6_13"
+    # run_name = "6_17"
+    # run_name = "6_18"
+    # run_name = "6_20"
+    # run_name = "6_21"
+    run_name = "6_22"
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:

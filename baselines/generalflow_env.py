@@ -711,7 +711,9 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             
             if self.explore_result["has_valid_explore"]:
                 self.logger.log(logging.INFO, f"Valid explore detected, thus start reconstruction...") 
-                self.recon_result = self.recon_stage_general_flow()
+                self.recon_result = self.recon_stage_general_flow(
+                    gt_joint_type=True
+                )
                 self.recon_result["has_valid_recon"] = True
             else:
                 self.logger.log(logging.INFO, f"No Valid explore, thus skip reconstruction...") 

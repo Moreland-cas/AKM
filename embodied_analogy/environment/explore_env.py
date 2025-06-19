@@ -86,7 +86,8 @@ class ExploreEnv(ObjEnv):
             self.num_tries += 1
             if not actually_tried:
                 self.logger.log(logging.INFO, "The planning path is not valid, update affordance map and try again...")
-                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
+                if self.explore_env_cfg["use_IOC"]:
+                    self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
             
             if self.check_valid(visualize=visualize):
@@ -94,7 +95,8 @@ class ExploreEnv(ObjEnv):
                 break
             else:
                 self.logger.log(logging.INFO, "Check invalid, update affordance map and try again...")
-                self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
+                if self.explore_env_cfg["use_IOC"]:
+                    self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
         # save explore data
         if visualize:
@@ -138,7 +140,12 @@ class ExploreEnv(ObjEnv):
         cur_frame = self.capture_frame()
         
         obj_mask = self.affordance_map_2d.get_obj_mask(visualize=False) # H, W
-        contact_uv = self.affordance_map_2d.sample_highest(visualize=False)
+        
+        if self.explore_env_cfg["use_IOC"]:
+            contact_uv = self.affordance_map_2d.sample_highest(visualize=False)
+        else:
+            # sample_prob 返回的是一个 N, 2 的 list, alpha 越大, 采样越密集
+            contact_uv = self.affordance_map_2d.sample_prob(alpha=30, num_samples=1, return_rgb_frame=True, visualize=False)[0]
         
         cur_frame.obj_mask = obj_mask
         cur_frame.contact2d = contact_uv
@@ -290,15 +297,40 @@ class ExploreEnv(ObjEnv):
         self.obj_repr.frames.track2d_to_3d(filter=True, visualize=visualize)
         self.obj_repr.frames.cluster_track3d(visualize=visualize)
         
-        # 根据 moving tracks 的位移来判断
+        # 根据 moving tracks 的位移来判断, (T, M, 3)
         moving_tracks = self.obj_repr.frames.track3d_seq[:, self.obj_repr.frames.moving_mask, :]
         
+        # 原始的版本 (用首尾帧的)
         mean_delta = np.linalg.norm(moving_tracks[-1] - moving_tracks[0], axis=-1).mean()
         if mean_delta > self.pertubation_distance * self.valid_thresh:
             self.has_valid_explore = True
             return True
         else:
             return False
+        
+        # 更新的版本 ()
+        # def calculate_trajectory_length(trajectory):
+        #     """
+        #     trajectory: T, 3
+        #     """
+        #     # 计算相邻时间步之间的差值
+        #     diff = np.diff(trajectory, axis=0) # T-1, 3
+        #     # 计算每个时间步的欧几里得距离
+        #     distances = np.linalg.norm(diff, axis=1) # T - 1
+        #     # 累加得到轨迹长度
+        #     return np.sum(distances)
+        
+        # max_traj_len = -1
+        # for i in range(moving_tracks.shape[1]):
+        #     traj_len = calculate_trajectory_length(moving_tracks[:, i])
+        #     if traj_len >= max_traj_len:
+        #         max_traj_len = traj_len
+        # if max_traj_len > self.pertubation_distance * self.valid_thresh:
+        #     self.has_valid_explore = True
+        #     return True
+        # else:
+        #     return False
+
     
     ###############################################
     def main(self):

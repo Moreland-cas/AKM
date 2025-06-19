@@ -1,0 +1,130 @@
+
+************** Explore Stage Analysis **************
+Success Rate (actual): 116 / 116 = 100.00%
+Success Rate (pred): 116 / 116 = 100.00%
+Average tries (pred): 116 / 116 = 1.00
+
+Prismatic Joints (n=60):
+  Actual Success: 100.00%
+  Predicted Success: 100.00%
+
+Revolute Joints (n=56):
+  Actual Success: 100.00%
+  Predicted Success: 100.00%
+
+Detailed Results (All Joints):
+tries=1 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=2 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=3 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=4 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=5 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=6 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=7 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=8 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=9 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=10 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=11 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=12 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=13 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=14 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=15 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=16 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=17 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=18 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=19 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=20 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=21 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=22 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=23 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=24 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=25 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=26 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=27 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=28 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=29 | success rate (actual): 100.00% | success rate (pred): 100.00%
+tries=30 | success rate (actual): 100.00% | success rate (pred): 100.00%
+
+Bin Success Rates:
+prismatic_bin_0: 100.00% (60 samples)
+revolute_bin_0: 100.00% (56 samples)
+****************************************************
+
+
+************** Reconstruct Stage Analysis **************
+Success Rate: 6 / 116 = 5.17%
+note: Reconstruction loss under PIVOT_THRESH: 0.05 m and ANGLE_THRESH: 10 degree is considered valid.
+
+Detailed Results: 
+PRISMATIC: 
+	60 in total
+Success/invalid_explore/false_positive/wrong_type/bad_optimize: 
+	10%/0%/0%/0%/90% (6/0/0/0/54)
+Angle loss: 
+	7.96 degree -> 7.96 degree (coarse -> fine)
+
+REVOLUTE: 
+	56 in total
+Success/invalid_explore/false_positive/wrong_type/bad_optimize: 
+	0%/0%/0%/0%/100% (0/0/0/0/56)
+Angle loss: 
+	0.00 degree -> 0.00 degree (coarse -> fine)
+Pivot loss: 
+	0.00 cm -> 0.00 cm (coarse -> fine)
+****************************************************
+
+
+************** Manipulation Stage Analysis **************
+Success Rate: 79/1392 = 5.68%
+Relative Error (mean): 4.35%
+Revolute manip summary:
+0_1
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.13554865623029388, 'error_traj': [10.000000006232286, 0.13554865623029388, 0.13554865623029388, 0.13554865623029388, 0.13554865623029388, 0.13554865623029388]}
+0_2
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.12881328141522633, 'error_traj': [20.00000008942247, 0.12881328141522633, 0.12881328141522633, 0.12881328141522633, 0.12881328141522633, 0.12881328141522633]}
+0_3
+{'loss_lists': [], 'success': 0, 'failed_manip': 0, 'failed_recon': 56, 'avg_manips': None, 'final_error': None, 'error_traj': None}
+1_0
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.8249257731096147, 'error_traj': [10.000000245084905, 0.8249257731096147, 0.8249257731096147, 0.8249257731096147, 0.8249257731096147, 0.8249257731096147]}
+1_2
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.8460583012820394, 'error_traj': [9.999999916564542, 0.8460583012820394, 0.8460583012820394, 0.8460583012820394, 0.8460583012820394, 0.8460583012820394]}
+1_3
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.13694687775644895, 'error_traj': [20.00000039460909, 0.13694687775644895, 0.13694687775644895, 0.13694687775644895, 0.13694687775644895, 0.13694687775644895]}
+2_0
+{'loss_lists': [], 'success': 3, 'failed_manip': 0, 'failed_recon': 53, 'avg_manips': 1.0, 'final_error': 0.8281799803846642, 'error_traj': [19.999999830518092, 0.8281799803846642, 0.8281799803846642, 0.8281799803846642, 0.8281799803846642, 0.8281799803846642]}
+2_1
+{'loss_lists': [], 'success': 0, 'failed_manip': 0, 'failed_recon': 56, 'avg_manips': None, 'final_error': None, 'error_traj': None}
+2_3
+{'loss_lists': [], 'success': 0, 'failed_manip': 0, 'failed_recon': 56, 'avg_manips': None, 'final_error': None, 'error_traj': None}
+3_0
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.5322649677579648, 'error_traj': [29.99999842182202, 0.5322649677579648, 0.5322649677579648, 0.5322649677579648, 0.5322649677579648, 0.5322649677579648]}
+3_1
+{'loss_lists': [], 'success': 1, 'failed_manip': 0, 'failed_recon': 55, 'avg_manips': 1.0, 'final_error': 0.19991971370268405, 'error_traj': [19.999999494882253, 0.19991971370268405, 0.19991971370268405, 0.19991971370268405, 0.19991971370268405, 0.19991971370268405]}
+3_2
+{'loss_lists': [], 'success': 0, 'failed_manip': 0, 'failed_recon': 56, 'avg_manips': None, 'final_error': None, 'error_traj': None}
+Prismatic manip summary:
+0_1
+{'loss_lists': [], 'success': 8, 'failed_manip': 4, 'failed_recon': 48, 'avg_manips': 1.0, 'final_error': 0.5306957157468886, 'error_traj': [9.999999940939599, 0.5306957157468886, 0.5306957157468886, 0.5306957157468886, 0.5306957157468886, 0.5306957157468886]}
+0_2
+{'loss_lists': [], 'success': 5, 'failed_manip': 5, 'failed_recon': 50, 'avg_manips': 1.0, 'final_error': 0.9282004884398527, 'error_traj': [20.000000028247417, 0.9282004884398527, 0.9282004884398527, 0.9282004884398527, 0.9282004884398527, 0.9282004884398527]}
+0_3
+{'loss_lists': [], 'success': 2, 'failed_manip': 5, 'failed_recon': 53, 'avg_manips': 1.0, 'final_error': 0.04802864328196654, 'error_traj': [30.00000010892579, 0.04802864328196654, 0.04802864328196654, 0.04802864328196654, 0.04802864328196654, 0.04802864328196654]}
+1_0
+{'loss_lists': [], 'success': 7, 'failed_manip': 5, 'failed_recon': 48, 'avg_manips': 1.0, 'final_error': 0.30295718157336454, 'error_traj': [10.000000081236474, 0.30295718157336454, 0.30295718157336454, 0.30295718157336454, 0.30295718157336454, 0.30295718157336454]}
+1_2
+{'loss_lists': [], 'success': 7, 'failed_manip': 5, 'failed_recon': 48, 'avg_manips': 1.0, 'final_error': 0.3905477541391133, 'error_traj': [9.999999888658738, 0.3905477541391133, 0.3905477541391133, 0.3905477541391133, 0.3905477541391133, 0.3905477541391133]}
+1_3
+{'loss_lists': [], 'success': 6, 'failed_manip': 6, 'failed_recon': 48, 'avg_manips': 1.0, 'final_error': 0.8644487245712549, 'error_traj': [19.99999986497717, 0.8644487245712549, 0.8644487245712549, 0.8644487245712549, 0.8644487245712549, 0.8644487245712549]}
+2_0
+{'loss_lists': [], 'success': 6, 'failed_manip': 6, 'failed_recon': 48, 'avg_manips': 1.0, 'final_error': 0.8091398997670738, 'error_traj': [20.00000000515351, 0.8091398997670738, 0.8091398997670738, 0.8091398997670738, 0.8091398997670738, 0.8091398997670738]}
+2_1
+{'loss_lists': [], 'success': 4, 'failed_manip': 5, 'failed_recon': 51, 'avg_manips': 1.0, 'final_error': 0.37236291485871975, 'error_traj': [10.000000654842305, 0.37236291485871975, 0.37236291485871975, 0.37236291485871975, 0.37236291485871975, 0.37236291485871975]}
+2_3
+{'loss_lists': [], 'success': 9, 'failed_manip': 5, 'failed_recon': 46, 'avg_manips': 1.0, 'final_error': 0.6817452260328013, 'error_traj': [10.000000077297868, 0.6817452260328013, 0.6817452260328013, 0.6817452260328013, 0.6817452260328013, 0.6817452260328013]}
+3_0
+{'loss_lists': [], 'success': 6, 'failed_manip': 6, 'failed_recon': 48, 'avg_manips': 1.0, 'final_error': 0.9365982066809341, 'error_traj': [30.00000026187544, 0.9365982066809341, 0.9365982066809341, 0.9365982066809341, 0.9365982066809341, 0.9365982066809341]}
+3_1
+{'loss_lists': [], 'success': 5, 'failed_manip': 5, 'failed_recon': 50, 'avg_manips': 1.0, 'final_error': 1.049872713087, 'error_traj': [20.000000559554135, 1.049872713087, 1.049872713087, 1.049872713087, 1.049872713087, 1.049872713087]}
+3_2
+{'loss_lists': [], 'success': 4, 'failed_manip': 6, 'failed_recon': 50, 'avg_manips': 1.0, 'final_error': 0.583274679212642, 'error_traj': [10.000000062523428, 0.583274679212642, 0.583274679212642, 0.583274679212642, 0.583274679212642, 0.583274679212642]}
+****************************************************
+
