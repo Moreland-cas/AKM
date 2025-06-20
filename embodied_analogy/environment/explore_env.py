@@ -60,6 +60,12 @@ class ExploreEnv(ObjEnv):
             logger=self.logger
         )
         
+        if not self.explore_env_cfg["contact_analogy"]:
+            self.affordance_map_2d.uninit_cosmap()
+            self.logger.log(logging.INFO, "Detected contact_analogy flag = False, disable Contact Analogy")
+        else:
+            self.logger.log(logging.INFO, "Detected contact_analogy flag = True, use Contact Analogy")
+        
         # 在这里保存 first frame
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
@@ -70,6 +76,12 @@ class ExploreEnv(ObjEnv):
         
         self.max_tries = self.explore_env_cfg["max_tries"]
         self.logger.log(logging.INFO, f"Start exploring..., you have {self.max_tries} chances to explore...")
+        
+        if self.max_tries == 1:
+            self.logger.log(logging.INFO, "Only try once, Disable Interactive perception")
+        else:
+            self.logger.log(logging.INFO, "Enable Interactive perception")
+            
         self.num_tries = 0
         while self.num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
@@ -81,12 +93,11 @@ class ExploreEnv(ObjEnv):
                 self.reset_robot_safe()
             
             self.logger.log(logging.INFO, f"[{self.num_tries + 1}|{self.max_tries}] Start exploring once...")
-            # TODO
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
             self.num_tries += 1
             if not actually_tried:
                 self.logger.log(logging.INFO, "The planning path is not valid, update affordance map and try again...")
-                if self.explore_env_cfg["use_IOC"]:
+                if self.explore_env_cfg["use_IOR"]:
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 continue
             
@@ -95,7 +106,7 @@ class ExploreEnv(ObjEnv):
                 break
             else:
                 self.logger.log(logging.INFO, "Check invalid, update affordance map and try again...")
-                if self.explore_env_cfg["use_IOC"]:
+                if self.explore_env_cfg["use_IOR"]:
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
         # save explore data
@@ -141,11 +152,13 @@ class ExploreEnv(ObjEnv):
         
         obj_mask = self.affordance_map_2d.get_obj_mask(visualize=False) # H, W
         
-        if self.explore_env_cfg["use_IOC"]:
+        if self.explore_env_cfg["use_IOR"]:
+            self.logger.log(logging.INFO, "Detected use_IOR flag = True, use Inhibition of Return")
             contact_uv = self.affordance_map_2d.sample_highest(visualize=False)
         else:
             # sample_prob 返回的是一个 N, 2 的 list, alpha 越大, 采样越密集
-            contact_uv = self.affordance_map_2d.sample_prob(alpha=30, num_samples=1, return_rgb_frame=True, visualize=False)[0]
+            self.logger.log(logging.INFO, "Detected use_IOR flag = False, do not update affoedance map")
+            contact_uv = self.affordance_map_2d.sample_prob(alpha=10, num_samples=1, return_rgb_frame=True, visualize=False)[0]
         
         cur_frame.obj_mask = obj_mask
         cur_frame.contact2d = contact_uv

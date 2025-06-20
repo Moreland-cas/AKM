@@ -199,7 +199,7 @@ class Obj_repr(Data):
             tracks_3d=self.frames.track3d_seq[:, self.frames.moving_mask, :], 
             visualize=visualize,
             logger=self.logger,
-            num_R_augmented=num_R_augmented
+            num_R_augmented=num_R_augmented,
         )
         self.coarse_joint_dict = coarse_joint_dict
         self.frames.write_joint_states(coarse_joint_dict["joint_states"])

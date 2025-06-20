@@ -1,7 +1,7 @@
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs/6_22"
+  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs/6_24"
   save_cfg: True
   save_obj_repr: False
   save_result: True
@@ -40,11 +40,11 @@ explore_env_cfg:
   pertubation_distance: 0.1
   reserved_distance: 0.05
   valid_thresh: 0.5
-  update_sigma: 0.1
+  update_sigma: 0.05
   max_tries: 25
   fully_zeroshot: False
   num_initial_pts: 1000
-  use_IOR: True
+  use_IOR: False
 
 recon_env_cfg:
   num_kframes: 5

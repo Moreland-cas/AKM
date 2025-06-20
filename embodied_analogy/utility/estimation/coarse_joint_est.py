@@ -286,6 +286,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False, logger=None):
         tracks_3d=tracks_3d,
         joint_type="prismatic"
     )
+        
     joint_states = estimate_joint_state_given_joint_param(
         joint_start=joint_start,
         joint_dir=joint_dir,

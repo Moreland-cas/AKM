@@ -44,6 +44,8 @@ explore_env_cfg:
   max_tries: 25
   fully_zeroshot: False
   num_initial_pts: 1000
+  use_IOR: True
+  contact_analogy: True
 
 recon_env_cfg:
   num_kframes: 5

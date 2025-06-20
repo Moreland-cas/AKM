@@ -100,6 +100,22 @@ class Affordance_map_2d:
         resized_mask = resized_mask > 0
         self.cos_map[~resized_mask] = -1
         
+    def uninit_cosmap(self):
+        """
+            将 cos_map 中不在 cropped_mask 中的点值设置为 -1,
+            在 cropped_mask 中的点设置为 1
+        """
+        # 首先需要将 cropped_mask 缩放到 cos_map 大小（插值的方式）
+        mask_uint8 = self.cropped_mask.astype(np.uint8)  # 将 True 转换为 255，False 转换为 0
+
+        # 使用cv2.resize进行最近邻插值
+        cos_w = self.cos_map.shape[1]
+        cos_h = self.cos_map.shape[0]
+        resized_mask = cv2.resize(mask_uint8, (cos_w, cos_h), interpolation=cv2.INTER_NEAREST)
+        resized_mask = resized_mask > 0
+        self.cos_map[~resized_mask] = -1
+        self.cos_map[resized_mask] = 1
+        
     def sample_prob(self, alpha=10, num_samples=1, return_rgb_frame=True, visualize=False):
         """
             首先根据 cos_map 得到 prob_map, 然后随机 sample 一个, 并且保证该点落在 cropped_mask 中
@@ -330,7 +346,7 @@ class Affordance_map_2d:
 
         # 更新 cos_map，使用权重降低值
         self.cos_map -= weights * 0.5  
-        self.cos_map = np.clip(self.cos_map, -1, None)  # 确保不低于 -1
+        self.cos_map = np.clip(self.cos_map, -1, 1)  # 确保不低于 -1
 
         if visualize:
             # 可视化更新后的 cos_map
