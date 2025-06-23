@@ -158,7 +158,8 @@ class ExploreEnv(ObjEnv):
         else:
             # sample_prob 返回的是一个 N, 2 的 list, alpha 越大, 采样越密集
             self.logger.log(logging.INFO, "Detected use_IOR flag = False, do not update affoedance map")
-            contact_uv = self.affordance_map_2d.sample_prob(alpha=10, num_samples=1, return_rgb_frame=True, visualize=False)[0]
+            # contact_uv = self.affordance_map_2d.sample_prob(alpha=10, num_samples=1, return_rgb_frame=True, visualize=False)[0]
+            contact_uv = self.affordance_map_2d.sample_prob(alpha=1, num_samples=1, return_rgb_frame=True, visualize=False)[0]
         
         cur_frame.obj_mask = obj_mask
         cur_frame.contact2d = contact_uv

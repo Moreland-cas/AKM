@@ -39,8 +39,7 @@ from embodied_analogy.utility.estimation.coarse_joint_est import (
 from embodied_analogy.utility.utils import (
     visualize_pc,
     set_random_seed,
-    numpy_to_json,
-    world_to_image
+    numpy_to_json
 )
 
 set_random_seed(SEED)
@@ -519,10 +518,7 @@ def get_generalFlow(
     exec_model.set_desc(instruction)
 
     # (w, h) --> (h, w)
-    # contact_uv = frame.contact2d
-    # 从这个 frame 保存的 Tph2w 中获取 contact_uv
-    contact_uv = world_to_image(frame.Tph2w[:3, -1][None], frame.K, frame.Tw2c)[0]
-    
+    contact_uv = frame.contact2d
     gripper_pos = np.array([contact_uv[1], contact_uv[0]])
     # 获取三维点云和 contact_3d
     pcd, gripper_3d_pos, pcd_org = exec_model.geometric_generation(
@@ -535,6 +531,7 @@ def get_generalFlow(
     )
 
     # 获取 contact_3d 附近的点, (Q, 3)
+    # TODO 在这里改为从 obj_mask 里均匀采样
     kps_3d, weights = exec_model.get_kps_3d(
         pcd=pcd,
         gripper_3d_pos=gripper_3d_pos,
@@ -606,8 +603,6 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         self.obj_repr.Tw2c = self.camera_extrinsic
         self.obj_repr.coarse_joint_dict = None
         self.obj_repr.fine_joint_dict = None
-        
-        self.logger.log(logging.INFO, "Running gflow baseline...")
     
     def get_contact_2d(self, frame, manip_type, visualize=False):
         """
@@ -649,7 +644,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         # if frame.contact2d is None or frame.obj_mask is None:
         #     self.get_contact_2d(frame=frame, manip_type="open", visualize=visualize)
         
-        frame = self.obj_repr.frames[0]
+        frame = self.obj_repr.initial_frame
         
         # (M, T, 3) in camera frame
         general_flow = get_generalFlow(
@@ -712,23 +707,25 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         #     with open(save_json_path, 'w', encoding='utf-8') as json_file:
         #         json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
                 
-        # try:
-        if True:
+        try:
+        # if True:
             self.recon_result = {}
             
             if self.explore_result["has_valid_explore"]:
                 self.logger.log(logging.INFO, f"Valid explore detected, thus start reconstruction...") 
-                self.recon_result = self.recon_stage_general_flow()
+                self.recon_result = self.recon_stage_general_flow(
+                    gt_joint_type=True
+                )
                 self.recon_result["has_valid_recon"] = True
             else:
                 self.logger.log(logging.INFO, f"No Valid explore, thus skip reconstruction...") 
                 self.recon_result["has_valid_recon"] = False
                 self.recon_result["exception"] = "No valid explore."
             
-        # except Exception as e:
-        #     self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}", exc_info=True)
-        #     self.recon_result["has_valid_recon"] = False
-        #     self.recon_result["exception"] = str(e)
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}", exc_info=True)
+            self.recon_result["has_valid_recon"] = False
+            self.recon_result["exception"] = str(e)
         
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(
@@ -831,7 +828,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         self.logger.log(logging.INFO, result_dict)
         return result_dict
 
-    def manip_general_flow(self):
+    def manip_general_flow(self, manip_type, visualize=False):
         """
         根据将 initial_frame 的 grasp 迁移到 cur_frame, 并按照 articulation mdoel 进行操作
         """
@@ -839,11 +836,9 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         self.cur_frame: Frame = self.capture_frame()
         
         # 使用 gt 的 reloc joint state
-        self.obj_repr.frames[0].joint_state = self.obj_repr.frames[0].gt_joint_state
         self.cur_frame.joint_state = self.cur_frame.gt_joint_state
         self.ref_ph_to_tgt(
-            # ref_frame=self.obj_repr.kframes[0],
-            ref_frame=self.obj_repr.frames[0],
+            ref_frame=self.obj_repr.kframes[0],
             tgt_frame=self.cur_frame
         )
         # 
@@ -876,7 +871,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
                 joint_type=self.obj_repr.fine_joint_dict["joint_type"],
                 joint_axis=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_dir"],
                 joint_start=Tc2w[:3, :3] @ self.obj_repr.fine_joint_dict["joint_start"] + Tc2w[:3, 3],
-                moving_distance=self.goal_delta,
+                moving_distance=self.target_state-self.cur_frame.joint_state,
                 drop_large_move=False
             )
             
@@ -888,7 +883,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
     
     def main(self):
         # 保存 explore_result, 和 initial_frame 的 contact point, grasp pose
-        ExploreEnv.main(self)
+        ExploreEnv.main()
         
         self.recon_main()
         
@@ -910,8 +905,8 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             # if True:
                 if self.recon_result["has_valid_recon"]:
                     self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
-                    # manip_type = "open" if manip_end_state > manip_start_state else "close"
-                    tmp_manip_result.update(self.manip_general_flow())
+                    manip_type = "open" if manip_end_state > manip_start_state else "close"
+                    tmp_manip_result.update(self.manip_general_flow(manip_type=manip_type))
                 
             except Exception as e:
                 self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)

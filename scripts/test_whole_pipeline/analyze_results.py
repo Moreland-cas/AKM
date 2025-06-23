@@ -101,7 +101,8 @@ def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
     
     # 初始化统计数据结构
     num_total_exp = len(saved_result.keys())
-    num_total_tries = 0
+    num_total_tries_for_success_exp = 0
+    num_total_tries_for_all_exp = 0
     
     # 全局成功率统计
     num_pred_valid = {i: 0 for i in range(1, max_tries + 1)}
@@ -170,13 +171,19 @@ def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
         bin_success_rates[bin_key].append(1 if actual_valid else 0)
         bin_counts[bin_key] += 1
         
+        # 统计一下所有实验的尝试次数
+        if "num_tries" not in result:
+            # 对于在 explore 阶段遇到 exception 的 exp, 可能 num_tries 还未写入, 此时默认计算为 25
+            result["num_tries"] = task_yaml["explore_env_cfg"]["max_tries"]
+        num_tries = result["num_tries"]
+        num_total_tries_for_all_exp += num_tries
+        
         # 只统计有有效探索的实验
         if not has_valid_explore:
             continue
         
-        # 更新全局统计
-        num_tries = result["num_tries"]
-        num_total_tries += num_tries
+        # 更新成功的那些实验的平均尝试次数
+        num_total_tries_for_success_exp += num_tries
         
         # 更新尝试次数统计
         for i in range(num_tries, max_tries + 1):
@@ -206,7 +213,9 @@ def summary_explore(saved_result, task_yaml, verbose=False, num_bins=4):
     print("\n************** Explore Stage Analysis **************")
     print(f"Success Rate (actual): {num_actual_valid[max_tries]} / {num_total_exp} = {(num_actual_valid[max_tries] / num_total_exp * 100):.2f}%")
     print(f"Success Rate (pred): {num_pred_valid[max_tries]} / {num_total_exp} = {(num_pred_valid[max_tries] / num_total_exp * 100):.2f}%")
-    print(f"Average tries (pred): {num_total_tries} / {num_pred_valid[max_tries]} = {num_total_tries / num_pred_valid[max_tries]:.2f}")
+    
+    # print(f"Average tries (pred): {num_total_tries} / {num_pred_valid[max_tries]} = {num_total_tries / num_pred_valid[max_tries]:.2f}")
+    print(f"Average tries (all): {num_total_tries_for_all_exp} / {num_total_exp} = {num_total_tries_for_all_exp / num_total_exp:.2f}")
     
     # 分别打印prismatic和revolute的结果
     if total_prismatic > 0:
@@ -757,22 +766,8 @@ def summary_manip(saved_result, task_yaml, verbose=False):
     # print(prismatic_grid_dicts)
     print("****************************************************\n")
     
-    
-if __name__ == "__main__":
-    # run_name = "6_4"
-    # run_name = "6_6"
-    # run_name = "6_8"
-    # run_name = "6_10"
-    # run_name = "6_11"
-    # run_name = "6_12"
-    # run_name = "6_17"
-    # run_name = "6_18"
-    # run_name = "6_20"
-    # run_name = "6_21"
-    # run_name = "6_22"
-    # run_name = "6_23"
-    # run_name = "6_24"
-    run_name = "6_25"
+
+def analyze_and_save(run_name):
     task_yaml_path = f"/home/zby/Programs/Embodied_Analogy/cfgs/base_{run_name}.yaml"
     
     with open(task_yaml_path, "r") as f:
@@ -799,7 +794,6 @@ if __name__ == "__main__":
             manip_result = json.load(f)
             saved_result[int(run_folder)]["manip"] = manip_result
         
-
     # 这里要确保每个 run 的结果都读取进来了
     assert len(saved_result.keys()) == len(run_folders)
 
@@ -809,4 +803,32 @@ if __name__ == "__main__":
         summary_explore(saved_result, task_yaml)
         summary_recon(saved_result)
         summary_manip(saved_result, task_yaml)
+        
+    
+if __name__ == "__main__":
+    # run_name = "6_4"
+    # run_name = "6_6"
+    # run_name = "6_8"
+    # run_name = "6_10"
+    # run_name = "6_11"
+    # run_name = "6_12"
+    # run_name = "6_17"
+    # run_name = "6_18"
+    # run_name = "6_20"
+    # run_name = "6_21"
+    # run_name = "6_22"
+    # run_name = "6_23"
+    # run_name = "6_24"
+    # run_name = "6_25"
+    # run_name = "6_26"
+    # run_name = "6_27"
+    names = [
+        # "6_21",
+        # "6_26",
+        # "6_27",
+        "6_17"
+    ]
+    for name in names:
+        analyze_and_save(name)
+    
         

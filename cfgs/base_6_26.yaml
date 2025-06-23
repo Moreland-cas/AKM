@@ -1,7 +1,7 @@
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs/6_17"
+  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs/6_26"
   save_cfg: True
   save_obj_repr: False
   save_result: True
@@ -44,7 +44,7 @@ explore_env_cfg:
   max_tries: 25
   fully_zeroshot: False
   num_initial_pts: 1000
-  use_IOR: True
+  use_IOR: False
   contact_analogy: True
 
 recon_env_cfg:
@@ -52,8 +52,6 @@ recon_env_cfg:
   fine_lr: 0.001
   reloc_lr: 0.003
   num_R_augmented: 1000
-  # specifically used in gflow
-  use_gt_joint_type: True
 
 manip_env_cfg:
   # max number of manipulations used for closed-loop control

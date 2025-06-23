@@ -112,10 +112,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument('--cuda_idx', type=str)
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
-    parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
-    parser.add_argument('--method', type=str, default="ours") # ours, gpnet, gflow
+    parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
+    parser.add_argument('--method', type=str, default="gflow") # ours, gpnet, gflow
     
-    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_25.yaml")
+    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_17.yaml")
     # parser.add_argument('--base_yaml_path', type=str)
     parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new")
     

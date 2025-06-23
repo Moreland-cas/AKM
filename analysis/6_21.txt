@@ -2,7 +2,7 @@
 ************** Explore Stage Analysis **************
 Success Rate (actual): 104 / 116 = 89.66%
 Success Rate (pred): 108 / 116 = 93.10%
-Average tries (pred): 427 / 108 = 3.95
+Average tries (all): 627 / 116 = 5.41
 
 Prismatic Joints (n=60):
   Actual Success: 81.67%
