@@ -1,0 +1,14 @@
+# ninja log v5
+1	11683	1730170477162969133	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/bindings.o	366911ea962bfd0a
+1	11818	1730170477302972073	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/group_points.o	d611e92d23944a11
+0	11822	1730170477305972136	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/ball_query.o	c4e45eee2184d488
+6	10749	1730170583085356737	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/interpolate.o	dcec212a617e4dcb
+9	9323	1730171955885306578	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/group_points.o	340f6cdf15c05e4c
+8	9350	1730171955914308705	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/ball_query.o	52dd6ff62c909260
+8	9523	1730171956089321533	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/bindings.o	b57ba2f97412e63a
+9350	18542	1730171965104980177	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/interpolate.o	a9ae00ff2c6058ba
+8	21261	1730171967825178060	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/ball_query_gpu.o	704bf144d4b60846
+18543	27702	1730171974265645044	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/sampling.o	add579a71c3762b6
+9323	30493	1730171977058846911	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/group_points_gpu.o	70737f84c98b4d9d
+9523	30760	1730171977324866111	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/interpolate_gpu.o	de38aa059c89d6d1
+21261	43117	1730171989681754204	/home/haoran/Project/GAPartNet/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-38/pointnet2_ops/_ext-src/src/sampling_gpu.o	5eb4f4fd6a3347bb

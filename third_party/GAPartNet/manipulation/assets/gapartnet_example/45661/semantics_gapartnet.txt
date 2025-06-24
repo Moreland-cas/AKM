@@ -1,0 +1,7 @@
+link_0 hinge door
+link_1 slider drawer
+link_2 slider drawer
+link_3 heavy furniture_body
+link_4 fixed handle
+link_5 fixed handle
+link_6 fixed handle
