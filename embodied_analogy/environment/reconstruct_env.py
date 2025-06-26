@@ -58,7 +58,7 @@ class ReconEnv(ExploreEnv):
         Tph2w_tgt = Tref2tgt_w @ Tph2w_ref
         return Tph2w_tgt
 
-    def ref_ph_to_tgt(self, ref_frame: Frame, tgt_frame: Frame):
+    def ref_ph_to_tgt(self, ref_frame: Frame, tgt_frame: Frame, use_gt_joint_dict: bool = False):
         """
         将 ref_frame 中的 panda_hand grasp_pose 转换到 target_frame 中去
         
@@ -69,11 +69,19 @@ class ReconEnv(ExploreEnv):
         Tph2w_ref = ref_frame.Tph2w
         Tph2c_ref = self.obj_repr.Tw2c @ Tph2w_ref
         
+        if use_gt_joint_dict:
+            fine_joint_dict = self.obj_repr.get_joint_param(
+                resolution="gt",
+                frame="camera"
+            )
+        else:
+            fine_joint_dict = self.obj_repr.fine_joint_dict
+            
         # Tref2tgt 是 camera 坐标系下的一个变换
         Tref2tgt_c = joint_data_to_transform_np(
-            joint_type=self.obj_repr.fine_joint_dict["joint_type"],
-            joint_dir=self.obj_repr.fine_joint_dict["joint_dir"],
-            joint_start=self.obj_repr.fine_joint_dict["joint_start"],
+            joint_type=fine_joint_dict["joint_type"],
+            joint_dir=fine_joint_dict["joint_dir"],
+            joint_start=fine_joint_dict["joint_start"],
             joint_state_ref2tgt=tgt_frame.joint_state-ref_frame.joint_state
         )
         

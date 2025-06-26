@@ -61,6 +61,7 @@ manip_env_cfg:
   # for whole traj closed-loop
   prismatic_whole_traj_success_thresh: 0.01
   revolute_whole_traj_success_thresh: 3
+  use_gt_ref_ph_to_tgt: False
   # for intermediate closed-loop
   prismatic_reloc_interval: 0.005
   prismatic_reloc_tolerance: 0.001

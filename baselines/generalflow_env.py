@@ -844,7 +844,8 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         self.ref_ph_to_tgt(
             # ref_frame=self.obj_repr.kframes[0],
             ref_frame=self.obj_repr.frames[0],
-            tgt_frame=self.cur_frame
+            tgt_frame=self.cur_frame,
+            use_gt_joint_dict=self.manip_env_cfg["use_gt_ref_ph_to_tgt"]
         )
         # 
         pc_collision_w, pc_colors = self.cur_frame.get_env_pc(

@@ -41,15 +41,19 @@ explore_env_cfg:
   reserved_distance: 0.05
   valid_thresh: 0.5
   update_sigma: 0.05
-  max_tries: 30
+  max_tries: 25
   fully_zeroshot: False
   num_initial_pts: 1000
+  use_IOR: True
+  contact_analogy: True
 
 recon_env_cfg:
   num_kframes: 5
   fine_lr: 0.001
   reloc_lr: 0.003
   num_R_augmented: 1000
+  # specifically used in gflow
+  use_gt_joint_type: True
 
 manip_env_cfg:
   # max number of manipulations used for closed-loop control
@@ -57,6 +61,7 @@ manip_env_cfg:
   # for whole traj closed-loop
   prismatic_whole_traj_success_thresh: 0.01
   revolute_whole_traj_success_thresh: 3
+  use_gt_ref_ph_to_tgt: True
   # for intermediate closed-loop
   prismatic_reloc_interval: 0.005
   prismatic_reloc_tolerance: 0.001
