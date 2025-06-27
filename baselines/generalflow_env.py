@@ -712,8 +712,8 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         #     with open(save_json_path, 'w', encoding='utf-8') as json_file:
         #         json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
                 
-        # try:
-        if True:
+        try:
+        # if True:
             self.recon_result = {}
             
             if self.explore_result["has_valid_explore"]:
@@ -725,10 +725,10 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
                 self.recon_result["has_valid_recon"] = False
                 self.recon_result["exception"] = "No valid explore."
             
-        # except Exception as e:
-        #     self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}", exc_info=True)
-        #     self.recon_result["has_valid_recon"] = False
-        #     self.recon_result["exception"] = str(e)
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Exception occured during Reconstruct_stage: {e}", exc_info=True)
+            self.recon_result["has_valid_recon"] = False
+            self.recon_result["exception"] = str(e)
         
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(

@@ -319,8 +319,8 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False, logger=None):
             joint_type="prismatic",
             joint_start=joint_start
         )
-        if i % 10 == 0:
-            logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse t loss: {loss.item()}")
+        if i % 10 == 0 and logger:
+                logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse t loss: {loss.item()}")
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
         # 给最开始插入 0
@@ -336,11 +336,12 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False, logger=None):
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        if i % 10 == 0:
+        if i % 10 == 0 and logger:
             logger.log(logging.DEBUG, f"\t lr: {cur_lr}")
         
         if should_early_stop:
-            logger.log(logging.INFO, "Early stop in coarse_t_estimation")
+            if logger:
+                logger.log(logging.INFO, "Early stop in coarse_t_estimation")
             break
         
         loss.backward()
@@ -430,7 +431,7 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False, logger=None):
             joint_type="revolute",
             joint_start=joint_start
         )
-        if i % 10 == 0:
+        if i % 10 == 0 and logger:
             logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse R loss: {loss.item()}")
         
         joint_states_tmp = joint_states.detach().cpu().numpy()
@@ -446,11 +447,12 @@ def coarse_R_from_tracks_3d(tracks_3d, visualize=False, logger=None):
         should_early_stop = scheduler.step(loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        if i % 10 == 0:
+        if i % 10 == 0 and logger:
             logger.log(logging.DEBUG, f"\t lr: {cur_lr}")
         
         if should_early_stop:
-            logger.log(logging.INFO, "EARLY STOP")
+            if logger:
+                logger.log(logging.INFO, "EARLY STOP")
             break
         
         loss.backward()
@@ -699,11 +701,13 @@ def coarse_estimation(tracks_3d, visualize=False, logger=None, num_R_augmented=1
     logger.log(logging.INFO, f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
     torch.cuda.empty_cache()
     if t_est_loss < R_est_loss:
-        logger.log(logging.INFO, "Thus, select as prismatic joint")
+        if logger:
+            logger.log(logging.INFO, "Thus, select as prismatic joint")
         t_state_dict["joint_type"] = "prismatic"
         return t_state_dict
     else:
-        logger.log(logging.INFO, "Thus, select as revolute joint")
+        if logger:
+            logger.log(logging.INFO, "Thus, select as revolute joint")
         R_state_dict["joint_type"] = "revolute"
         return R_state_dict
 

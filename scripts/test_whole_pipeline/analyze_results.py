@@ -320,24 +320,20 @@ def is_reconstruct_valid(explore_result, recon_result):
             type_loss == 0, but recon_loss is high
     """
     joint_type = explore_result["joint_type"]
-    recon_valid = False
+    recon_valid_c = False
+    recon_valid_f = False
     failed_reason = np.array([0, 0, 0, 0])
     pivot_loss_c, angle_loss_c = None, None
     pivot_loss_f, angle_loss_f = None, None
     
     # 如果都没有 explore_think_valid, 直接返回
-    # TODO 记得把这里改回去
-    if "has_valid_recon" in recon_result:
-        has_valid_recon = recon_result["has_valid_recon"]
-    elif "has_valid_reconstruct" in recon_result:
-        has_valid_recon = recon_result["has_valid_reconstruct"]
-    else:
-        assert "no has_valid_recon or has_valid_reconstruct in recon_result"
+    has_valid_recon = recon_result["has_valid_recon"]
     
     if not has_valid_recon:
-        recon_valid = False
+        recon_valid_c = False
+        recon_valid_f = False
         failed_reason[0] = 1
-        return recon_valid, failed_reason, joint_type, None
+        return recon_valid_c, recon_valid_f, failed_reason, joint_type, None
     
     # NOTE 接下来的应该都是有 recon_result 的
     # 读取重建结果
@@ -355,37 +351,34 @@ def is_reconstruct_valid(explore_result, recon_result):
     
     # 根据重建结果判断 recon_valid
     if joint_type == "prismatic":
-        if angle_loss_f < np.deg2rad(ANGLE_THRESH) and fine_type_loss == 0:
-            recon_valid = True
-            return recon_valid, failed_reason, joint_type, (pivot_loss_c, pivot_loss_f, angle_loss_c, angle_loss_f)
+        recon_valid_c = (angle_loss_c < np.deg2rad(ANGLE_THRESH) and coarse_type_loss == 0)
+        recon_valid_f = (angle_loss_f < np.deg2rad(ANGLE_THRESH) and fine_type_loss == 0)
+    else:
+        recon_valid_c = (pivot_loss_c < PIVOT_THRESH and angle_loss_c < np.deg2rad(ANGLE_THRESH) and coarse_type_loss == 0)
+        recon_valid_f = (pivot_loss_f < PIVOT_THRESH and angle_loss_f < np.deg2rad(ANGLE_THRESH) and fine_type_loss == 0)
     
-    if joint_type == "revolute":
-        if pivot_loss_f < PIVOT_THRESH and angle_loss_f < np.deg2rad(ANGLE_THRESH) and fine_type_loss == 0:
-            recon_valid = True
-            return recon_valid, failed_reason, joint_type, (pivot_loss_c, pivot_loss_f, angle_loss_c, angle_loss_f)
+    if recon_valid_f:
+        return recon_valid_c, recon_valid_f, failed_reason, joint_type, (pivot_loss_c, pivot_loss_f, angle_loss_c, angle_loss_f)
     
     # 如果到了这里还没有退出, 说明 recon_valid 是 False, 接下来判断是因为什么原因失败的
-    assert recon_valid == False
+    assert recon_valid_f == False
     
     # 认为有 valid_explore, 但是实际上没有
     if not explore_actually_valid(explore_result):
-        recon_valid = False
         failed_reason[1] = 1
-        return recon_valid, failed_reason, joint_type, None
+        return recon_valid_c, recon_valid_f, failed_reason, joint_type, None
     
     # NOTE 实际上有 valid_explore, 只是重建的问题
     
     # 关节类型重建错误
     if recon_result["coarse_loss"]["type_err"] > 0:
-        recon_valid = False
         failed_reason[2] = 1
-        return recon_valid, failed_reason, joint_type, None
+        return recon_valid_c, recon_valid_f, failed_reason, joint_type, None
     
     # 关节类型重建对了, 但是优化有问题
     if recon_result["coarse_loss"]["type_err"] == 0:                
-        recon_valid = False
         failed_reason[3] = 1
-        return recon_valid, failed_reason, joint_type, None
+        return recon_valid_c, recon_valid_f, failed_reason, joint_type, None
 
 
 def summary_recon(saved_result):
@@ -414,8 +407,11 @@ def summary_recon(saved_result):
     num_revolute = 0
     
     # 先根据 "什么样的 reconstruct 是好的", 计算整体的成功率, 以及成功的那些的误差
-    num_prismatic_success = 0
-    num_revolute_success = 0
+    num_prismatic_success_f = 0
+    num_revolute_success_f = 0
+    
+    num_prismatic_success_c = 0
+    num_revolute_success_c = 0
     
     prismatic_angle_err_coarse = []
     revolute_angle_err_coarse = []
@@ -431,19 +427,26 @@ def summary_recon(saved_result):
     
     for explore_result, recon_result in zip(explore_results, recon_results):
         # 这里的 recon_valid 指 recon 的误差小于一定值
-        recon_valid, failed_reason, joint_type, loss = is_reconstruct_valid(explore_result, recon_result)
+        # failed_reason 是针对 recon_valid_f 判断的
+        recon_valid_c, recon_valid_f, failed_reason, joint_type, loss = is_reconstruct_valid(explore_result, recon_result)
         
         num_prismatic += int(joint_type == "prismatic")
         num_revolute += int(joint_type == "revolute")
         
-        if recon_valid:
+        if recon_valid_c:
+            if joint_type == "prismatic":
+                num_prismatic_success_c += 1
+            else:
+                num_revolute_success_c += 1
+            
+        if recon_valid_f:
             pivot_loss_c, pivot_loss_f, angle_loss_c, angle_loss_f = loss
             if joint_type == "prismatic":
-                num_prismatic_success += 1
+                num_prismatic_success_f += 1
                 prismatic_angle_err_coarse.append(angle_loss_c)
                 prismatic_angle_err_fine.append(angle_loss_f)
             else:
-                num_revolute_success += 1
+                num_revolute_success_f += 1
                 revolute_pos_err_coarse.append(pivot_loss_c)
                 revolute_angle_err_coarse.append(angle_loss_c)
                 revolute_pos_err_fine.append(pivot_loss_f)
@@ -458,39 +461,46 @@ def summary_recon(saved_result):
     # 打印结果
     print("\n************** Reconstruct Stage Analysis **************")
     
-    print(f"Success Rate: {num_prismatic_success + num_revolute_success} / {num_exp} = {((num_prismatic_success + num_revolute_success) / num_exp * 100):.2f}%")
+    print(f"Success Rate (fine): {num_prismatic_success_f + num_revolute_success_f} / {num_exp} = {((num_prismatic_success_f + num_revolute_success_f) / num_exp * 100):.2f}%")
+    print(f"Success Rate (coarse): {num_prismatic_success_c + num_revolute_success_c} / {num_exp} = {((num_prismatic_success_c + num_revolute_success_c) / num_exp * 100):.2f}%")
+    
+    print(f"Success Rate (fine-prismatic): {num_prismatic_success_f} / {num_prismatic} = {(num_prismatic_success_f / num_prismatic * 100):.2f}%")
+    print(f"Success Rate (fine-revolute): {num_revolute_success_f} / {num_revolute} = {(num_revolute_success_f / num_revolute * 100):.2f}%")
+    
+    print(f"Success Rate (coarse-prismatic): {num_prismatic_success_c} / {num_prismatic} = {(num_prismatic_success_c / num_prismatic * 100):.2f}%")
+    print(f"Success Rate (coarse-revolute): {num_revolute_success_c} / {num_revolute} = {(num_revolute_success_c / num_revolute * 100):.2f}%")
     print(f"note: Reconstruction loss under PIVOT_THRESH: {PIVOT_THRESH} m and ANGLE_THRESH: {ANGLE_THRESH} degree is considered valid.")
     
     # 具体打印下两种关节的成功率
     print("\nDetailed Results: ")
     print(f"PRISMATIC: \n\t{num_prismatic} in total")
     print(f"Success/invalid_explore/false_positive/wrong_type/bad_optimize: ")
-    print_array(prefix="\t", array=[num_prismatic_success, *prismatic_failed_reason_array])
+    print_array(prefix="\t", array=[num_prismatic_success_f, *prismatic_failed_reason_array])
     
-    prismatic_angle_err_coarse_mean_rad = sum(prismatic_angle_err_coarse) / max(num_prismatic_success, 1)
+    prismatic_angle_err_coarse_mean_rad = sum(prismatic_angle_err_coarse) / max(num_prismatic_success_f, 1)
     prismatic_angle_err_coarse_mean_degree = np.rad2deg(prismatic_angle_err_coarse_mean_rad)
     
-    prismatic_angle_err_fine_mean_rad = sum(prismatic_angle_err_fine) / max(num_prismatic_success, 1)
+    prismatic_angle_err_fine_mean_rad = sum(prismatic_angle_err_fine) / max(num_prismatic_success_f, 1)
     prismatic_angle_err_fine_mean_degree = np.rad2deg(prismatic_angle_err_fine_mean_rad)
     
     print(f"Angle loss: \n\t{prismatic_angle_err_coarse_mean_degree:.2f} degree -> {prismatic_angle_err_fine_mean_degree:.2f} degree (coarse -> fine)")
 
     print(f"\nREVOLUTE: \n\t{num_revolute} in total")
     print(f"Success/invalid_explore/false_positive/wrong_type/bad_optimize: ")
-    print_array(prefix="\t", array=[num_revolute_success, *revolute_failed_reason_array])
+    print_array(prefix="\t", array=[num_revolute_success_f, *revolute_failed_reason_array])
     
-    revolute_angle_err_coarse_mean_rad = sum(revolute_angle_err_coarse) / max(num_revolute_success, 1)
+    revolute_angle_err_coarse_mean_rad = sum(revolute_angle_err_coarse) / max(num_revolute_success_f, 1)
     revolute_angle_err_coarse_mean_degree = np.rad2deg(revolute_angle_err_coarse_mean_rad)
     
-    revolute_angle_err_fine_mean_rad = sum(revolute_angle_err_fine) / max(num_revolute_success, 1)
+    revolute_angle_err_fine_mean_rad = sum(revolute_angle_err_fine) / max(num_revolute_success_f, 1)
     revolute_angle_err_fine_mean_degree = np.rad2deg(revolute_angle_err_fine_mean_rad)
     
     print(f"Angle loss: \n\t{revolute_angle_err_coarse_mean_degree:.2f} degree -> {revolute_angle_err_fine_mean_degree:.2f} degree (coarse -> fine)")
 
-    revolute_pos_err_coarse_mean_m = sum(revolute_pos_err_coarse) / max(num_revolute_success, 1)
+    revolute_pos_err_coarse_mean_m = sum(revolute_pos_err_coarse) / max(num_revolute_success_f, 1)
     revolute_pos_err_coarse_mean_cm = revolute_pos_err_coarse_mean_m * 100
     
-    revolute_pos_err_fine_mean_m = sum(revolute_pos_err_fine) / max(num_revolute_success, 1)
+    revolute_pos_err_fine_mean_m = sum(revolute_pos_err_fine) / max(num_revolute_success_f, 1)
     revolute_pos_err_fine_mean_cm = revolute_pos_err_fine_mean_m * 100
     
     print(f"Pivot loss: \n\t{revolute_pos_err_coarse_mean_cm:.2f} cm -> {revolute_pos_err_fine_mean_cm:.2f} cm (coarse -> fine)")
@@ -824,9 +834,10 @@ if __name__ == "__main__":
     # run_name = "6_27"
     names = [
         # "6_21",
+        "6_18",
         # "6_26",
         # "6_27",
-        "6_17"
+        # "6_17"
     ]
     for name in names:
         analyze_and_save(name)

@@ -62,8 +62,7 @@ def test_one(base_yaml_path, specific_yaml_path, method_name):
         sys.path.append(PROJECT_ROOT)
         from baselines.generalflow_env import GeneralFlow_ManipEnv as env_class
     elif method_name == "gpnet":
-        pass
-    # elif method_name == "a3vlm":
+        from baselines.gapartnet_env import GAPartNet_ManipEnv as env_class
         
     manipulateEnv = env_class(cfg=task_cfg)
     manipulateEnv.main()
@@ -113,9 +112,9 @@ if __name__ == "__main__":
     # parser.add_argument('--cuda_idx', type=str)
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
-    parser.add_argument('--method', type=str, default="gflow") # ours, gpnet, gflow
+    parser.add_argument('--method', type=str, default="gpnet") # ours, gpnet, gflow
     
-    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_18.yaml")
+    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_29.yaml")
     # parser.add_argument('--base_yaml_path', type=str)
     parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new")
     
