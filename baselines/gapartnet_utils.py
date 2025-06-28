@@ -475,6 +475,7 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
             joint_dict, loss = coarse_t_from_tracks_3d(np.stack([moving_bbox_first, moving_bbox_last], axis=0))
         else:
             joint_dict, loss = coarse_R_from_tracks_3d_augmented(np.stack([moving_bbox_first, moving_bbox_last], axis=0), num_R_augmented=1000)
+        joint_dict["joint_type"] = gt_joint_type
     else:
         joint_dict = coarse_estimation(np.stack([moving_bbox_first, moving_bbox_last], axis=0))
     return joint_dict

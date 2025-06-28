@@ -322,17 +322,43 @@ def _inference_perception_model_with_masks(perception_model, points_list, masks,
         return bboxes, sem_preds, npcs_maps, None, None, None
 
 def _load_perception_model(
-        ckpt_path = "gapartnet/ckpt/all_best_7816.ckpt",
+        ckpt_path = None,
         class_path = "gapartnet.network.model.GAPartNet",
         device = "cuda",
         USE_2D_FOR_PERCEPTION = False,
     ):
     module_name = ".".join(class_path.split(".")[:-1])
     class_name = class_path.split(".")[-1]
-
+    """
+    ckpt_path = '/home/zby/Programs/Embodied_Analogy/assets/ckpts/gapartnet/release.ckpt'
+    class_path = 'gapartnet.network.model.GAPartNet'
+    """
     module = importlib.import_module(module_name)
     cls = getattr(module, class_name)
-    net = cls.load_from_checkpoint(ckpt_path)
+    net = cls.load_from_checkpoint(
+        checkpoint_path=ckpt_path, 
+        strict=False,
+        # hparams_file="/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/gapartnet/gapartnet.yaml"
+        num_part_classes=10,
+        training_schedule=[5, 10],
+        instance_seg_cfg = {
+            "ball_query_radius": 0.04,
+            "max_num_points_per_query": 50,
+            "min_num_points_per_proposal": 5, # 50 for scannet?
+            "max_num_points_per_query_shift": 300,
+            "score_fullscale": 28,
+            "score_scale": 50,
+        },
+        backbone_cfg = {
+            "channels": [16,32,48,64,80,96,112],
+            "block_repeat": 2
+        }
+    )
+    
+    # ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
+    # net = cls()
+    # net.load_state_dict(ckpt['state_dict'])
+    
     net.use_2d_masks = USE_2D_FOR_PERCEPTION
     net.training_schedule = [0,0]
     net.scorenet_npcsnet_new_backbone = False

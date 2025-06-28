@@ -4,8 +4,9 @@ import yaml
 from os.path import join as pjoin
 import os
 import argparse
+from embodied_analogy.project_config import PROJECT_ROOT, ASSET_PATH
 import sys
-sys.path.append(sys.path[0] + "/..")
+sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
 import importlib
 from gapartnet.structures.point_cloud import PointCloud
 from gapartnet.datasets.gapartnet_new import apply_voxelization

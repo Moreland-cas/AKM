@@ -1,0 +1,13 @@
+__pycache__/
+GAPartNet_All
+perception/
+wandb/
+ckpt/
+image_kuafu
+output/GAPartNet_result/
+test/
+visu/
+example_rendered/
+partnet_mobility_part
+ckpts/
+assets/

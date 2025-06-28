@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.utils.data
 import torch.nn.functional as F
-from network.pointnet.pointnet_utils import PointNetEncoder, feature_transform_reguliarzer
+from gapartnet.network.pointnet.pointnet_utils import PointNetEncoder, feature_transform_reguliarzer
 
 class PointNetSegBackbone(nn.Module):
     def __init__(self, pc_dim, fea_dim):

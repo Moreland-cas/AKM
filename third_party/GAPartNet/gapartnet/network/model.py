@@ -1,4 +1,5 @@
 import lightning.pytorch as lp
+# import pytorch_lightning as lp
 from typing import Optional, Dict, Tuple, List
 import functools
 import torch
@@ -11,17 +12,17 @@ from einops import rearrange, repeat
 from epic_ops.reduce import segmented_maxpool
 from epic_ops.iou import batch_instance_seg_iou
 
-from network.losses import focal_loss, dice_loss, pixel_accuracy, mean_iou
-from network.grouping_utils import (apply_nms, cluster_proposals, compute_ap,
+from gapartnet.network.losses import focal_loss, dice_loss, pixel_accuracy, mean_iou
+from gapartnet.network.grouping_utils import (apply_nms, cluster_proposals, compute_ap,
                                compute_npcs_loss, filter_invalid_proposals,
                                get_gt_scores, segmented_voxelize)
-from structure.point_cloud import PointCloudBatch, PointCloud
-from structure.segmentation import Segmentation
-from structure.instances import Instances
+from gapartnet.structure.point_cloud import PointCloudBatch, PointCloud
+from gapartnet.structure.segmentation import Segmentation
+from gapartnet.structure.instances import Instances
 
-from misc.info import OBJECT_NAME2ID, PART_ID2NAME, PART_NAME2ID, get_symmetry_matrix
-from misc.visu import visualize_gapartnet
-from misc.pose_fitting import estimate_pose_from_npcs
+from gapartnet.misc.info import OBJECT_NAME2ID, PART_ID2NAME, PART_NAME2ID, get_symmetry_matrix
+from gapartnet.misc.visu import visualize_gapartnet
+from gapartnet.misc.pose_fitting import estimate_pose_from_npcs
 from .backbone import SparseUNet
 
 class GAPartNet(lp.LightningModule):
@@ -130,6 +131,7 @@ class GAPartNet(lp.LightningModule):
 
         
         if ckpt != "":
+            ckpt = "/home/zby/Programs/Embodied_Analogy/assets/ckpts/gapartnet/all_best.ckpt"
             print("Loading pretrained model from:", ckpt)
             state_dict = torch.load(
                 ckpt, map_location="cpu"
@@ -460,9 +462,7 @@ class GAPartNet(lp.LightningModule):
             )
 
         return loss_npcs
-
-
-
+    
     def _training_or_validation_step(
         self,
         point_clouds: List[PointCloud],

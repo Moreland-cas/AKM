@@ -595,7 +595,7 @@ def coarse_R_from_tracks_3d_augmented(tracks_3d, visualize=False, logger=None, n
             joint_type="revolute",
             joint_start=batch_joint_start
         )
-        if i % 10 == 0:
+        if i % 10 == 0 and logger:
             logger.log(logging.DEBUG, f"[{i}/{num_iterations}] coarse R loss: {loss.item()}")
         
         # NOTE 这里改为存储每次优化所有 batch 最好的那个 joint_dict
@@ -612,11 +612,12 @@ def coarse_R_from_tracks_3d_augmented(tracks_3d, visualize=False, logger=None, n
         should_early_stop = scheduler.step(best_loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
-        if i % 10 == 0:
+        if i % 10 == 0 and logger:
             logger.log(logging.DEBUG, f"\t lr: {cur_lr}")
         
         if should_early_stop:
-            logger.log(logging.INFO, "EARLY STOP")
+            if logger:
+                logger.log(logging.INFO, "EARLY STOP")
             break
         
         loss.backward()
@@ -698,7 +699,8 @@ def coarse_estimation(tracks_3d, visualize=False, logger=None, num_R_augmented=1
     # R_state_dict, R_est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize, logger)
     R_state_dict, R_est_loss = coarse_R_from_tracks_3d_augmented(tracks_3d, visualize, logger, num_R_augmented)
     
-    logger.log(logging.INFO, f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
+    if logger:
+        logger.log(logging.INFO, f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
     torch.cuda.empty_cache()
     if t_est_loss < R_est_loss:
         if logger:

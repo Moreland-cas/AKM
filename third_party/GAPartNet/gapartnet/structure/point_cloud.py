@@ -127,7 +127,7 @@ class PointCloud:
             num_instances = None
             num_points_per_instance = None
             instance_sem_labels = None
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
 
         if point_clouds[0].instance_regions is not None:
             instance_regions = torch.cat([

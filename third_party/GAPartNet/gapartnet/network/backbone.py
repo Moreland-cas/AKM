@@ -3,7 +3,7 @@ import spconv.pytorch as spconv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from network.pointnet.pointnet_sem_seg import PointNetSegBackbone
+from gapartnet.network.pointnet.pointnet_sem_seg import PointNetSegBackbone
 
 class ResBlock(spconv.SparseModule):
     def __init__(

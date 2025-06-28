@@ -7,7 +7,7 @@ from epic_ops.nms import nms
 from epic_ops.reduce import segmented_reduce
 from epic_ops.voxelize import voxelize
 
-from structure.instances import Instances
+from gapartnet.structure.instances import Instances
 
 
 # @torch.jit.script

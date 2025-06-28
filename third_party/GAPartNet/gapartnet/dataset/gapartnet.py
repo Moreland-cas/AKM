@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Union, List
 
 import numpy as np
 from lightning.pytorch import LightningDataModule
+# from pytorch_lightning import LightningDataModule
 import torch
 import torchdata.datapipes as dp
 from epic_ops.voxelize import voxelize
@@ -14,9 +15,13 @@ from torch.utils.data import Dataset
 import random
 from glob import glob
 
-from structure.point_cloud import PointCloud
-from dataset import data_utils
-from misc.info import OBJECT_NAME2ID
+from embodied_analogy.project_config import PROJECT_ROOT, ASSET_PATH
+import sys
+import os
+sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
+from gapartnet.structure.point_cloud import PointCloud
+from gapartnet.dataset import data_utils
+from gapartnet.misc.info import OBJECT_NAME2ID
 
 
 class GAPartNetDataset(Dataset):

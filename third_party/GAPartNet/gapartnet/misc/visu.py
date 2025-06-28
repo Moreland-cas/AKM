@@ -7,13 +7,13 @@ import argparse
 import sys
 sys.path.append(sys.path[0] + "/..")
 import importlib
-from structure.point_cloud import PointCloud
-from dataset.gapartnet import apply_voxelization
-from misc.pose_fitting import estimate_pose_from_npcs
+from gapartnet.structure.point_cloud import PointCloud
+from gapartnet.dataset.gapartnet import apply_voxelization
+from gapartnet.misc.pose_fitting import estimate_pose_from_npcs
 import cv2
 from typing import List
 import glob
-from misc.visu_util import OBJfile2points, map2image, save_point_cloud_to_ply, \
+from gapartnet.misc.visu_util import OBJfile2points, map2image, save_point_cloud_to_ply, \
     WorldSpaceToBallSpace, FindMaxDis, draw_bbox_old, draw_bbox, COLOR20, \
     OTHER_COLOR, HEIGHT, WIDTH, EDGE, K, font, fontScale, fontColor,thickness, lineType 
 

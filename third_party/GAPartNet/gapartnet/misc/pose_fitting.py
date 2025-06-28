@@ -81,7 +81,8 @@ def get_RANSAC_inliers(
 
 
 def estimate_similarity_transform(
-    source: np.ndarray, target: np.ndarray,
+    source: np.ndarray,  # npcs
+    target: np.ndarray,  # xyzs
     stop_thrsh: float = 0.5,
     max_iters: int = 100,
 ):
