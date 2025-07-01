@@ -510,6 +510,7 @@ def summary_recon(saved_result):
 # 相对误差在 10 % 内的视为成功, 如打开 10 cm, 最终误差在 1 cm 内的
 MANIP_RELATIVE_VALID_THRESH = 0.1
 
+
 def is_manip_success(manip_result):
     """
     manip_distance: 该任务实际需要 manip 的 delta joint state
@@ -679,6 +680,7 @@ def process_manip_grid_dict(summary_dict, task_yaml, joint_type):
         # base_dict["print_str"] = f'{base_dict["success"]}/{base_dict["failed_recon"]}/{base_dict["failed_manip"]/{base_dict["avg_manips"]}/{base_dict["final_error"]}/{base_dict["error_traj"]}}'
         base_dict["loss_lists"] = []
 
+
 def print_matrix_string(matrix):
     """
     以网格形式打印二维矩阵中的字符串
@@ -696,7 +698,7 @@ def print_matrix_string(matrix):
             print(f"{matrix[i][j]}", end="\t")
         # 每行结束后换行
         print()
-        
+    
                            
 def summary_manip(saved_result, task_yaml, verbose=False):
     print("\n************** Manipulation Stage Analysis **************")
@@ -838,7 +840,7 @@ if __name__ == "__main__":
         # "6_26",
         # "6_27",
         # "6_17"
-        "6_29"
+        "6_30"
     ]
     for name in names:
         analyze_and_save(name)

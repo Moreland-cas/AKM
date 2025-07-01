@@ -98,7 +98,7 @@ class Affordance_map_2d:
         cos_h = self.cos_map.shape[0]
         resized_mask = cv2.resize(mask_uint8, (cos_w, cos_h), interpolation=cv2.INTER_NEAREST)
         resized_mask = resized_mask > 0
-        self.cos_map[~resized_mask] = -1
+        self.cos_map[~resized_mask] = -1e6
         
     def uninit_cosmap(self):
         """
@@ -346,7 +346,7 @@ class Affordance_map_2d:
 
         # 更新 cos_map，使用权重降低值
         self.cos_map -= weights * 0.5  
-        self.cos_map = np.clip(self.cos_map, -1, 1)  # 确保不低于 -1
+        # self.cos_map = np.clip(self.cos_map, -1, 1)  # 确保不低于 -1
 
         if visualize:
             # 可视化更新后的 cos_map

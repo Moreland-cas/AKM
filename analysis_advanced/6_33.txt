@@ -1,0 +1,146 @@
+
+************** Explore Stage Analysis **************
+SR (actual): 1236 / 1392 = 88.79%
+SR (pred): 1320 / 1392 = 94.83%
+Num Tries (all): 10956 / 1392 = 7.87
+
+Detailed Results (All Joints):
+tries=1:
+	SR (actual): 12 / 1392 = 0.86%
+	SR (pred): 12 / 1392 = 0.86%
+tries=2:
+	SR (actual): 132 / 1392 = 9.48%
+	SR (pred): 144 / 1392 = 10.34%
+tries=3:
+	SR (actual): 276 / 1392 = 19.83%
+	SR (pred): 300 / 1392 = 21.55%
+tries=4:
+	SR (actual): 576 / 1392 = 41.38%
+	SR (pred): 624 / 1392 = 44.83%
+tries=5:
+	SR (actual): 684 / 1392 = 49.14%
+	SR (pred): 732 / 1392 = 52.59%
+tries=6:
+	SR (actual): 768 / 1392 = 55.17%
+	SR (pred): 816 / 1392 = 58.62%
+tries=7:
+	SR (actual): 816 / 1392 = 58.62%
+	SR (pred): 864 / 1392 = 62.07%
+tries=8:
+	SR (actual): 828 / 1392 = 59.48%
+	SR (pred): 876 / 1392 = 62.93%
+tries=9:
+	SR (actual): 924 / 1392 = 66.38%
+	SR (pred): 984 / 1392 = 70.69%
+tries=10:
+	SR (actual): 960 / 1392 = 68.97%
+	SR (pred): 1020 / 1392 = 73.28%
+tries=11:
+	SR (actual): 1056 / 1392 = 75.86%
+	SR (pred): 1128 / 1392 = 81.03%
+tries=12:
+	SR (actual): 1068 / 1392 = 76.72%
+	SR (pred): 1140 / 1392 = 81.90%
+tries=13:
+	SR (actual): 1092 / 1392 = 78.45%
+	SR (pred): 1164 / 1392 = 83.62%
+tries=14:
+	SR (actual): 1128 / 1392 = 81.03%
+	SR (pred): 1200 / 1392 = 86.21%
+tries=15:
+	SR (actual): 1140 / 1392 = 81.90%
+	SR (pred): 1212 / 1392 = 87.07%
+tries=16:
+	SR (actual): 1152 / 1392 = 82.76%
+	SR (pred): 1224 / 1392 = 87.93%
+tries=17:
+	SR (actual): 1176 / 1392 = 84.48%
+	SR (pred): 1248 / 1392 = 89.66%
+tries=18:
+	SR (actual): 1200 / 1392 = 86.21%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=19:
+	SR (actual): 1224 / 1392 = 87.93%
+	SR (pred): 1308 / 1392 = 93.97%
+tries=20:
+	SR (actual): 1224 / 1392 = 87.93%
+	SR (pred): 1308 / 1392 = 93.97%
+tries=21:
+	SR (actual): 1224 / 1392 = 87.93%
+	SR (pred): 1308 / 1392 = 93.97%
+tries=22:
+	SR (actual): 1236 / 1392 = 88.79%
+	SR (pred): 1320 / 1392 = 94.83%
+tries=23:
+	SR (actual): 1236 / 1392 = 88.79%
+	SR (pred): 1320 / 1392 = 94.83%
+tries=24:
+	SR (actual): 1236 / 1392 = 88.79%
+	SR (pred): 1320 / 1392 = 94.83%
+tries=25:
+	SR (actual): 1236 / 1392 = 88.79%
+	SR (pred): 1320 / 1392 = 94.83%
+****************************************************
+
+************** Reconstruct Stage Analysis **************
+Joint type pred SR: 1236 / 1392 = 88.79%
+Angle error threshold: 1 degree, Pivot error threshold: 0.01 m
+	SR (coarse): 528 / 1392 = 37.93%
+	SR (fine): 768 / 1392 = 55.17%
+Angle error threshold: 5 degree, Pivot error threshold: 0.05 m
+	SR (coarse): 1080 / 1392 = 77.59%
+	SR (fine): 1176 / 1392 = 84.48%
+Angle error threshold: 10 degree, Pivot error threshold: 0.1 m
+	SR (coarse): 1200 / 1392 = 86.21%
+	SR (fine): 1224 / 1392 = 87.93%
+Angle error threshold: 20 degree, Pivot error threshold: 0.2 m
+	SR (coarse): 1236 / 1392 = 88.79%
+	SR (fine): 1236 / 1392 = 88.79%
+****************************************************
+
+************** Manipulation Stage Analysis **************
+Summary for Total:
+Revolute  closed-loop loss: 
+	16.67deg -> 5.97deg -> 4.74deg -> 4.56deg -> 4.56deg -> 4.54deg
+Prismatic closed-loop loss: 
+	16.67cm -> 5.47cm -> 4.88cm -> 4.67cm -> 4.81cm -> 4.82cm
+Manip relative threshold: 0.1
+	0.00% -> 63.22% -> 69.76% -> 70.69% -> 70.91% -> 71.26%
+Manip relative threshold: 0.2
+	0.00% -> 69.68% -> 74.35% -> 75.65% -> 75.72% -> 76.08%
+Manip relative threshold: 0.5
+	0.00% -> 74.43% -> 79.45% -> 79.81% -> 79.60% -> 80.03%
+Summary for 1: 
+Revolute  closed-loop loss: 
+	10.00deg -> 4.92deg -> 3.96deg -> 3.97deg -> 3.87deg -> 3.77deg
+Prismatic closed-loop loss: 
+	10.00cm -> 3.66cm -> 3.52cm -> 3.41cm -> 3.55cm -> 3.54cm
+Manip relative threshold: 0.1
+	0.00% -> 60.78% -> 66.24% -> 67.39% -> 67.39% -> 67.82%
+Manip relative threshold: 0.2
+	0.00% -> 67.96% -> 71.84% -> 73.13% -> 73.42% -> 74.14%
+Manip relative threshold: 0.5
+	0.00% -> 73.85% -> 78.59% -> 78.30% -> 78.30% -> 78.74%
+Summary for 2: 
+Revolute  closed-loop loss: 
+	20.00deg -> 6.28deg -> 4.96deg -> 4.94deg -> 4.99deg -> 5.00deg
+Prismatic closed-loop loss: 
+	20.00cm -> 6.58cm -> 5.65cm -> 5.25cm -> 5.42cm -> 5.54cm
+Manip relative threshold: 0.1
+	0.00% -> 65.73% -> 72.20% -> 72.84% -> 73.49% -> 73.49%
+Manip relative threshold: 0.2
+	0.00% -> 71.34% -> 76.72% -> 77.59% -> 77.59% -> 77.59%
+Manip relative threshold: 0.5
+	0.00% -> 75.22% -> 80.39% -> 80.82% -> 80.39% -> 80.82%
+Summary for 3: 
+Revolute  closed-loop loss: 
+	30.00deg -> 8.49deg -> 6.64deg -> 5.60deg -> 5.75deg -> 5.93deg
+Prismatic closed-loop loss: 
+	30.00cm -> 8.66cm -> 7.41cm -> 7.28cm -> 7.36cm -> 7.21cm
+Manip relative threshold: 0.1
+	0.00% -> 65.52% -> 75.43% -> 76.29% -> 76.29% -> 77.16%
+Manip relative threshold: 0.2
+	0.00% -> 71.55% -> 77.16% -> 79.31% -> 78.88% -> 78.88%
+Manip relative threshold: 0.5
+	0.00% -> 74.57% -> 80.17% -> 82.33% -> 81.90% -> 82.33%
+****************************************************

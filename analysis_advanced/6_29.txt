@@ -1,0 +1,113 @@
+
+************** Explore Stage Analysis **************
+SR (actual): 1248 / 1392 = 89.66%
+SR (pred): 1272 / 1392 = 91.38%
+Num Tries (all): 7788 / 1392 = 5.59
+
+Detailed Results (All Joints):
+tries=1:
+	SR (actual): 312 / 1392 = 22.41%
+	SR (pred): 312 / 1392 = 22.41%
+tries=2:
+	SR (actual): 588 / 1392 = 42.24%
+	SR (pred): 588 / 1392 = 42.24%
+tries=3:
+	SR (actual): 828 / 1392 = 59.48%
+	SR (pred): 828 / 1392 = 59.48%
+tries=4:
+	SR (actual): 924 / 1392 = 66.38%
+	SR (pred): 936 / 1392 = 67.24%
+tries=5:
+	SR (actual): 1008 / 1392 = 72.41%
+	SR (pred): 1020 / 1392 = 73.28%
+tries=6:
+	SR (actual): 1080 / 1392 = 77.59%
+	SR (pred): 1092 / 1392 = 78.45%
+tries=7:
+	SR (actual): 1092 / 1392 = 78.45%
+	SR (pred): 1104 / 1392 = 79.31%
+tries=8:
+	SR (actual): 1116 / 1392 = 80.17%
+	SR (pred): 1128 / 1392 = 81.03%
+tries=9:
+	SR (actual): 1152 / 1392 = 82.76%
+	SR (pred): 1164 / 1392 = 83.62%
+tries=10:
+	SR (actual): 1164 / 1392 = 83.62%
+	SR (pred): 1188 / 1392 = 85.34%
+tries=11:
+	SR (actual): 1188 / 1392 = 85.34%
+	SR (pred): 1212 / 1392 = 87.07%
+tries=12:
+	SR (actual): 1200 / 1392 = 86.21%
+	SR (pred): 1224 / 1392 = 87.93%
+tries=13:
+	SR (actual): 1212 / 1392 = 87.07%
+	SR (pred): 1236 / 1392 = 88.79%
+tries=14:
+	SR (actual): 1236 / 1392 = 88.79%
+	SR (pred): 1260 / 1392 = 90.52%
+tries=15:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=16:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=17:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=18:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=19:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=20:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=21:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=22:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=23:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=24:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+tries=25:
+	SR (actual): 1248 / 1392 = 89.66%
+	SR (pred): 1272 / 1392 = 91.38%
+****************************************************
+
+************** Reconstruct Stage Analysis **************
+Joint type pred SR: 1236 / 1392 = 88.79%
+Angle error threshold: 1 degree, Pivot error threshold: 0.01 m
+	SR (coarse): 24 / 1392 = 1.72%
+	SR (fine): 24 / 1392 = 1.72%
+Angle error threshold: 5 degree, Pivot error threshold: 0.05 m
+	SR (coarse): 300 / 1392 = 21.55%
+	SR (fine): 300 / 1392 = 21.55%
+Angle error threshold: 10 degree, Pivot error threshold: 0.1 m
+	SR (coarse): 480 / 1392 = 34.48%
+	SR (fine): 480 / 1392 = 34.48%
+Angle error threshold: 20 degree, Pivot error threshold: 0.2 m
+	SR (coarse): 660 / 1392 = 47.41%
+	SR (fine): 660 / 1392 = 47.41%
+****************************************************
+
+************** Manipulation Stage Analysis **************
+Summary for Total:
+Revolute  closed-loop loss: 
+	16.67deg -> 11.77deg -> 11.77deg -> 11.77deg -> 11.77deg -> 11.77deg
+Prismatic closed-loop loss: 
+	16.67cm -> 8.71cm -> 8.71cm -> 8.71cm -> 8.71cm -> 8.71cm
+Manip relative threshold: 0.1
+	0.00% -> 27.73% -> 27.73% -> 27.73% -> 27.73% -> 27.73%
+Manip relative threshold: 0.2
+	0.00% -> 34.41% -> 34.41% -> 34.41% -> 34.41% -> 34.41%
+Manip relative threshold: 0.5
+	0.00% -> 51.01% -> 51.01% -> 51.01% -> 51.01% -> 51.01%
+****************************************************
