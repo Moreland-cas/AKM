@@ -313,9 +313,9 @@ class DataAnalyze():
     def summary_manip(self):
         print("\n************** Manipulation Stage Analysis **************")
         self.summary_manip_helper()
-        self.summary_manip_helper(range_transition_delta=1)
-        self.summary_manip_helper(range_transition_delta=2)
-        self.summary_manip_helper(range_transition_delta=3)
+        # self.summary_manip_helper(range_transition_delta=1)
+        # self.summary_manip_helper(range_transition_delta=2)
+        # self.summary_manip_helper(range_transition_delta=3)
         print("****************************************************")
         
     
@@ -335,7 +335,7 @@ def analyze(run_name="6_21"):
                     )
                 )
     dataAnalyze = DataAnalyze(datalist=data_list)
-    save_analysis_path = f"/home/zby/Programs/Embodied_Analogy/analysis_advanced/{run_name}.txt"
+    save_analysis_path = f"/home/zby/Programs/Embodied_Analogy/assets/analysis_advanced/{run_name}.txt"
     with open(save_analysis_path, "w") as f:
         sys.stdout = f
         dataAnalyze.summary_explore()
@@ -352,7 +352,8 @@ if __name__ == "__main__":
         # "6_30",
         # "6_31",
         # "6_32",
-        "6_33"
+        # "6_33",
+        "6_34"
     ]
     for run_name in run_names:
         analyze(run_name)

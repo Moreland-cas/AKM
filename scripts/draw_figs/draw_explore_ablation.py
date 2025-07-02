@@ -12,7 +12,7 @@ plt.rcParams.update({
     # 'legend.fontsize': 12     # 图例字体大小
 })
 
-def plot_comparison(data_dict, title="Method Comparison", xlabel="Number of Interactions (times)", ylabel="Actual Success Rate (%)"):
+def plot_comparison(data_dict, title="Method Comparison", xlabel="Number of Interactions (times)", ylabel="Explore Success Rate (%)"):
     """
     绘制多组数据的折线图对比
     
@@ -37,11 +37,11 @@ def plot_comparison(data_dict, title="Method Comparison", xlabel="Number of Inte
     plt.grid(True, alpha=0.3)
     plt.ylim(0, 100)  # 假设百分比范围是0-100%
     # plt.show()
-    plt.savefig("./explore_ablation.png")
+    plt.savefig("/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/explore_ablation.png")
 
 # 示例数据
 data = {
-    "Ours": [
+    "Ours Full": [
         25.00, 45.69, 56.90, 67.24, 73.28, 76.72, 77.59, 81.03, 81.90, 84.48,
         85.34, 85.34, 86.21, 86.21, 87.07, 87.07, 87.07, 87.07, 88.79, 88.79,
         88.79, 88.79, 88.79, 88.79, 89.66
@@ -71,6 +71,11 @@ data = {
     #     79.31, 81.90, 86.21, 87.07, 87.07, 87.07, 88.79, 88.79, 91.38, 92.24,
     #     92.24, 92.24, 92.24, 92.24, 92.24
     # ]
+    "Ours Zero-Shot": [
+        23.28, 31.90, 45.69, 56.03, 56.90, 60.34, 63.79, 69.83, 71.55, 74.14,
+        75.86, 76.72, 79.31, 80.17, 81.03, 82.76, 84.48, 84.48, 84.48, 85.34,
+        85.34, 85.34, 86.21, 86.21, 86.21
+    ]
 }
 
 # 调用函数绘制图表

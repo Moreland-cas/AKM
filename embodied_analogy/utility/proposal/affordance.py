@@ -120,8 +120,8 @@ class Affordance_map_2d:
         """
             首先根据 cos_map 得到 prob_map, 然后随机 sample 一个, 并且保证该点落在 cropped_mask 中
         """
-        if self.cos_map.max() == -1:
-            assert False, "cos_map 中没有值"
+        # if self.cos_map.max() == -1:
+        #     assert False, "cos_map 中没有值"
             
         self.mask_cos_map() # 把 mask 外的部分的 cos sim 变为 -1
         prob_map = (self.cos_map + 1.) / 2 # 值域变为 (0, 1)
@@ -272,8 +272,8 @@ class Affordance_map_2d:
         """
             在 cos_map 上 sample 出值最大的点, 并且保证该点落在 cropped_mask 中
         """
-        if self.cos_map.max() == -1:
-            assert False, "cos_map 中没有值"
+        # if self.cos_map.max() == -1:
+        #     assert False, "cos_map 中没有值"
             
         self.mask_cos_map()
         max_index = np.unravel_index(np.argmax(self.cos_map), self.cos_map.shape)
