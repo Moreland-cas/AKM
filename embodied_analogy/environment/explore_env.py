@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import logging
 import math
@@ -20,7 +21,6 @@ class ExploreEnv(ObjEnv):
         super().__init__(cfg=cfg)
             
         self.explore_env_cfg = cfg["explore_env_cfg"]
-        # self.task_cfg = cfg["task_cfg"]
         self.algo_cfg = cfg["algo_cfg"]
         
         self.record_fps = self.explore_env_cfg["record_fps"]
@@ -66,6 +66,12 @@ class ExploreEnv(ObjEnv):
         else:
             self.logger.log(logging.INFO, "Detected contact_analogy flag = True, use Contact Analogy")
         
+        # 保存第初始化 affordance map 时得到的 cos_map
+        if self.exp_cfg["save_obj_repr"]:
+            self.obj_repr.save_for_vis.update({
+                "explore_cos_map": [np.copy(self.affordance_map_2d.cos_map)]
+            })
+            
         # 在这里保存 first frame
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
@@ -85,6 +91,14 @@ class ExploreEnv(ObjEnv):
         self.num_tries = 0
         while self.num_tries < self.max_tries:
             # 初始化相关状态, 需要把之前得到的 frames 进行清楚
+            
+            if self.num_tries >= 1:
+                if self.exp_cfg["save_obj_repr"]:
+                    self.obj_repr.save_for_vis[str(self.num_tries)] = [
+                        copy.deepcopy(self.obj_repr.frames[0]),
+                        copy.deepcopy(self.obj_repr.frames[-1])
+                    ]
+                    
             self.obj_repr.clear_frames()
             
             if self.num_tries == 0:
@@ -99,6 +113,10 @@ class ExploreEnv(ObjEnv):
                 self.logger.log(logging.INFO, "The planning path is not valid, update affordance map and try again...")
                 if self.explore_env_cfg["use_IOR"]:
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
+                    
+                    # 保存 update 后 affordance map 的 cos_map
+                    if self.exp_cfg["save_obj_repr"]:
+                        self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
                 continue
             
             if self.check_valid(visualize=visualize):
@@ -109,6 +127,13 @@ class ExploreEnv(ObjEnv):
                 if self.explore_env_cfg["use_IOR"]:
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
+                # 保存 update 后 affordance map 的 cos_map
+                if self.exp_cfg["save_obj_repr"]:
+                    self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
+
+        if self.exp_cfg["save_obj_repr"]:
+            self.obj_repr.save_for_vis["aff_map"] = copy.deepcopy(self.affordance_map_2d)
+                    
         # save explore data
         if visualize:
             self.obj_repr.visualize()

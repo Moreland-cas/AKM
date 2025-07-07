@@ -51,6 +51,9 @@ class Obj_repr(Data):
             "joint_start": None,
             "joint_states": None
         }
+        
+        # for visualization
+        self.save_for_vis = {}
     
     def setup_logger(self, logger):
         self.logger = logger

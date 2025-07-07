@@ -115,14 +115,25 @@ if __name__ == "__main__":
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
     
     parser.add_argument('--method', type=str, default="ours") # ours, gpnet, gflow
-    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_36.yaml")
+    parser.add_argument('--base_yaml_path', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/base_6_39.yaml")
     parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new")
     
     args = parser.parse_args()
     yaml_path_list = []
     for yaml_path in os.listdir(args.task_cfgs_folder): 
         yaml_path_list.append(os.path.join(args.task_cfgs_folder, yaml_path))
-        
+    
+    yaml_path_list=[
+        # "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/3.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/4.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/7.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/10.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/78.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/95.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/97.yaml",
+        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/114.yaml",
+    ]
+    
     task_groups = distribute_tasks(yaml_path_list, args.ts)
     
     assert (args.cs >= 0) and (args.cs < args.ts)
@@ -131,8 +142,6 @@ if __name__ == "__main__":
     failed_list = test_batch(
         base_yaml_path=args.base_yaml_path,
         yaml_path_list=current_group,
-        # yaml_path_list=["/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/47.yaml",
-        #                 "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_6_4/567.yaml"]
         method_name=args.method
     )
     if len(failed_list) == 0:

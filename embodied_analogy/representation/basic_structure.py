@@ -110,6 +110,9 @@ class Frame(Data):
         # NOTE: Tph2w 是在世界坐标系下的 (4, 4)
         self.Tph2w = Tph2w
         
+        # save for vis
+        self.target_state = None
+        
     def _visualize(self, viewer, prefix=""):
         viewer.add_image(self.rgb, rgb=True, name=f"{prefix}_rgb")
         

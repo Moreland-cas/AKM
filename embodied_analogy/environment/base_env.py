@@ -33,6 +33,7 @@ class BaseEnv():
         phy_timestep = self.base_env_cfg["phy_timestep"]
         planner_timestep = self.base_env_cfg["planner_timestep"]
         use_sapien2 = self.base_env_cfg["use_sapien2"]
+        self.use_sapien2 = use_sapien2
         
         self.asset_prefix = ASSET_PATH
         self.cur_steps = 0

@@ -458,7 +458,7 @@ def farthest_point_sampling(point_cloud, M):
     return indices
 
 
-def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_contact_dirs=None):
+def visualize_pc_deprecated(points, colors=None, grasp=None, contact_point=None, post_contact_dirs=None):
     """
     visualize pointcloud
     points: Nx3
@@ -528,6 +528,298 @@ def visualize_pc(points, colors=None, grasp=None, contact_point=None, post_conta
     
     # 统一绘制所有几何对象
     o3d.visualization.draw_geometries(geometries_to_draw)
+
+
+def create_bbox(bbox, color=[0, 1, 0]):
+    """
+    创建一个长方体 bbox
+    center: 中心点坐标 [x, y, z]
+    half_x, half_y, half_z: 半长、半宽、半高
+    color: 颜色
+    """
+    
+    points = bbox
+    lines = [
+        # 0 1 4 2
+        [0, 1],
+        [0, 2],
+        [2, 4],
+        [4, 1],
+        # 3 5 7 6
+        [3, 5],
+        [5, 7],
+        [7, 6],
+        [6, 3],
+        #
+        [0, 3],
+        [1, 5],
+        [4, 7],
+        [2, 6]
+    ]
+    colors = [color for _ in range(len(lines))]
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(points)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+    return line_set
+
+def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution=10, cylinder_per=0.7):
+    """
+    创建一个从 start_point 到 end_point 的带箭头的圆柱体
+    start_point: (3,) 起点坐标
+    end_point: (3,) 终点坐标
+    thickness: float 圆柱体和圆锥体的粗细（半径）
+    resolution: int 圆柱体和圆锥体的分辨率
+    返回：包含圆柱体和圆锥体的几何体列表，圆锥体尖端对齐 end_point
+    假设总长度为1，圆柱体高度为0.8，圆锥体高度为0.2
+    """
+    start_point = np.asarray(start_point)
+    end_point = np.asarray(end_point)
+    direction = end_point - start_point
+    length = np.linalg.norm(direction)
+    if length < 1e-6:
+        return []
+    
+    direction = direction / length
+    # 圆柱体：高度为总长度的0.8
+    cylinder_height = length * cylinder_per
+    cylinder_end = start_point + direction * cylinder_height
+    cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=thickness, height=cylinder_height, resolution=resolution)
+    z_axis = np.array([0, 0, 1])
+    axis = np.cross(z_axis, direction)
+    if np.linalg.norm(axis) > 1e-6:
+        axis = axis / np.linalg.norm(axis)
+        angle = np.arccos(np.dot(z_axis, direction))
+        rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle(axis * angle)
+        cylinder.rotate(rotation_matrix)
+    cylinder.translate(start_point + direction * cylinder_height / 2)
+    
+    cylinder.compute_vertex_normals()  # 计算法向量以支持光照
+    cylinder.paint_uniform_color([0.5, 0.5, 0.5])  # 默认灰色，增强光影对比
+    
+    # 圆锥体：高度为总长度的0.2，尖端对齐 end_point
+    cone_height = length * (1 - cylinder_per)
+    cone = o3d.geometry.TriangleMesh.create_cone(radius=thickness * 2, height=cone_height, resolution=resolution)
+    if np.linalg.norm(axis) > 1e-6:
+        cone.rotate(rotation_matrix)
+    cone.translate(end_point - direction * cone_height)  # 尖端对齐 end_point
+    
+    cone.compute_vertex_normals()  # 计算法向量以支持光照
+    cone.paint_uniform_color([0.5, 0.5, 0.5])  # 默认灰色，增强光影对比
+
+    return [cylinder, cone]
+
+def visualize_pc(points, point_size=1, colors=None, grasp=None, contact_point=None, post_contact_dirs=None, 
+                 bboxes=None, tracks_3d=None, tracks_3d_colors=None, pivot_point=None, joint_axis=None,
+                 tracks_t_step=1, tracks_n_step=1, tracks_norm_threshold=1e-3, visualize_origin=False,
+                 camera_intrinsic=None, online_viewer=False):
+    """
+    可视化点云、抓取、接触点、边界框、3D轨迹和关节
+    points: Nx3 点云坐标
+    colors: Nx3 (0-1) 点云颜色
+    grasp: Grasp 或 GraspGroup 对象
+    contact_point: 接触点坐标
+    post_contact_dirs: 接触点方向列表
+    bboxes: 边界框列表，格式为 [center_x, center_y, center_z, half_x, half_y, half_z]
+    tracks_3d: (T, N, 3) 3D轨迹，T是时间步，N是轨迹数量
+    tracks_3d_colors: (N, 3) 每条轨迹的颜色 (0-1)，或 None（随机颜色）
+    pivot_point: (3,) 关节的枢轴点坐标
+    joint_axis: (3,) 关节轴的方向向量
+    tracks_t_step: int 时间步降采样间隔（默认1，即不降采样）
+    tracks_n_step: int 轨迹数量降采样间隔（默认1，即不降采样）
+    tracks_norm_threshold: float 轨迹线段长度的阈值，小于此值不绘制（默认1e-3）
+    """
+    # if post_contact_dirs is not None:
+    #     assert isinstance=post_contact_dirs, List)
+    
+    # 初始化点云
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    
+    # 处理点云颜色
+    if colors is None:
+        colors = np.zeros([points.shape[0], 3])
+        colors[:, 1] = 1  # 默认颜色为蓝色
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+    
+    geometries_to_draw = [pcd]
+    
+    # 处理 grasp
+    if isinstance(grasp, graspnetAPI.grasp.Grasp):
+        grasp_o3d = grasp.to_open3d_geometry()
+        geometries_to_draw.append(grasp_o3d)
+    if isinstance(grasp, List):
+        for g in grasp:
+            grasp_o3d = g.to_open3d_geometry()
+            geometries_to_draw.append(grasp_o3d)
+    elif isinstance(grasp, graspnetAPI.grasp.GraspGroup):
+        grasp_o3ds = grasp.to_open3d_geometry_list()
+        geometries_to_draw.extend(grasp_o3ds)
+    
+    # 处理 contact_point
+    if contact_point is not None:
+        sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
+        sphere.translate(contact_point)
+        sphere.paint_uniform_color([1, 0, 0])  # 红色
+        geometries_to_draw.append(sphere)
+        
+    # 处理 contact_point 和 post_contact_dirs
+    if contact_point is not None and post_contact_dirs is not None:
+        for post_contact_dir in post_contact_dirs:
+            start_point = contact_point
+            end_point = start_point + post_contact_dir * 0.1
+            line_set = o3d.geometry.LineSet()
+            line_set.points = o3d.utility.Vector3dVector([start_point, end_point])
+            line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
+            line_set.paint_uniform_color([1, 0, 0])  # 红色
+            geometries_to_draw.append(line_set)
+            
+    # 绘制坐标系
+    if visualize_origin:
+        axis_length = 0.1
+        axes = [
+            ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]),  # X轴 (红色)
+            ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]),  # Y轴 (绿色)
+            ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]),  # Z轴 (蓝色)
+        ]
+        
+        for start, end, color in axes:
+            cylinder = create_cylinder(start, end)
+            if cylinder is not None:
+                cylinder.paint_uniform_color(color)
+                geometries_to_draw.append(cylinder)
+    
+    # 处理边界框
+    if bboxes is not None:
+        for bbox in bboxes:
+            bbox_line_set = create_bbox(bbox)
+            geometries_to_draw.append(bbox_line_set)
+    
+    # 处理3D轨迹
+    if tracks_3d is not None:
+        T, N, D = tracks_3d.shape
+        if D != 3:
+            raise ValueError("轨迹的最后一维必须是3（x,y,z坐标）")
+        
+        # 如果未提供颜色，生成随机颜色
+        if tracks_3d_colors is None:
+            tracks_3d_colors = np.random.rand(N, 3)  # 每条轨迹随机颜色
+        else:
+            tracks_3d_colors = np.asarray(tracks_3d_colors)
+            if tracks_3d_colors.shape != (N, 3):
+                raise ValueError("tracks_3d_colors 形状必须为 (N, 3)")
+        
+        # 降采样轨迹：按 tracks_n_step 选择轨迹，按 tracks_t_step 选择时间步
+        t_indices = np.linspace(0, T-1, tracks_t_step, dtype=int)
+        if tracks_n_step is None:
+            tracks_n_step = N - 1
+        n_indices = np.linspace(0, N-1, tracks_n_step, dtype=int)
+        
+        for i in n_indices:  # 遍历降采样的轨迹
+            points = tracks_3d[t_indices, i, :]  # shape: (T', 3)，T' 为降采样后的时间步数
+            # 在轨迹起点添加小球
+            if len(points) > 0:
+                start_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.003)
+                start_sphere.translate(points[0])
+                start_sphere.paint_uniform_color(tracks_3d_colors[i])
+                geometries_to_draw.append(start_sphere)
+            
+            # 为每对连续点绘制带箭头的圆柱体
+            for j in range(len(points)-1):
+                start_point = points[j]
+                end_point = points[j+1]
+                # 检查线段长度
+                segment_vector = end_point - start_point
+                segment_norm = np.linalg.norm(segment_vector)
+                if segment_norm < tracks_norm_threshold:
+                    continue  # 跳过长度小于阈值的线段
+                
+                # 使用 create_directed_cylinder 绘制
+                directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.002)
+                for geom in directed_cylinder:
+                    geom.paint_uniform_color(tracks_3d_colors[i])
+                    geometries_to_draw.append(geom)
+    
+    # 处理关节（pivot_point 和 joint_axis）
+    if pivot_point is not None and joint_axis is not None:
+        pivot_point = np.asarray(pivot_point)
+        joint_axis = np.asarray(joint_axis)
+        if pivot_point.shape != (3,) or joint_axis.shape != (3,):
+            raise ValueError("pivot_point 和 joint_axis 必须是形状为 (3,) 的向量")
+        
+        # 归一化 joint_axis
+        joint_axis = joint_axis / np.linalg.norm(joint_axis)
+        start_point = pivot_point
+        end_point = pivot_point + joint_axis * 0.2
+        
+        # 使用 create_directed_cylinder 绘制关节
+        directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.01, resolution=20)
+        for geom in directed_cylinder:
+            geom.paint_uniform_color([1, 0.5, 0])  # 橙色
+            geometries_to_draw.append(geom)
+        
+
+    if online_viewer:
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(
+            width=800,
+            height=600
+        )
+        for geom in geometries_to_draw:
+            vis.add_geometry(geom)
+        opt = vis.get_render_option()
+        opt.point_size = point_size
+        vis.run()
+        vis.destroy_window()
+    else:
+        scale = 4
+        camera_intrinsic = camera_intrinsic * scale
+        camera_intrinsic[0, 0] *= 1.5
+        camera_intrinsic[1, 1] *= 1.5
+        
+        renderer = o3d.visualization.rendering.OffscreenRenderer(width=800*scale, height=600*scale)
+        renderer.setup_camera(
+            intrinsic_matrix=camera_intrinsic,
+            # Tw2c
+            extrinsic_matrix=np.array([
+                [1, 0, 0, 0],
+                [0, 1, 0, 0],
+                [0, 0, 1, 0.1],
+                [0, 0, 0, 1]
+            ]),
+            intrinsic_width_px=800*scale,
+            intrinsic_height_px=600*scale
+        )
+        scene = renderer.scene
+        scene.set_background(np.array([0., 0., 0., 0]))
+        # 设置光源
+        scene.set_lighting(scene.LightingProfile.SOFT_SHADOWS, [0, 0, 0])
+        # scene.add_directional_light("sun", [1, 1, 1], [1000, 1000, 1000], [0, 0, 0])
+    
+        for i, geom in enumerate(geometries_to_draw):
+            mat = o3d.visualization.rendering.MaterialRecord()
+                # 根据几何体类型设置不同材质
+            if isinstance(geom, o3d.geometry.PointCloud):
+                mat.shader = "defaultUnlit"
+                # mat.shader = "defaultLit"    # 网格使用带光照的材质
+                mat.point_size = point_size  # 点云需要设置点大小
+            elif isinstance(geom, o3d.geometry.TriangleMesh):
+                mat.shader = "defaultLit"    # 网格使用带光照的材质
+                # mat.base_color = np.concatenate([np.asarray(geom.vertex_colors[0]), [1.0]]) if geom.has_vertex_colors() else [0.5, 0.5, 0.5, 1]
+                # mat.base_roughness = 0.0
+                # mat.base_metallic = 0.0
+                mat.base_roughness = 1.0  # 增加粗糙度减少反光 (0-1)
+                mat.base_metallic = 0.9   # 减少金属感 (0-1)
+                mat.base_reflectance = 0.9  # 降低反射率
+            else:  # LineSet等
+                mat.shader = "defaultUnlit"
+                mat.line_width = 2.0  # 线宽设置
+            
+            scene.add_geometry(f"geom_{i}", geom, mat)
+        image = renderer.render_to_image()
+        rgb_image = np.asarray(image)  # shape: (image_height, image_width, 3), uint8
+        return rgb_image
+        
 
 @torch.no_grad()
 def plot_matching(image1, image2, hr1, hr2, span):

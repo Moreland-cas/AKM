@@ -121,13 +121,13 @@ class ReconEnv(ExploreEnv):
         )
         self.logger.log(logging.INFO, self.recon_result)
         
-        if self.exp_cfg["save_obj_repr"]:
-            save_path = os.path.join(
-                self.exp_cfg["exp_folder"],
-                str(self.task_cfg["task_id"]),
-                "obj_repr.npy"
-            )
-            self.obj_repr.save(save_path)
+        # if self.exp_cfg["save_obj_repr"]:
+        #     save_path = os.path.join(
+        #         self.exp_cfg["exp_folder"],
+        #         str(self.task_cfg["task_id"]),
+        #         "obj_repr.npy"
+        #     )
+        #     self.obj_repr.save(save_path)
         return self.recon_result
     
     ###########################################################
