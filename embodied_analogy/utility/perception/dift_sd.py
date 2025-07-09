@@ -262,7 +262,7 @@ class SDFeaturizer4Eval(SDFeaturizer):
         self.pipe.tokenizer = None
         self.pipe.text_encoder = None
         gc.collect()
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
 
 
     @torch.no_grad()

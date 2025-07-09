@@ -425,7 +425,7 @@ def fine_estimation(
             )
         napari.run()
     
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     return scheduler.best_state_dict
 
 

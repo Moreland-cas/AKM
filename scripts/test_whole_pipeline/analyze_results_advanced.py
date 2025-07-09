@@ -34,7 +34,7 @@ class ExpDataPiece():
         self.obj_idx = obj_idx
         self.range_transition = range_transition
         
-        run_yaml_path = os.path.join(cfgs_path, f"base_{run_name}.yaml")
+        run_yaml_path = os.path.join(cfgs_path, f"{run_name}.yaml")
         with open(run_yaml_path, "r") as f:
             run_yaml = yaml.safe_load(f)
         
@@ -177,7 +177,7 @@ class ExpDataPiece():
         ) for (angle_thr_deg, pivot_thr_m) in zip(ANGLE_THRESHS, PIVOT_THRESHS)]
         
         self.manip_valid = []
-        for i in range(self.task_yaml["manip_env_cfg"]["max_attempts"] + 1):
+        for i in range(self.task_yaml["manip_env_cfg"]["max_manip"] + 1):
             self.manip_valid.append([
                 self.manipulate_valid_under_thr(num_manip=i, rel_thr=thr) for thr in MANIP_RELATIVE_VALID_THRESHS
             ])
@@ -185,7 +185,7 @@ class ExpDataPiece():
         # 将 self.loss_array padd 到 max_tries
         self.num_closed_loop_manip = len(self.loss_array)
         # NOTE 之所以要 +1, 是因为我们还保存了操作 0 次时的 loss
-        for i in range(self.task_yaml["manip_env_cfg"]["max_attempts"] - self.num_closed_loop_manip + 1):
+        for i in range(self.task_yaml["manip_env_cfg"]["max_manip"] - self.num_closed_loop_manip + 1):
             self.loss_array.append(self.last_loss)
         
         # 记录一个 长度 为 max_tries 的 manip_error list
@@ -335,7 +335,7 @@ def analyze(run_name="6_21"):
                     )
                 )
     dataAnalyze = DataAnalyze(datalist=data_list)
-    save_analysis_path = f"/home/zby/Programs/Embodied_Analogy/assets/analysis_advanced/{run_name}.txt"
+    save_analysis_path = f"/home/zby/Programs/Embodied_Analogy/assets/analysis_batch/{run_name}.txt"
     with open(save_analysis_path, "w") as f:
         sys.stdout = f
         dataAnalyze.summary_explore()
@@ -344,19 +344,7 @@ def analyze(run_name="6_21"):
 
 if __name__ == "__main__":
     run_names = [
-        # "6_18",
-        # "6_21",
-        # "6_26",
-        # "6_27",
-        # "6_29",
-        # "6_30",
-        # "6_31",
-        # "6_32",
-        # "6_33",
-        # "6_34",
-        # "6_35",
-        # "6_36",
-        "6_38"
+        "ours_5"
     ]
     for run_name in run_names:
         analyze(run_name)

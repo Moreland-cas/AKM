@@ -36,7 +36,7 @@ def run_grounded_sam(
         post_process=post_process_mask,
         visualize=visualize,
     )
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     return initial_bbox, initial_mask
 
 if __name__ == "__main__":

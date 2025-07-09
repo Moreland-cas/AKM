@@ -154,7 +154,7 @@ def detect_grasp_anygrasp(
         Tapp2w = np.hstack((Rapp2w, zero_translation))
         gg.transform(Tapp2w)
         ggs.add(gg)
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
     
     if visualize:
         visualize_pc(

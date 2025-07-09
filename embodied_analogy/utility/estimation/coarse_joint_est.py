@@ -701,7 +701,7 @@ def coarse_estimation(tracks_3d, visualize=False, logger=None, num_R_augmented=1
     
     if logger:
         logger.log(logging.INFO, f"t_est_loss: {t_est_loss}, R_est_loss: {R_est_loss}")
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     if t_est_loss < R_est_loss:
         if logger:
             logger.log(logging.INFO, "Thus, select as prismatic joint")

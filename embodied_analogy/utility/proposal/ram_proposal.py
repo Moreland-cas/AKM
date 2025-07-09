@@ -167,7 +167,7 @@ def get_ram_affordance_2d(
             # Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
             # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
             break
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     return affordance_map_2d
 
 
