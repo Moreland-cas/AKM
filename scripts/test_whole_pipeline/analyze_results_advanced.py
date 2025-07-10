@@ -344,7 +344,8 @@ def analyze(run_name="6_21"):
 
 if __name__ == "__main__":
     run_names = [
-        "ours_5"
+        "ours_wo_AT_3",
+        "ours_wo_AT_5"
     ]
     for run_name in run_names:
         analyze(run_name)
