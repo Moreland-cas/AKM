@@ -344,8 +344,22 @@ def analyze(run_name="6_21"):
 
 if __name__ == "__main__":
     run_names = [
-        "ours_wo_AT_3",
-        "ours_wo_AT_5"
+        # "ours_wo_IOR_1",
+        # "ours_wo_IOR_2",
+        # "ours_wo_IOR_3",
+        # "ours_wo_AT_5",
+        # "ours_wo_CA_1",
+        # "ours_wo_CA_2",
+        # "ours_wo_CA_3",
+        # "ours_zs_1",
+        # "ours_zs_2",
+        # "ours_zs_3",
+        # "gflow_2",
+        # "gflow_3",
+        # "gpnet_2",
+        # "gpnet_3",
+        # "gpnet_4",
+        # "gpnet_5"
     ]
     for run_name in run_names:
         analyze(run_name)
