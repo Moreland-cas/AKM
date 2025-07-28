@@ -351,6 +351,7 @@ def coarse_t_from_tracks_3d(tracks_3d, visualize=False, logger=None):
         joint_states = np.copy(scheduler.best_state_dict["joint_states"])
         joint_dir = np.copy(scheduler.best_state_dict["joint_dir"])
         joint_start = np.copy(scheduler.best_state_dict["joint_start"])
+        tracks_3d = np.copy(tracks_3d)
         reconstructed_tracks = np.expand_dims(tracks_3d[0], axis=0) + np.outer(joint_states, joint_dir).reshape(T, 1, 3) # T, M, 3
         
         viewer = napari.Viewer(ndisplay=3)

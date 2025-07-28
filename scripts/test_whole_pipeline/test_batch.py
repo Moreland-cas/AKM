@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
     
     # byp for base yaml path
-    parser.add_argument('--byp', type=str, default="gflow_4")
+    parser.add_argument('--byp', type=str, default="gflow_5")
     parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new")
     
     args = parser.parse_args()

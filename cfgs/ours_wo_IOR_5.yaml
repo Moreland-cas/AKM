@@ -1,0 +1,62 @@
+exp_cfg:
+# one experiment has multiple task, each has a unique task id
+# the related files of task id are saved under exp_folder/task_id
+  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs_batch/ours_wo_IOR_5"
+  method_name: "ours"
+  save_cfg: True
+  save_obj_repr: False
+  save_result: True
+
+logging:
+  level: INFO
+
+base_env_cfg:
+  offscreen: True
+  phy_timestep: 0.004
+  use_sapien2: True
+  planner_timestep: 0.01
+
+task_cfg:
+  task_id: null
+  instruction: null
+
+obj_env_cfg:
+  data_path: null
+  joint_type: null
+  joint_index: null
+  obj_index: null
+  init_joint_state: null
+  active_joint_name: null
+  active_link_name: null
+  load_scale: null
+  load_pose: null
+  load_quat: null
+  obj_description: null
+
+algo_cfg:
+  use_anygrasp: True
+
+explore_env_cfg:
+  record_fps: 30
+  pertubation_distance: 0.1
+  reserved_distance: 0.05
+  valid_thresh: 0.5
+  update_sigma: 0.05
+  max_tries: 25
+  fully_zeroshot: False
+  num_initial_pts: 1000
+  use_IOR: False
+  contact_analogy: True
+
+recon_env_cfg:
+  num_kframes: 5
+  fine_lr: 0.001
+  reloc_lr: 0.003
+  num_R_augmented: 1000
+
+manip_env_cfg:
+  # max number of manipulations used for closed-loop control
+  max_manip: 5
+  # for whole traj closed-loop
+  prismatic_whole_traj_success_thresh: 0.01
+  revolute_whole_traj_success_thresh: 3
