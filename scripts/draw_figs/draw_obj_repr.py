@@ -27,7 +27,10 @@ from graspnetAPI.grasp import Grasp
 # mobile_pc_color = np.array([162, 223, 248]) / 255.
 # static_pc_color = np.array([179, 173, 235]) / 255.
 
-mobile_pc_color = np.array([0, 255, 0]) / 255
+gray_color = np.array([128, 128, 128]) / 255
+apple_green_color = np.array([159, 191, 82]) / 255
+slight_green_color = np.array([149, 187, 114]) / 255
+mobile_pc_color = np.array([147, 205, 245]) / 255
 static_pc_color = np.array([255, 0, 0]) / 255
 
 def draw_points_on_image(image, uv_list, color_list=None, radius=None, normalized_uv=False):
@@ -67,33 +70,43 @@ def draw_points_on_image(image, uv_list, color_list=None, radius=None, normalize
             
     return image_draw
 
-def add_text_to_image(image: Image.Image, text: str, font_size: int = 20, text_color: tuple = (255, 255, 255), position=(10, 10)) -> Image.Image:
+def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, text_color: tuple = (255, 255, 255), position_ratio: tuple = (0.05, 0.05)) -> Image.Image:
     """
-    在图片左上角添加文本并返回新图片
+    在图片上添加文本,字体大小和位置根据图像大小动态确定,使用 Times New Roman 字体
     
     Args:
         image: PIL Image对象
         text: 要添加的文本
-        font_size: 字体大小
-        text_color: 文本颜色，RGB元组格式 (R, G, B)
+        font_scale: 字体大小相对于图像高度的比例(默认0.05,即5%)
+        text_color: 文本颜色,RGB元组格式 (R, G, B)
+        position_ratio: 文本位置相对于图像宽度和高度的比例 (x_ratio, y_ratio),默认(0.05, 0.05)
     
     Returns:
-        PIL Image对象，包含添加的文本
+        PIL Image对象,包含添加的文本
     """
     # 创建图片副本以避免修改原图
     new_image = image.copy()
+    new_image = new_image.resize((3200, 2400), Image.Resampling.LANCZOS)
     draw = ImageDraw.Draw(new_image)
     
-    # 尝试加载默认字体，如果不可用则使用PIL默认字体
-    # try:
-        # font_path = os.path.join(os.path.dirname(__file__), 'arial.ttf')
-    font_path = "/home/zby/Programs/Embodied_Analogy/scripts/arial.ttf"
-    font = ImageFont.truetype(font_path, font_size)
-    # except:
-    #     print("Error")
-    #     font = ImageFont.load_default()
+    # 获取图像尺寸
+    img_width, img_height = new_image.size
     
-    # 在左上角(10,10)位置绘制文本
+    # 动态计算字体大小(基于图像高度的比例)
+    font_size = int(img_height * font_scale)
+    
+    # 尝试加载 Times New Roman 字体
+    try:
+        font_path = "/home/zby/Programs/Embodied_Analogy/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
+        font = ImageFont.truetype(font_path, font_size)
+    except Exception as e:
+        print(f"无法加载 Times New Roman 字体: {e}, 使用默认字体")
+        font = ImageFont.load_default()
+    
+    # 动态计算文字位置(基于图像尺寸的比例)
+    position = (int(img_width * position_ratio[0]), int(img_height * position_ratio[1]))
+    
+    # 在指定位置绘制文本
     draw.text(position, text, font=font, fill=text_color)
     
     return new_image
@@ -142,8 +155,47 @@ def overlay_mask_on_image(image, mask, overlay_color=(255, 0, 0, 128), bbox_colo
     
     return result
 
+def farthest_point_sampling_2d(points, M):
+    """
+    Perform farthest point sampling on a 2D point set.
+    
+    Args:
+        points: np.ndarray of shape (N, 2), input 2D points
+        M: int, number of points to retain
+    
+    Returns:
+        mask: np.ndarray of shape (N,), boolean mask where True indicates retained points
+    """
+    N = points.shape[0]
+    if M > N or M <= 0:
+        raise ValueError("M must be between 1 and N")
+    
+    # Initialize mask
+    mask = np.zeros(N, dtype=bool)
+    
+    # Randomly select the first point
+    first_idx = np.random.randint(0, N)
+    mask[first_idx] = True
+    
+    # Compute all pairwise distances
+    dist_matrix = np.sqrt(np.sum((points[:, np.newaxis] - points) ** 2, axis=2))
+    
+    # Track minimum distance from each point to selected points
+    min_distances = dist_matrix[first_idx].copy()
+    
+    # Select M-1 more points
+    for _ in range(M - 1):
+        # Find point with maximum minimum distance to selected points
+        next_idx = np.argmax(min_distances)
+        mask[next_idx] = True
+        
+        # Update minimum distances
+        min_distances = np.minimum(min_distances, dist_matrix[next_idx])
+    
+    return mask
+
 # 读取 obj_repr
-vis_idx = [3, 4, 7, 10, 78, 95, 97, 114]
+# vis_idx = [3, 4, 7, 10, 78, 95, 97, 114]
 vis_idx = 3
 load_path = f"/home/zby/Programs/Embodied_Analogy/assets/logs/6_39/{vis_idx}/obj_repr.npy"
 save_folder = f"/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/pipeline_{vis_idx}"
@@ -202,38 +254,42 @@ if visualize_explore:
 
     # 绘制 valid explore 的 tracking result
     num_tracks = obj_repr.frames.track2d_seq.shape[1]
+    # import torch
+    # random_track_idx = torch.randperm(obj_repr.frames.track2d_seq[0].shape[0])[:200]
+    
+    random_track_idx = farthest_point_sampling_2d(obj_repr.frames.track2d_seq[0].numpy(), 200)
     track_colors = colors = np.random.randint(0, 256, size=(num_tracks, 3), dtype=np.uint8)
     draw_points_on_image(
         image=obj_repr.frames[0].rgb,
-        uv_list=obj_repr.frames.track2d_seq[0],
+        uv_list=obj_repr.frames.track2d_seq[0][random_track_idx, :],
         color_list=track_colors,
-        radius=1,
+        radius=3,
     ).save(os.path.join(save_folder, f"track_start.png"))
 
     draw_points_on_image(
         image=obj_repr.frames[-1].rgb,
-        uv_list=obj_repr.frames.track2d_seq[-1],
+        uv_list=obj_repr.frames.track2d_seq[-1][random_track_idx, :],
         color_list=track_colors,
-        radius=1,
+        radius=3,
     ).save(os.path.join(save_folder, f"track_end.png"))
 
 # 绘制 reconstruct
 # 绘制 kframes 的 dynamic mask
-visualize_coarse = False
+visualize_coarse = True
 if visualize_coarse:
     for i, kf in enumerate(obj_repr.kframes):
         kf_rgb = kf.rgb
         dynamic_mask = kf.dynamic_mask
         kf_rgb[dynamic_mask == MOVING_LABEL] = mobile_pc_color * 255
-        kf_rgb[dynamic_mask == STATIC_LABEL] = static_pc_color * 255
-        kf_rgb[(dynamic_mask!=MOVING_LABEL) & (dynamic_mask!=STATIC_LABEL)] = 0
+        # kf_rgb[dynamic_mask == STATIC_LABEL] = static_pc_color * 255
+        kf_rgb[dynamic_mask == STATIC_LABEL] = gray_color * 255
+        # kf_rgb[(dynamic_mask!=MOVING_LABEL) & (dynamic_mask!=STATIC_LABEL)] = 0
+        kf_rgb[(dynamic_mask!=MOVING_LABEL) & (dynamic_mask!=STATIC_LABEL)] = 255
         kf_pil = Image.fromarray(kf_rgb)
         kf_pil = add_text_to_image(
             image=kf_pil,
-            text=f"{i}th kframe: state = {kf.joint_state * 100:.2f} cm",
-            font_size=50,
-            text_color=(255, 255, 255), 
-            position=(10, 10)
+            text=f"{i}th Keyframe\nJoint State: {kf.joint_state * 100:.2f} cm",
+            text_color = (0, 0, 0), 
         )
         kf_pil.save(os.path.join(save_folder, f"kframe_{i}.png"))
     
@@ -254,37 +310,73 @@ if visualize_coarse:
     )
     pc_colors_e = pc_colors_e / 255
 
-
-    tracks_3d_colors = obj_repr.frames.moving_mask[:, None] * np.array([[0, 1, 0]]) + ~obj_repr.frames.moving_mask[:, None] * np.array([[1, 0, 0]])
+    # tracks_3d_colors = obj_repr.frames.moving_mask[:, None] * np.array([[0, 1, 0]]) + ~obj_repr.frames.moving_mask[:, None] * np.array([[1, 0, 0]])
 
     coarse_jonint_dict = obj_repr.get_joint_param(
         resolution="coarse",
         frame="camera"
     )
 
-    obj_pc = np.concatenate([obj_pc_s, obj_pc_e])
-    pc_colors = np.concatenate([pc_colors_s, pc_colors_e])
-
+    # obj_pc = np.concatenate([obj_pc_s, obj_pc_e])
+    # pc_colors = np.concatenate([pc_colors_s, pc_colors_e])
+    moving_track_mask = obj_repr.frames.moving_mask
     coarse_image = visualize_pc(
-        points=obj_pc,
-        colors=pc_colors,
-        tracks_3d=obj_repr.frames.track3d_seq,
-        tracks_3d_colors=tracks_3d_colors,
+        points=[obj_pc_s, obj_pc_e],
+        point_size=[5, 5],
+        # voxel_size=0.005,
+        voxel_size=None,
+        colors=[gray_color, gray_color],
+        alpha=[0.6, 0.6],
+        tracks_3d=obj_repr.frames.track3d_seq[:, moving_track_mask],
+        tracks_3d_colors=apple_green_color,
         pivot_point=coarse_jonint_dict["joint_start"],
         joint_axis=coarse_jonint_dict["joint_dir"],
         tracks_t_step=3, 
-        # tracks_n_step=200,
         tracks_n_step=None,
         tracks_norm_threshold=0.2e-2,
-        point_size=2.5,
         camera_intrinsic=obj_repr.K,
         online_viewer=False
     )
     Image.fromarray(coarse_image).save(os.path.join(save_folder, "coarse_image.png"))
+    
+    coarse_image_start = visualize_pc(
+        points=[obj_pc_s],
+        point_size=[5],
+        voxel_size=None,
+        colors=[gray_color],
+        alpha=[0.6],
+        tracks_3d=obj_repr.frames.track3d_seq[:, moving_track_mask],
+        tracks_3d_colors=apple_green_color,
+        pivot_point=coarse_jonint_dict["joint_start"],
+        joint_axis=coarse_jonint_dict["joint_dir"],
+        tracks_t_step=3, 
+        tracks_n_step=None,
+        tracks_norm_threshold=0.2e-2,
+        camera_intrinsic=obj_repr.K,
+        online_viewer=False
+    )
+    Image.fromarray(coarse_image_start).save(os.path.join(save_folder, "coarse_image_start.png"))
 
+    coarse_image_end = visualize_pc(
+        points=[obj_pc_e],
+        point_size=[5],
+        voxel_size=None,
+        colors=[gray_color],
+        alpha=[0.6],
+        tracks_3d=obj_repr.frames.track3d_seq[:, moving_track_mask],
+        tracks_3d_colors=apple_green_color,
+        pivot_point=coarse_jonint_dict["joint_start"],
+        joint_axis=coarse_jonint_dict["joint_dir"],
+        tracks_t_step=3, 
+        tracks_n_step=None,
+        tracks_norm_threshold=0.2e-2,
+        camera_intrinsic=obj_repr.K,
+        online_viewer=False
+    )
+    Image.fromarray(coarse_image_end).save(os.path.join(save_folder, "coarse_image_end.png"))
 
 # fine 阶段绘制一个 kframes[0] 和 kframes[-1] 的 mobile part + joint axis
-visualize_fine = False
+visualize_fine = True
 if visualize_fine:
     kframes_start_mobile_pc = depth_image_to_pointcloud(
         obj_repr.kframes[0].depth,
@@ -319,20 +411,45 @@ if visualize_fine:
     )
     
     fine_image = visualize_pc(
-        points=np.concatenate([kframes_start_static_pc, kframes_start_mobile_pc, kframes_end_mobile_pc], axis=0),
-        colors=mobile_pc_color[None] * mobile_mask[:, None] + static_pc_color[None] * (1 - mobile_mask[:, None]),
-        point_size=2.5,
+        points=[kframes_start_static_pc, kframes_start_mobile_pc, kframes_end_mobile_pc],
+        colors=[gray_color, mobile_pc_color, mobile_pc_color],
+        voxel_size=None, 
+        point_size=[5, 5, 5],
+        alpha=[0.6, 0.8, 0.8],
         pivot_point=fine_jonint_dict["joint_start"],
         joint_axis=fine_jonint_dict["joint_dir"],
         camera_intrinsic=obj_repr.K,
         online_viewer=False
     )
     Image.fromarray(fine_image).save(os.path.join(save_folder, "fine_image.png"))
-
+    
+    fine_image_start = visualize_pc(
+        points=[kframes_start_static_pc, kframes_start_mobile_pc],
+        colors=[gray_color, mobile_pc_color],
+        voxel_size=None, 
+        point_size=[5, 5],
+        alpha=[0.6, 0.6],
+        pivot_point=fine_jonint_dict["joint_start"],
+        joint_axis=fine_jonint_dict["joint_dir"],
+        camera_intrinsic=obj_repr.K,
+        online_viewer=False
+    )
+    Image.fromarray(fine_image_start).save(os.path.join(save_folder, "fine_image_start.png"))
+    
+    fine_image_end = visualize_pc(
+        points=[kframes_start_static_pc, kframes_end_mobile_pc],
+        colors=[gray_color, mobile_pc_color],
+        voxel_size=None, 
+        point_size=[5, 5],
+        alpha=[0.6, 0.6],
+        pivot_point=fine_jonint_dict["joint_start"],
+        joint_axis=fine_jonint_dict["joint_dir"],
+        camera_intrinsic=obj_repr.K,
+        online_viewer=False
+    )
+    Image.fromarray(fine_image_end).save(os.path.join(save_folder, "fine_image_end.png"))
+    
 # 绘制 manipulate
-# 绘制一下每个 task 对应的 reloc 序列, 包含 rgb 和 mobile part 的点云, 以及 target state 的 mobile part 的点云
-# 绘制出 initial frame
-
 visualize_manipulate = True
 if visualize_manipulate:
     for i in range(4):
@@ -354,9 +471,10 @@ if visualize_manipulate:
                     # 这里改为显示 joint state
                     # text=f"{prefix} Joint State: {joint_state:.2f} cm", 
                     text=f"{prefix} Joint State: {joint_state:.2f} degree", 
-                    position=(10, 10),
-                    font_size=50,
-                    text_color=(255, 255, 255)
+                    # position=(10, 10),
+                    # font_size=50,
+                    # text_color=(255, 255, 255)
+                    text_color = (0, 0, 0), 
                 )
                 texted_img.save(os.path.join(save_folder, task_idx, f"manip_{k}.png"))
                 
@@ -400,40 +518,36 @@ if visualize_manipulate:
                 )
                 
                 manip_reloc = visualize_pc(
-                    points=np.concatenate([manip_first_frame_static_pc, manip_first_frame_mobile_pc], axis=0),
-                    colors=mobile_pc_color[None] * mobile_mask[:, None] + static_pc_color[None] * (1 - mobile_mask[:, None]),
-                    point_size=5,
-                    # pivot_point=fine_jonint_dict["joint_start"],
-                    # joint_axis=fine_jonint_dict["joint_dir"],
+                    points=[manip_first_frame_static_pc, manip_first_frame_mobile_pc],
+                    colors=[gray_color, mobile_pc_color],
+                    point_size=[5, 5],
+                    voxel_size=None,
+                    alpha=[0.6, 0.8],
                     camera_intrinsic=obj_repr.K,
                     online_viewer=False
                 )
                 manip_reloc = Image.fromarray(manip_reloc)
                 manip_reloc = add_text_to_image(
                     image=manip_reloc,
-                    text = f"Relocalized State = {cur_state * 100:.2f} cm", 
-                    font_size = 200, 
-                    text_color= (255, 255, 255), 
-                    position=(40, 40)
+                    text = f"Relocalized Joint State: {cur_state * 100:.2f} cm", 
+                    text_color = (0, 0, 0), 
                 )
                 manip_reloc.save(os.path.join(save_folder, "manip_reloc.png"))
                 
                 manip_terget = visualize_pc(
-                    points=np.concatenate([manip_first_frame_static_pc, translated_mobile_pc], axis=0),
-                    colors=mobile_pc_color[None] * mobile_mask[:, None] + static_pc_color[None] * (1 - mobile_mask[:, None]),
-                    point_size=5,
-                    # pivot_point=fine_jonint_dict["joint_start"],
-                    # joint_axis=fine_jonint_dict["joint_dir"],
+                    points=[manip_first_frame_static_pc, translated_mobile_pc],
+                    colors=[gray_color, mobile_pc_color],
+                    point_size=[5, 5],
+                    alpha=[0.6, 0.8],
+                    voxel_size=None,
                     camera_intrinsic=obj_repr.K,
                     online_viewer=False
                 )
                 manip_terget = Image.fromarray(manip_terget)
                 manip_terget = add_text_to_image(
                     image=manip_terget,
-                    text= f"Target State = {target_state * 100:.2f} cm", 
-                    font_size = 200, 
-                    text_color = (255, 255, 255), 
-                    position=(40, 40)
+                    text= f"Target Joint State: {target_state * 100:.2f} cm", 
+                    text_color = (0, 0, 0), 
                 )
                 manip_terget.save(os.path.join(save_folder, "manip_terget.png"))
                 
@@ -480,15 +594,9 @@ if visualize_manipulate:
                 Tgrasp2c_draws = [obj_repr.Tw2c @ Tgrasp2w for Tgrasp2w in Tgrasp2w_draws]
                 Grasps = []
                 for Tgrasp2c_draw in Tgrasp2c_draws:
-                    # score, width, height, depth
-                    # g_array = [0.1, 0.01, 0.05, 0.02] + Tgrasp2c_draw[:3, :3].reshape(-1).tolist() + Tgrasp2c_draw[:3, -1].tolist() + [0]
                     g_array = [0.1, 0.02, 0.05, 0.00] + Tgrasp2c_draw[:3, :3].reshape(-1).tolist() + Tgrasp2c_draw[:3, -1].tolist() + [0]
                     G = Grasp(np.array(g_array))
                     Grasps.append(G)
-                # Grasps = []
-                # new_grasp = manip_first_frame.detect_grasp(
-                #     use_anygrasp=False, world_frame=False, visualize=False
-                # )
                 
                 from embodied_analogy.utility.grasp.anygrasp import detect_grasp_anygrasp
                 new_grasp = detect_grasp_anygrasp(
@@ -500,23 +608,57 @@ if visualize_manipulate:
                     logger=None
                 )  
                 planned_image = visualize_pc(
-                    points=np.concatenate([manip_first_frame_static_pc, manip_first_frame_mobile_pc], axis=0),
-                    colors=mobile_pc_color[None] * mobile_mask[:, None] + static_pc_color[None] * (1 - mobile_mask[:, None]),
-                    point_size=5,
+                    points=[manip_first_frame_static_pc, manip_first_frame_mobile_pc, translated_mobile_pc],
+                    colors=[gray_color, mobile_pc_color, mobile_pc_color],
+                    alpha=[0.6, 0.8, 0.8],
+                    point_size=[5, 5, 5],
+                    voxel_size=None,
                     grasp=Grasps,
-                    # grasp=new_grasp,
-                    # pivot_point=fine_jonint_dict["joint_start"],
-                    # joint_axis=fine_jonint_dict["joint_dir"],
                     camera_intrinsic=obj_repr.K,
                     online_viewer=False
                 )
                 planned_image = Image.fromarray(planned_image)
                 planned_image = add_text_to_image(
                     image=planned_image,
-                    text= f"Relocalized State = {cur_state * 100:.2f} cm", 
-                    font_size = 200, 
-                    text_color = (255, 255, 255), 
-                    position=(40, 40)
+                    text= f"Plan from {cur_state * 100:.2f} cm to {target_state * 100:.2f} cm", 
+                    text_color = (0, 0, 0), 
                 )
                 planned_image.save(os.path.join(save_folder, "planned_image.png"))
+                
+                
+                planned_image_start = visualize_pc(
+                    points=[manip_first_frame_static_pc, manip_first_frame_mobile_pc],
+                    colors=[gray_color, mobile_pc_color],
+                    point_size=[5, 5],
+                    voxel_size=None,
+                    alpha=[0.6, 0.8],
+                    grasp=Grasps,
+                    camera_intrinsic=obj_repr.K,
+                    online_viewer=False
+                )
+                planned_image_start = Image.fromarray(planned_image_start)
+                planned_image_start = add_text_to_image(
+                    image=planned_image_start,
+                    text= f"Plan from {cur_state * 100:.2f} cm to {target_state * 100:.2f} cm", 
+                    text_color = (0, 0, 0), 
+                )
+                planned_image_start.save(os.path.join(save_folder, "planned_image_start.png"))
+                
+                planned_image_end = visualize_pc(
+                    points=[manip_first_frame_static_pc, translated_mobile_pc],
+                    colors=[gray_color, mobile_pc_color],
+                    point_size=[5, 5],
+                    voxel_size=None,
+                    alpha=[0.6, 0.8],
+                    grasp=Grasps,
+                    camera_intrinsic=obj_repr.K,
+                    online_viewer=False
+                )
+                planned_image_end = Image.fromarray(planned_image_end)
+                planned_image_end = add_text_to_image(
+                    image=planned_image_end,
+                    text= f"Plan from {cur_state * 100:.2f} cm to {target_state * 100:.2f} cm", 
+                    text_color = (0, 0, 0), 
+                )
+                planned_image_end.save(os.path.join(save_folder, "planned_image_end.png"))
                 

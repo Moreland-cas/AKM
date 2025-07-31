@@ -662,6 +662,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         general_flow = np.transpose(general_flow, (1, 0, 2))
         self.general_flow_c = general_flow
         
+        
         if self.recon_env_cfg["use_gt_joint_type"]:
             joint_type = self.obj_repr.gt_joint_dict["joint_type"]
             if joint_type == "revolute":
@@ -684,6 +685,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             )
         
         # 将 joint_dict 转换到世界坐标系下
+        joint_dict["general_flow_c"] = self.general_flow_c
         self.obj_repr.coarse_joint_dict = joint_dict
         self.obj_repr.fine_joint_dict = joint_dict
         
@@ -738,6 +740,14 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+        
+        if self.exp_cfg["save_obj_repr"]:
+            save_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "obj_repr.npy"
+            )
+            self.obj_repr.save(save_path)
                 
     def manip_general_flow_deprecated(self, manip_type, visualize=False):
         """

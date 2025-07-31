@@ -30,7 +30,48 @@ def initialize_napari():
             time_in_msec = 100
             QTimer().singleShot(time_in_msec, app.quit)
         viewer.close()
+
+def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, text_color: tuple = (255, 255, 255), position_ratio: tuple = (0.05, 0.05)) -> Image.Image:
+    """
+    在图片上添加文本,字体大小和位置根据图像大小动态确定,使用 Times New Roman 字体
     
+    Args:
+        image: PIL Image对象
+        text: 要添加的文本
+        font_scale: 字体大小相对于图像高度的比例(默认0.05,即5%)
+        text_color: 文本颜色,RGB元组格式 (R, G, B)
+        position_ratio: 文本位置相对于图像宽度和高度的比例 (x_ratio, y_ratio),默认(0.05, 0.05)
+    
+    Returns:
+        PIL Image对象,包含添加的文本
+    """
+    # 创建图片副本以避免修改原图
+    new_image = image.copy()
+    new_image = new_image.resize((3200, 2400), Image.Resampling.LANCZOS)
+    draw = ImageDraw.Draw(new_image)
+    
+    # 获取图像尺寸
+    img_width, img_height = new_image.size
+    
+    # 动态计算字体大小(基于图像高度的比例)
+    font_size = int(img_height * font_scale)
+    
+    # 尝试加载 Times New Roman 字体
+    try:
+        font_path = "/home/zby/Programs/Embodied_Analogy/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
+        font = ImageFont.truetype(font_path, font_size)
+    except Exception as e:
+        print(f"无法加载 Times New Roman 字体: {e}, 使用默认字体")
+        font = ImageFont.load_default()
+    
+    # 动态计算文字位置(基于图像尺寸的比例)
+    position = (int(img_width * position_ratio[0]), int(img_height * position_ratio[1]))
+    
+    # 在指定位置绘制文本
+    draw.text(position, text, font=font, fill=text_color)
+    
+    return new_image
+
 def pil_to_pygame(pil_image):
     pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
     return pygame.image.fromstring(np.array(pil_image).tobytes(), pil_image.size, "RGB")
@@ -254,33 +295,6 @@ def pil_images_to_mp4(pil_images, output_filename, fps=30):
     video_writer.release()
     print(f"Video saved as {output_filename}")
     
-def add_text_to_image(image, text, position=(10, 10), font_size=30):
-    """
-    在图像的指定位置添加文本。
-    
-    Args:
-        image (PIL.Image): 输入的PIL图像。
-        text (str): 要添加的文本。
-        position (tuple): 文本的左上角位置（默认在左上角,坐标为(10, 10)）。
-        font_size (int): 字体大小, default 30。
-    
-    Returns:
-        PIL.Image: 添加了文本的图像。
-    """
-    # 创建ImageDraw对象
-    draw = ImageDraw.Draw(image)
-    
-    # 使用默认字体,如果需要可以提供路径
-    font = ImageFont.load_default()  # 使用Pillow默认字体
-    try:
-        font = ImageFont.truetype("arial.ttf", font_size)  # 如果有系统字体,可以选择
-    except IOError:
-        print("Arial font not found, using default font.")
-    
-    # 在图像上绘制文本
-    draw.text(position, text, font=font, fill="black")  # fill指定文本颜色,黑色
-    
-    return image
 
 def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalized_uv=False):
     """
@@ -609,120 +623,202 @@ def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution
 
     return [cylinder, cone]
 
-def visualize_pc(points, point_size=1, colors=None, grasp=None, contact_point=None, post_contact_dirs=None, 
+def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None, grasp=None, contact_point=None, post_contact_dirs=None, 
                  bboxes=None, tracks_3d=None, tracks_3d_colors=None, pivot_point=None, joint_axis=None,
                  tracks_t_step=1, tracks_n_step=1, tracks_norm_threshold=1e-3, visualize_origin=False,
                  camera_intrinsic=None, online_viewer=False):
     """
     可视化点云、抓取、接触点、边界框、3D轨迹和关节
-    points: Nx3 点云坐标
-    colors: Nx3 (0-1) 点云颜色
+    points: List[np.ndarray],每個元素為 Nx3 點雲座標
+    point_size: List[float] 或 float,每個點雲的點大小,若為單一值則應用於所有點雲
+    colors: List[np.ndarray],每個元素為 Nx3 (RGB, 0-1) 或 Nx4 (RGBA) 點雲顏色,或 None(默認綠色)
+    alpha: List[float],每個點雲的透明度(0-1),若為 None 則默認 1.0
     grasp: Grasp 或 GraspGroup 对象
     contact_point: 接触点坐标
     post_contact_dirs: 接触点方向列表
-    bboxes: 边界框列表，格式为 [center_x, center_y, center_z, half_x, half_y, half_z]
-    tracks_3d: (T, N, 3) 3D轨迹，T是时间步，N是轨迹数量
-    tracks_3d_colors: (N, 3) 每条轨迹的颜色 (0-1)，或 None（随机颜色）
+    bboxes: 边界框列表,格式为 [center_x, center_y, center_z, half_x, half_y, half_z]
+    tracks_3d: (T, N, 3) 3D轨迹,T是时间步,N是轨迹数量
+    tracks_3d_colors: (N, 3) 每条轨迹的颜色 (0-1),或 None(随机颜色)
     pivot_point: (3,) 关节的枢轴点坐标
     joint_axis: (3,) 关节轴的方向向量
-    tracks_t_step: int 时间步降采样间隔（默认1，即不降采样）
-    tracks_n_step: int 轨迹数量降采样间隔（默认1，即不降采样）
-    tracks_norm_threshold: float 轨迹线段长度的阈值，小于此值不绘制（默认1e-3）
+    tracks_t_step: int 时间步降采样间隔(默认1,即不降采样)
+    tracks_n_step: int 轨迹数量降采样间隔(默认1,即不降采样)
+    tracks_norm_threshold: float 轨迹线段长度的阈值,小于此值不绘制(默认1e-3)
     """
-    # if post_contact_dirs is not None:
-    #     assert isinstance=post_contact_dirs, List)
+    geometries_to_draw = []
     
-    # 初始化点云
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
+    assert isinstance(points, list)
+    assert isinstance(colors, list)
+    if point_size is None:
+        point_size = [1.0] * len(points)
+    elif not isinstance(point_size, list):
+        point_size = [point_size] * len(points)
+    if alpha is None:
+        alpha = [1.0] * len(points)
+    elif not isinstance(alpha, list):
+        alpha = [alpha] * len(points)
     
-    # 处理点云颜色
-    if colors is None:
-        colors = np.zeros([points.shape[0], 3])
-        colors[:, 1] = 1  # 默认颜色为蓝色
-    pcd.colors = o3d.utility.Vector3dVector(colors)
-    
-    geometries_to_draw = [pcd]
+    if not (len(points) == len(colors) == len(point_size) == len(alpha)):
+        raise ValueError("points, colors, point_size 和 alpha 的長度必須相同")
+
+    # 处理點雲
+    for i, (pts, clr, size, alp) in enumerate(zip(points, colors, point_size, alpha)):
+        pts = np.asarray(pts)
+        if pts.ndim != 2 or pts.shape[1] != 3:
+            raise ValueError(f"points[{i}] 必須是 Nx3 陣列")
+        print(pts.shape, colors)
+        
+        pcd = o3d.t.geometry.PointCloud(o3d.core.Tensor(pts))
+        if voxel_size is not None:
+            try:
+                pcd = pcd.voxel_down_sample(voxel_size)
+                pts = pcd.point.positions.numpy()  # 更新点云坐标
+            except Exception as e:
+                raise RuntimeError(f"点云[{i}] 下采样失败: {str(e)}")
+            
+        # 处理顏色
+        if clr is None:
+            clr = np.zeros((pts.shape[0], 4))
+            clr[:, 1] = 1.0  # 默認綠色
+            clr[:, 3] = alp  # 使用指定的透明度
+        elif clr.ndim == 1:
+            clr = np.tile(clr, (pts.shape[0], 1))
+        else:
+            clr = np.asarray(clr)
+            if clr.shape[0] != pts.shape[0]:
+                raise ValueError(f"colors[{i}] 的點數必須與 points[{i}] 匹配")
+            if clr.shape[1] == 3:
+                clr = np.concatenate([clr, np.ones((clr.shape[0], 1)) * alp], axis=1)
+            elif clr.shape[1] != 4:
+                raise ValueError(f"colors[{i}] 必須是 Nx3 (RGB) 或 Nx4 (RGBA)")
+        
+        pcd.point.colors = o3d.core.Tensor(clr[:, :3])  # Tensor 點雲僅儲存 RGB
+        mat = o3d.visualization.rendering.MaterialRecord()
+        mat.shader = "defaultLitTransparency"
+        mat.point_size = size
+        mat.base_color = np.concatenate([clr[0, :3] if clr.shape[0] > 0 else [0.0, 1.0, 0.0], [alp]])
+        geometries_to_draw.append({"name": f"pcd_{i}", "geometry": pcd, "material": mat})
     
     # 处理 grasp
     if isinstance(grasp, graspnetAPI.grasp.Grasp):
         grasp_o3d = grasp.to_open3d_geometry()
-        geometries_to_draw.append(grasp_o3d)
-    if isinstance(grasp, List):
-        for g in grasp:
+        mat = o3d.visualization.rendering.MaterialRecord()
+        mat.shader = "defaultUnlit"
+        mat.base_color = [0.0, 1.0, 0.0, 1.0]  # 綠色，不透明
+        mat.line_width = 2.0
+        geometries_to_draw.append({"name": "grasp", "geometry": grasp_o3d, "material": mat})
+    elif isinstance(grasp, list):
+        for i, g in enumerate(grasp):
             grasp_o3d = g.to_open3d_geometry()
-            geometries_to_draw.append(grasp_o3d)
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultUnlit"
+            mat.base_color = [0.0, 1.0, 0.0, 1.0]
+            mat.line_width = 2.0
+            geometries_to_draw.append({"name": f"grasp_{i}", "geometry": grasp_o3d, "material": mat})
     elif isinstance(grasp, graspnetAPI.grasp.GraspGroup):
         grasp_o3ds = grasp.to_open3d_geometry_list()
-        geometries_to_draw.extend(grasp_o3ds)
+        for i, grasp_o3d in enumerate(grasp_o3ds):
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultUnlit"
+            mat.base_color = [0.0, 1.0, 0.0, 1.0]
+            mat.line_width = 2.0
+            geometries_to_draw.append({"name": f"grasp_group_{i}", "geometry": grasp_o3d, "material": mat})
     
     # 处理 contact_point
     if contact_point is not None:
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
         sphere.translate(contact_point)
-        sphere.paint_uniform_color([1, 0, 0])  # 红色
-        geometries_to_draw.append(sphere)
+        sphere.paint_uniform_color([1, 0, 0])  # 紅色
+        mat = o3d.visualization.rendering.MaterialRecord()
+        mat.shader = "defaultLit"
+        mat.base_color = [1.0, 0.0, 0.0, 1.0]
+        mat.base_roughness = 1.0
+        mat.base_metallic = 0.9
+        mat.base_reflectance = 0.9
+        geometries_to_draw.append({"name": "contact_point", "geometry": sphere, "material": mat})
         
     # 处理 contact_point 和 post_contact_dirs
     if contact_point is not None and post_contact_dirs is not None:
-        for post_contact_dir in post_contact_dirs:
+        for i, post_contact_dir in enumerate(post_contact_dirs):
             start_point = contact_point
             end_point = start_point + post_contact_dir * 0.1
             line_set = o3d.geometry.LineSet()
             line_set.points = o3d.utility.Vector3dVector([start_point, end_point])
             line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
-            line_set.paint_uniform_color([1, 0, 0])  # 红色
-            geometries_to_draw.append(line_set)
+            line_set.paint_uniform_color([1, 0, 0])  # 紅色
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultUnlit"
+            mat.base_color = [1.0, 0.0, 0.0, 1.0]
+            mat.line_width = 2.0
+            geometries_to_draw.append({"name": f"contact_dir_{i}", "geometry": line_set, "material": mat})
             
     # 绘制坐标系
     if visualize_origin:
         axis_length = 0.1
         axes = [
-            ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]),  # X轴 (红色)
-            ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]),  # Y轴 (绿色)
-            ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]),  # Z轴 (蓝色)
+            ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]),  # X軸 (紅色)
+            ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]),  # Y軸 (綠色)
+            ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]),  # Z軸 (藍色)
         ]
         
-        for start, end, color in axes:
+        for i, (start, end, color) in enumerate(axes):
             cylinder = create_cylinder(start, end)
             if cylinder is not None:
                 cylinder.paint_uniform_color(color)
-                geometries_to_draw.append(cylinder)
+                mat = o3d.visualization.rendering.MaterialRecord()
+                mat.shader = "defaultLit"
+                mat.base_color = np.concatenate([color, [1.0]])
+                mat.base_roughness = 1.0
+                mat.base_metallic = 0.9
+                mat.base_reflectance = 0.9
+                geometries_to_draw.append({"name": f"axis_{i}", "geometry": cylinder, "material": mat})
     
     # 处理边界框
     if bboxes is not None:
-        for bbox in bboxes:
+        for i, bbox in enumerate(bboxes):
             bbox_line_set = create_bbox(bbox)
-            geometries_to_draw.append(bbox_line_set)
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultUnlit"
+            mat.base_color = [0, 1, 0., 1.0]  # 綠色
+            mat.line_width = 2.0
+            geometries_to_draw.append({"name": f"bbox_{i}", "geometry": bbox_line_set, "material": mat})
     
     # 处理3D轨迹
     if tracks_3d is not None:
         T, N, D = tracks_3d.shape
         if D != 3:
-            raise ValueError("轨迹的最后一维必须是3（x,y,z坐标）")
+            raise ValueError("轨迹的最后一维必须是3(x,y,z坐标)")
         
-        # 如果未提供颜色，生成随机颜色
+        # 如果未提供颜色,生成随机颜色
         if tracks_3d_colors is None:
             tracks_3d_colors = np.random.rand(N, 3)  # 每条轨迹随机颜色
+        elif tracks_3d_colors.ndim == 1:
+            tracks_3d_colors = np.tile(tracks_3d_colors, (N, 1))
         else:
             tracks_3d_colors = np.asarray(tracks_3d_colors)
-            if tracks_3d_colors.shape != (N, 3):
-                raise ValueError("tracks_3d_colors 形状必须为 (N, 3)")
+            # if tracks_3d_colors.shape != (N, 3):
+            #     raise ValueError("tracks_3d_colors 形状必须为 (N, 3)")
         
-        # 降采样轨迹：按 tracks_n_step 选择轨迹，按 tracks_t_step 选择时间步
+        # 降采样轨迹：按 tracks_n_step 选择轨迹,按 tracks_t_step 选择时间步
         t_indices = np.linspace(0, T-1, tracks_t_step, dtype=int)
         if tracks_n_step is None:
             tracks_n_step = N - 1
         n_indices = np.linspace(0, N-1, tracks_n_step, dtype=int)
         
         for i in n_indices:  # 遍历降采样的轨迹
-            points = tracks_3d[t_indices, i, :]  # shape: (T', 3)，T' 为降采样后的时间步数
+            points = tracks_3d[t_indices, i, :]  # shape: (T', 3),T' 为降采样后的时间步数
             # 在轨迹起点添加小球
             if len(points) > 0:
                 start_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.003)
                 start_sphere.translate(points[0])
                 start_sphere.paint_uniform_color(tracks_3d_colors[i])
-                geometries_to_draw.append(start_sphere)
+                mat = o3d.visualization.rendering.MaterialRecord()
+                mat.shader = "defaultLit"
+                mat.base_color = np.concatenate([tracks_3d_colors[i], [1.0]])
+                mat.base_roughness = 1.0
+                mat.base_metallic = 0.9
+                mat.base_reflectance = 0.9
+                geometries_to_draw.append({"name": f"track_sphere_{i}", "geometry": start_sphere, "material": mat})
             
             # 为每对连续点绘制带箭头的圆柱体
             for j in range(len(points)-1):
@@ -736,11 +832,15 @@ def visualize_pc(points, point_size=1, colors=None, grasp=None, contact_point=No
                 
                 # 使用 create_directed_cylinder 绘制
                 directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.002)
-                for geom in directed_cylinder:
+                for k, geom in enumerate(directed_cylinder):
                     geom.paint_uniform_color(tracks_3d_colors[i])
-                    geometries_to_draw.append(geom)
+                    mat = o3d.visualization.rendering.MaterialRecord()
+                    mat.shader = "defaultUnlit"
+                    mat.base_color = np.concatenate([tracks_3d_colors[i], [1.0]])
+                    mat.line_width = 2.0
+                    geometries_to_draw.append({"name": f"track_cyl_{i}_{k}", "geometry": geom, "material": mat})
     
-    # 处理关节（pivot_point 和 joint_axis）
+    # 处理关节(pivot_point 和 joint_axis)
     if pivot_point is not None and joint_axis is not None:
         pivot_point = np.asarray(pivot_point)
         joint_axis = np.asarray(joint_axis)
@@ -754,25 +854,27 @@ def visualize_pc(points, point_size=1, colors=None, grasp=None, contact_point=No
         
         # 使用 create_directed_cylinder 绘制关节
         directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.01, resolution=20)
-        for geom in directed_cylinder:
+        for i, geom in enumerate(directed_cylinder):
             geom.paint_uniform_color([1, 0.5, 0])  # 橙色
-            geometries_to_draw.append(geom)
-        
+            mat = o3d.visualization.rendering.MaterialRecord()
+            mat.shader = "defaultLit"
+            mat.base_color = [1.0, 0.5, 0.0, 1.0]
+            mat.base_roughness = 1.0
+            mat.base_metallic = 0.9
+            mat.base_reflectance = 0.9
+            geometries_to_draw.append({"name": f"joint_{i}", "geometry": geom, "material": mat})
 
     if online_viewer:
-        vis = o3d.visualization.Visualizer()
-        vis.create_window(
+        o3d.visualization.draw(
+            geometries_to_draw,
+            bg_color=(1, 1, 1, 1.0),  # 深灰色背景
+            show_skybox=False,
             width=800,
             height=600
         )
-        for geom in geometries_to_draw:
-            vis.add_geometry(geom)
-        opt = vis.get_render_option()
-        opt.point_size = point_size
-        vis.run()
-        vis.destroy_window()
     else:
         scale = 4
+        # scale = 1
         camera_intrinsic = camera_intrinsic * scale
         camera_intrinsic[0, 0] *= 1.5
         camera_intrinsic[1, 1] *= 1.5
@@ -785,37 +887,20 @@ def visualize_pc(points, point_size=1, colors=None, grasp=None, contact_point=No
                 [1, 0, 0, 0],
                 [0, 1, 0, 0],
                 [0, 0, 1, 0.1],
+                # [0, 0, 1, 0],
                 [0, 0, 0, 1]
             ]),
             intrinsic_width_px=800*scale,
             intrinsic_height_px=600*scale
         )
         scene = renderer.scene
-        scene.set_background(np.array([0., 0., 0., 0]))
+        scene.set_background(np.array([1., 1., 1., 1.]))
         # 设置光源
         scene.set_lighting(scene.LightingProfile.SOFT_SHADOWS, [0, 0, 0])
-        # scene.add_directional_light("sun", [1, 1, 1], [1000, 1000, 1000], [0, 0, 0])
     
-        for i, geom in enumerate(geometries_to_draw):
-            mat = o3d.visualization.rendering.MaterialRecord()
-                # 根据几何体类型设置不同材质
-            if isinstance(geom, o3d.geometry.PointCloud):
-                mat.shader = "defaultUnlit"
-                # mat.shader = "defaultLit"    # 网格使用带光照的材质
-                mat.point_size = point_size  # 点云需要设置点大小
-            elif isinstance(geom, o3d.geometry.TriangleMesh):
-                mat.shader = "defaultLit"    # 网格使用带光照的材质
-                # mat.base_color = np.concatenate([np.asarray(geom.vertex_colors[0]), [1.0]]) if geom.has_vertex_colors() else [0.5, 0.5, 0.5, 1]
-                # mat.base_roughness = 0.0
-                # mat.base_metallic = 0.0
-                mat.base_roughness = 1.0  # 增加粗糙度减少反光 (0-1)
-                mat.base_metallic = 0.9   # 减少金属感 (0-1)
-                mat.base_reflectance = 0.9  # 降低反射率
-            else:  # LineSet等
-                mat.shader = "defaultUnlit"
-                mat.line_width = 2.0  # 线宽设置
+        for item in geometries_to_draw:
+            scene.add_geometry(item["name"], item["geometry"], item["material"])
             
-            scene.add_geometry(f"geom_{i}", geom, mat)
         image = renderer.render_to_image()
         rgb_image = np.asarray(image)  # shape: (image_height, image_width, 3), uint8
         return rgb_image

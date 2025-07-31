@@ -81,6 +81,15 @@ class GAPartNet_ManipEnv(ManipulateEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+        
+        if self.exp_cfg["save_obj_repr"]:
+            # NOTE 同时需要把 matched bbox 也加上去
+            save_path = os.path.join(
+                self.exp_cfg["exp_folder"],
+                str(self.task_cfg["task_id"]),
+                "obj_repr.npy"
+            )
+            self.obj_repr.save(save_path)
                 
     def manip_gapartnet(self):
         """

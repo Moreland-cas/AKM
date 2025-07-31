@@ -478,6 +478,10 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
         joint_dict["joint_type"] = gt_joint_type
     else:
         joint_dict = coarse_estimation(np.stack([moving_bbox_first, moving_bbox_last], axis=0))
+    
+    joint_dict["moving_bbox_first"] = moving_bbox_first
+    joint_dict["moving_bbox_last"] = moving_bbox_last
+    
     return joint_dict
 
 def estimate_joint_from_bboxes(moving_bbox_first, moving_bbox_last, joint_type):
