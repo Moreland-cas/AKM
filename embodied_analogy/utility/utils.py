@@ -472,110 +472,53 @@ def farthest_point_sampling(point_cloud, M):
     return indices
 
 
-def visualize_pc_deprecated(points, colors=None, grasp=None, contact_point=None, post_contact_dirs=None):
-    """
-    visualize pointcloud
-    points: Nx3
-    colors: Nx3 (0-1)
-    grasp: None
-    """
-    if post_contact_dirs is not None:
-        assert isinstance(post_contact_dirs, List)
-    # 初始化点云
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-    
-    # 处理点云颜色
-    if colors is None:
-        colors = np.zeros([points.shape[0], 3])
-        colors[:, 1] = 1  # 默认颜色为蓝色
-    pcd.colors = o3d.utility.Vector3dVector(colors)
-    
-    # 初始化要绘制的几何对象列表
-    geometries_to_draw = [pcd]
-    
-    # 处理 grasp
-    if isinstance(grasp, graspnetAPI.grasp.Grasp):
-        grasp_o3d = grasp.to_open3d_geometry()
-        geometries_to_draw.append(grasp_o3d)
-    elif isinstance(grasp, graspnetAPI.grasp.GraspGroup):
-        grasp_o3ds = grasp.to_open3d_geometry_list()
-        geometries_to_draw.extend(grasp_o3ds)
-    
-    if contact_point is not None:
-        sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)  # 创建小球
-        sphere.translate(contact_point)  # 平移到 contact_point
-        sphere.paint_uniform_color([1, 0, 0])  # 设置颜色为红色
-        geometries_to_draw.append(sphere)
-        
-    # 处理 contact_point 和 post_contact_dirs
-    if contact_point is not None and post_contact_dirs is not None:
-        for post_contact_dir in post_contact_dirs:
-            start_point = contact_point
-            end_point = start_point + post_contact_dir * 0.1
-            line_set = o3d.geometry.LineSet()
-            line_set.points = o3d.utility.Vector3dVector([start_point, end_point])
-            line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
-            line_set.paint_uniform_color([1, 0, 0])  # 红色
-            geometries_to_draw.append(line_set)
-            
-    # 绘制坐标系
-    axis_length = 0.1  # 坐标轴长度
-    axes = [
-        ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]),  # X轴 (红色)
-        ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]),  # Y轴 (绿色)
-        ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]),  # Z轴 (蓝色)
-    ]
-    
-    # for start, end, color in axes:
-    #     line_set = o3d.geometry.LineSet()
-    #     line_set.points = o3d.utility.Vector3dVector([start, end])
-    #     line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
-    #     line_set.paint_uniform_color(color)  # 设置颜色
-    #     geometries_to_draw.append(line_set)
-    
-    for start, end, color in axes:
-        cylinder = create_cylinder(start, end)
-        if cylinder is not None:
-            cylinder.paint_uniform_color(color)  # 设置颜色
-            geometries_to_draw.append(cylinder)
-    
-    # 统一绘制所有几何对象
-    o3d.visualization.draw_geometries(geometries_to_draw)
-
-
-def create_bbox(bbox, color=[0, 1, 0]):
+def create_bbox(bbox, radius=0.01):
     """
     创建一个长方体 bbox
     center: 中心点坐标 [x, y, z]
     half_x, half_y, half_z: 半长、半宽、半高
     color: 颜色
     """
-    
-    points = bbox
-    lines = [
-        # 0 1 4 2
-        [0, 1],
-        [0, 2],
-        [2, 4],
-        [4, 1],
-        # 3 5 7 6
-        [3, 5],
-        [5, 7],
-        [7, 6],
-        [6, 3],
-        #
-        [0, 3],
-        [1, 5],
-        [4, 7],
-        [2, 6]
+    edges = [
+        [0, 1], [0, 2], [2, 4], [4, 1],
+        [3, 5], [5, 7], [7, 6], [6, 3],
+        [0, 3], [1, 5], [4, 7], [2, 6]
     ]
-    colors = [color for _ in range(len(lines))]
-    line_set = o3d.geometry.LineSet()
-    line_set.points = o3d.utility.Vector3dVector(points)
-    line_set.lines = o3d.utility.Vector2iVector(lines)
-    line_set.colors = o3d.utility.Vector3dVector(colors)
-    return line_set
+    points = np.array(bbox)
+    geometries = []
+
+    for edge in edges:
+        start = points[edge[0]]
+        end = points[edge[1]]
+        
+        direction = end - start
+        length = np.linalg.norm(direction)
+        
+        cylinder = o3d.geometry.TriangleMesh.create_cylinder(
+            radius=radius,
+            height=length,
+            resolution=10,
+            split=1
+        )
+        
+        z_axis = np.array([0, 0, 1])
+        direction_norm = direction / length if length > 0 else z_axis
+        axis = np.cross(z_axis, direction_norm)
+        axis_norm = np.linalg.norm(axis)
+        
+        if axis_norm > 1e-6:
+            axis = axis / axis_norm
+            angle = np.arccos(np.dot(z_axis, direction_norm))
+            rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle(axis * angle)
+        else:
+            rotation_matrix = np.eye(3) if direction_norm[2] > 0 else o3d.geometry.get_rotation_matrix_from_axis_angle([1, 0, 0], np.pi)
+        
+        cylinder.rotate(rotation_matrix, center=(0, 0, 0))
+        cylinder.translate(start + (end - start) / 2)
+        
+        geometries.append(cylinder)
+    
+    return geometries
 
 def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution=10, cylinder_per=0.7):
     """
@@ -624,9 +567,9 @@ def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution
     return [cylinder, cone]
 
 def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None, grasp=None, contact_point=None, post_contact_dirs=None, 
-                 bboxes=None, tracks_3d=None, tracks_3d_colors=None, pivot_point=None, joint_axis=None,
+                 bboxes=None, bbox_radius=0.01, tracks_3d=None, tracks_3d_colors=None, pivot_point=None, joint_axis=None,
                  tracks_t_step=1, tracks_n_step=1, tracks_norm_threshold=1e-3, visualize_origin=False,
-                 camera_intrinsic=None, online_viewer=False):
+                 camera_intrinsic=None, camera_extrinsic=None, zoom_in_scale=2, online_viewer=False):
     """
     可视化点云、抓取、接触点、边界框、3D轨迹和关节
     points: List[np.ndarray],每個元素為 Nx3 點雲座標
@@ -636,7 +579,6 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
     grasp: Grasp 或 GraspGroup 对象
     contact_point: 接触点坐标
     post_contact_dirs: 接触点方向列表
-    bboxes: 边界框列表,格式为 [center_x, center_y, center_z, half_x, half_y, half_z]
     tracks_3d: (T, N, 3) 3D轨迹,T是时间步,N是轨迹数量
     tracks_3d_colors: (N, 3) 每条轨迹的颜色 (0-1),或 None(随机颜色)
     pivot_point: (3,) 关节的枢轴点坐标
@@ -653,6 +595,8 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         point_size = [1.0] * len(points)
     elif not isinstance(point_size, list):
         point_size = [point_size] * len(points)
+    if not isinstance(colors, list):
+        colors = [colors] * len(points) if colors is not None else [None] * len(points)
     if alpha is None:
         alpha = [1.0] * len(points)
     elif not isinstance(alpha, list):
@@ -776,12 +720,16 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
     # 处理边界框
     if bboxes is not None:
         for i, bbox in enumerate(bboxes):
-            bbox_line_set = create_bbox(bbox)
-            mat = o3d.visualization.rendering.MaterialRecord()
-            mat.shader = "defaultUnlit"
-            mat.base_color = [0, 1, 0., 1.0]  # 綠色
-            mat.line_width = 2.0
-            geometries_to_draw.append({"name": f"bbox_{i}", "geometry": bbox_line_set, "material": mat})
+            bbox_line_sets = create_bbox(bbox, radius=bbox_radius)
+            for j, line_set in enumerate(bbox_line_sets):
+                mat = o3d.visualization.rendering.MaterialRecord()
+                mat.shader = "defaultLit"
+                apple_green_color = np.array([159, 191, 82]) / 255
+                mat.base_color = np.concatenate([apple_green_color, [1.0]])
+                mat.base_roughness = 1.0
+                mat.base_metallic = 0.9
+                mat.base_reflectance = 0.9
+                geometries_to_draw.append({"name": f"bbox_{i}_{j}", "geometry": line_set, "material": mat})
     
     # 处理3D轨迹
     if tracks_3d is not None:
@@ -800,11 +748,13 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
             #     raise ValueError("tracks_3d_colors 形状必须为 (N, 3)")
         
         # 降采样轨迹：按 tracks_n_step 选择轨迹,按 tracks_t_step 选择时间步
-        t_indices = np.linspace(0, T-1, tracks_t_step, dtype=int)
         if tracks_n_step is None:
             tracks_n_step = N - 1
         n_indices = np.linspace(0, N-1, tracks_n_step, dtype=int)
-        
+        if tracks_t_step is None:
+            tracks_t_step = T - 1
+        t_indices = np.linspace(0, T-1, tracks_t_step, dtype=int)
+        print(t_indices)
         for i in n_indices:  # 遍历降采样的轨迹
             points = tracks_3d[t_indices, i, :]  # shape: (T', 3),T' 为降采样后的时间步数
             # 在轨迹起点添加小球
@@ -820,25 +770,34 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
                 mat.base_reflectance = 0.9
                 geometries_to_draw.append({"name": f"track_sphere_{i}", "geometry": start_sphere, "material": mat})
             
-            # 为每对连续点绘制带箭头的圆柱体
-            for j in range(len(points)-1):
-                start_point = points[j]
-                end_point = points[j+1]
-                # 检查线段长度
-                segment_vector = end_point - start_point
-                segment_norm = np.linalg.norm(segment_vector)
-                if segment_norm < tracks_norm_threshold:
-                    continue  # 跳过长度小于阈值的线段
-                
-                # 使用 create_directed_cylinder 绘制
-                directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.002)
-                for k, geom in enumerate(directed_cylinder):
-                    geom.paint_uniform_color(tracks_3d_colors[i])
-                    mat = o3d.visualization.rendering.MaterialRecord()
-                    mat.shader = "defaultUnlit"
-                    mat.base_color = np.concatenate([tracks_3d_colors[i], [1.0]])
-                    mat.line_width = 2.0
-                    geometries_to_draw.append({"name": f"track_cyl_{i}_{k}", "geometry": geom, "material": mat})
+            if len(points) > 1:  # 确保至少有两个点
+                start_point = points[0]
+                end_point = points[-1]
+                track_vector = end_point - start_point
+                track_norm = np.linalg.norm(track_vector)
+                # print(f"Track {i}, start-to-end norm: {track_norm}")  # 调试输出
+                if track_norm < tracks_norm_threshold:
+                    # print(f"Track {i} skipped due to norm {track_norm} < {tracks_norm_threshold}")  # 调试输出
+                    continue  # 跳过首尾距离小于阈值的轨迹
+            
+                # 为每对连续点绘制带箭头的圆柱体
+                for j in range(len(points)-1):
+                    start_point = points[j]
+                    end_point = points[j+1]
+                    # 检查线段长度
+                    segment_vector = end_point - start_point
+                    segment_norm = np.linalg.norm(segment_vector)
+                    if segment_norm < tracks_norm_threshold:
+                        continue  # 跳过长度小于阈值的线段
+                    
+                    # 使用 create_directed_cylinder 绘制
+                    directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.002)
+                    for k, geom in enumerate(directed_cylinder):
+                        geom.paint_uniform_color(tracks_3d_colors[i])
+                        mat = o3d.visualization.rendering.MaterialRecord()
+                        mat.shader = "defaultUnlit"
+                        mat.base_color = np.concatenate([tracks_3d_colors[i], [1.0]])
+                        geometries_to_draw.append({"name": f"track_cyl_{i}_{j}_{k}", "geometry": geom, "material": mat})
     
     # 处理关节(pivot_point 和 joint_axis)
     if pivot_point is not None and joint_axis is not None:
@@ -850,7 +809,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         # 归一化 joint_axis
         joint_axis = joint_axis / np.linalg.norm(joint_axis)
         start_point = pivot_point
-        end_point = pivot_point + joint_axis * 0.2
+        end_point = pivot_point + joint_axis * 0.3
         
         # 使用 create_directed_cylinder 绘制关节
         directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.01, resolution=20)
@@ -873,25 +832,16 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
             height=600
         )
     else:
-        scale = 4
-        # scale = 1
-        camera_intrinsic = camera_intrinsic * scale
-        camera_intrinsic[0, 0] *= 1.5
-        camera_intrinsic[1, 1] *= 1.5
-        
-        renderer = o3d.visualization.rendering.OffscreenRenderer(width=800*scale, height=600*scale)
+        if zoom_in_scale is None:
+            zoom_in_scale = 1.
+        camera_intrinsic = camera_intrinsic * zoom_in_scale
+        camera_intrinsic[-1, -1] = 1
+        renderer = o3d.visualization.rendering.OffscreenRenderer(width=800*zoom_in_scale, height=600*zoom_in_scale)
         renderer.setup_camera(
             intrinsic_matrix=camera_intrinsic,
-            # Tw2c
-            extrinsic_matrix=np.array([
-                [1, 0, 0, 0],
-                [0, 1, 0, 0],
-                [0, 0, 1, 0.1],
-                # [0, 0, 1, 0],
-                [0, 0, 0, 1]
-            ]),
-            intrinsic_width_px=800*scale,
-            intrinsic_height_px=600*scale
+            extrinsic_matrix=camera_extrinsic,
+            intrinsic_width_px=800*zoom_in_scale,
+            intrinsic_height_px=600*zoom_in_scale
         )
         scene = renderer.scene
         scene.set_background(np.array([1., 1., 1., 1.]))

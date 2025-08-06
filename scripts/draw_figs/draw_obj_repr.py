@@ -33,6 +33,15 @@ slight_green_color = np.array([149, 187, 114]) / 255
 mobile_pc_color = np.array([147, 205, 245]) / 255
 static_pc_color = np.array([255, 0, 0]) / 255
 
+render_intrinsic = np.array(
+    [[300.,   0., 400.],
+    [  0., 300., 300.],
+    [  0.,   0.,   1.]], dtype=np.float32)
+render_extrinsic = np.eye(4)
+# z 軸
+render_extrinsic[2, -1] = 0.1
+zoom_in_scale = 2
+
 def draw_points_on_image(image, uv_list, color_list=None, radius=None, normalized_uv=False):
     """
     Args:
@@ -202,7 +211,7 @@ save_folder = f"/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs
 os.makedirs(save_folder, exist_ok=True)
 obj_repr: Obj_repr = Obj_repr.load(load_path)
 
-visualize_explore = True
+visualize_explore = False
 if visualize_explore:
     num_tries = len(obj_repr.save_for_vis["explore_cos_map"])
     # 绘制多次 explore 的首尾帧
@@ -280,16 +289,16 @@ if visualize_coarse:
     for i, kf in enumerate(obj_repr.kframes):
         kf_rgb = kf.rgb
         dynamic_mask = kf.dynamic_mask
-        kf_rgb[dynamic_mask == MOVING_LABEL] = mobile_pc_color * 255
-        # kf_rgb[dynamic_mask == STATIC_LABEL] = static_pc_color * 255
-        kf_rgb[dynamic_mask == STATIC_LABEL] = gray_color * 255
-        # kf_rgb[(dynamic_mask!=MOVING_LABEL) & (dynamic_mask!=STATIC_LABEL)] = 0
+        alpha = 0.4
+        kf_rgb[dynamic_mask == MOVING_LABEL] = mobile_pc_color * 255 * alpha + (1-alpha) * np.array([255, 255, 255])
+        kf_rgb[dynamic_mask == STATIC_LABEL] = gray_color * 255 * alpha + (1-alpha) * np.array([255, 255, 255])
         kf_rgb[(dynamic_mask!=MOVING_LABEL) & (dynamic_mask!=STATIC_LABEL)] = 255
-        kf_pil = Image.fromarray(kf_rgb)
+        kf_pil = Image.fromarray(kf_rgb.astype(np.uint8)) 
         kf_pil = add_text_to_image(
             image=kf_pil,
             text=f"{i}th Keyframe\nJoint State: {kf.joint_state * 100:.2f} cm",
             text_color = (0, 0, 0), 
+            font_scale=0.1
         )
         kf_pil.save(os.path.join(save_folder, f"kframe_{i}.png"))
     
@@ -334,7 +343,9 @@ if visualize_coarse:
         tracks_t_step=3, 
         tracks_n_step=None,
         tracks_norm_threshold=0.2e-2,
-        camera_intrinsic=obj_repr.K,
+        camera_intrinsic=render_intrinsic,
+        camera_extrinsic=render_extrinsic,
+        zoom_in_scale=zoom_in_scale,
         online_viewer=False
     )
     Image.fromarray(coarse_image).save(os.path.join(save_folder, "coarse_image.png"))
@@ -352,7 +363,9 @@ if visualize_coarse:
         tracks_t_step=3, 
         tracks_n_step=None,
         tracks_norm_threshold=0.2e-2,
-        camera_intrinsic=obj_repr.K,
+        camera_intrinsic=render_intrinsic,
+        camera_extrinsic=render_extrinsic,
+        zoom_in_scale=zoom_in_scale,
         online_viewer=False
     )
     Image.fromarray(coarse_image_start).save(os.path.join(save_folder, "coarse_image_start.png"))
@@ -370,38 +383,36 @@ if visualize_coarse:
         tracks_t_step=3, 
         tracks_n_step=None,
         tracks_norm_threshold=0.2e-2,
-        camera_intrinsic=obj_repr.K,
+        camera_intrinsic=render_intrinsic,
+        camera_extrinsic=render_extrinsic,
+        zoom_in_scale=zoom_in_scale,
         online_viewer=False
     )
     Image.fromarray(coarse_image_end).save(os.path.join(save_folder, "coarse_image_end.png"))
 
 # fine 阶段绘制一个 kframes[0] 和 kframes[-1] 的 mobile part + joint axis
-visualize_fine = True
+visualize_fine = False
 if visualize_fine:
     kframes_start_mobile_pc = depth_image_to_pointcloud(
         obj_repr.kframes[0].depth,
         obj_repr.kframes[0].dynamic_mask == MOVING_LABEL,
         obj_repr.kframes[0].K,
     )
-    # visualize_pc(kframes_start_mobile_pc)
     kframes_start_static_pc = depth_image_to_pointcloud(
         obj_repr.kframes[0].depth,
         obj_repr.kframes[0].dynamic_mask == STATIC_LABEL,
         obj_repr.kframes[0].K,
     )
-    # visualize_pc(kframes_start_static_pc)
     kframes_end_mobile_pc = depth_image_to_pointcloud(
         obj_repr.kframes[-1].depth,
         obj_repr.kframes[-1].dynamic_mask == MOVING_LABEL,
         obj_repr.kframes[-1].K,
     )
-    # visualize_pc(kframes_end_mobile_pc)
     kframes_end_static_pc = depth_image_to_pointcloud(
         obj_repr.kframes[-1].depth,
         obj_repr.kframes[-1].dynamic_mask == STATIC_LABEL,
         obj_repr.kframes[-1].K,
     )
-    # visualize_pc(kframes_end_static_pc)
     mobile_mask = np.zeros(kframes_start_static_pc.shape[0] + kframes_start_mobile_pc.shape[0] + kframes_end_mobile_pc.shape[0])
     mobile_mask[kframes_start_static_pc.shape[0]:] = 1
     
@@ -418,7 +429,9 @@ if visualize_fine:
         alpha=[0.6, 0.8, 0.8],
         pivot_point=fine_jonint_dict["joint_start"],
         joint_axis=fine_jonint_dict["joint_dir"],
-        camera_intrinsic=obj_repr.K,
+        camera_intrinsic=render_intrinsic,
+        camera_extrinsic=render_extrinsic,
+        zoom_in_scale=zoom_in_scale,
         online_viewer=False
     )
     Image.fromarray(fine_image).save(os.path.join(save_folder, "fine_image.png"))
@@ -431,7 +444,9 @@ if visualize_fine:
         alpha=[0.6, 0.6],
         pivot_point=fine_jonint_dict["joint_start"],
         joint_axis=fine_jonint_dict["joint_dir"],
-        camera_intrinsic=obj_repr.K,
+        camera_intrinsic=render_intrinsic,
+        camera_extrinsic=render_extrinsic,
+        zoom_in_scale=zoom_in_scale,
         online_viewer=False
     )
     Image.fromarray(fine_image_start).save(os.path.join(save_folder, "fine_image_start.png"))
@@ -444,7 +459,9 @@ if visualize_fine:
         alpha=[0.6, 0.6],
         pivot_point=fine_jonint_dict["joint_start"],
         joint_axis=fine_jonint_dict["joint_dir"],
-        camera_intrinsic=obj_repr.K,
+        camera_intrinsic=render_intrinsic,
+        camera_extrinsic=render_extrinsic,
+        zoom_in_scale=zoom_in_scale,
         online_viewer=False
     )
     Image.fromarray(fine_image_end).save(os.path.join(save_folder, "fine_image_end.png"))
@@ -459,25 +476,21 @@ if visualize_manipulate:
             task_idx = f"{i}_{j}"
             os.makedirs(os.path.join(save_folder, task_idx), exist_ok=True)
             for k in range(len(obj_repr.save_for_vis[task_idx])):
-                # if k == 0:
-                #     joint_state = obj_repr.save_for_vis[task_idx][0].gt_joint_state * 100
-                # else:
-                #     joint_state = obj_repr.save_for_vis[task_idx][0].gt_joint_state * 100 + (j - i) * 10
-                joint_state = obj_repr.save_for_vis[task_idx][k].gt_joint_state * 100
-                joint_state = np.rad2deg(obj_repr.save_for_vis[task_idx][k].gt_joint_state)
+                joint_type = obj_repr.fine_joint_dict["joint_type"]
+                if joint_type == "revolute":
+                    joint_state = np.rad2deg(obj_repr.save_for_vis[task_idx][k].gt_joint_state)
+                else:
+                    joint_state = obj_repr.save_for_vis[task_idx][k].gt_joint_state * 100
+                
                 prefix = "Init" if k == 0 else "End"
                 texted_img = add_text_to_image(
                     image=Image.fromarray(obj_repr.save_for_vis[task_idx][k].rgb),
-                    # 这里改为显示 joint state
-                    # text=f"{prefix} Joint State: {joint_state:.2f} cm", 
+                    font_scale=0.1,
                     text=f"{prefix} Joint State: {joint_state:.2f} degree", 
-                    # position=(10, 10),
-                    # font_size=50,
-                    # text_color=(255, 255, 255)
-                    text_color = (0, 0, 0), 
+                    text_color=(255, 255, 255)
                 )
                 texted_img.save(os.path.join(save_folder, task_idx, f"manip_{k}.png"))
-                
+            # continue
             if i == 1 and j == 3:
                 manip_first_frame = obj_repr.save_for_vis[task_idx][0]
                 cur_state = manip_first_frame.joint_state
@@ -507,7 +520,6 @@ if visualize_manipulate:
                     manip_first_frame.obj_mask & ~(manip_first_frame.dynamic_mask == MOVING_LABEL),
                     manip_first_frame.K,
                 )
-                # visualize_pc(manip_first_frame_static_pc)
                 
                 mobile_mask = np.zeros(manip_first_frame_static_pc.shape[0] + manip_first_frame_mobile_pc.shape[0])
                 mobile_mask[manip_first_frame_static_pc.shape[0]:] = 1
@@ -523,14 +535,17 @@ if visualize_manipulate:
                     point_size=[5, 5],
                     voxel_size=None,
                     alpha=[0.6, 0.8],
-                    camera_intrinsic=obj_repr.K,
+                    camera_intrinsic=render_intrinsic,
+                    camera_extrinsic=render_extrinsic,
+                    zoom_in_scale=zoom_in_scale,
                     online_viewer=False
                 )
                 manip_reloc = Image.fromarray(manip_reloc)
                 manip_reloc = add_text_to_image(
                     image=manip_reloc,
-                    text = f"Relocalized Joint State: {cur_state * 100:.2f} cm", 
+                    text = f"Relocalized State: {cur_state * 100:.2f} cm", 
                     text_color = (0, 0, 0), 
+                    font_scale=0.1,
                 )
                 manip_reloc.save(os.path.join(save_folder, "manip_reloc.png"))
                 
@@ -540,14 +555,17 @@ if visualize_manipulate:
                     point_size=[5, 5],
                     alpha=[0.6, 0.8],
                     voxel_size=None,
-                    camera_intrinsic=obj_repr.K,
+                    camera_intrinsic=render_intrinsic,
+                    camera_extrinsic=render_extrinsic,
+                    zoom_in_scale=zoom_in_scale,
                     online_viewer=False
                 )
                 manip_terget = Image.fromarray(manip_terget)
                 manip_terget = add_text_to_image(
                     image=manip_terget,
-                    text= f"Target Joint State: {target_state * 100:.2f} cm", 
+                    text= f"Target State: {target_state * 100:.2f} cm", 
                     text_color = (0, 0, 0), 
+                    font_scale=0.1,
                 )
                 manip_terget.save(os.path.join(save_folder, "manip_terget.png"))
                 
@@ -614,14 +632,17 @@ if visualize_manipulate:
                     point_size=[5, 5, 5],
                     voxel_size=None,
                     grasp=Grasps,
-                    camera_intrinsic=obj_repr.K,
+                    camera_intrinsic=render_intrinsic,
+                    camera_extrinsic=render_extrinsic,
+                    zoom_in_scale=zoom_in_scale,
                     online_viewer=False
                 )
                 planned_image = Image.fromarray(planned_image)
                 planned_image = add_text_to_image(
                     image=planned_image,
-                    text= f"Plan from {cur_state * 100:.2f} cm to {target_state * 100:.2f} cm", 
+                    text= f"{cur_state * 100:.2f} cm -> {target_state * 100:.2f} cm", 
                     text_color = (0, 0, 0), 
+                    font_scale=0.1,
                 )
                 planned_image.save(os.path.join(save_folder, "planned_image.png"))
                 
@@ -633,7 +654,9 @@ if visualize_manipulate:
                     voxel_size=None,
                     alpha=[0.6, 0.8],
                     grasp=Grasps,
-                    camera_intrinsic=obj_repr.K,
+                    camera_intrinsic=render_intrinsic,
+                    camera_extrinsic=render_extrinsic,
+                    zoom_in_scale=zoom_in_scale,
                     online_viewer=False
                 )
                 planned_image_start = Image.fromarray(planned_image_start)
@@ -641,6 +664,7 @@ if visualize_manipulate:
                     image=planned_image_start,
                     text= f"Plan from {cur_state * 100:.2f} cm to {target_state * 100:.2f} cm", 
                     text_color = (0, 0, 0), 
+                    font_scale=0.1,
                 )
                 planned_image_start.save(os.path.join(save_folder, "planned_image_start.png"))
                 
@@ -651,7 +675,9 @@ if visualize_manipulate:
                     voxel_size=None,
                     alpha=[0.6, 0.8],
                     grasp=Grasps,
-                    camera_intrinsic=obj_repr.K,
+                    camera_intrinsic=render_intrinsic,
+                    camera_extrinsic=render_extrinsic,
+                    zoom_in_scale=zoom_in_scale,
                     online_viewer=False
                 )
                 planned_image_end = Image.fromarray(planned_image_end)
@@ -659,6 +685,7 @@ if visualize_manipulate:
                     image=planned_image_end,
                     text= f"Plan from {cur_state * 100:.2f} cm to {target_state * 100:.2f} cm", 
                     text_color = (0, 0, 0), 
+                    font_scale=0.1,
                 )
                 planned_image_end.save(os.path.join(save_folder, "planned_image_end.png"))
                 
