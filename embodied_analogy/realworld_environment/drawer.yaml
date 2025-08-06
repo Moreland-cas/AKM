@@ -1,0 +1,44 @@
+exp_cfg:
+  exp_folder: /home/user/Programs/Embodied_Analogy/assets/logs_rw/drawer
+  method_name: ours
+  save_cfg: true
+  save_obj_repr: true
+  save_result: true
+  realworld: true
+logging:
+  level: INFO
+base_env_cfg:
+  offscreen: true
+  phy_timestep: 0.004
+  use_sapien2: true
+  planner_timestep: 0.1
+  calib_folder: /home/user/Programs/Embodied_Analogy/assets/calib_data
+task_cfg:
+  task_id: 1
+  instruction: open the cabinet
+obj_env_cfg:
+  joint_type: prismatic
+  obj_description: cabinet
+  load_joint_state: 0
+algo_cfg:
+  use_anygrasp: True
+explore_env_cfg:
+  pertubation_distance: 0.1
+  reserved_distance: 0.1
+  valid_thresh: 0.5
+  update_sigma: 0.05
+  max_tries: 5
+  fully_zeroshot: false
+  num_initial_pts: 2000
+  use_IOR: true
+  contact_analogy: true
+recon_env_cfg:
+  num_kframes: 5
+  fine_lr: 0.001
+  reloc_lr: 0.003
+  num_R_augmented: 100
+manip_env_cfg:
+  max_manip: 1
+  prismatic_whole_traj_success_thresh: 0.01
+  revolute_whole_traj_success_thresh: 3
+  goal_delta: 0
