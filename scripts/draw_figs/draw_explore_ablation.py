@@ -26,7 +26,7 @@ def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Explo
     - output_file: Path to save the PNG file (default: '/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/explore_ablation_2.png').
     """
     # 创建图形
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 5))
     
     # 高级感颜色列表（Tableau-inspired）
     colors = ['#4C78A8', '#F28C38', '#76B7B2', '#E15759', '#B07AA1', '#59A14F', '#EDC949']
