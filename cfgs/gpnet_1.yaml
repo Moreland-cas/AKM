@@ -1,7 +1,7 @@
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs_batch/gpnet_1"
+  exp_folder: "/home/zby/Programs/AKM/assets/logs_batch/gpnet_1"
   method_name: "gpnet"
   save_cfg: True
   save_obj_repr: False

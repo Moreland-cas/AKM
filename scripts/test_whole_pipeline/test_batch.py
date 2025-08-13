@@ -144,7 +144,7 @@ if __name__ == "__main__":
     
     # byp for base yaml path
     parser.add_argument('--byp', type=str, default="gflow_draw")
-    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new")
+    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/AKM/cfgs/task_cfgs_new")
     
     args = parser.parse_args()
     assert (args.cs >= 0) and (args.cs < args.ts)
@@ -155,21 +155,21 @@ if __name__ == "__main__":
     
     # 可视化五个 revolute, 五个 prismatic, 最好都是一次 explore 就成功的那种, 且物品最好不同
     yaml_path_list=[
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/11.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/17.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/22.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/27.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/33.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/11.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/17.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/22.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/27.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/33.yaml",
         #
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/85.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/93.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/104.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/110.yaml",
-        "/home/zby/Programs/Embodied_Analogy/cfgs/task_cfgs_new/115.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/85.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/93.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/104.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/110.yaml",
+        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/115.yaml",
     ]
     
     # 对 yaml_path_list 进行过滤
-    base_yaml_path = os.path.join("/home/zby/Programs/Embodied_Analogy/cfgs/", f"{args.byp}.yaml")
+    base_yaml_path = os.path.join("/home/zby/Programs/AKM/cfgs/", f"{args.byp}.yaml")
     yaml_path_list = filter_tasks(base_yaml_path, yaml_path_list)
     
     task_groups = distribute_tasks(yaml_path_list, args.ts)

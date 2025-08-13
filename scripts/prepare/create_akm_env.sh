@@ -4,7 +4,7 @@
 set -e
 set -o pipefail
 
-EXPECTED_PATH="/home/zby/Programs/Embodied_Analogy"
+EXPECTED_PATH="/home/zby/Programs/AKM"
 CURRENT_PATH=$(pwd)
 
 if [[ "$CURRENT_PATH" != "$EXPECTED_PATH" ]]; then

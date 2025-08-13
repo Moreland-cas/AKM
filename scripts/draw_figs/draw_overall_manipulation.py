@@ -49,11 +49,11 @@ if __name__ == "__main__":
     }
     draw_colored_grid(
         data_dict=our_revolute,
-        save_path="/home/zby/Programs/Embodied_Analogy/paper_figs/our_revolute.png"
+        save_path="/home/zby/Programs/AKM/paper_figs/our_revolute.png"
     )
     draw_colored_grid(
         data_dict=our_prismatic,
-        save_path="/home/zby/Programs/Embodied_Analogy/paper_figs/our_prismatic.png"
+        save_path="/home/zby/Programs/AKM/paper_figs/our_prismatic.png"
     )
     
     gpnet_revolute = {
@@ -70,11 +70,11 @@ if __name__ == "__main__":
     }
     draw_colored_grid(
         data_dict=gpnet_revolute,
-        save_path="/home/zby/Programs/Embodied_Analogy/paper_figs/gpnet_revolute.png"
+        save_path="/home/zby/Programs/AKM/paper_figs/gpnet_revolute.png"
     )
     draw_colored_grid(
         data_dict=gpnet_prismatic,
-        save_path="/home/zby/Programs/Embodied_Analogy/paper_figs/gpnet_prismatic.png"
+        save_path="/home/zby/Programs/AKM/paper_figs/gpnet_prismatic.png"
     )
     
     gflow_revolute = {
@@ -91,9 +91,9 @@ if __name__ == "__main__":
     }
     draw_colored_grid(
         data_dict=gflow_revolute,
-        save_path="/home/zby/Programs/Embodied_Analogy/paper_figs/gflow_revolute.png"
+        save_path="/home/zby/Programs/AKM/paper_figs/gflow_revolute.png"
     )
     draw_colored_grid(
         data_dict=gflow_prismatic,
-        save_path="/home/zby/Programs/Embodied_Analogy/paper_figs/gflow_prismatic.png"
+        save_path="/home/zby/Programs/AKM/paper_figs/gflow_prismatic.png"
     )

@@ -1,8 +1,8 @@
 # ninja log v5
-0	114	1745733462668048255	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmcubes/marchingcubes.o	bded52257ffeea21
-0	420	1745733462976051830	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmcubes/pywrapper.o	66249558adebfd
-0	759	1745733463312055724	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmcubes/mcubes.o	a4ec875738d979a2
-0	1822	1745733465196077525	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmesh/triangle_hash.o	f844d8d8fb2e6ac2
-0	2093	1745733467324102056	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmise/mise.o	bbbe6de853df4476
-0	2234	1745733469592128095	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libsimplify/simplify_mesh.o	58ff0e1df81bfba3
-0	1594	1745733471252147085	/home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libvoxelize/voxelize.o	7aac99b8dd320503
+0	114	1745733462668048255	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmcubes/marchingcubes.o	bded52257ffeea21
+0	420	1745733462976051830	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmcubes/pywrapper.o	66249558adebfd
+0	759	1745733463312055724	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmcubes/mcubes.o	a4ec875738d979a2
+0	1822	1745733465196077525	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmesh/triangle_hash.o	f844d8d8fb2e6ac2
+0	2093	1745733467324102056	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libmise/mise.o	bbbe6de853df4476
+0	2234	1745733469592128095	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libsimplify/simplify_mesh.o	58ff0e1df81bfba3
+0	1594	1745733471252147085	/home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libvoxelize/voxelize.o	7aac99b8dd320503

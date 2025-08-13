@@ -1,10 +1,10 @@
 # ninja log v5
-0	13373	1751042577734995980	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/bindings.o	d33a85aea3156232
-2	13644	1751042578006991472	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/interpolate.o	e0c74b71583865aa
-2	13694	1751042578056990645	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/sampling.o	4bf814bdda40b154
-0	14001	1751042578366985516	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/ball_query.o	49c2fa1af1f1617d
-1	14749	1751042579114973142	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/group_points.o	53615fd78fa988e3
-23	15384	1751042684927364106	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/sampling_gpu.o	cb24a8f7269d38e
-21	15566	1751042685110361550	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/ball_query_gpu.o	d0f211a360107430
-22	15778	1751042685322358591	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/group_points_gpu.o	3942ce0809349579
-22	15852	1751042685410357363	/home/zby/Programs/Embodied_Analogy/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/interpolate_gpu.o	427246d97773b2f6
+0	13373	1751042577734995980	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/bindings.o	d33a85aea3156232
+2	13644	1751042578006991472	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/interpolate.o	e0c74b71583865aa
+2	13694	1751042578056990645	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/sampling.o	4bf814bdda40b154
+0	14001	1751042578366985516	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/ball_query.o	49c2fa1af1f1617d
+1	14749	1751042579114973142	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/group_points.o	53615fd78fa988e3
+23	15384	1751042684927364106	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/sampling_gpu.o	cb24a8f7269d38e
+21	15566	1751042685110361550	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/ball_query_gpu.o	d0f211a360107430
+22	15778	1751042685322358591	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/group_points_gpu.o	3942ce0809349579
+22	15852	1751042685410357363	/home/zby/Programs/AKM/third_party/GAPartNet/pointnet2_ops_lib/build/temp.linux-x86_64-cpython-310/pointnet2_ops/_ext-src/src/interpolate_gpu.o	427246d97773b2f6

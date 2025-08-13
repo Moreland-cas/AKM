@@ -49,7 +49,7 @@ class ObjEnv(RobotEnv):
 
 
 if __name__ == "__main__":
-    test_cfgs_path = "/home/zby/Programs/Embodied_Analogy/scripts/test_cfgs.json"
+    test_cfgs_path = "/home/zby/Programs/AKM/scripts/test_cfgs.json"
     with open(test_cfgs_path, 'r', encoding='utf-8') as f:
         test_cfgs = json.load(f)
         

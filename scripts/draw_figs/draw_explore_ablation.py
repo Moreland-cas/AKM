@@ -15,7 +15,7 @@ plt.rcParams.update({
 
 
 
-def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Exploration Success Rate (%)", output_file="/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/explore_ablation_2.png"):
+def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Exploration Success Rate (%)", output_file="/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/explore_ablation_2.png"):
     """
     Plot time series with mean as lines and standard deviation as shaded error bands, and save as PNG.
     
@@ -23,7 +23,7 @@ def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Explo
     - data: Dict with method names as keys and {'means': [...], 'stds': [...]} as values.
     - xlabel: Label for x-axis (default: 'Number of Interactions (times)').
     - ylabel: Label for y-axis (default: 'Exploration Success Rate (%)').
-    - output_file: Path to save the PNG file (default: '/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/explore_ablation_2.png').
+    - output_file: Path to save the PNG file (default: '/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/explore_ablation_2.png').
     """
     # 创建图形
     plt.figure(figsize=(10, 5))
@@ -73,9 +73,9 @@ if __name__ == "__main__":
     ]
     # 示例数据
     draw_data = {}
-    result_path = "/home/zby/Programs/Embodied_Analogy/assets/analysis_batch"
+    result_path = "/home/zby/Programs/AKM/assets/analysis_batch"
     import sys
-    sys.path.append("/home/zby/Programs/Embodied_Analogy/scripts/test_whole_pipeline/")
+    sys.path.append("/home/zby/Programs/AKM/scripts/test_whole_pipeline/")
     from get_statistics import process_nested_dict
     for method in method_list:
         print("Method:", method)

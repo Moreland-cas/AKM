@@ -106,7 +106,7 @@ def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, t
     
     # 尝试加载 Times New Roman 字体
     try:
-        font_path = "/home/zby/Programs/Embodied_Analogy/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
+        font_path = "/home/zby/Programs/AKM/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
         font = ImageFont.truetype(font_path, font_size)
     except Exception as e:
         print(f"无法加载 Times New Roman 字体: {e}, 使用默认字体")
@@ -206,8 +206,8 @@ def farthest_point_sampling_2d(points, M):
 # 读取 obj_repr
 # vis_idx = [3, 4, 7, 10, 78, 95, 97, 114]
 vis_idx = 3
-load_path = f"/home/zby/Programs/Embodied_Analogy/assets/logs/6_39/{vis_idx}/obj_repr.npy"
-save_folder = f"/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/pipeline_{vis_idx}"
+load_path = f"/home/zby/Programs/AKM/assets/logs/6_39/{vis_idx}/obj_repr.npy"
+save_folder = f"/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/pipeline_{vis_idx}"
 os.makedirs(save_folder, exist_ok=True)
 obj_repr: Obj_repr = Obj_repr.load(load_path)
 

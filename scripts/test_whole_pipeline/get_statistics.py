@@ -84,7 +84,7 @@ if __name__ == "__main__":
         "gpnet_4",
         "gpnet_5"
     ]
-    result_path = "/home/zby/Programs/Embodied_Analogy/assets/analysis_batch"
+    result_path = "/home/zby/Programs/AKM/assets/analysis_batch"
     
     # 对于每个类别的实验, 统计 explore, reconstruct 和 manipulate 的平均值, 注意 explore 把 generalflow 和 gpnet 也要统计进去
     method_list = [

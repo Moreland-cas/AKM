@@ -15,7 +15,7 @@ rule compile
 
 
 
-build /home/zby/Programs/Embodied_Analogy/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libvoxelize/voxelize.o: compile /home/zby/Programs/Embodied_Analogy/third_party/Ditto/src/third_party/ConvONets/utils/libvoxelize/voxelize.c
+build /home/zby/Programs/AKM/third_party/Ditto/build/temp.linux-x86_64-cpython-310/src/third_party/ConvONets/utils/libvoxelize/voxelize.o: compile /home/zby/Programs/AKM/third_party/Ditto/src/third_party/ConvONets/utils/libvoxelize/voxelize.c
 
 
 

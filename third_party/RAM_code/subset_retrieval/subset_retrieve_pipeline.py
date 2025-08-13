@@ -16,7 +16,7 @@ MAX_IMD_RANKING_NUM = 30 # change this for different levels of efficiency
 
 def segment_images(frames, trajs, obj_description, visualize=False, asset_path=None):
     from akm.utility.perception.grounded_sam import run_grounded_sam
-    # 重写了这个函数, 用 embodied_analogy 的 grounded sam 来完成
+    # 重写了这个函数, 用 akm 的 grounded sam 来完成
     masked_frames = []
     frame_masks = []
     for idx, frame in enumerate(frames):

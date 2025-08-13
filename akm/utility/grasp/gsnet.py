@@ -68,5 +68,5 @@ def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize
     return gg
 
 if __name__ == "__main__":
-    test_data = "/home/zby/Programs/Embodied_Analogy/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy"
+    test_data = "/home/zby/Programs/AKM/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy"
     

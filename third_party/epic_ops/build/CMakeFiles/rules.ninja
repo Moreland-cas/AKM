@@ -52,7 +52,7 @@ rule CXX_SHARED_LIBRARY_LINKER__epic_ops_Release
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = /home/zby/ProgramFiles/anaconda3/envs/tools/bin/cmake --regenerate-during-build -S/home/zby/Programs/Embodied_Analogy/third_party/epic_ops -B/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build
+  command = /home/zby/ProgramFiles/anaconda3/envs/tools/bin/cmake --regenerate-during-build -S/home/zby/Programs/AKM/third_party/epic_ops -B/home/zby/Programs/AKM/third_party/epic_ops/build
   description = Re-running CMake...
   generator = 1
 
@@ -61,7 +61,7 @@ rule RERUN_CMAKE
 # Rule for re-checking globbed directories.
 
 rule VERIFY_GLOBS
-  command = /home/zby/ProgramFiles/anaconda3/envs/tools/bin/cmake -P /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/VerifyGlobs.cmake
+  command = /home/zby/ProgramFiles/anaconda3/envs/tools/bin/cmake -P /home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/VerifyGlobs.cmake
   description = Re-checking globbed directories...
   generator = 1
 

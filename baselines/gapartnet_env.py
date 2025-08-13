@@ -20,7 +20,7 @@ class GAPartNet_ManipEnv(ManipulateEnv):
     """
     def __init__(self, cfg):
         """
-        这里的 cfg 来自于 embodied_analogy 测试的那些 cfg
+        这里的 cfg 来自于 akm 测试的那些 cfg
         """
         self.cfg = cfg
         ManipulateEnv.__init__(self, cfg)

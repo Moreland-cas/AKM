@@ -754,11 +754,11 @@ class Frames(Data):
 
 
 if __name__ == "__main__":
-    # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_drawer.npy")
-    # frame = Frame.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/grasp/init_frame_micro.npy")
+    # frame = Frame.load("/home/zby/Programs/AKM/assets/unit_test/grasp/init_frame_drawer.npy")
+    # frame = Frame.load("/home/zby/Programs/AKM/assets/unit_test/grasp/init_frame_micro.npy")
     # frame.detect_grasp(True)
     # frame.segment_obj(obj_description="drawer", visualize=True, remove_robot=False)
-    obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy")
+    obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy")
     # obj_repr.visualize()
     
     from akm.utility.grasp.gsnet import detect_grasp_gsnet

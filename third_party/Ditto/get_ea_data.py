@@ -3,9 +3,9 @@ import numpy as np
 from akm.representation.basic_structure import Frame
 from akm.representation.obj_repr import Obj_repr
 
-# obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/40147_1_prismatic"
-# obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45162_0_revolute"
-obj_folder = "/home/zby/Programs/Embodied_Analogy/asset_book/logs/explore_424/45168_0_prismatic"
+# obj_folder = "/home/zby/Programs/AKM/asset_book/logs/explore_424/40147_1_prismatic"
+# obj_folder = "/home/zby/Programs/AKM/asset_book/logs/explore_424/45162_0_revolute"
+obj_folder = "/home/zby/Programs/AKM/asset_book/logs/explore_424/45168_0_prismatic"
 obj_repr: Obj_repr = Obj_repr.load(os.path.join(obj_folder, "obj_repr.npy"))
 
 # 提取首尾两帧

@@ -274,7 +274,7 @@ class Affordance_map_3d(Affordance_map_2d):
         pass 
 
 if __name__ == "__main__":
-    input_data = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
+    input_data = np.load("/home/zby/Programs/AKM/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
     # 测试一下 Affordance_map_2d
     affordance_map_2d = Affordance_map_2d(
         rgb_img=input_data["rgb_img"],

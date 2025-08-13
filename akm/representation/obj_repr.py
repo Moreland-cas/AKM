@@ -528,21 +528,21 @@ class Obj_repr(Data):
 
 if __name__ == "__main__":
     # drawer
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/explore/explore_data.pkl")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/44962/reconstruct/recon_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/44962/explore/explore_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/44962/reconstruct/recon_data.pkl")
     # microwave
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/explore/explore_data.pkl")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/7221/reconstruct/recon_data.pkl")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/tmp/48878/recon_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/7221/explore/explore_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/7221/reconstruct/recon_data.pkl")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/48878/recon_data.pkl")
     # obj_repr.visualize()
     
     # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
     # pass
     # obj_repr = Obj_repr()
-    # obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/Embodied_Analogy/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
+    # obj_repr.load("/home/zby/Programs/AKM/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
+    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
     obj_repr = Obj_repr.load(
-        "/home/zby/Programs/Embodied_Analogy/assets_zby/logs/explore_52/40147_1_prismatic/obj_repr.npy"
+        "/home/zby/Programs/AKM/assets_zby/logs/explore_52/40147_1_prismatic/obj_repr.npy"
     )
     
     from akm.utility.grasp.gsnet import detect_grasp_gsnet

@@ -86,7 +86,7 @@ def run_groundingDINO(
 
 if __name__ == "__main__":
     bbox_scaled, bbox_score = run_groundingDINO(
-        image="/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/sapien_test.png",
+        image="/home/zby/Programs/AKM/akm/dev/sapien_test.png",
         obj_description="object",
         dino_model=load_groundingDINO_model(),
         visualize=True

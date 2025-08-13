@@ -29,13 +29,13 @@ def sample_pos():
     
 def collect_data(
     init_qpos=None,
-    save_folder = "/home/user/Programs/Embodied_Analogy/assets/calib_data",
+    save_folder = "/home/user/Programs/AKM/assets/calib_data",
     num_views=30
 ):
     shutil.rmtree(save_folder)
     os.makedirs(save_folder, exist_ok=True)
     
-    cfg_path = "/home/user/Programs/Embodied_Analogy/embodied_analogy/realworld_environment/calibration/test.yaml"
+    cfg_path = "/home/user/Programs/AKM/akm/realworld_environment/calibration/test.yaml"
 
     # open
     with open(cfg_path, "r") as f:
@@ -105,7 +105,7 @@ def collect_data(
     print(f'Collect {num_views} images in {save_folder}.')
     
     
-def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/Embodied_Analogy/assets/calib_data/', visualize=False):
+def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/AKM/assets/calib_data/', visualize=False):
     frame_paths = []
 
     for f in os.listdir(calib_folder):
@@ -215,7 +215,7 @@ env.rot_dx()
 Image.fromarray(env.capture_frame().rgb).show()
 """
 if __name__ == "__main__":
-    calib_folder = "/home/user/Programs/Embodied_Analogy/assets/calib_data"
+    calib_folder = "/home/user/Programs/AKM/assets/calib_data"
     init_qpos=np.array([-2.55179204,  0.95217725,  2.49179559, -2.54909801, -0.31007478,
         1.89506812, -1.55903886,  0.        ,  0.        ])
     

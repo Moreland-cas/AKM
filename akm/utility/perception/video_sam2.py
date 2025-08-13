@@ -2,7 +2,7 @@ import sys
 import torch
 import numpy as np
 from sam2.build_sam import build_sam2_video_predictor
-sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/sam2")
+sys.path.append("/home/zby/Programs/AKM/third_party/sam2")
 
 def run_sam2_part(
     rgb_folder, 
@@ -10,10 +10,10 @@ def run_sam2_part(
     static_tracks_2d, # np.array([T, N2, 2])
     save_mask=True,
     clear_tmp_folder=False,
-    tmp_folder = "/home/zby/Programs/Embodied_Analogy/asset/tmp/",
+    tmp_folder = "/home/zby/Programs/AKM/asset/tmp/",
 ):    
     # load sam2 predictor model
-    sam2_proj_path = "/home/zby/Programs/Embodied_Analogy/third_party/sam2"
+    sam2_proj_path = "/home/zby/Programs/AKM/third_party/sam2"
     predictor = build_sam2_video_predictor(
         config_file ="configs/sam2.1/sam2.1_hiera_l.yaml",
         # config_file ="configs/sam2.1/sam2.1_hiera_s.yaml",
@@ -110,7 +110,7 @@ def run_sam2_whole(
     initial_point_prompt, # np.array([N, 2])
 ):    
     # load sam2 predictor model
-    sam2_proj_path = "/home/zby/Programs/Embodied_Analogy/third_party/sam2"
+    sam2_proj_path = "/home/zby/Programs/AKM/third_party/sam2"
     predictor = build_sam2_video_predictor(
         config_file ="configs/sam2.1/sam2.1_hiera_l.yaml",
         # config_file ="configs/sam2.1/sam2.1_hiera_s.yaml",

@@ -4,7 +4,7 @@
 32211	32585	1751041469275452603	src/epic_ops/libepic_ops.so	bcef360238c6d76a
 14	21530	1751041458190827832	src/epic_ops/CMakeFiles/epic_ops.dir/cuda/ball_query_cuda.cu.o	d4e5d265a82b3156
 11	5169	1751041441857908041	src/epic_ops/CMakeFiles/epic_ops.dir/ball_query.cpp.o	b5dcea9a1c5d3f38
-2	10	0	/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/cmake.verify_globs	4af4b847fe434e56
+2	10	0	/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/cmake.verify_globs	4af4b847fe434e56
 11	5090	1751041441776918525	src/epic_ops/CMakeFiles/epic_ops.dir/ccl.cpp.o	c906d1e13d96699d
 10	7456	1751041444140613389	src/epic_ops/CMakeFiles/epic_ops.dir/autograd/reduce_autograd.cpp.o	48b7733212b8c14c
 13	5367	1751041442051882943	src/epic_ops/CMakeFiles/epic_ops.dir/reduce.cpp.o	a8f9f8ecac761854
@@ -17,5 +17,5 @@
 12	5239	1751041441927898980	src/epic_ops/CMakeFiles/epic_ops.dir/expand.cpp.o	c98060fec8537638
 15	22693	1751041459341683699	src/epic_ops/CMakeFiles/epic_ops.dir/cuda/expand.cu.o	8172fd06d3129743
 15	21139	1751041457789878126	src/epic_ops/CMakeFiles/epic_ops.dir/cuda/iou_cuda.cu.o	50b21230eb4f8ae3
-5	14	0	/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/cmake.verify_globs	4af4b847fe434e56
+5	14	0	/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/cmake.verify_globs	4af4b847fe434e56
 36	45	0	CMakeFiles/install.util	964fa65e1fca04f3

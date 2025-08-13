@@ -15,7 +15,7 @@ import sys
 from einops import rearrange, repeat
 
 from akm.project_config import PROJECT_ROOT, ASSET_PATH
-# sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "Embodied_Analogy", "GAPartNet"))
+# sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "AKM", "GAPartNet"))
 sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
 # from structure.gapartnet import ObjIns
 from structure.utils import _load_perception_model
@@ -421,7 +421,7 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
 
     if gapartnet_model is None:
         gapartnet_model = load_gapartnet_model(
-            "/home/zby/Programs/Embodied_Analogy/assets/ckpts/gapartnet/all_best.ckpt"
+            "/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt"
         )
         
     # Get ground truth for guidance
@@ -602,10 +602,10 @@ def estimate_revolute_joint(bbox_first, bbox_last):
 
 if __name__ == "__main__":
     gapartnet_model = load_gapartnet_model(
-        # "/home/zby/Programs/Embodied_Analogy/assets/ckpts/gapartnet/release.ckpt"
-        "/home/zby/Programs/Embodied_Analogy/assets/ckpts/gapartnet/all_best.ckpt"
+        # "/home/zby/Programs/AKM/assets/ckpts/gapartnet/release.ckpt"
+        "/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt"
     )
     obj_repr = Obj_repr.load(
-        "/home/zby/Programs/Embodied_Analogy/assets/unit_test/gapartnet/obj_repr.npy"
+        "/home/zby/Programs/AKM/assets/unit_test/gapartnet/obj_repr.npy"
     )
     gapartnet_result = gapartnet_reconstruct(obj_repr, gapartnet_model, visualize=True)

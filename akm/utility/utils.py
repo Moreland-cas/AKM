@@ -58,7 +58,7 @@ def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, t
     
     # 尝试加载 Times New Roman 字体
     try:
-        font_path = "/home/zby/Programs/Embodied_Analogy/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
+        font_path = "/home/zby/Programs/AKM/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
         font = ImageFont.truetype(font_path, font_size)
     except Exception as e:
         print(f"无法加载 Times New Roman 字体: {e}, 使用默认字体")

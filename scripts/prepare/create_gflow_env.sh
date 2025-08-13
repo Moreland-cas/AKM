@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-WS_PATH="/home/zby/Programs/Embodied_Analogy"
+WS_PATH="/home/zby/Programs/AKM"
 CLONED_ENV_NAME="general_flow"
 SOURCE_ENV_NAME="ea_v2"
 

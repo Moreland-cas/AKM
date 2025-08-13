@@ -28,7 +28,7 @@ events:
       Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "a.out"
       
       The C compiler identification is GNU, found in:
-        /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdC/a.out
+        /home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdC/a.out
       
   -
     kind: "message-v1"
@@ -50,7 +50,7 @@ events:
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "a.out"
       
       The CXX compiler identification is GNU, found in:
-        /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCXX/a.out
+        /home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCXX/a.out
       
   -
     kind: "message-v1"
@@ -98,9 +98,9 @@ events:
       #$ PTXAS_FLAGS=
       #$ rm tmp/a_dlink.reg.c
       #$ gcc -D__CUDA_ARCH_LIST__=520 -E -x c++ -D__CUDACC__ -D__NVCC__  "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"    -D__CUDACC_VER_MAJOR__=12 -D__CUDACC_VER_MINOR__=1 -D__CUDACC_VER_BUILD__=66 -D__CUDA_API_VER_MAJOR__=12 -D__CUDA_API_VER_MINOR__=1 -D__NVCC_DIAG_PRAGMA_SUPPORT__=1 -include "cuda_runtime.h" -m64 "CMakeCUDACompilerId.cu" -o "tmp/CMakeCUDACompilerId.cpp4.ii" 
-      #$ cudafe++ --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed  --m64 --parse_templates --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.cpp" --stub_file_name "CMakeCUDACompilerId.cudafe1.stub.c" --gen_module_id_file --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" "tmp/CMakeCUDACompilerId.cpp4.ii" 
+      #$ cudafe++ --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed  --m64 --parse_templates --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.cpp" --stub_file_name "CMakeCUDACompilerId.cudafe1.stub.c" --gen_module_id_file --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" "tmp/CMakeCUDACompilerId.cpp4.ii" 
       #$ gcc -D__CUDA_ARCH__=520 -D__CUDA_ARCH_LIST__=520 -E -x c++  -DCUDA_DOUBLE_MATH_FUNCTIONS -D__CUDACC__ -D__NVCC__  "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"    -D__CUDACC_VER_MAJOR__=12 -D__CUDACC_VER_MINOR__=1 -D__CUDACC_VER_BUILD__=66 -D__CUDA_API_VER_MAJOR__=12 -D__CUDA_API_VER_MINOR__=1 -D__NVCC_DIAG_PRAGMA_SUPPORT__=1 -include "cuda_runtime.h" -m64 "CMakeCUDACompilerId.cu" -o "tmp/CMakeCUDACompilerId.cpp1.ii" 
-      #$ cicc --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed   -arch compute_52 -m64 --no-version-ident -ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 --include_file_name "CMakeCUDACompilerId.fatbin.c" -tused --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.c" --stub_file_name "tmp/CMakeCUDACompilerId.cudafe1.stub.c" --gen_device_file_name "tmp/CMakeCUDACompilerId.cudafe1.gpu"  "tmp/CMakeCUDACompilerId.cpp1.ii" -o "tmp/CMakeCUDACompilerId.ptx"
+      #$ cicc --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed   -arch compute_52 -m64 --no-version-ident -ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 --include_file_name "CMakeCUDACompilerId.fatbin.c" -tused --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.c" --stub_file_name "tmp/CMakeCUDACompilerId.cudafe1.stub.c" --gen_device_file_name "tmp/CMakeCUDACompilerId.cudafe1.gpu"  "tmp/CMakeCUDACompilerId.cpp1.ii" -o "tmp/CMakeCUDACompilerId.ptx"
       #$ ptxas -arch=sm_52 -m64  "tmp/CMakeCUDACompilerId.ptx"  -o "tmp/CMakeCUDACompilerId.sm_52.cubin" 
       #$ fatbinary --create="tmp/CMakeCUDACompilerId.fatbin" -64 --cicc-cmdline="-ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 " "--image3=kind=elf,sm=52,file=tmp/CMakeCUDACompilerId.sm_52.cubin" "--image3=kind=ptx,sm=52,file=tmp/CMakeCUDACompilerId.ptx" --embedded-fatbin="tmp/CMakeCUDACompilerId.fatbin.c" 
       #$ gcc -D__CUDA_ARCH__=520 -D__CUDA_ARCH_LIST__=520 -c -x c++  -DCUDA_DOUBLE_MATH_FUNCTIONS "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"   -m64 "tmp/CMakeCUDACompilerId.cudafe1.cpp" -o "tmp/CMakeCUDACompilerId.o" 
@@ -113,7 +113,7 @@ events:
       Compilation of the CUDA compiler identification source "CMakeCUDACompilerId.cu" produced "a.out"
       
       The CUDA compiler identification is NVIDIA, found in:
-        /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/a.out
+        /home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/a.out
       
   -
     kind: "message-v1"
@@ -128,9 +128,9 @@ events:
         found 'INCLUDES=' string: ["-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"  ]
         considering line: [#$ rm tmp/a_dlink.reg.c]
         considering line: [gcc -D__CUDA_ARCH_LIST__=520 -E -x c++ -D__CUDACC__ -D__NVCC__  "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"    -D__CUDACC_VER_MAJOR__=12 -D__CUDACC_VER_MINOR__=1 -D__CUDACC_VER_BUILD__=66 -D__CUDA_API_VER_MAJOR__=12 -D__CUDA_API_VER_MINOR__=1 -D__NVCC_DIAG_PRAGMA_SUPPORT__=1 -include "cuda_runtime.h" -m64 "CMakeCUDACompilerId.cu" -o "tmp/CMakeCUDACompilerId.cpp4.ii" ]
-        considering line: [cudafe++ --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed  --m64 --parse_templates --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.cpp" --stub_file_name "CMakeCUDACompilerId.cudafe1.stub.c" --gen_module_id_file --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" "tmp/CMakeCUDACompilerId.cpp4.ii" ]
+        considering line: [cudafe++ --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed  --m64 --parse_templates --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.cpp" --stub_file_name "CMakeCUDACompilerId.cudafe1.stub.c" --gen_module_id_file --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" "tmp/CMakeCUDACompilerId.cpp4.ii" ]
         considering line: [gcc -D__CUDA_ARCH__=520 -D__CUDA_ARCH_LIST__=520 -E -x c++  -DCUDA_DOUBLE_MATH_FUNCTIONS -D__CUDACC__ -D__NVCC__  "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"    -D__CUDACC_VER_MAJOR__=12 -D__CUDACC_VER_MINOR__=1 -D__CUDACC_VER_BUILD__=66 -D__CUDA_API_VER_MAJOR__=12 -D__CUDA_API_VER_MINOR__=1 -D__NVCC_DIAG_PRAGMA_SUPPORT__=1 -include "cuda_runtime.h" -m64 "CMakeCUDACompilerId.cu" -o "tmp/CMakeCUDACompilerId.cpp1.ii" ]
-        considering line: [cicc --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed   -arch compute_52 -m64 --no-version-ident -ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 --include_file_name "CMakeCUDACompilerId.fatbin.c" -tused --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.c" --stub_file_name "tmp/CMakeCUDACompilerId.cudafe1.stub.c" --gen_device_file_name "tmp/CMakeCUDACompilerId.cudafe1.gpu"  "tmp/CMakeCUDACompilerId.cpp1.ii" -o "tmp/CMakeCUDACompilerId.ptx"]
+        considering line: [cicc --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed   -arch compute_52 -m64 --no-version-ident -ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 --include_file_name "CMakeCUDACompilerId.fatbin.c" -tused --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.c" --stub_file_name "tmp/CMakeCUDACompilerId.cudafe1.stub.c" --gen_device_file_name "tmp/CMakeCUDACompilerId.cudafe1.gpu"  "tmp/CMakeCUDACompilerId.cpp1.ii" -o "tmp/CMakeCUDACompilerId.ptx"]
         considering line: [ptxas -arch=sm_52 -m64  "tmp/CMakeCUDACompilerId.ptx"  -o "tmp/CMakeCUDACompilerId.sm_52.cubin" ]
         considering line: [fatbinary --create="tmp/CMakeCUDACompilerId.fatbin" -64 --cicc-cmdline="-ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 " "--image3=kind=elf,sm=52,file=tmp/CMakeCUDACompilerId.sm_52.cubin" "--image3=kind=ptx,sm=52,file=tmp/CMakeCUDACompilerId.ptx" --embedded-fatbin="tmp/CMakeCUDACompilerId.fatbin.c" ]
         considering line: [gcc -D__CUDA_ARCH__=520 -D__CUDA_ARCH_LIST__=520 -c -x c++  -DCUDA_DOUBLE_MATH_FUNCTIONS "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"   -m64 "tmp/CMakeCUDACompilerId.cudafe1.cpp" -o "tmp/CMakeCUDACompilerId.o" ]
@@ -184,9 +184,9 @@ events:
         found 'INCLUDES=' string: ["-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"  ]
         considering line: [#$ rm tmp/a_dlink.reg.c]
         considering line: [gcc -D__CUDA_ARCH_LIST__=520 -E -x c++ -D__CUDACC__ -D__NVCC__  "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"    -D__CUDACC_VER_MAJOR__=12 -D__CUDACC_VER_MINOR__=1 -D__CUDACC_VER_BUILD__=66 -D__CUDA_API_VER_MAJOR__=12 -D__CUDA_API_VER_MINOR__=1 -D__NVCC_DIAG_PRAGMA_SUPPORT__=1 -include "cuda_runtime.h" -m64 "CMakeCUDACompilerId.cu" -o "tmp/CMakeCUDACompilerId.cpp4.ii" ]
-        considering line: [cudafe++ --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed  --m64 --parse_templates --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.cpp" --stub_file_name "CMakeCUDACompilerId.cudafe1.stub.c" --gen_module_id_file --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" "tmp/CMakeCUDACompilerId.cpp4.ii" ]
+        considering line: [cudafe++ --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed  --m64 --parse_templates --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.cpp" --stub_file_name "CMakeCUDACompilerId.cudafe1.stub.c" --gen_module_id_file --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" "tmp/CMakeCUDACompilerId.cpp4.ii" ]
         considering line: [gcc -D__CUDA_ARCH__=520 -D__CUDA_ARCH_LIST__=520 -E -x c++  -DCUDA_DOUBLE_MATH_FUNCTIONS -D__CUDACC__ -D__NVCC__  "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"    -D__CUDACC_VER_MAJOR__=12 -D__CUDACC_VER_MINOR__=1 -D__CUDACC_VER_BUILD__=66 -D__CUDA_API_VER_MAJOR__=12 -D__CUDA_API_VER_MINOR__=1 -D__NVCC_DIAG_PRAGMA_SUPPORT__=1 -include "cuda_runtime.h" -m64 "CMakeCUDACompilerId.cu" -o "tmp/CMakeCUDACompilerId.cpp1.ii" ]
-        considering line: [cicc --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed   -arch compute_52 -m64 --no-version-ident -ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 --include_file_name "CMakeCUDACompilerId.fatbin.c" -tused --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.c" --stub_file_name "tmp/CMakeCUDACompilerId.cudafe1.stub.c" --gen_device_file_name "tmp/CMakeCUDACompilerId.cudafe1.gpu"  "tmp/CMakeCUDACompilerId.cpp1.ii" -o "tmp/CMakeCUDACompilerId.ptx"]
+        considering line: [cicc --c++17 --gnu_version=110400 --display_error_number --orig_src_file_name "CMakeCUDACompilerId.cu" --orig_src_path_name "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/3.29.0/CompilerIdCUDA/CMakeCUDACompilerId.cu" --allow_managed   -arch compute_52 -m64 --no-version-ident -ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 --include_file_name "CMakeCUDACompilerId.fatbin.c" -tused --module_id_file_name "tmp/CMakeCUDACompilerId.module_id" --gen_c_file_name "tmp/CMakeCUDACompilerId.cudafe1.c" --stub_file_name "tmp/CMakeCUDACompilerId.cudafe1.stub.c" --gen_device_file_name "tmp/CMakeCUDACompilerId.cudafe1.gpu"  "tmp/CMakeCUDACompilerId.cpp1.ii" -o "tmp/CMakeCUDACompilerId.ptx"]
         considering line: [ptxas -arch=sm_52 -m64  "tmp/CMakeCUDACompilerId.ptx"  -o "tmp/CMakeCUDACompilerId.sm_52.cubin" ]
         considering line: [fatbinary --create="tmp/CMakeCUDACompilerId.fatbin" -64 --cicc-cmdline="-ftz=0 -prec_div=1 -prec_sqrt=1 -fmad=1 " "--image3=kind=elf,sm=52,file=tmp/CMakeCUDACompilerId.sm_52.cubin" "--image3=kind=ptx,sm=52,file=tmp/CMakeCUDACompilerId.ptx" --embedded-fatbin="tmp/CMakeCUDACompilerId.fatbin.c" ]
         considering line: [gcc -D__CUDA_ARCH__=520 -D__CUDA_ARCH_LIST__=520 -c -x c++  -DCUDA_DOUBLE_MATH_FUNCTIONS "-I/home/zby/Cudas/cuda-12.1/bin/../targets/x86_64-linux/include"   -m64 "tmp/CMakeCUDACompilerId.cudafe1.cpp" -o "tmp/CMakeCUDACompilerId.o" ]
@@ -236,8 +236,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_C_FLAGS: ""
@@ -247,7 +247,7 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_a7bc7
         [1/2] /usr/bin/cc   -v -o CMakeFiles/cmTC_a7bc7.dir/CMakeCCompilerABI.c.o -c /home/zby/ProgramFiles/anaconda3/envs/tools/share/cmake-3.29/Modules/CMakeCCompilerABI.c
@@ -340,7 +340,7 @@ events:
       Parsed C implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(\\.[a-z]+)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|")?[ 	]*(([^"]*[/\\])?(ld[0-9]*(\\.[a-z]+)?))("|,| |$)]
-        ignore line: [Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn']
+        ignore line: [Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-WZ2DOn']
         ignore line: []
         ignore line: [Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_a7bc7]
         ignore line: [[1/2] /usr/bin/cc   -v -o CMakeFiles/cmTC_a7bc7.dir/CMakeCCompilerABI.c.o -c /home/zby/ProgramFiles/anaconda3/envs/tools/share/cmake-3.29/Modules/CMakeCCompilerABI.c]
@@ -483,8 +483,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_CXX_FLAGS: ""
@@ -494,7 +494,7 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_c15a1
         [1/2] /usr/bin/c++   -v -o CMakeFiles/cmTC_c15a1.dir/CMakeCXXCompilerABI.cpp.o -c /home/zby/ProgramFiles/anaconda3/envs/tools/share/cmake-3.29/Modules/CMakeCXXCompilerABI.cpp
@@ -597,7 +597,7 @@ events:
       Parsed CXX implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(\\.[a-z]+)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|")?[ 	]*(([^"]*[/\\])?(ld[0-9]*(\\.[a-z]+)?))("|,| |$)]
-        ignore line: [Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz']
+        ignore line: [Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-xdofwz']
         ignore line: []
         ignore line: [Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_c15a1]
         ignore line: [[1/2] /usr/bin/c++   -v -o CMakeFiles/cmTC_c15a1.dir/CMakeCXXCompilerABI.cpp.o -c /home/zby/ProgramFiles/anaconda3/envs/tools/share/cmake-3.29/Modules/CMakeCXXCompilerABI.cpp]
@@ -740,8 +740,8 @@ events:
     checks:
       - "Detecting CUDA compiler ABI info"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_CUDA_FLAGS: ""
@@ -752,7 +752,7 @@ events:
       variable: "CMAKE_CUDA_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_bcde5
         [1/2] /home/zby/Cudas/cuda-12.1/bin/nvcc -forward-unknown-to-host-compiler   "--generate-code=arch=compute_52,code=[compute_52,sm_52]"   -Xcompiler=-v -MD -MT CMakeFiles/cmTC_bcde5.dir/CMakeCUDACompilerABI.cu.o -MF CMakeFiles/cmTC_bcde5.dir/CMakeCUDACompilerABI.cu.o.d -x cu -c /home/zby/ProgramFiles/anaconda3/envs/tools/share/cmake-3.29/Modules/CMakeCUDACompilerABI.cu -o CMakeFiles/cmTC_bcde5.dir/CMakeCUDACompilerABI.cu.o
@@ -916,7 +916,7 @@ events:
       Parsed CUDA implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(\\.[a-z]+)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|")?[ 	]*(([^"]*[/\\])?(ld[0-9]*(\\.[a-z]+)?))("|,| |$)]
-        ignore line: [Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi']
+        ignore line: [Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-qaVTzi']
         ignore line: []
         ignore line: [Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_bcde5]
         ignore line: [[1/2] /home/zby/Cudas/cuda-12.1/bin/nvcc -forward-unknown-to-host-compiler   "--generate-code=arch=compute_52 code=[compute_52 sm_52]"   -Xcompiler=-v -MD -MT CMakeFiles/cmTC_bcde5.dir/CMakeCUDACompilerABI.cu.o -MF CMakeFiles/cmTC_bcde5.dir/CMakeCUDACompilerABI.cu.o.d -x cu -c /home/zby/ProgramFiles/anaconda3/envs/tools/share/cmake-3.29/Modules/CMakeCUDACompilerABI.cu -o CMakeFiles/cmTC_bcde5.dir/CMakeCUDACompilerABI.cu.o]
@@ -1133,8 +1133,8 @@ events:
     checks:
       - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_C_FLAGS: ""
@@ -1145,10 +1145,10 @@ events:
       variable: "CMAKE_HAVE_LIBC_PTHREAD"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_dc120
-        [1/2] /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_dc120.dir/src.c.o -c /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd/src.c
+        [1/2] /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_dc120.dir/src.c.o -c /home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeScratch/TryCompile-yQQTZd/src.c
         [2/2] : && /usr/bin/cc   CMakeFiles/cmTC_dc120.dir/src.c.o -o cmTC_dc120   && :
         
       exitCode: 0
@@ -1160,8 +1160,8 @@ events:
       - "/home/zby/ProgramFiles/anaconda3/envs/gpnet/lib/python3.10/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)"
       - "CMakeLists.txt:12 (find_package)"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_CXX_FLAGS: ""
@@ -1172,10 +1172,10 @@ events:
       variable: "compile_result"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_75e44
-        [1/2] /usr/bin/c++  -I/home/zby/Cudas/cuda-12.1/include  -o CMakeFiles/cmTC_75e44.dir/detect_cuda_version.cc.o -c /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/detect_cuda_version.cc
+        [1/2] /usr/bin/c++  -I/home/zby/Cudas/cuda-12.1/include  -o CMakeFiles/cmTC_75e44.dir/detect_cuda_version.cc.o -c /home/zby/Programs/AKM/third_party/epic_ops/build/detect_cuda_version.cc
         [2/2] : && /usr/bin/c++   CMakeFiles/cmTC_75e44.dir/detect_cuda_version.cc.o -o cmTC_75e44  -Wl,-rpath,/home/zby/Cudas/cuda-12.1/lib64  /home/zby/Cudas/cuda-12.1/lib64/libcudart.so && :
         
       exitCode: 0
@@ -1196,8 +1196,8 @@ events:
       - "/home/zby/ProgramFiles/anaconda3/envs/gpnet/lib/python3.10/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)"
       - "CMakeLists.txt:12 (find_package)"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_CUDA_FLAGS: ""
@@ -1208,10 +1208,10 @@ events:
       variable: "compile_result"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_4cda8
-        [1/2] /home/zby/Cudas/cuda-12.1/bin/nvcc -forward-unknown-to-host-compiler   "--generate-code=arch=compute_52,code=[compute_52,sm_52]" -MD -MT CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o -MF CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o.d -x cu -c /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/detect_cuda_compute_capabilities.cu -o CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o
+        [1/2] /home/zby/Cudas/cuda-12.1/bin/nvcc -forward-unknown-to-host-compiler   "--generate-code=arch=compute_52,code=[compute_52,sm_52]" -MD -MT CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o -MF CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o.d -x cu -c /home/zby/Programs/AKM/third_party/epic_ops/build/detect_cuda_compute_capabilities.cu -o CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o
         [2/2] : && /usr/bin/g++  CMakeFiles/cmTC_4cda8.dir/detect_cuda_compute_capabilities.cu.o -o cmTC_4cda8  -lcudadevrt  -lcudart_static  -lrt  -lpthread  -ldl -L"/home/zby/Cudas/cuda-12.1/targets/x86_64-linux/lib/stubs" -L"/home/zby/Cudas/cuda-12.1/targets/x86_64-linux/lib" && :
         
       exitCode: 0
@@ -1233,8 +1233,8 @@ events:
       - "/home/zby/ProgramFiles/anaconda3/envs/gpnet/lib/python3.10/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)"
       - "CMakeLists.txt:12 (find_package)"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_CXX_FLAGS: ""
@@ -1245,10 +1245,10 @@ events:
       variable: "compile_result"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_beec4
-        [1/2] /usr/bin/c++  -I/home/zby/Cudas/cuda-12.1/include  -o CMakeFiles/cmTC_beec4.dir/detect_cuda_version.cc.o -c /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/detect_cuda_version.cc
+        [1/2] /usr/bin/c++  -I/home/zby/Cudas/cuda-12.1/include  -o CMakeFiles/cmTC_beec4.dir/detect_cuda_version.cc.o -c /home/zby/Programs/AKM/third_party/epic_ops/build/detect_cuda_version.cc
         [2/2] : && /usr/bin/c++   CMakeFiles/cmTC_beec4.dir/detect_cuda_version.cc.o -o cmTC_beec4  -Wl,-rpath,/home/zby/Cudas/cuda-12.1/lib64  /home/zby/Cudas/cuda-12.1/lib64/libcudart.so && :
         
       exitCode: 0
@@ -1269,8 +1269,8 @@ events:
       - "/home/zby/ProgramFiles/anaconda3/envs/gpnet/lib/python3.10/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)"
       - "CMakeLists.txt:12 (find_package)"
     directories:
-      source: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
-      binary: "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      source: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
+      binary: "/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "52"
       CMAKE_CUDA_FLAGS: ""
@@ -1281,10 +1281,10 @@ events:
       variable: "compile_result"
       cached: true
       stdout: |
-        Change Dir: '/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
+        Change Dir: '/home/zby/Programs/AKM/third_party/epic_ops/build/CMakeFiles/CMakeTmp'
         
         Run Build Command(s): /home/zby/ProgramFiles/anaconda3/envs/gpnet/bin/ninja -v cmTC_0a325
-        [1/2] /home/zby/Cudas/cuda-12.1/bin/nvcc -forward-unknown-to-host-compiler   "--generate-code=arch=compute_52,code=[compute_52,sm_52]" -MD -MT CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o -MF CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o.d -x cu -c /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/detect_cuda_compute_capabilities.cu -o CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o
+        [1/2] /home/zby/Cudas/cuda-12.1/bin/nvcc -forward-unknown-to-host-compiler   "--generate-code=arch=compute_52,code=[compute_52,sm_52]" -MD -MT CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o -MF CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o.d -x cu -c /home/zby/Programs/AKM/third_party/epic_ops/build/detect_cuda_compute_capabilities.cu -o CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o
         [2/2] : && /usr/bin/g++  CMakeFiles/cmTC_0a325.dir/detect_cuda_compute_capabilities.cu.o -o cmTC_0a325  -lcudadevrt  -lcudart_static  -lrt  -lpthread  -ldl -L"/home/zby/Cudas/cuda-12.1/targets/x86_64-linux/lib/stubs" -L"/home/zby/Cudas/cuda-12.1/targets/x86_64-linux/lib" && :
         
       exitCode: 0

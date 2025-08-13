@@ -100,7 +100,7 @@ def mask_obj_from_video_with_video_sam2(rgb_folder, selected_idx, positive_track
 
 
 if __name__ == "__main__":
-    data = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/explore_data.npz")
+    data = np.load("/home/zby/Programs/AKM/assets/unit_test/explore_data.npz")
     rgb_seq = data["rgb_seq"][::20]
     mask_obj_from_video_with_image_sam2(
         rgb_seq,

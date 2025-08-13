@@ -132,7 +132,7 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False):
 
 if __name__ == "__main__":
     rgb_frames = mp4_to_numpy_array_list("./third_party/sam2/notebooks/videos/bedroom.mp4")
-    mask = np.load("./embodied_analogy/mask.npy")
+    mask = np.load("./akm/mask.npy")
     queries = np.column_stack(np.where(mask))
     # import pdb;pdb.set_trace()
     queries = np.flip(queries, axis=-1)

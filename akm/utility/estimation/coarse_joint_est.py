@@ -852,9 +852,9 @@ def test_coarse_t_from_tracks_3d():
 
 
 def test_coarse_R():
-    # tracks_3d = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/reconstruct/rotate_track_open.npy")
+    # tracks_3d = np.load("/home/zby/Programs/AKM/assets/unit_test/reconstruct/rotate_track_open.npy")
     # tracks_3d = tracks_3d[::-1, ...]
-    tracks_3d = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/reconstruct/rotate_track_close.npy")
+    tracks_3d = np.load("/home/zby/Programs/AKM/assets/unit_test/reconstruct/rotate_track_close.npy")
     # 调用 coarse_R_from_tracks_3d 函数
     best_state, est_loss = coarse_R_from_tracks_3d(tracks_3d, visualize=True)
     

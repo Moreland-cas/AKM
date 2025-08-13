@@ -61,7 +61,7 @@ def filter_grasp_group(
     return grasp_group
 
 def prepare_any_grasp_model(asset_path=ASSET_PATH):
-    relative_path = os.path.join(PROJECT_ROOT, "embodied_analogy", "utility/grasp")
+    relative_path = os.path.join(PROJECT_ROOT, "akm", "utility/grasp")
     sys.path.append(relative_path)
     # load model
     from gsnet import AnyGrasp # gsnet.so
@@ -245,7 +245,7 @@ if __name__ == '__main__':
     import os
     from PIL import Image
     from akm.utility.utils import depth_image_to_pointcloud
-    path = "/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/"
+    path = "/home/zby/Programs/AKM/akm/dev/ram_proposal/"
     colors = np.array(Image.open(os.path.join(path, 'rgb.png')), dtype=np.float32) / 255.0
     depths = np.load(os.path.join(path, 'depth.npy'))
     masks = np.load(os.path.join(path, 'mask.npy'))

@@ -159,7 +159,7 @@ def find_closest_alpha(pos, dir, pos2):
     return alpha, closest_point, distance
 
 
-data_path = "/home/zby/Programs/Embodied_Analogy/assets/logs_draw"
+data_path = "/home/zby/Programs/AKM/assets/logs_draw"
 method_names = ["gflow", "gpnet", "ours"]
 obj_idx_list = os.listdir(os.path.join(data_path, method_names[0]))
 
@@ -167,7 +167,7 @@ def idx_available(obj_idx):
     """
     分别对于 三个方法读取 obj_idx 下的 recon_result.json, 都有 valid recon 才去绘制
     """
-    data_path = "/home/zby/Programs/Embodied_Analogy/assets/logs_draw"
+    data_path = "/home/zby/Programs/AKM/assets/logs_draw"
     ours_json = json.load(open(os.path.join(data_path, "ours", str(obj_idx), "recon_result.json"), "r"))
     gpnet_json = json.load(open(os.path.join(data_path, "gpnet", str(obj_idx), "recon_result.json"), "r"))
     gflow_json = json.load(open(os.path.join(data_path, "gflow", str(obj_idx), "recon_result.json"), "r"))
@@ -187,7 +187,7 @@ obj_idx_list_filtered = [obj_idx for obj_idx in obj_idx_list if idx_available(ob
         gpnet.png
         gflow.png
 """ 
-save_folder = f"/home/zby/Programs/Embodied_Analogy/scripts/draw_figs/paper_figs/reconstruct"
+save_folder = f"/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/reconstruct"
 for obj_idx in obj_idx_list_filtered:
     print("obj_idx:", obj_idx)
     

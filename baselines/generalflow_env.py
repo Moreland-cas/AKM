@@ -16,7 +16,7 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 # from inference import load_model
 
 import sys
-sys.path.append("/home/zby/Programs/Embodied_Analogy/third_party/GeneralFlow")
+sys.path.append("/home/zby/Programs/AKM/third_party/GeneralFlow")
 
 from openpoints.transforms import build_transforms_from_cfg
 from util import save_pickle, load_pickle, load_easyconfig_from_yaml
@@ -597,7 +597,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
     """
     def __init__(self, cfg):
         """
-        这里的 cfg 来自于 embodied_analogy 测试的那些 cfg
+        这里的 cfg 来自于 akm 测试的那些 cfg
         """
         self.cfg = cfg
         ManipulateEnv.__init__(self, cfg)
@@ -945,12 +945,12 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
     
     
 if __name__ == "__main__":
-    yaml_path = "/home/zby/Programs/Embodied_Analogy/assets/logs/6_11/115/115.yaml"
+    yaml_path = "/home/zby/Programs/AKM/assets/logs/6_11/115/115.yaml"
     with open(yaml_path, "r") as f:
         import yaml
         cfg = yaml.safe_load(f)
     
-    cfg["exp_cfg"]["exp_folder"] = "/home/zby/Programs/Embodied_Analogy/assets/logs/6_17"
+    cfg["exp_cfg"]["exp_folder"] = "/home/zby/Programs/AKM/assets/logs/6_17"
     env = GeneralFlow_ManipEnv(cfg=cfg)
     env.main()
     

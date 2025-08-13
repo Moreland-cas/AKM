@@ -23,8 +23,8 @@ rule cuda_compile
 
 
 
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer.o: cuda_compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/chamfer.cu
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer_cuda.o: compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/chamfer_cuda.cpp
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer.o: cuda_compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/chamfer.cu
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer_cuda.o: compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/chamfer_cuda.cpp
 
 
 

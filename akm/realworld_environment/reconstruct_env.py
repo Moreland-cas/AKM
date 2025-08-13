@@ -237,8 +237,8 @@ class ReconEnv(ExploreEnv):
         
 if __name__ == "__main__":
     import yaml
-    # with open("/home/user/Programs/Embodied_Analogy/embodied_analogy/realworld_environment/cabinet.yaml", "r") as f:
-    with open("/home/user/Programs/Embodied_Analogy/embodied_analogy/realworld_environment/drawer.yaml", "r") as f:
+    # with open("/home/user/Programs/AKM/akm/realworld_environment/cabinet.yaml", "r") as f:
+    with open("/home/user/Programs/AKM/akm/realworld_environment/drawer.yaml", "r") as f:
         cfg = yaml.safe_load(f)
         
     reconEnv = ReconEnv(cfg=cfg)

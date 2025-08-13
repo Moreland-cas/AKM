@@ -1,8 +1,8 @@
-# Install script for directory: /home/zby/Programs/Embodied_Analogy/third_party/epic_ops/src
+# Install script for directory: /home/zby/Programs/AKM/third_party/epic_ops/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "/home/zby/Programs/Embodied_Analogy/third_party/epic_ops")
+  set(CMAKE_INSTALL_PREFIX "/home/zby/Programs/AKM/third_party/epic_ops")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 
@@ -44,6 +44,6 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/zby/Programs/Embodied_Analogy/third_party/epic_ops/build/src/epic_ops/cmake_install.cmake")
+  include("/home/zby/Programs/AKM/third_party/epic_ops/build/src/epic_ops/cmake_install.cmake")
 endif()
 

@@ -272,7 +272,7 @@ def sam2_on_image(
 
 
 if __name__ == "__main__":
-    image_pil = Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/sapien_test.png")
+    image_pil = Image.open("/home/zby/Programs/AKM/akm/dev/sapien_test.png")
     # image_pil.show() # 1100 x 1100
     image_np = np.array(image_pil.convert("RGB"))
     input_bbox = np.array([0, 0, 1000, 400])

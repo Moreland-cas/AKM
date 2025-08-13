@@ -23,15 +23,15 @@ rule cuda_compile
 
 
 
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/ball_query.o: compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/ball_query.cpp
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/ball_query_gpu.o: cuda_compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/ball_query_gpu.cu
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/group_points.o: compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/group_points.cpp
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/group_points_gpu.o: cuda_compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/group_points_gpu.cu
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/interpolate.o: compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/interpolate.cpp
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/interpolate_gpu.o: cuda_compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/interpolate_gpu.cu
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/pointnet2_api.o: compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/pointnet2_api.cpp
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/sampling.o: compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/sampling.cpp
-build /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/sampling_gpu.o: cuda_compile /home/zby/Programs/Embodied_Analogy/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/sampling_gpu.cu
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/ball_query.o: compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/ball_query.cpp
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/ball_query_gpu.o: cuda_compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/ball_query_gpu.cu
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/group_points.o: compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/group_points.cpp
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/group_points_gpu.o: cuda_compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/group_points_gpu.cu
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/interpolate.o: compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/interpolate.cpp
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/interpolate_gpu.o: cuda_compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/interpolate_gpu.cu
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/pointnet2_api.o: compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/pointnet2_api.cpp
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/sampling.o: compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/sampling.cpp
+build /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/build/temp.linux-x86_64-cpython-310/src/sampling_gpu.o: cuda_compile /home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/pointnet2_batch/src/sampling_gpu.cu
 
 
 

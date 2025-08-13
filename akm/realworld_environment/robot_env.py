@@ -988,7 +988,7 @@ class RobotEnv(BaseEnv):
 
 if __name__ == "__main__":
     import yaml
-    cfg_path = "/home/user/Programs/Embodied_Analogy/embodied_analogy/realworld_environment/calibration/test.yaml"
+    cfg_path = "/home/user/Programs/AKM/akm/realworld_environment/calibration/test.yaml"
 
     # open
     with open(cfg_path, "r") as f:

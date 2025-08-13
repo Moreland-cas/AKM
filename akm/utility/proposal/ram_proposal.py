@@ -131,7 +131,7 @@ def get_ram_affordance_2d(
     # 保存 affordance map 2d 的输入方便后续 debug
     if False:
         np.savez(
-            "/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz",
+            "/home/zby/Programs/AKM/assets/unit_test/ram_proposal/affordance_map_2d_input.npz",
             rgb_img=query_rgb,
             cos_map=cos_map,
             cropped_mask=query_mask,
@@ -173,9 +173,9 @@ def get_ram_affordance_2d(
 
 if __name__ == "__main__":
     import sys
-    query_rgb = np.asarray(Image.open("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/rgb.png"))
-    query_depth = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/depth.npy")
-    # query_mask = np.load("/home/zby/Programs/Embodied_Analogy/embodied_analogy/dev/ram_proposal/mask.npy")
+    query_rgb = np.asarray(Image.open("/home/zby/Programs/AKM/akm/dev/ram_proposal/rgb.png"))
+    query_depth = np.load("/home/zby/Programs/AKM/akm/dev/ram_proposal/depth.npy")
+    # query_mask = np.load("/home/zby/Programs/AKM/akm/dev/ram_proposal/mask.npy")
     
     affordance_map_2d = get_ram_affordance_2d(
         query_rgb, # H, W, 3 in numpy
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     )
     Rw2c = Tw2c[:3, :3]
     
-    input_data = np.load("/home/zby/Programs/Embodied_Analogy/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
+    input_data = np.load("/home/zby/Programs/AKM/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
     # 测试一下 Affordance_map_2d
     # affordance_map_2d = Affordance_map_2d(
     #     rgb_img=input_data["rgb_img"],
