@@ -134,9 +134,9 @@ if __name__ == "__main__":
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
     
-    # byp for base yaml path
-    parser.add_argument('--byp', type=str, default="gflow_draw")
-    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/AKM/cfgs/task_cfgs_new")
+    # method_cfg for base yaml path
+    parser.add_argument('--method_cfg', type=str, default="gflow_draw")
+    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/AKM/cfgs/simulation_cfgs/tasks")
     
     args = parser.parse_args()
     assert (args.cs >= 0) and (args.cs < args.ts)
@@ -146,7 +146,7 @@ if __name__ == "__main__":
         yaml_path_list.append(os.path.join(args.task_cfgs_folder, yaml_path))
     
     # filter yaml_path_list
-    base_yaml_path = os.path.join("/home/zby/Programs/AKM/cfgs/", f"{args.byp}.yaml")
+    base_yaml_path = os.path.join("/home/zby/Programs/AKM/cfgs/", f"{args.method_cfg}.yaml")
     yaml_path_list = filter_tasks(base_yaml_path, yaml_path_list)
     
     task_groups = distribute_tasks(yaml_path_list, args.ts)

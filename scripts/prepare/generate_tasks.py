@@ -26,7 +26,7 @@ For an object, tasks are divided into open, close, and different delta_states.
 After determining these, determine init_joint_state and load_pose, a total of n random values.
 """
 parser = argparse.ArgumentParser(description='Folder to save the cfg files')
-parser.add_argument('--save_dir', type=str, default=os.path.join(PROJECT_ROOT, "cfgs", "task_cfgs_new"), help='folder to save the test cfg')
+parser.add_argument('--save_dir', type=str, default=os.path.join(PROJECT_ROOT, "cfgs", "simulation_cfgs", "tasks"), help='folder to save the task cfgs')
 args = parser.parse_args()
     
 task_cfgs = {}

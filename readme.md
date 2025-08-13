@@ -97,11 +97,11 @@ assets/RAM_memory/customize/open_the_dishwasher
 We use [SAPIEN](https://github.com/haosulab/SAPIEN) simulator as our testbed, to run the code, use the `test_batch.py` in `scripts`:
 ```
 cd /AKM/scripts/test_whole_pipeline
-python test_batch.py --ts n_ts --cs cs_idx --byp base_yaml_path --task_cfgs_folder path_to_task_cfgs
+python test_batch.py --ts n_ts --cs cs_idx --method_cfg method_cfg_path --task_cfgs_folder path_to_task_cfgs
 ```
 This script will test all the preset precise manipulation task as shown in,
 ```
-/AKM/cfgs/task_cfgs_new
+/AKM/cfgs/simulation_cfgs/tasks
 ├── 0.yaml
 ├── 1.yaml
 ├── 2.yaml
@@ -191,7 +191,7 @@ which defines a unique way of loading an articulated object, and upon this, with
 ```
 The saved path is indicated by the cfg file of a run.
 
-`--byp base_yaml_path` indicate where to find the cfg for this run, where method to be tested and hyperparameters are set, e.g. in `/AKM/cfgs/ours_1.yaml`, hyperparameters for each stage are listed as,
+`--method_cfg method_cfg_path` indicate where to find the cfg for this run, where method to be tested and hyperparameters are set, e.g. in `/AKM/cfgs/ours_1.yaml`, hyperparameters for each stage are listed as,
 ```
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
