@@ -1,8 +1,5 @@
-import heapq
-import os
-# import napari
-# import pygame
 import torch
+from sklearn.cluster import SpectralClustering
 import random
 from PIL import Image
 import numpy as np
@@ -30,6 +27,62 @@ def initialize_napari():
             time_in_msec = 100
             QTimer().singleShot(time_in_msec, app.quit)
         viewer.close()
+
+def clean_pc_np(
+    points: np.ndarray,
+    voxel_size=0.01,
+    sor_k=20, sor_std=2.0,
+    clustering_threshold=0.1,  # 点数较少的类别占总点数的比例阈值
+    num_iterations=5,  # 聚类迭代次数
+) -> np.ndarray:
+    """
+    输入: (N,3) np.ndarray
+    输出: (M,3) np.ndarray  (M <= N)
+    """
+    # 1) np.ndarray → o3d.PointCloud
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    # 2) 下采样
+    pcd = pcd.voxel_down_sample(voxel_size)
+    
+    # 3) 统计离群点移除
+    _, ind_sor = pcd.remove_statistical_outlier(
+        nb_neighbors=sor_k,
+        std_ratio=sor_std
+    )
+    pcd = pcd.select_by_index(ind_sor)
+
+    # 4) 多次二分聚类过滤
+    points_after_sor = np.asarray(pcd.points)
+    for _ in range(num_iterations):
+        if len(points_after_sor) < 2:
+            break  # 如果点数少于2个，无法继续聚类
+
+        # 使用 SpectralClustering 进行二分聚类
+        clustering = SpectralClustering(n_clusters=2, affinity='nearest_neighbors')
+        labels = clustering.fit_predict(points_after_sor)
+
+        # 统计每个聚类的点数
+        unique_labels, label_counts = np.unique(labels, return_counts=True)
+
+        # 检查两个聚类的点数
+        if len(label_counts) == 2:
+            if label_counts[0] / len(points_after_sor) < clustering_threshold:
+                # 如果第一个聚类的点数太少，保留第二个聚类
+                points_after_sor = points_after_sor[labels == 1]
+            elif label_counts[1] / len(points_after_sor) < clustering_threshold:
+                # 如果第二个聚类的点数太少，保留第一个聚类
+                points_after_sor = points_after_sor[labels == 0]
+            else:
+                # 如果两个聚类的点数都足够多，保留所有点
+                break
+        else:
+            # 如果只有一个聚类，直接退出循环
+            break
+
+    # 5) 返回结果
+    return points_after_sor
 
 def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, text_color: tuple = (255, 255, 255), position_ratio: tuple = (0.05, 0.05)) -> Image.Image:
     """

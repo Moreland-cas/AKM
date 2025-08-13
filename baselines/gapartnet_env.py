@@ -4,8 +4,8 @@ import sys
 import numpy as np
 import json
 from akm.project_config import PROJECT_ROOT, ASSET_PATH
-from akm.environment.explore_env import ExploreEnv
-from akm.environment.manipulate_env import ManipulateEnv
+from akm.simulated_envs.explore_env import ExploreEnv
+from akm.simulated_envs.manipulate_env import ManipulateEnv
 from akm.representation.basic_structure import Frame
 from akm.utility.utils import numpy_to_json
 

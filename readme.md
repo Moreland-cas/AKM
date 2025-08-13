@@ -1,4 +1,4 @@
-<div align="center">
+<div align="center" style="font-size: 3em">
   AKM
 </div>
 
@@ -260,4 +260,6 @@ manip_env_cfg:
 ### Evaluate Result 
 
 ## Test our method in Real-World 
-We also modify our `Env` class to support real-world deployment, the code are in `/AKM/akm/realworld_environment`
+We also modify our `Env` class to support real-world deployment, the code are in `/AKM/akm/realworld_envs`.
+We use a Franka Robot Arm and RealSense D455 camera for real-world deployment.
+To callibrate the intrinsic and extrinsic of the D455 camera, use the `/scripts/collect_and_calibrate.py`.

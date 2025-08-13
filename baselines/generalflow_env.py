@@ -28,8 +28,8 @@ from PIL import Image
 
 from akm.utility.constants import *
 from akm.representation.basic_structure import Frame
-from akm.environment.explore_env import ExploreEnv
-from akm.environment.manipulate_env import ManipulateEnv
+from akm.simulated_envs.explore_env import ExploreEnv
+from akm.simulated_envs.manipulate_env import ManipulateEnv
 from akm.utility.estimation.coarse_joint_est import (
     coarse_t_from_tracks_3d,
     coarse_R_from_tracks_3d,
