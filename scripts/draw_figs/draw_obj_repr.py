@@ -1,31 +1,24 @@
-"""
-读取一个 obj_repr, 然后对其进行绘制
-
-"""
 import os
 import numpy as np
-import open3d as o3d
 from PIL import Image
-from akm.representation.obj_repr import Obj_repr
-from akm.representation.basic_structure import Frame
-from akm.utility.proposal.affordance import Affordance_map_2d
+from graspnetAPI.grasp import Grasp
 from PIL import Image, ImageDraw, ImageFont
+
 from akm.project_config import (
-    BACKGROUND_LABEL,
     STATIC_LABEL,
     MOVING_LABEL,
-    UNKNOWN_LABEL,
 )
 from akm.utility.utils import (
     draw_points_on_image,
     visualize_pc,
     depth_image_to_pointcloud,
-    joint_data_to_transform_np
+    joint_data_to_transform_np,
+    add_text_to_image
 )
-from graspnetAPI.grasp import Grasp
+from akm.representation.obj_repr import Obj_repr
+from akm.representation.basic_structure import Frame
+from akm.utility.proposal.affordance import Affordance_map_2d
 
-# mobile_pc_color = np.array([162, 223, 248]) / 255.
-# static_pc_color = np.array([179, 173, 235]) / 255.
 
 gray_color = np.array([128, 128, 128]) / 255
 apple_green_color = np.array([159, 191, 82]) / 255
@@ -38,27 +31,25 @@ render_intrinsic = np.array(
     [  0., 300., 300.],
     [  0.,   0.,   1.]], dtype=np.float32)
 render_extrinsic = np.eye(4)
-# z 軸
+# z axis
 render_extrinsic[2, -1] = 0.1
 zoom_in_scale = 2
 
 def draw_points_on_image(image, uv_list, color_list=None, radius=None, normalized_uv=False):
     """
     Args:
-        image: PIL.Image 对象, 或是一个 np.array。
-        uv_list: 一个包含 (u, v) 坐标的列表,表示要绘制的点。
-        返回一个 pil image
+        image: A PIL.Image object, or an np.array.
+        uv_list: A list of (u, v) coordinates representing the points to be drawn.
+        Returns a PIL image
     """
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
         
-    # 获取图像的宽度和高度
     width, height = image.size
     image_draw = image.copy()
     draw = ImageDraw.Draw(image_draw)
     
     for i, (u, v) in enumerate(uv_list):
-        # 将归一化坐标转换为像素坐标
         if normalized_uv:
             x = int(u * width)
             y = int(v * height)
@@ -66,59 +57,19 @@ def draw_points_on_image(image, uv_list, color_list=None, radius=None, normalize
             x = int(u)
             y = int(v)
         
-        # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
+        # Draw a red dot at position (x, y) (fill color is red)
         if color_list is None:
             color = (255, 0, 0)
         else:
             color = tuple(color_list[i])
             
         if radius == None:
-            draw.point((x, y), fill=color)  # (255, 0, 0) 表示红色
+            draw.point((x, y), fill=color) 
         else:
             draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
             
     return image_draw
 
-def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, text_color: tuple = (255, 255, 255), position_ratio: tuple = (0.05, 0.05)) -> Image.Image:
-    """
-    在图片上添加文本,字体大小和位置根据图像大小动态确定,使用 Times New Roman 字体
-    
-    Args:
-        image: PIL Image对象
-        text: 要添加的文本
-        font_scale: 字体大小相对于图像高度的比例(默认0.05,即5%)
-        text_color: 文本颜色,RGB元组格式 (R, G, B)
-        position_ratio: 文本位置相对于图像宽度和高度的比例 (x_ratio, y_ratio),默认(0.05, 0.05)
-    
-    Returns:
-        PIL Image对象,包含添加的文本
-    """
-    # 创建图片副本以避免修改原图
-    new_image = image.copy()
-    new_image = new_image.resize((3200, 2400), Image.Resampling.LANCZOS)
-    draw = ImageDraw.Draw(new_image)
-    
-    # 获取图像尺寸
-    img_width, img_height = new_image.size
-    
-    # 动态计算字体大小(基于图像高度的比例)
-    font_size = int(img_height * font_scale)
-    
-    # 尝试加载 Times New Roman 字体
-    try:
-        font_path = "/home/zby/Programs/AKM/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
-        font = ImageFont.truetype(font_path, font_size)
-    except Exception as e:
-        print(f"无法加载 Times New Roman 字体: {e}, 使用默认字体")
-        font = ImageFont.load_default()
-    
-    # 动态计算文字位置(基于图像尺寸的比例)
-    position = (int(img_width * position_ratio[0]), int(img_height * position_ratio[1]))
-    
-    # 在指定位置绘制文本
-    draw.text(position, text, font=font, fill=text_color)
-    
-    return new_image
 
 def overlay_mask_on_image(image, mask, overlay_color=(255, 0, 0, 128), bbox_color=(0, 255, 0)):
     """
@@ -203,7 +154,7 @@ def farthest_point_sampling_2d(points, M):
     
     return mask
 
-# 读取 obj_repr
+# read obj_repr
 # vis_idx = [3, 4, 7, 10, 78, 95, 97, 114]
 vis_idx = 3
 load_path = f"/home/zby/Programs/AKM/assets/logs/6_39/{vis_idx}/obj_repr.npy"
@@ -214,17 +165,17 @@ obj_repr: Obj_repr = Obj_repr.load(load_path)
 visualize_explore = False
 if visualize_explore:
     num_tries = len(obj_repr.save_for_vis["explore_cos_map"])
-    # 绘制多次 explore 的首尾帧
+    # Draw the first and last frames of multiple explorations
     for i in range(1, num_tries):
         explore_first_frame, explore_last_frame = obj_repr.save_for_vis[str(i)]
         Image.fromarray(explore_first_frame.rgb).save(os.path.join(save_folder, f"{i}_first.png"))
         Image.fromarray(explore_last_frame.rgb).save(os.path.join(save_folder, f"{i}_last.png"))
         
-    # 绘制 valid explore 的首尾帧
+    # Draw the first and last frames of valid explore
     Image.fromarray(obj_repr.frames[0].rgb).save(os.path.join(save_folder, f"{num_tries}_first.png"))
     Image.fromarray(obj_repr.frames[-1].rgb).save(os.path.join(save_folder, f"{num_tries}_last.png"))
 
-    # 绘制 explore 最开始的 initial_frame
+    # Draw the initial_frame of explore
     initial_frame = obj_repr.initial_frame
     Image.fromarray(obj_repr.initial_frame.rgb).save(os.path.join(save_folder, f"initial_frame.png"))
 
@@ -235,7 +186,7 @@ if visualize_explore:
         visualize=False,
     )
     overlay_mask_on_image(Image.fromarray(obj_repr.initial_frame.rgb), obj_repr.initial_frame.obj_mask, overlay_color=(230, 100, 110, 128), bbox_color=(10, 120, 40)).save(os.path.join(save_folder, f"initial_frame_gsam.png"))
-    # 绘制 cos_map
+    # draw cos_map
     cos_map_list = obj_repr.save_for_vis["explore_cos_map"] # list of np.array([H, W])
     cropped_mask = obj_repr.save_for_vis["aff_map"].cropped_mask
     cropped_region = obj_repr.save_for_vis["aff_map"].cropped_region
@@ -261,11 +212,8 @@ if visualize_explore:
         )
         image_cos.save(os.path.join(save_folder, f"cos_map_{i+1}.png"))
 
-    # 绘制 valid explore 的 tracking result
+    # Draw the tracking result of valid exploration
     num_tracks = obj_repr.frames.track2d_seq.shape[1]
-    # import torch
-    # random_track_idx = torch.randperm(obj_repr.frames.track2d_seq[0].shape[0])[:200]
-    
     random_track_idx = farthest_point_sampling_2d(obj_repr.frames.track2d_seq[0].numpy(), 200)
     track_colors = colors = np.random.randint(0, 256, size=(num_tracks, 3), dtype=np.uint8)
     draw_points_on_image(
@@ -282,8 +230,9 @@ if visualize_explore:
         radius=3,
     ).save(os.path.join(save_folder, f"track_end.png"))
 
-# 绘制 reconstruct
-# 绘制 kframes 的 dynamic mask
+
+# Draw reconstruct
+# Draw the dynamic mask of kframes
 visualize_coarse = True
 if visualize_coarse:
     for i, kf in enumerate(obj_repr.kframes):
@@ -302,7 +251,7 @@ if visualize_coarse:
         )
         kf_pil.save(os.path.join(save_folder, f"kframe_{i}.png"))
     
-# coarse 阶段绘制一个 manipulate first frame + 3D tracks + joint_axis
+# Coarse stage draws a manipulate first frame + 3D tracks + joint_axis
     obj_pc_s, pc_colors_s = obj_repr.frames[0].get_obj_pc(
         use_robot_mask=True, 
         use_height_filter=True,
@@ -319,20 +268,15 @@ if visualize_coarse:
     )
     pc_colors_e = pc_colors_e / 255
 
-    # tracks_3d_colors = obj_repr.frames.moving_mask[:, None] * np.array([[0, 1, 0]]) + ~obj_repr.frames.moving_mask[:, None] * np.array([[1, 0, 0]])
-
     coarse_jonint_dict = obj_repr.get_joint_param(
         resolution="coarse",
         frame="camera"
     )
 
-    # obj_pc = np.concatenate([obj_pc_s, obj_pc_e])
-    # pc_colors = np.concatenate([pc_colors_s, pc_colors_e])
     moving_track_mask = obj_repr.frames.moving_mask
     coarse_image = visualize_pc(
         points=[obj_pc_s, obj_pc_e],
         point_size=[5, 5],
-        # voxel_size=0.005,
         voxel_size=None,
         colors=[gray_color, gray_color],
         alpha=[0.6, 0.6],
@@ -390,7 +334,7 @@ if visualize_coarse:
     )
     Image.fromarray(coarse_image_end).save(os.path.join(save_folder, "coarse_image_end.png"))
 
-# fine 阶段绘制一个 kframes[0] 和 kframes[-1] 的 mobile part + joint axis
+# Fine stage draws a mobile part + joint axis of kframes[0] and kframes[-1]
 visualize_fine = False
 if visualize_fine:
     kframes_start_mobile_pc = depth_image_to_pointcloud(
@@ -466,7 +410,7 @@ if visualize_fine:
     )
     Image.fromarray(fine_image_end).save(os.path.join(save_folder, "fine_image_end.png"))
     
-# 绘制 manipulate
+# draw manipulate
 visualize_manipulate = True
 if visualize_manipulate:
     for i in range(4):
@@ -490,7 +434,6 @@ if visualize_manipulate:
                     text_color=(255, 255, 255)
                 )
                 texted_img.save(os.path.join(save_folder, task_idx, f"manip_{k}.png"))
-            # continue
             if i == 1 and j == 3:
                 manip_first_frame = obj_repr.save_for_vis[task_idx][0]
                 cur_state = manip_first_frame.joint_state
@@ -569,10 +512,10 @@ if visualize_manipulate:
                 )
                 manip_terget.save(os.path.join(save_folder, "manip_terget.png"))
                 
-                # 最后绘制 grasp Trajctory
+                # finally draw grasp Trajctory
                 def transfer_Tph2w(obj_repr, Tph2w_ref, ref_state, tgt_state):
                     """
-                    将 Tph2w 从 ref_state 转换到 tgt_state
+                    Transition Tph2w from ref_state to tgt_state
                     """
                     Tph2c_ref = obj_repr.Tw2c @ Tph2w_ref
                     Tref2tgt_c = joint_data_to_transform_np(
@@ -587,9 +530,9 @@ if visualize_manipulate:
                 
                 def inverse_anyGrasp2ph(Tph2w):
                     """
-                        Convert Tph2w to Tgrasp2w (inverse of anyGrasp2ph)
-                        Tph2w: 4x4 homogeneous transformation matrix from panda_hand to world
-                        Returns: Tgrasp2w, 4x4 homogeneous transformation matrix from grasp to world
+                    Convert Tph2w to Tgrasp2w (inverse of anyGrasp2ph)
+                    Tph2w: 4x4 homogeneous transformation matrix from panda_hand to world
+                    Returns: Tgrasp2w, 4x4 homogeneous transformation matrix from grasp to world
                     """
                     def Tph2grasp(offset):
                         # Inverse of Tph2grasp from original function

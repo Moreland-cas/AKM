@@ -1,32 +1,49 @@
-import json
 import os
+import json
 import numpy as np
 from PIL import Image
+
 from akm.utility.utils import (
     visualize_pc,
     add_text_to_image,
-    depth_image_to_pointcloud
+    depth_image_to_pointcloud,
+    camera_to_image
 )
+from akm.utility.constants import MOVING_LABEL
 from akm.representation.obj_repr import Obj_repr
-from akm.representation.basic_structure import Frame
-from akm.utility.constants import MOVING_LABEL, STATIC_LABEL
 
-from PIL import Image, ImageDraw
+
+gray_color = np.array([128, 128, 128]) / 255
+apple_green_color = np.array([159, 191, 82]) / 255
+slight_green_color = np.array([149, 187, 114]) / 255
+mobile_pc_color = np.array([147, 205, 245]) / 255
+static_pc_color = np.array([255, 0, 0]) / 255
+render_intrinsic = np.array(
+    [[300.,   0., 400.],
+    [  0., 300., 300.],
+    [  0.,   0.,   1.]], dtype=np.float32)
+render_extrinsic = np.eye(4)
+zoom_in_scale = 2
+position_ratio_error = (0.05, 0.8)
+
+data_path = "/home/zby/Programs/AKM/assets/logs_draw"
+method_names = ["gflow", "gpnet", "ours"]
+obj_idx_list = os.listdir(os.path.join(data_path, method_names[0]))
+
 
 def get_rotation_matrix_x(alpha_deg):
     """
-    生成绕 X 轴正方向旋转 alpha 度的旋转矩阵。
+    Generates a rotation matrix that rotates by alpha degrees around the positive X-axis.
 
-    参数：
-        alpha_deg (float): 旋转角度（度）
+    Parameters:
+        alpha_deg (float): Rotation angle (degrees)
 
-    返回：
-        np.ndarray: 3x3 旋转矩阵
+    Returns:
+        np.ndarray: 3x3 rotation matrix
     """
-    # 转换为弧度
     alpha_rad = np.deg2rad(alpha_deg)
     
-    # 构建旋转矩阵
+    # Rotation Matrix
     cos_a = np.cos(alpha_rad)
     sin_a = np.sin(alpha_rad)
     rotation_matrix = np.array([
@@ -37,23 +54,6 @@ def get_rotation_matrix_x(alpha_deg):
     
     return rotation_matrix
 
-gray_color = np.array([128, 128, 128]) / 255
-apple_green_color = np.array([159, 191, 82]) / 255
-slight_green_color = np.array([149, 187, 114]) / 255
-mobile_pc_color = np.array([147, 205, 245]) / 255
-static_pc_color = np.array([255, 0, 0]) / 255
-
-render_intrinsic = np.array(
-    [[300.,   0., 400.],
-    [  0., 300., 300.],
-    [  0.,   0.,   1.]], dtype=np.float32)
-render_extrinsic = np.eye(4)
-# render_extrinsic[:3, :3] = get_rotation_matrix_x(-10)
-# render_extrinsic[1, -1] = 0.1 # y 軸
-zoom_in_scale = 2
-
-# position_ratio_method = (0.45, 0.05)
-position_ratio_error = (0.05, 0.8)
 
 def farthest_point_sampling_2d(points, M):
     """
@@ -96,18 +96,16 @@ def farthest_point_sampling_2d(points, M):
 
 def find_medium_alpha(pos, dir, K):
     """
-    找到使得 pos + alpha * dir 後能完全展示在屏幕內的 joint alpha 值。
+    Find the joint alpha value that makes pos + alpha * dir completely displayed on the screen.
     """
-    # import pdb;pdb.set_trace()
     alpha = np.linspace(-2, 2, 100)
-    from akm.utility.utils import camera_to_image
     mid_points = pos[None] + (alpha[:, None] + 0.5) * dir[None]
     uv, depth = camera_to_image(mid_points, K)
     W, H = K[0, -1] * 2, K[1, -1] * 2
     in_mask = (uv[:, 0] >= 0) & (uv[:, 0] < W) & (uv[:, 1] >= 0) & (uv[:, 1] < H)
     mid_points = mid_points[in_mask & (depth > 0.1)] # M, 2
     depth = depth[in_mask & (depth > 0.1)]
-    # 找到 depth 最小的那個
+    # Find the one with the smallest depth
     min_point = mid_points[np.argmin(depth)]
     alpha = ((min_point - pos) / dir )[0] - 0.5
     new_pivot = pos + alpha * dir
@@ -116,56 +114,44 @@ def find_medium_alpha(pos, dir, K):
     
 def find_closest_alpha(pos, dir, pos2):
     """
-    找到 alpha，使得 pos + alpha * dir 到 pos2 的距离最小。
-    
-    参数：
-        pos (np.ndarray): 起始点，形状 (3,)
-        dir (np.ndarray): 方向向量，形状 (3,)
-        pos2 (np.ndarray): 目标点，形状 (3,)
-    
-    返回：
+    Find alpha such that the distance from pos + alpha * dir to pos2 is minimized.
+
+    Parameters:
+        pos (np.ndarray): Starting point, shape (3,)
+        dir (np.ndarray): Direction vector, shape (3,)
+        pos2 (np.ndarray): Destination point, shape (3,)
+
+    Return:
         tuple: (alpha, closest_point, distance)
-            - alpha (float): 使得距离最小的 alpha 值
-            - closest_point (np.ndarray): 直线上的最近点，形状 (3,)
-            - distance (float): 最近点到 pos2 的距离
+        -alpha (float): The alpha value that minimizes the distance
+        -closest_point (np.ndarray): The closest point on the line, shape (3,)
+        -distance (float): The distance from the closest point to pos2
     """
-    # 转换为 NumPy 数组并验证形状
     pos = np.asarray(pos)
     dir = np.asarray(dir)
     pos2 = np.asarray(pos2)
     
     if pos.shape != (3,) or dir.shape != (3,) or pos2.shape != (3,):
-        raise ValueError("pos, dir, pos2 必须是形状为 (3,) 的向量")
+        raise ValueError("pos, dir, pos2 must be vectors of shape (3,)")
     
-    # 计算 dir 的模平方
+    # Calculate the square of the modulus of dir
     dir_norm_sq = np.dot(dir, dir)
     
-    # 检查 dir 是否为零向量
-    if dir_norm_sq < 1e-10:  # 阈值避免数值误差
-        raise ValueError("dir 不能是零向量")
+    # Checks if dir is the zero vector
+    if dir_norm_sq < 1e-10:  
+        raise ValueError("dir cannot be zero vector")
     
-    # 计算 v = pos - pos2
     v = pos - pos2
-    
-    # 计算 alpha
     alpha = -np.dot(v, dir) / dir_norm_sq
-    
-    # 计算最近点
     closest_point = pos + alpha * dir
+    min_distance = np.linalg.norm(closest_point - pos2)
     
-    # 计算最小距离
-    distance = np.linalg.norm(closest_point - pos2)
-    
-    return alpha, closest_point, distance
+    return alpha, closest_point, min_distance
 
-
-data_path = "/home/zby/Programs/AKM/assets/logs_draw"
-method_names = ["gflow", "gpnet", "ours"]
-obj_idx_list = os.listdir(os.path.join(data_path, method_names[0]))
 
 def idx_available(obj_idx):
     """
-    分别对于 三个方法读取 obj_idx 下的 recon_result.json, 都有 valid recon 才去绘制
+    Read recon_result.json under obj_idx for each of the three methods, and only draw if there is a valid recon
     """
     data_path = "/home/zby/Programs/AKM/assets/logs_draw"
     ours_json = json.load(open(os.path.join(data_path, "ours", str(obj_idx), "recon_result.json"), "r"))
@@ -177,9 +163,8 @@ def idx_available(obj_idx):
         return False
 
 
-obj_idx_list_filtered = [obj_idx for obj_idx in obj_idx_list if idx_available(obj_idx)]
 """
-保存方式爲
+save as:
 /reconstruct
     /obj_idx
         obj.png
@@ -187,6 +172,7 @@ obj_idx_list_filtered = [obj_idx for obj_idx in obj_idx_list if idx_available(ob
         gpnet.png
         gflow.png
 """ 
+obj_idx_list_filtered = [obj_idx for obj_idx in obj_idx_list if idx_available(obj_idx)]
 save_folder = f"/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/reconstruct"
 for obj_idx in obj_idx_list_filtered:
     print("obj_idx:", obj_idx)
@@ -214,7 +200,7 @@ for obj_idx in obj_idx_list_filtered:
         init_pil = init_pil.resize((3200, 2400))
         init_pil.save(os.path.join(obj_save_folder, f"obj_{obj_idx}.png"))
         
-        # 不妨先用第一幀的點暈做背景
+        # Let’s use the first frame’s dot halo as the background.
         obj_pc, pc_colors = obj_repr.initial_frame.get_obj_pc(
             use_robot_mask=True, 
             use_height_filter=True,
@@ -224,18 +210,15 @@ for obj_idx in obj_idx_list_filtered:
         
         recon_result = json.load(open(os.path.join(data_path, method_name, str(obj_idx), "recon_result.json"), "r"))
         fine_loss_dict = recon_result["fine_loss"]
-        # joint_type = recon_result["gt_w"]["joint_type"]
         type_error = int(fine_loss_dict["type_err"])
         pos_error = fine_loss_dict["pos_err"] * 100
         angle_error = np.rad2deg(fine_loss_dict["angle_err"])
-        # err_str = f'Pivot Err: {pos_error:.1f}cm\nAngle Err: {angle_error:.1f}°'
         err_str = f'Pivot/Angle Err: {pos_error:.1f}cm/{angle_error:.1f}°'
         
         # joint information
         fine_joint_dict = obj_repr.get_joint_param(resolution="fine", frame="camera")
             
         if method_name == "ours":
-            # 計算點暈
             first_kframe_mobile_mask = (obj_repr.kframes[0].dynamic_mask == MOVING_LABEL)
             
             moving_pc = depth_image_to_pointcloud(depth_image=obj_repr.initial_frame.depth, mask=first_kframe_mobile_mask, K=obj_repr.K)
@@ -261,7 +244,6 @@ for obj_idx in obj_idx_list_filtered:
                 zoom_in_scale=zoom_in_scale,
                 online_viewer=False
             )
-            # continue
             ours_pil = Image.fromarray(ours_rgb)
             ours_pil = add_text_to_image(
                 image=ours_pil,
@@ -295,7 +277,6 @@ for obj_idx in obj_idx_list_filtered:
                 zoom_in_scale=zoom_in_scale,
                 online_viewer=False,
             )
-            # continue
             gpnet_pil = Image.fromarray(gpnet_rgb)
             gpnet_pil = add_text_to_image(
                 image=gpnet_pil,
@@ -365,14 +346,7 @@ for obj_idx in obj_idx_list_filtered:
                 zoom_in_scale=zoom_in_scale,
                 online_viewer=False
             )
-            # continue
             gt_pil = Image.fromarray(gt_rgb)
-            # gt_pil = add_text_to_image(
-            #     image=gt_pil,
-            #     text="Ground Truth", 
-            #     text_color=(0, 0, 0), 
-            #     position_ratio=position_ratio_method
-            # )
             gt_pil = add_text_to_image(
                 image=gt_pil,
                 text=f'Pivot/Angle Err: {0.0}cm/{0.0}°', 
@@ -380,4 +354,3 @@ for obj_idx in obj_idx_list_filtered:
                 position_ratio=position_ratio_error
             )
             gt_pil.save(os.path.join(obj_save_folder, f"{obj_idx}_gt.png"))
-        
