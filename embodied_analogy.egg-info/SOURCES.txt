@@ -1,7 +1,0 @@
-setup.py
-embodied_analogy/__init__.py
-embodied_analogy.egg-info/PKG-INFO
-embodied_analogy.egg-info/SOURCES.txt
-embodied_analogy.egg-info/dependency_links.txt
-embodied_analogy.egg-info/requires.txt
-embodied_analogy.egg-info/top_level.txt

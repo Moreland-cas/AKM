@@ -44,6 +44,6 @@ class PreExtractDiftFeat(SubsetRetrievePipeline):
                         print(f"Features saved to {save_path}")
 
 if __name__ == "__main__":
-    my_class = PreExtractDiftFeat(subset_dir="/home/zby/Programs/RAM_code/assets/data")
+    my_class = PreExtractDiftFeat(subset_dir="/home/zby/Programs/Embodied_Analogy/assets/RAM_memory")
     my_class.pre_extract()
     
