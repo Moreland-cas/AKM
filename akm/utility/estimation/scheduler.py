@@ -1,4 +1,3 @@
-import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
@@ -11,43 +10,36 @@ class Scheduler:
         early_stop_patience=10,
     ):
         """
-        初始化早停与学习率调度器结合的类
+        Initializes a class that combines early stopping with a learning rate scheduler.
 
-        参数:
-            optimizer: 优化器
-            factor: 学习率衰减因子
-            patience: int, 验证指标在多少个 epoch 内没有改善时降低学习率
-            early_stop_patience: int, 验证指标在多少个 epoch 内没有改善时触发早停
-            delta: float, 验证指标改善的最小变化量
-            path: str, 保存最佳模型的路径
+        Parameters:
+        optimizer: optimizer
+        factor: learning rate decay factor
+        patience: int, number of epochs after which the validation metric shows no improvement before reducing the learning rate
+        early_stop_patience: int, number of epochs after which the validation metric shows no improvement before triggering early stopping
+        delta: float, minimum delta required to improve the validation metric
+        path: str, path to the best model
         """
         self.optimizer = optimizer
         self.factor = lr_update_factor
         self.patience = lr_scheduler_patience
         self.early_stop_patience = early_stop_patience
         
-        # 初始化学习率调度器
         self.scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=self.factor, patience=self.patience, verbose=True)
-
-        # 早停相关变量
         self.best_loss = 1e9
         self.best_state_dict = {}
-        
-        # 代表有多久没有下降了
+        # How long has it been since it last dropped?
         self.counter = 0
 
     def step(self, cur_loss, state_dict):
         """
-        在每次用 cur_state_dictc 计算出 cur_loss 后调用本函数, 更新学习率并检查早停条件
+        This function is called each time cur_loss is calculated using cur_state_dictc to update the learning rate and check the early stopping condition.
 
-        参数:
-            cur_loss: float, 当前计算出的待优化损失
-            state_dict: 当前的待优化参数状态
+        Parameters:
+            cur_loss: float, the currently calculated loss to be optimized
+            state_dict: the current parameter state to be optimized
         """
-        # 更新学习率调度器
         self.scheduler.step(cur_loss)
-
-        # 检查早停条件
         if cur_loss < self.best_loss:
             self.counter = 0
             self.best_loss = cur_loss

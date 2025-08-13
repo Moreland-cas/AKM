@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from einops import rearrange, repeat
 
-from akm.project_config import PROJECT_ROOT, ASSET_PATH
+from akm.utility.constants import PROJECT_ROOT, ASSET_PATH
 sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
 from structure.utils import _load_perception_model
 from gapartnet.structure.point_cloud import PointCloud

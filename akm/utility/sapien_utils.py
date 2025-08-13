@@ -1,7 +1,7 @@
 import numpy as np
-import sapien.core as sapien
-import numpy as np
 from copy import deepcopy
+import sapien.core as sapien
+
 
 def parse_urdf_config(config_dict: dict, scene: sapien.Scene) :
     """Parse config from dict for SAPIEN URDF loader.

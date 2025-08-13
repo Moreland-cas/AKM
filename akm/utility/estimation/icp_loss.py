@@ -1,9 +1,11 @@
 import torch
 import numpy as np
+
 from akm.utility.utils import (
     compute_normals,
     find_correspondences
 )
+
 
 def icp_loss_torch(
     joint_type,
@@ -16,27 +18,27 @@ def icp_loss_torch(
     num_sample_points=10000
 ):
     """
-    计算 ICP 损失 (点到点 或 点到平面)，支持平移或旋转。
-    需要优化的是 joint_dir, joint_dir 是唯一需要梯度的
+    Calculates ICP loss (point-to-point or point-to-plane), supporting translation or rotation.
+    The only parameter that needs to be optimized is joint_dir. This is the only one that requires gradients.
 
-    参数：
-        joint_dir (torch.Tensor): 形状 (3,) ，是可学习的参数, 且模长为 1
-        ref_pc (np.ndarray): 参考点云，形状 (N, 3)
-        tgt_pc (np.ndarray): 目标点云，形状 (M, 3)
-        target_normals (np.ndarray, 可选): 目标点云法向量，形状 (M, 3)，仅在点到平面模式中使用
-        loss_type (str): "point_to_point" 或 "point_to_plane" # TODO: 这里还可以加一种混合式
-        joint_type (str): "prismatic" 或 "revolute"
-        sample_points (int): 如果点云超了, 那就 sample 出其中 10000 个点
+    Parameters:
+        joint_dir (torch.Tensor): shape (3,) , a learnable parameter with a modulus of 1
+        ref_pc (np.ndarray): reference point cloud, shape (N, 3)
+        tgt_pc (np.ndarray): target point cloud, shape (M, 3)
+        target_normals (np.ndarray, optional): target point cloud normals, shape (M, 3), used only in point-to-plane mode
+        loss_type (str): "point_to_point" or "point_to_plane"
+        joint_type (str): "prismatic" or "revolute"
+        sample_points (int): If the point cloud exceeds the limit, sample 10,000 points from it
 
-    返回：
-        loss (torch.Tensor): 计算得到的损失值
+    Returns:
+        loss (torch.Tensor): the calculated loss value
     """
     assert joint_type in ["prismatic", "revolute"]
     assert Tref2tgt.is_cuda and "Tref2tgt tensor must be on GPU"
     assert Tref2tgt.requires_grad and "Tref2tgt tensor must requires grad to be optimized"
     assert loss_type in ["point_to_point", "point_to_plane"]
     
-    # print(f"icp input len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    print(f"icp input len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
     
     if min(len(ref_pc), len(tgt_pc)) < 100:
         return torch.tensor(0).cuda()
@@ -48,16 +50,6 @@ def icp_loss_torch(
             target_normals = compute_normals(tgt_pc) # N, 3
         target_normals = torch.tensor(target_normals, dtype=torch.float32, device=Tref2tgt.device)
         
-    # 在这里有针对的进行采样:
-    # from akm.utility.utils import farthest_point_sampling
-    # if len(ref_pc) > 5000:
-    #     sampled_index = farthest_point_sampling(ref_pc, num_sample_points)
-    #     ref_pc = ref_pc[sampled_index]
-    # if len(tgt_pc) > 5000:
-    #     sampled_index = farthest_point_sampling(tgt_pc, num_sample_points)
-    #     tgt_pc = tgt_pc[sampled_index]
-    #     target_normals = target_normals[sampled_index]
-    
     if len(ref_pc) > num_sample_points:
         sampled_index = np.random.choice(len(ref_pc), num_sample_points, replace=False)
         ref_pc = ref_pc[sampled_index]
@@ -66,28 +58,25 @@ def icp_loss_torch(
         tgt_pc = tgt_pc[sampled_index]
         target_normals = target_normals[sampled_index]
     
-    # print(f"downed sampled size len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    print(f"downed sampled size len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
     
-    # 将 numpy 数组转换为 torch.Tensor
     ref_pc = torch.tensor(ref_pc, dtype=torch.float32, device=Tref2tgt.device)
     target_pc = torch.tensor(tgt_pc, dtype=torch.float32, device=Tref2tgt.device)
-
-    # 将 ref_pc 扩展到齐次坐标 (N, 4)
     ref_pc_homogeneous = torch.cat([ref_pc, torch.ones(ref_pc.shape[0], 1, device=ref_pc.device)], dim=1)
 
-    # 应用变换
-    transformed_ref_pc_homogeneous = ref_pc_homogeneous @ Tref2tgt.T  # 变换为齐次坐标 (N, 4)
-    transformed_ref_pc = transformed_ref_pc_homogeneous[:, :3]  # 去掉齐次坐标 (N, 3)
+    # apply transform
+    transformed_ref_pc_homogeneous = ref_pc_homogeneous @ Tref2tgt.T 
+    transformed_ref_pc = transformed_ref_pc_homogeneous[:, :3]  
 
-    # 最近邻搜索
+    # NN search
     indices, _, valid_mask = find_correspondences(transformed_ref_pc.detach().cpu().numpy(), tgt_pc, max_distance=icp_select_range)
     
-    if valid_mask.sum() < 100: # 如果太少返回 0
+    if valid_mask.sum() < 100:
         return torch.tensor(0).cuda()
 
     matched_target_pc = target_pc[indices] # N, 3
 
-    # 计算损失
+    # compute loss
     if loss_type == "point_to_point":
         loss = torch.mean(torch.sum((transformed_ref_pc[valid_mask] - matched_target_pc[valid_mask]) ** 2, dim=1))
     elif loss_type == "point_to_plane":
@@ -101,14 +90,10 @@ def icp_loss_torch(
 
 if __name__ == "__main__":
     def test_differentiable_icp_loss():
-        # 模拟参考点云和目标点云
-        ref_pc = np.random.rand(6000, 3).astype(np.float32)  # 参考点云 (600, 3)
-        tgt_pc = np.random.rand(8000, 3).astype(np.float32)  # 目标点云 (800, 3)
-
-        # 模拟 joint_dir 作为优化参数
+        ref_pc = np.random.rand(6000, 3).astype(np.float32) 
+        tgt_pc = np.random.rand(8000, 3).astype(np.float32) 
         joint_dir = torch.tensor([1, 0.5, 1], requires_grad=True, device='cuda')
 
-        # 计算损失
         loss = icp_loss_torch(
             joint_dir, ref_pc, tgt_pc,
             target_normals=None,
@@ -116,9 +101,5 @@ if __name__ == "__main__":
             joint_type="prismatic", 
             coor_valid_distance=10
         )
-
-        # 打印损失值
         print(f"ICP Loss: {loss.item()}")
-
-    # 运行测试
     test_differentiable_icp_loss()

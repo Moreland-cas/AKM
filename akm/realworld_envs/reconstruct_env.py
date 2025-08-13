@@ -10,7 +10,7 @@ from akm.utility.utils import (
     joint_data_to_transform_np,
     depth_image_to_pointcloud
 )
-from akm.project_config import MOVING_LABEL
+from akm.utility.constants import MOVING_LABEL
 from akm.representation.obj_repr import Obj_repr
 from akm.representation.basic_structure import Frame
 from akm.realworld_envs.explore_env import ExploreEnv

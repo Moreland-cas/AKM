@@ -1,18 +1,15 @@
-import logging
-import open3d as o3d
-import numpy as np
-import torch
-import random
 import os
 import sys
-import cv2
-from akm.utility.constants import PROJECT_ROOT
+import logging
+import numpy as np
+import open3d as o3d
+
 relative_path = os.path.join(PROJECT_ROOT, "third_party", "RAM_code")
 sys.path.append(relative_path)
-from graspness_implementation.gsnet import GSNet, vis_save_grasp
-from graspnetAPI import GraspGroup, Grasp
-import argparse
-from akm.utility.constants import ASSET_PATH
+from graspnetAPI import GraspGroup
+from graspness_implementation.gsnet import GSNet
+
+from akm.utility.constants import PROJECT_ROOT, ASSET_PATH
 
 
 def prepare_gsnet(asset_path=ASSET_PATH):
@@ -36,6 +33,7 @@ def prepare_gsnet(asset_path=ASSET_PATH):
     gsnet = GSNet(config["gsnet"])
     return gsnet
 
+
 def inference_gsnet(gsnet: GSNet, pcs, keep=1e6, nms=True):
     if gsnet is None:
         gsnet = prepare_gsnet()
@@ -46,6 +44,7 @@ def inference_gsnet(gsnet: GSNet, pcs, keep=1e6, nms=True):
     if len(gg) > keep:
         gg = gg[:keep]
     return gg
+    
     
 def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize=False, asset_path=None, logger=None):
     '''GSNet'''
@@ -66,7 +65,3 @@ def detect_grasp_gsnet(gsnet, points, colors=None, nms=True, keep=1e6, visualize
         cloud.points = o3d.utility.Vector3dVector(points.astype(np.float32))
         o3d.visualization.draw_geometries([cloud, *grippers]) 
     return gg
-
-if __name__ == "__main__":
-    test_data = "/home/zby/Programs/AKM/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy"
-    

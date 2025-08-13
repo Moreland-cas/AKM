@@ -4,7 +4,7 @@ from PIL import Image
 from graspnetAPI.grasp import Grasp
 from PIL import Image, ImageDraw, ImageFont
 
-from akm.project_config import (
+from akm.utility.constants import (
     STATIC_LABEL,
     MOVING_LABEL,
 )

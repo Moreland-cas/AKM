@@ -92,6 +92,8 @@ assets/RAM_memory/customize/open_the_dishwasher
 └── vis
 ```
 
+To use the AnyGrasp Detector, TODO
+
 ## Test our method in Simulation
 ### Test script
 We use [SAPIEN](https://github.com/haosulab/SAPIEN) simulator as our testbed, to run the code, use the `test_batch.py` in `scripts`:

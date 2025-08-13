@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 import random
 from glob import glob
 
-from akm.project_config import PROJECT_ROOT, ASSET_PATH
+from akm.utility.constants import PROJECT_ROOT, ASSET_PATH
 import sys
 import os
 sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
