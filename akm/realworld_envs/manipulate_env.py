@@ -1,16 +1,15 @@
 import os
+import yaml
 import logging
 import numpy as np
 from franky import Reaction, JointStopMotion
 
-from akm.utility.utils import clean_pc_np
-from akm.realworld_envs.reconstruct_env import ReconEnv
 from akm.utility.constants import *
-
-from akm.representation.basic_structure import Frame
+from akm.utility.utils import clean_pc_np
 from akm.representation.obj_repr import Obj_repr
+from akm.realworld_envs.reconstruct_env import ReconEnv
 
-# 要修改的地方: 安全性保证
+
 class ManipulateEnv(ReconEnv):
     def __init__(self, cfg):       
         super().__init__(cfg)
@@ -86,22 +85,13 @@ class ManipulateEnv(ReconEnv):
                 self.clear_planner_pc()
                 self.open_gripper(target=0.06)
                 self.approach(distance=self.reserved_distance)
-                # self.approach_safe(distance=self.reserved_distance)
-                # self.close_gripper_safe(target=0.02, gripper_force=4)
                 self.close_gripper(target=0.0, gripper_force=4)
                 
-                # self.update_cur_frame(
-                #     init_guess=None,
-                #     visualize=visualize
-                # )
-                
-                # 转换 joint_dict 到世界坐标系
                 fine_dict_w = self.obj_repr.get_joint_param(
                     resolution="fine",
                     frame="world"
                 )
                 
-                # try:
                 reaction_motion = Reaction(self.get_force() > 15, JointStopMotion())
                 self.move_along_axis(
                     joint_type=fine_dict_w["joint_type"],
@@ -111,11 +101,6 @@ class ManipulateEnv(ReconEnv):
                     drop_large_move=False,
                     reaction_motion=reaction_motion
                 )
-                # except Exception as e:
-                #     self.open_gripper(target=0.06)
-                #     self.franky_robot.recover_from_errors()
-                #     self.move_dz(-self.reserved_distance)
-                #     continue
                     
                 if self.not_good_enough(visualize=visualize):
                     if self.goal_delta < 0 and num_manip == 1:
@@ -129,13 +114,11 @@ class ManipulateEnv(ReconEnv):
     
     def prepare_task_env(self, goal_delta):
         """
-        在 explore 和 reconstruct 结束后执行一次 manipulate 任务
-        manip_start_state: 物体关节被初始化到这个值 (完全关闭的 joint_state = 0)
-        manip_end_state: 算法要操作物体使得其关节变到这个值
+        After exploration and reconstructing, a manipulation task is executed.
+        manip_start_state: The object's joints are initialized to this value (joint_state = 0 for a fully closed state).
+        manip_end_state: The algorithm manipulates the object so that its joints reach this value.
         """
         self.goal_delta = goal_delta
-        # 进行 robot 的 reset
-        # input("Please reset robot and init joint state before you continue: ")
         self.reset_robot()
         self.update_cur_frame(
             init_guess=None,
@@ -155,12 +138,10 @@ class ManipulateEnv(ReconEnv):
 
 
 if __name__ == '__main__':
-    import yaml
     with open("/home/user/Programs/AKM/akm/realworld_envs/drawer.yaml", "r") as f:
         cfg = yaml.safe_load(f)
         
     manipEnv = ManipulateEnv(cfg=cfg)
-    # manipEnv.update_cur_frame(visualize=True)
     manipEnv.main()
     manipEnv.reset_robot_safe()
     

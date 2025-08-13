@@ -1,12 +1,8 @@
 import copy
 import logging
 import numpy as np
-from akm.representation.basic_structure import Data, Frame, Frames
-from akm.utility.estimation.coarse_joint_est import coarse_estimation
-from akm.utility.estimation.fine_joint_est import fine_estimation
 
 from akm.utility.utils import (
-    initialize_napari,   
     farthest_scale_sampling,
     joint_data_to_transform_np,
     get_depth_mask,
@@ -14,8 +10,10 @@ from akm.utility.utils import (
     depth_image_to_pointcloud,
     line_to_line_distance
 )
-initialize_napari()
 from akm.utility.constants import *
+from akm.representation.basic_structure import Data, Frame, Frames
+from akm.utility.estimation.fine_joint_est import fine_estimation
+from akm.utility.estimation.coarse_joint_est import coarse_estimation
 
 
 class Obj_repr(Data):
@@ -27,11 +25,10 @@ class Obj_repr(Data):
         self.K = None
         self.Tw2c = None
         
-        # 通过 reconstruct 恢复出的结果
         self.kframes = Frames()
         self.track_type = None # either "open" or "close"
         
-        # 这里的 coarse_joint_dict 和 fine_joint_dict 是在相机坐标系下估计的
+        # The coarse_joint_dict and fine_joint_dict and gt_joint_dict here are estimated in the camera coordinate system
         self.coarse_joint_dict = {
             "joint_type": None,
             "joint_dir": None,
@@ -44,7 +41,6 @@ class Obj_repr(Data):
             "joint_start": None,
             "joint_states": None
         }
-        # 这里的 gt_joint_dict 是在 load object 阶段保存的, 存储的值是在世界坐标系下的 
         self.gt_joint_dict = {
             "joint_type": None,
             "joint_dir": None,
@@ -78,7 +74,6 @@ class Obj_repr(Data):
                 joint_dict["joint_dir"] = Tc2w[:3, :3] @ joint_dict["joint_dir"]
                 joint_dict["joint_start"] = Tc2w[:3, :3] @ joint_dict["joint_start"] + Tc2w[:3, 3]
         elif resolution == "gt":
-            # TODO 可能有问题
             if self.gt_joint_dict["joint_type"] is None:
                 assert "Ground truth joint dict is not found"
             joint_dict = copy.deepcopy(self.gt_joint_dict)
@@ -90,9 +85,8 @@ class Obj_repr(Data):
     
     def compute_joint_error(self, skip_states=False):
         """
-        分别计算 coarse_joint_dict, fine_joint_dict 与 gt_joint_dict 的差距, 并打印, 保存
-        还要分别计算 frames 和 kframes 的 joint_state_error
-        
+        Calculate the difference between coarse_joint_dict, fine_joint_dict, and gt_joint_dict, print, and save.
+        Also calculate joint_state_error for frames and kframes.
         """
         coarse_w = self.get_joint_param(resolution="coarse", frame="world")
         fine_w = self.get_joint_param(resolution="fine", frame="world")
@@ -112,7 +106,7 @@ class Obj_repr(Data):
                 "pos_err": 0,
             }
         }
-        # NOTE: 这里要对 angle_err 取一个 minimum
+        # NOTE: Here we need to take a minimum for angle_err
         result["coarse_loss"]["type_err"] = 1 if coarse_w["joint_type"] != gt_w["joint_type"] else 0
         coarse_dir_dot = np.clip(np.dot(coarse_w["joint_dir"], gt_w["joint_dir"]), -1, 1)
         if np.arccos(coarse_dir_dot) > np.pi / 2:
@@ -143,8 +137,6 @@ class Obj_repr(Data):
         if skip_states:
             return result
         
-        # 新增加一个逻辑, 用于判断 coarse estimation 和 fine estimation
-        # 首先得到 coarse joint state, fine joint state 等信息
         coarse_joint_state_recon = self.coarse_joint_dict["joint_states"]
         fine_joint_state_recon = self.fine_joint_dict["joint_states"]
         
@@ -154,11 +146,10 @@ class Obj_repr(Data):
         fine_joint_state_gt = self.kframes.get_gt_joint_states()
         fine_joint_state_gt -= fine_joint_state_gt[0]
         
-        # 首先进行一个保存
         result["gt_w"]["fine_joint_states"] = fine_joint_state_gt
         result["gt_w"]["coarse_joint_states"] = coarse_joint_state_gt
         
-        # 然后对 state_err 进行计算, 为 l1 loss 的平均值
+        # Calculate state_err, which is the average value of l1 loss
         result["coarse_loss"]["state_err"] = np.abs(coarse_joint_state_recon - coarse_joint_state_gt).mean()
         result["fine_loss"]["state_err"] = np.abs(fine_joint_state_recon - fine_joint_state_gt).mean()
         
@@ -180,7 +171,7 @@ class Obj_repr(Data):
         self.kframes.moving_mask = self.frames.moving_mask
         self.kframes.static_mask = self.frames.static_mask
         
-        # NOTE: 这里要保证 frames[0] 一定被选进 kframes, 因为 ph_pose 保存在了 frames[0] 中
+        # NOTE: Here we need to ensure that frames[0] is selected into kframes, because ph_pose is stored in frames[0]
         kf_idxs = farthest_scale_sampling(
             arr=self.coarse_joint_dict["joint_states"],
             M=num_kframes,
@@ -220,24 +211,18 @@ class Obj_repr(Data):
             opti_joint_dir=True,
             opti_joint_start=(joint_type=="revolute"),
             opti_joint_states_mask=np.arange(self.kframes.num_frames())!=0,
-            # update_dynamic_mask=None,
             lr=lr, # 1mm
             gt_joint_dict=self.get_joint_param(resolution="gt", frame="camera"),
             visualize=visualize,
             logger=self.logger
         )
-        # 在这里将更新的 joint_dict 和 joint_states 写回 obj_repr
+        # Write the updated joint_dict and joint_states back to obj_repr here
         self.kframes.write_joint_states(fine_joint_dict["joint_states"])
         self.fine_joint_dict = fine_joint_dict
         
-        # 默认在 explore 阶段是打开的轨迹
+        # By default, the track is open in the explore phase
         track_type = "open"
         self.track_type = track_type
-        
-        # 看下当前的 joint_dir 到底对应 open 还是 close, 如果对应 close, 需要将 joint 进行翻转
-        # if track_type == "close":
-        #     reverse_joint_dict(coarse_state_dict)
-        #     reverse_joint_dict(fine_state_dict)
         
     def reconstruct(
         self,
@@ -250,7 +235,7 @@ class Obj_repr(Data):
         num_R_augmented=100
     ):
         """
-            从 frames 中恢复出 joint state dict
+        Recover the joint state dict from frames
         """
         self.coarse_joint_estimation(visualize=visualize, num_R_augmented=num_R_augmented)
         self.initialize_kframes(num_kframes=num_kframes, save_memory=save_memory)
@@ -274,21 +259,21 @@ class Obj_repr(Data):
     
     def update_state(self, query_frame: Frame):
         """
-        给 query_frame 的 joint_state 做一个粗略的估值
-        策略是 sample 多个 joint state, 然后依次得到多个 transformed_moving_pc
-        然后找到与 query_frame 最接近的那个 joint state
-        
-        NOTE: 由于我们强制了 kframes[0] 其实就是 manipulate first frame, 且 first frame 的 joint state 是 0
-        所以之后的 joint_delta 都是直接加在 kframes[0] 的 joint_state 上
+        Make a rough estimate of the joint_state of the query_frame.
+        The strategy is to sample multiple joint states, then obtain multiple transformed_moving_pcs in turn.
+        Then find the joint state closest to the query_frame.
+
+        NOTE: Since we force kframes[0] to be the manipulated first frame, and the joint state of the first frame is 0,
+        then all subsequent joint_deltas are directly added to the joint_state of kframes[0].
         """
-        # 根据关节种类选择 sample 的范围
+        # Select the sample range based on the joint type
         if self.coarse_joint_dict["joint_type"] == "revolute":
             joint_delta = np.pi / 2.
         elif self.coarse_joint_dict["joint_type"] == "prismatic":
             joint_delta = 0.5
         
         sampled_states = np.linspace(0, joint_delta, 15)
-        # 获取 kframes[0] 中的 moving_part
+        # Get the moving_part in kframes[0]
         moving_pc = depth_image_to_pointcloud(
             depth_image=self.kframes[0].depth, 
             mask=self.kframes[0].dynamic_mask == MOVING_LABEL, 
@@ -307,12 +292,12 @@ class Obj_repr(Data):
             tf_moving_pc = (Tref2tgt[:3, :3] @ moving_pc.T).T + Tref2tgt[:3, 3] # N, 3
             tf_moving_uv, moving_depth = camera_to_image(tf_moving_pc, self.K) # (N, 2), (N, )
             
-            # 对于超出 depth 范围的 tf_moving_uv 进行过滤
+            # Filter tf_moving_uv that exceeds the depth range
             in_img_mask = (tf_moving_uv[:, 0] >= 0) & (tf_moving_uv[:, 0] < query_frame.depth.shape[1]) & \
                           (tf_moving_uv[:, 1] >= 0) & (tf_moving_uv[:, 1] < query_frame.depth.shape[0])
             tf_moving_uv, moving_depth = tf_moving_uv[in_img_mask], moving_depth[in_img_mask]
             
-            # 读取 query_frame 在 tf_moving_uv 处的 depth, 并与 moving_depth 做比较
+            # Read the depth of query_frame at tf_moving_uv and compare it with moving_depth
             query_depth = query_frame.depth[tf_moving_uv[:, 1].astype(np.int32), tf_moving_uv[:, 0].astype(np.int32)]
             cur_mean_err = np.abs(query_depth - moving_depth).mean()
             if cur_mean_err < best_err:
@@ -325,10 +310,9 @@ class Obj_repr(Data):
     
     def update_dynamic(self, query_frame: Frame, visualize=False):
         """
-        使用 obj_repr 中的 kframes 的 dynamics 来更新 query_frame 的 dynamics
-        NOTE: 
-            需要 query_frame 的 joint_state 不为空
-            但是不需要 obj_mask ??
+        Use the kframes dynamics in obj_repr to update the query_frame dynamics.
+        NOTE:
+        Requires the query_frame joint_state to be non-null.
         """
         K = self.K
         ref_joint_states = self.kframes.get_joint_states()
@@ -352,7 +336,6 @@ class Obj_repr(Data):
             moving_uv, _ = camera_to_image(moving_pc, K) # N, 2
             moving_uv = moving_uv.astype(np.int32)
             
-            # 在这里处理越界的 bug
             in_img_mask = (moving_uv[:, 0] >= 0) & (moving_uv[:, 0] < query_frame.depth.shape[1]) & \
                           (moving_uv[:, 1] >= 0) & (moving_uv[:, 1] < query_frame.depth.shape[0])
             moving_uv = moving_uv[in_img_mask]
@@ -360,17 +343,16 @@ class Obj_repr(Data):
             tmp_moving = np.zeros_like(query_moving)
             tmp_moving[moving_uv[:, 1], moving_uv[:, 0]] = True # H, W
             query_moving = query_moving | tmp_moving
-            # 真的需要那么多 ref ?? 尤其是在 k_frame 的 ref 不准的情况下
             break
         
-        # 用 depth_mask 和 robot_mask 对 query_dynamic 进行过滤
+        # Filter query_dynamic with depth_mask and robot_mask
         depth_mask = get_depth_mask(query_frame.depth, K, query_frame.Tw2c)
         query_moving = query_moving & depth_mask & (~query_frame.robot_mask)
         
-        # 先把整个图像赋值为 UNKNOWN
+        # First assign the entire image to UNKNOWN
         query_dynamic = np.ones_like(query_moving) * UNKNOWN_LABEL  
         
-        # 再把其中的移动部分赋值为 MOVING_LABEL
+        # Then assign the moving part to MOVING_LABEL
         query_dynamic[query_moving] = MOVING_LABEL
         query_frame.dynamic_mask = query_dynamic
         
@@ -389,27 +371,20 @@ class Obj_repr(Data):
         visualize=False
     ) -> Frame:
         """
-        对 query frame 的 joint_state, dynamic 进行恢复 
-        其中 dynamic 的恢复来自 sam2 和 kframes
+        Restore the joint_state and dynamics of the query frame.
+        Dynamics are restored from sam2 and kframes.
+
         query_frame:
-            需包含 query_depth, query_dynamic
+            Requires query_depth and query_dynamic
         """
         self.logger.log(logging.INFO, "Start Relocalizing...")
-        # 首先获取当前帧物体的 mask, 是不是也可以不需要 mask
+        # First get the mask of the object in the current frame. 
         num_ref = len(self.kframes)
         
-        # if init_guess is not None:
-        if False:
-            query_frame.joint_state = init_guess
-            self.logger.log(logging.INFO, f"Guess query state through history: {init_guess}")
-        else:
-            # 初始化 query_frame 的 joint 状态
-            self.update_state(query_frame)
-        
-        # 对 query_frame 的 dynamic_mask 进行估计
+        self.update_state(query_frame)
         self.update_dynamic(query_frame, visualize=visualize)
         
-        # 将 query_frame 写进 obj_repr.kframes, 然后复用 fine_estimation 对初始帧进行优化
+        # Write query_frame into obj_repr.kframes, and then reuse fine_estimation to optimize the initial frame
         self.kframes.frame_list.insert(0, query_frame)
         fine_joint_dict = fine_estimation(
             K=self.K,
@@ -426,7 +401,7 @@ class Obj_repr(Data):
             visualize=visualize,
             logger=self.logger
         )
-        # 然后在这里把 query_frame 从 keyframes 中吐出来
+        # Then spit out query_frame from keyframes here
         query_frame = self.kframes.frame_list.pop(0)
         if fine_joint_dict == {}:
             self.logger.log(logging.ERROR, "Fine estimation failed, return state as 0 or initial_guess if given")
@@ -445,7 +420,7 @@ class Obj_repr(Data):
         else:
             manip_first_frame_gt_joint_state = self.kframes[0].gt_joint_state
         self.logger.log(logging.INFO, f"GT joint state: {query_frame.gt_joint_state - manip_first_frame_gt_joint_state}")
-        # 估计完后再更新一次 dynamic 估计
+       
         self.update_dynamic(query_frame, visualize=visualize)
         return query_frame
     
@@ -471,13 +446,11 @@ class Obj_repr(Data):
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "fine joint est visualization"
         
-        # 改变坐标系
         joint_start[-1] *= -1
         joint_dir[-1] *= -1
         
         viewer.add_points(env_pc, size=0.01, name='predicted tracks 3d', opacity=0.8, face_color="green")
 
-        # 绘制一下 joint start 和 joint axis
         viewer.add_shapes(
             data=np.array([joint_start, joint_start + joint_dir * 0.2]),
             name="est joint dir",
@@ -524,36 +497,3 @@ class Obj_repr(Data):
             self.kframes._visualize_kf(viewer, prefix="kframes")
         self._visualize(viewer)
         napari.run()
-
-
-if __name__ == "__main__":
-    # drawer
-    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/44962/explore/explore_data.pkl")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/44962/reconstruct/recon_data.pkl")
-    # microwave
-    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/7221/explore/explore_data.pkl")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/7221/reconstruct/recon_data.pkl")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/tmp/48878/recon_data.pkl")
-    # obj_repr.visualize()
-    
-    # array([ 0.47273752,  0.16408749, -0.8657913 ], dtype=float32)
-    # pass
-    # obj_repr = Obj_repr()
-    # obj_repr.load("/home/zby/Programs/AKM/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
-    # obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets/logs/test_explore/41083_2_prismatic/explore/obj_repr.npy")
-    obj_repr = Obj_repr.load(
-        "/home/zby/Programs/AKM/assets_zby/logs/explore_52/40147_1_prismatic/obj_repr.npy"
-    )
-    
-    from akm.utility.grasp.gsnet import detect_grasp_gsnet
-    from akm.utility.utils import visualize_pc
-    # pc = obj_repr.frames[0].get_env_pc(
-    #     use_robot_mask=True, 
-    #     use_height_filter=True,
-    #     world_frame=True,
-    # )[0]
-    # visualize_pc(pc)
-    # detect_grasp_gsnet(None, pc, visualize=True)
-    obj_repr.frames[0].detect_grasp(
-        use_anygrasp=True, world_frame=False, visualize=True
-    )

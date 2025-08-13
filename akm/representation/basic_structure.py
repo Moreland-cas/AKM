@@ -2,7 +2,14 @@ import os
 import pickle
 import numpy as np
 from graspnetAPI import GraspGroup
-from akm.utility.constants import *
+
+from akm.utility.grasp.anygrasp import (
+    detect_grasp_anygrasp,
+    filter_grasp_group,
+    crop_grasp,
+    crop_grasp_by_moving,
+    sort_grasp_group
+)
 from akm.utility.utils import (
     napari_time_series_transform,
     image_to_camera,
@@ -19,23 +26,15 @@ from akm.utility.utils import (
     filter_tracks_by_consistency,
     filter_dynamic,
     camera_to_world,
-    initialize_napari
 )
-initialize_napari()
+from akm.utility.constants import *
 from akm.utility.perception.online_cotracker import track_any_points
-
 from akm.utility.estimation.clustering import cluster_tracks_3d_spectral as cluster_tracks_3d
-from akm.utility.grasp.anygrasp import (
-    detect_grasp_anygrasp,
-    filter_grasp_group,
-    crop_grasp,
-    crop_grasp_by_moving,
-    sort_grasp_group
-)
+
 
 class Data():
     def save(self, file_path):
-        # 保存这个类到 file_path, 如果 file_path 所在的文件夹路径不存在, 则创建
+        # Save this class to file_path. If the folder path where file_path is located does not exist, create it.
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
         with open(file_path, "wb") as f:
@@ -46,15 +45,6 @@ class Data():
         with open(file_path, "rb") as f:
             return pickle.load(f)
         
-    # def load(self, file_path):
-    #     with open(file_path, "rb") as f:
-    #         loaded_data = pickle.load(f)
-    #         # 递归更新所有属性
-    #         for key, value in loaded_data.__dict__.items():
-    #             if hasattr(self, key) and isinstance(getattr(self, key), object):
-    #                 # 这里可以添加更复杂的递归更新逻辑
-    #                 pass
-    #             setattr(self, key, value)
         
 class Frame(Data):
     def __init__(
@@ -80,9 +70,9 @@ class Frame(Data):
         Tph2w=None
     ):
         """
-        joint_state: 重建算法预测的 joint_state
-        joint_state_offset: explore_video 的第一帧对应的 gt_joint_state
-        gt_joint_state: 真实的 joint_state, 如果预测的足够好, 那么应该有 joint_state + joint_state_offset = gt_joint_state
+        joint_state: The joint_state predicted by the reconstruction algorithm
+        joint_state_offset: The gt_joint_state corresponding to the first frame of the explore_video
+        gt_joint_state: The actual joint_state. If the prediction is good enough, then joint_state + joint_state_offset = gt_joint_state
         """
         self.rgb = rgb
         self.depth = depth
@@ -96,7 +86,7 @@ class Frame(Data):
         self.gt_joint_state = gt_joint_state
         self.joint_state_offset = joint_state_offset
         
-        # NOTE: 这几个都在相机坐标系下
+        # NOTE: These are all in the camera coordinate system
         self.track2d = track2d
         self.contact2d = contact2d
         self.contact3d = contact3d
@@ -107,7 +97,7 @@ class Frame(Data):
         self.robot3d = robot3d
         self.robot_mask = robot_mask
         
-        # NOTE: Tph2w 是在世界坐标系下的 (4, 4)
+        # NOTE: Tph2w is in world coordinates (4, 4)
         self.Tph2w = Tph2w
         
         # save for vis
@@ -139,7 +129,6 @@ class Frame(Data):
                 face_color='transparent',
                 edge_color='green',
                 edge_width=5,
-                # features=features,
                 text="bbox",
                 name=f"{prefix}_bbox",
             )
@@ -152,7 +141,8 @@ class Frame(Data):
         visualize=False
     ):
         """
-        返回 camera 坐标系下的点云, 可以选择是否仅返回 obj_mask 为 True 的点
+        Returns the point cloud in the camera coordinate system. 
+        You can choose whether to return only the points where obj_mask is True
         """
         if use_height_filter:
             height_filter = 0.02
@@ -188,7 +178,8 @@ class Frame(Data):
         visualize=False
     ):
         """
-        返回 camera 坐标系下的点云, 可以选择是否仅返回 obj_mask 为 True 的点
+        Returns the point cloud in the camera coordinate system. 
+        You can choose whether to return only the points where obj_mask is True
         """
         if use_height_filter:
             height_filter = 0.02
@@ -215,8 +206,8 @@ class Frame(Data):
         
     def detect_grasp(self, use_anygrasp=True, world_frame=False, visualize=False, asset_path=None, logger=None) -> GraspGroup:
         """
-        返回当前 frame 的点云上 contact2d 附近的一个 graspGroup, default frame is Tgrasp2c
-        if world_frame = True, return Tgrasp2w
+        Returns a graspGroup near contact2d on the point cloud of the current frame. The default frame is Tgrasp2c.
+        If world_frame = True, return Tgrasp2w
         """
         assert (self.contact2d is not None) and (self.obj_mask is not None)
         c2d_int = self.contact2d.astype(np.int32)
@@ -229,7 +220,7 @@ class Frame(Data):
             self.contact3d = contact3d
         contact3d = self.contact3d
         
-        # 找到 contact3d 附近的点
+        # Find points near contact3d
         obj_pc, pc_colors = self.get_obj_pc(
             use_robot_mask=True,
             use_height_filter=True,
@@ -244,7 +235,7 @@ class Frame(Data):
         cropped_pc = obj_pc[crop_mask]
         cropped_colors = pc_colors[crop_mask]
         
-        # fit 一个局部的 normal 做为 grasp 的方向
+        # Fit a local normal as the grasp direction
         plane_normal = fit_plane_ransac(
             points=cropped_pc,
             threshold=0.005, 
@@ -257,25 +248,18 @@ class Frame(Data):
             dir_out = -plane_normal
         self.dir_out = dir_out
         
-        # 1) 在 crop 出的点云上检测 grasp
-        # gg = detect_grasp_anygrasp(
-        #     points=cropped_pc, 
-        #     colors=cropped_colors / 255.,
-        #     dir_out=dir_out, 
-        #     augment=True,
-        #     visualize=False
-        # )  
-        # 2) 在完整的点云上检测 grasp
+        #  detect grasp on full pc
         if use_anygrasp:
             gg = detect_grasp_anygrasp(
                 points=obj_pc, 
                 colors=pc_colors / 255.,
                 dir_out=dir_out, 
                 augment=True,
-                visualize=False, # still have bug visualize this
+                visualize=False,
                 logger=logger
             )  
-        else: # use gsnet
+        else: 
+            # use gsnet
             from akm.utility.grasp.gsnet import detect_grasp_gsnet
             gg = detect_grasp_gsnet(
                 gsnet=None,
@@ -288,13 +272,13 @@ class Frame(Data):
                 logger=logger
             )
             
-        # 初始化限制条件
-        max_radius = 0.5  # 最大可接受的 radius
-        max_degree_thre = 90  # 最大可接受的 degree_thre
-        radius_step = 0.05  # 每次增加的 radius 步长
-        degree_step = 10  # 每次增加的 degree_thre 步长
-        radius = 0.1  # 初始 radius
-        degree_thre = 30  # 初始 degree_thre
+        # Initial constraints
+        max_radius = 0.5 # Maximum acceptable radius
+        max_degree_thre = 90 # Maximum acceptable degree_thre
+        radius_step = 0.05 # Step size for each radius increment
+        degree_step = 10 # Step size for each degree_thre increment
+        radius = 0.1 # Initial radius
+        degree_thre = 30 # Initial degree_thre
 
         while True:
             gg_cropped = crop_grasp(
@@ -312,19 +296,18 @@ class Frame(Data):
             if gg_filtered is not None and len(gg_filtered) > 0:
                 break
 
-            # 如果没有找到 grasp，逐步放松限制
+            # If no grasp is found, gradually relax restrictions
             if radius < max_radius:
                 radius += radius_step
             if degree_thre < max_degree_thre:
                 degree_thre += degree_step
 
-            # 如果已经达到了最大可接受的阈值，退出循环
             if radius >= max_radius and degree_thre >= max_degree_thre:
                 break
 
         gg = gg_filtered
 
-        # 再用距离 contact3d 的距离和 detector 本身预测的分数做一个排序
+        # Then use the distance from contact3d and the score predicted by the detector itself to make a sort
         gg_sorted = sort_grasp_group(
             grasp_group=gg_filtered,
             contact_region=self.contact3d[None],
@@ -343,11 +326,11 @@ class Frame(Data):
             # Tgrasp2w
             Tc2w = np.linalg.inv(self.Tw2c)
             if self.grasp_group is not None and len(self.grasp_group) > 0:
-                self.grasp_group = self.grasp_group.transform(Tc2w) # TODO 解决是None的问题
+                self.grasp_group = self.grasp_group.transform(Tc2w) 
             
     def detect_grasp_moving(self, crop_thresh=0.1, visualize=False, logger=None) -> GraspGroup:
         """
-        返回当前 frame 的点云上 moving_part 附近的一个 graspGroup
+        Returns a graspGroup near the moving_part on the point cloud of the current frame
         """
         assert (self.dynamic_mask is not None) and (self.obj_mask is not None)
         
@@ -357,7 +340,7 @@ class Frame(Data):
             world_frame=False
         )
         
-        # 这里用相机坐标系的 -z 轴作为 dir_out
+        # Here we use the -z axis of the camera coordinate system as dir_out
         dir_out = np.linalg.inv(self.Tw2c)[:3, :3] @ np.array([0, 0, -1])
         gg = detect_grasp_anygrasp(
             points=obj_pc, 
@@ -367,7 +350,7 @@ class Frame(Data):
             visualize=False,
             logger=logger
         )  
-        # 这是在所有物体点云上检测得到的 grasp, 我们需要把距离 dynamic_mask 中 moving_mask 近的裁剪出来
+        # This is the grasp detected on all object point clouds. We need to crop out the ones that are close to the moving_mask in the dynamic_mask
         gg = crop_grasp_by_moving(
             grasp_group=gg,
             contact_region=depth_image_to_pointcloud(self.depth, self.dynamic_mask == MOVING_LABEL, self.K),
@@ -409,7 +392,6 @@ class Frame(Data):
         if filter:
             assert self.robot_mask is not None
             obj_mask = obj_mask & (~self.robot_mask)
-            # 使用 depth_mask 进行过滤
             depth_mask = get_depth_mask(
                 depth=self.depth,
                 K=self.K,
@@ -449,8 +431,7 @@ class Frames(Data):
         Tw2c=None,
         track2d_seq=None,
         track3d_seq=None,
-        # 用于记录 tracks 的语义分类
-        moving_mask=None,
+        moving_mask=None, # Used to record semantic classification of tracks
         static_mask=None,
         obj_mask_seq=None,
         dynamic_seq=None,
@@ -537,7 +518,7 @@ class Frames(Data):
     
     def track_points(self, visualize=False):
         """
-        使用 cotracker 对于第一个 frame 上的 track2d 进行跟踪得到其他 frame 上的 track2d
+        Use cotracker to track the track2d on the first frame to get the track2d on other frames
         """
         assert self.frame_list[0].track2d is not None
         # (T, M, 2), (T, M)
@@ -565,21 +546,20 @@ class Frames(Data):
         ).reshape(T, M, 3)
         self.track3d_seq = track3d_seq
         
-        # 对得到的 track3d_seq 进行过滤
+        # Filter the obtained track3d_seq
         if filter:
             def filter_pixel_tracks(boolean_mask, pixel_tracks):
                 T, H, W = boolean_mask.shape
                 M = pixel_tracks.shape[1]
-                # 创建一个大小为 M 的布尔掩码，初始化为 True
                 output_mask = np.ones(M, dtype=bool)
                 for m in range(M):
                     for t in range(T):
                         u, v = pixel_tracks[t, m]
                         u, v = int(u), int(v)
-                        # 检查坐标 (u, v) 是否在布尔掩码中为 True
+                        # Checks if coordinate (u, v) is True in the Boolean mask
                         if u < 0 or u >= W or v < 0 or v >= H or not boolean_mask[t, v, u]:
                             output_mask[m] = False
-                            break  # 一旦发现不满足条件，就可以停止检查
+                            break
                 return output_mask
             
             robot_filter = filter_pixel_tracks(~self.get_robot_mask_seq(), track2d_seq)
@@ -587,9 +567,8 @@ class Frames(Data):
             
             filter_mask = robot_filter & consis_filter
             
-            # 但是如果 filter_mask 过滤后的点实在太少, 那么就不进行过滤
+            # But if the number of points filtered by filter_mask is too small, no filtering will be performed.
             if filter_mask.sum() < 100:
-                # (f"WARNING: too few points after filtering (original: {track3d_seq.shape[1]}, filtered: {filter_mask.sum()}), skip filtering")
                 filter_mask = np.ones(M, dtype=bool)
                 
             track2d_seq = track2d_seq[:, filter_mask]
@@ -608,12 +587,9 @@ class Frames(Data):
     
     def segment_obj(self, obj_description=None, filter=True, visualize=False):
         from akm.utility.perception.mask_obj_from_video import mask_obj_from_video_with_image_sam2
-        # 对于所有 frames 进行物体分割
         obj_mask_seq = mask_obj_from_video_with_image_sam2(
             rgb_seq=self.get_rgb_seq(), 
             obj_description=obj_description,
-            # positive_tracks2d=self.track2d_seq, 
-            # negative_tracks2d=self.get_robot2d_seq(), 
             positive_tracks2d=None, 
             negative_tracks2d=None, 
             visualize=visualize
@@ -650,7 +626,7 @@ class Frames(Data):
             ref_states = joint_states[other_mask]
             
             query_dynamic_updated = filter_dynamic(
-                K=self.K, # 相机内参
+                K=self.K, 
                 query_depth=query_depth, # H, W
                 query_dynamic=query_dynamic, # H, W
                 ref_depths=ref_depths,  # T, H, W
@@ -668,7 +644,6 @@ class Frames(Data):
             import napari 
             viewer = napari.Viewer()
             viewer.title = "filter dynamic seq (moving part)"
-            # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
             viewer.add_labels(dynamic_seq.astype(np.int32), name='before filtering')
             viewer.add_labels(dynamic_seq_updated.astype(np.int32), name='after filtering')
             napari.run()
@@ -691,22 +666,10 @@ class Frames(Data):
         
         if filter:
             self.filter_dynamics(
-                depth_tolerance=0.03, # 假设 coarse 阶段的误差估计在 5 cm 内
+                depth_tolerance=0.03, 
                 joint_dict=joint_dict,
                 visualize=visualize
             ) 
-        
-        # for i in range(self.num_frames()):
-        #     self.frame_list[i].obj_mask = self.obj_mask_seq[i]
-        #     self.frame_list[i].dynamic_mask = dynamic_seq_updated[i]
-    
-    # 底下估计 open/close 的这一部分并不是很 robust, 因此删除, 并且默认 explore 阶段得到的都是 open 的轨迹
-    # 根据追踪的 3d 轨迹判断是 "open" 还是 "close"
-    # track_type = classify_open_close(
-    #     tracks3d=tracks3d_filtered,
-    #     moving_mask=moving_mask,
-    #     visualize=visualize
-    # )
            
     def _visualize_f(self, viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()
@@ -719,7 +682,6 @@ class Frames(Data):
         rgb_seq = self.get_rgb_seq()
         viewer.add_image(rgb_seq, rgb=True)
         
-        # 添加绘制 mask
         if self.obj_mask_seq is not None:
             viewer.add_labels(self.obj_mask_seq, name=f"{prefix}_obj_mask_seq")
         
@@ -751,22 +713,3 @@ class Frames(Data):
             viewer.title = "frames visualization"
             self._visualize_f(viewer)
         napari.run()
-
-
-if __name__ == "__main__":
-    # frame = Frame.load("/home/zby/Programs/AKM/assets/unit_test/grasp/init_frame_drawer.npy")
-    # frame = Frame.load("/home/zby/Programs/AKM/assets/unit_test/grasp/init_frame_micro.npy")
-    # frame.detect_grasp(True)
-    # frame.segment_obj(obj_description="drawer", visualize=True, remove_robot=False)
-    obj_repr = Obj_repr.load("/home/zby/Programs/AKM/assets_zby/logs/explore_51/44781_1_revolute/obj_repr.npy")
-    # obj_repr.visualize()
-    
-    from akm.utility.grasp.gsnet import detect_grasp_gsnet
-    from akm.utility.utils import visualize_pc
-    pc = obj_repr.frames[0].get_env_pc(
-        use_robot_mask=True, 
-        use_height_filter=True,
-        world_frame=True,
-    )[0]
-    visualize_pc(pc)
-    detect_grasp_gsnet(None, pc, visualize=True)

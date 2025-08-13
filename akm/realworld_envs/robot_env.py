@@ -5,7 +5,6 @@ import numpy as np
 import pybullet as p
 import pybullet_data
 from franky import *
-from PIL import Image
 import sapien.core as sapien
 from scipy.ndimage import binary_dilation
 from scipy.spatial.transform import Rotation as R
