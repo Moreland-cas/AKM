@@ -1,10 +1,9 @@
+import os
 import sys
 import json
-import os
 import copy
-import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import yaml
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 from akm.utility.constants import *
 
@@ -20,8 +19,8 @@ def update_dict(a, b):
             
 def filter_tasks(base_yaml_path, yaml_path_list):
     """
-    将已经跑过的 task 从 yaml_path_list 中过滤掉
-    返回过滤后的 yaml_path_list
+    Filters out already-running tasks from the yaml_path_list. 
+    Returns the filtered yaml_path_list.
     """
     yaml_path_list_filtered = []
     
@@ -46,12 +45,12 @@ def filter_tasks(base_yaml_path, yaml_path_list):
         for saved_result_path in saved_result_paths:
             if not os.path.exists(saved_result_path):
                 all_exist = False
-                # 发现三个文件并不同时存在, 因此需要跑
+                # Found that the three files do not exist at the same time, so you need to run
                 yaml_path_list_filtered.append(specific_yaml_path)
                 continue
         
         if all_exist:
-            # 如果 explore 中的 exception 是 CUDA out of memory, 那么还需要跑
+            # If the exception in explore is CUDA out of memory, you also need to run
             with open(os.path.join(saved_prefix, "explore_result.json"), "r") as f:
                 explore_dict = json.load(f)
             if "exception" in explore_dict.keys():
@@ -81,7 +80,6 @@ def test_one(base_yaml_path, specific_yaml_path):
     update_dict(task_cfg, specific_cfg)
     method_name = task_cfg["exp_cfg"]["method_name"]
     
-    # 否则执行
     if method_name == "ours":
         from akm.simulated_envs.manipulate_env import ManipulateEnv as env_class
     elif method_name == "gflow":
@@ -91,9 +89,6 @@ def test_one(base_yaml_path, specific_yaml_path):
         sys.path.append(PROJECT_ROOT)
         from baselines.gapartnet_env import GAPartNet_ManipEnv as env_class
     
-    # for gpu competition
-    # import torch
-    # useless_var = torch.empty((256, 256, 256, 256), dtype=torch.float32)
     manipulateEnv = env_class(cfg=task_cfg)
     manipulateEnv.main()
     manipulateEnv.delete()
@@ -114,11 +109,11 @@ def test_batch(base_yaml_path, yaml_path_list):
         
 
 def distribute_tasks(tasks, num_groups):
-    """将任务列表均匀分配到指定数量的组中"""
-    # 首先对于 tasks 这个 list 进行 sort
+    """
+    Evenly distribute the task list into the specified number of groups
+    """
     tasks.sort()
     
-    # 计算每组的基本大小和余数
     base_size = len(tasks) // num_groups
     remainder = len(tasks) % num_groups
     
@@ -126,19 +121,16 @@ def distribute_tasks(tasks, num_groups):
     start = 0
     
     for i in range(num_groups):
-        # 前remainder组多分配一个任务
         end = start + base_size + (1 if i < remainder else 0)
         distributed.append(tasks[start:end])
         start = end
     
     return distributed
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--cuda_idx', type=str)
     parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=4)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
     
@@ -153,22 +145,7 @@ if __name__ == "__main__":
     for yaml_path in os.listdir(args.task_cfgs_folder): 
         yaml_path_list.append(os.path.join(args.task_cfgs_folder, yaml_path))
     
-    # 可视化五个 revolute, 五个 prismatic, 最好都是一次 explore 就成功的那种, 且物品最好不同
-    yaml_path_list=[
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/11.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/17.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/22.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/27.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/33.yaml",
-        #
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/85.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/93.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/104.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/110.yaml",
-        "/home/zby/Programs/AKM/cfgs/task_cfgs_new/115.yaml",
-    ]
-    
-    # 对 yaml_path_list 进行过滤
+    # filter yaml_path_list
     base_yaml_path = os.path.join("/home/zby/Programs/AKM/cfgs/", f"{args.byp}.yaml")
     yaml_path_list = filter_tasks(base_yaml_path, yaml_path_list)
     

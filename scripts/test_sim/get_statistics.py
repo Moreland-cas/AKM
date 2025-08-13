@@ -4,7 +4,9 @@ import numpy as np
 from typing import List, Tuple, Any, Dict, Union
 
 def compute_stats(values: List[Union[int, float]]) -> Tuple[float, float]:
-    """计算数值列表的均值和标准差（样本标准差）"""
+    """
+    Calculate the mean and standard deviation (sample standard deviation) of a list of values
+    """
     if not values:
         return 0.0, 0.0
     mean = sum(values) / len(values)
@@ -13,7 +15,9 @@ def compute_stats(values: List[Union[int, float]]) -> Tuple[float, float]:
     return mean, std_dev
 
 def collect_values(dict_list: List[Dict[str, Any]], path: List[str]) -> List[Union[int, float]]:
-    """收集所有字典中给定路径的值"""
+    """
+    Collect all values of the given path in the dictionary
+    """
     values = []
     for d in dict_list:
         current = d
@@ -23,7 +27,9 @@ def collect_values(dict_list: List[Dict[str, Any]], path: List[str]) -> List[Uni
     return values
 
 def process_nested_dict(dict_list: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """处理嵌套字典，计算每个路径的均值和标准差"""
+    """
+    Process nested dictionaries and calculate the mean and standard deviation of each path
+    """
     if not dict_list:
         return {}
     
@@ -86,7 +92,8 @@ if __name__ == "__main__":
     ]
     result_path = "/home/zby/Programs/AKM/assets/analysis_batch"
     
-    # 对于每个类别的实验, 统计 explore, reconstruct 和 manipulate 的平均值, 注意 explore 把 generalflow 和 gpnet 也要统计进去
+    # For each category of experiments, calculate the average value of explore, reconstruct and manipulate. 
+    # Note that explore also includes generalflow and gpnet.
     method_list = [
         "ours_",
         "ours_wo_IOR_",
@@ -100,7 +107,6 @@ if __name__ == "__main__":
         print("Method:", method)
         npy_list = []
         for idx in range(1, 6):
-            # if run_name.startswith(method):
             data = np.load(os.path.join(result_path, f'{method}{idx}.npy'), allow_pickle=True).item()
             npy_list.append(data)
         print(process_nested_dict(npy_list))
@@ -114,10 +120,8 @@ if __name__ == "__main__":
     ]
     print("Explore summary:")
     for explore_method in explore_list:
-        # print("Method:", method)
         npy_list = []
         for idx in range(1, 6):
-            # if run_name.startswith(method):
             data = np.load(os.path.join(result_path, f'{explore_method}{idx}.npy'), allow_pickle=True).item()
             npy_list.append(data)
     print()

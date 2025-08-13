@@ -2,15 +2,15 @@
 
 WS_PATH="/home/zby/Programs/AKM"
 CLONED_ENV_NAME="general_flow"
-SOURCE_ENV_NAME="ea_v2"
+SOURCE_ENV_NAME="akm"
 
 export CUDA_HOME=/home/zby/Cudas/cuda-12.1
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-# 检查conda环境是否存在
+# Check if the conda environment exists
 if ! conda info --envs | grep -q $CLONED_ENV_NAME; then
-    # 如果不存在，克隆环境
+    # Clone the environment if it doesn't exist
     echo "Conda environment $CLONED_ENV_NAME not found, cloned from existing environment $SOURCE_ENV_NAME."
     conda create --name $CLONED_ENV_NAME --clone $SOURCE_ENV_NAME
 fi
@@ -31,11 +31,6 @@ pip install git+https://github.com/openai/CLIP.git
 
 cd $WS_PATH
 
-# optional:在跑 aff_exec.py 的时候会报错 
-# 将 ultralytics.yolo.engine.predictor.BasePredictor.setup_model 的
-device = select_device(self.args.device, verbose=verbose)
-改为
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-# 将 aff_exec.py 中的 KPSTExecutor.find_corresponding_3d_point 加一个 gripper_2d_pos = gripper_2d_pos.astype(np.int32)
-
-# 安装 embodied analogy
+# Optional: This will cause an error when running aff_exec.py
+# Change `device = select_device(self.args.device, verbose=verbose)` in `ultralytics.yolo.engine.predictor.BasePredictor.setup_model` to `device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')`
+# Add `gripper_2d_pos = gripper_2d_pos.astype(np.int32)` to `KPSTExecutor.find_corresponding_3d_point` in aff_exec.py .
