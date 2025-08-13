@@ -1,7 +1,7 @@
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zby/Programs/AKM/assets/logs_batch/ours_zs_5"
+  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs_batch/ours_wo_AT_1"
   method_name: "ours"
   save_cfg: True
   save_obj_repr: False
@@ -42,8 +42,8 @@ explore_env_cfg:
   reserved_distance: 0.05
   valid_thresh: 0.5
   update_sigma: 0.05
-  max_tries: 25
-  fully_zeroshot: True
+  max_tries: 1
+  fully_zeroshot: False
   num_initial_pts: 1000
   use_IOR: True
   contact_analogy: True
@@ -60,3 +60,4 @@ manip_env_cfg:
   # for whole traj closed-loop
   prismatic_whole_traj_success_thresh: 0.01
   revolute_whole_traj_success_thresh: 3
+  

@@ -5,13 +5,12 @@ import logging
 import math
 import numpy as np
 import sklearn.cluster as cluster
+
 from akm.utility.utils import (
     camera_to_world,
-    initialize_napari,
     visualize_pc,
     numpy_to_json
 )
-initialize_napari()
 from akm.simulated_envs.obj_env import ObjEnv
 from akm.utility.constants import ASSET_PATH
 
@@ -35,7 +34,6 @@ class ExploreEnv(ObjEnv):
         self.obj_description = self.obj_env_cfg["obj_description"]
         self.has_valid_explore = False
         
-        # 读取和保存所用的变量
         self.joint_type = self.obj_env_cfg["joint_type"]
         
     def explore_stage(self, visualize=False):

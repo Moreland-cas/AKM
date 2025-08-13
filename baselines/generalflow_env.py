@@ -1,30 +1,24 @@
-import argparse
 import os
 import cv2
+import json
 import torch
+import logging
+import argparse
 import numpy as np
 import open3d as o3d
+from PIL import Image
 import scipy.ndimage
 import matplotlib.pyplot as plt 
-import json
-import logging
-import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-
-# from transformers import CLIPTokenizer, CLIPModel
-# from openpoints.dataset.data_util import crop_pc
-# from inference import load_model
 
 import sys
 sys.path.append("/home/zby/Programs/AKM/third_party/GeneralFlow")
-
 from openpoints.transforms import build_transforms_from_cfg
-from util import save_pickle, load_pickle, load_easyconfig_from_yaml
+from util import save_pickle, load_easyconfig_from_yaml
 from vis_exec import visualization_exec
-
 from tool_repos.FastSAM.fastsam import FastSAM
 from fastsam_prompt import FastSAMPrompt
-from PIL import Image
+
 
 from akm.utility.constants import *
 from akm.representation.basic_structure import Frame
@@ -32,7 +26,6 @@ from akm.simulated_envs.explore_env import ExploreEnv
 from akm.simulated_envs.manipulate_env import ManipulateEnv
 from akm.utility.estimation.coarse_joint_est import (
     coarse_t_from_tracks_3d,
-    coarse_R_from_tracks_3d,
     coarse_estimation,
     coarse_R_from_tracks_3d_augmented
 )
@@ -55,7 +48,6 @@ class KPSTExecutor(object):
 
         from transformers import CLIPTokenizer, CLIPModel
         
-        # clip_model = None
         clip_model = {
             "tokenizer": CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32"),
             "model": CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
@@ -63,7 +55,6 @@ class KPSTExecutor(object):
         self.clip_model = clip_model
         print("Finish Loading CLIP Model.")
 
-        # self.sam_model = FastSAM('./tool_repos/FastSAM/weights/FastSAM-X.pt')
         self.sam_model = FastSAM(os.path.join(ASSET_PATH, 'ckpts/fastSAM/FastSAM-X.pt')) 
         self.sam_prompt_model = FastSAMPrompt(device=device)
 
@@ -72,7 +63,7 @@ class KPSTExecutor(object):
         self.cfg = cfg
         self.device = device
         self.desc = 'None'
-        self.desc_feat = None    # (1, 512)
+        self.desc_feat = None   
 
         args.not_load = False  
         self.kpst_model = None
@@ -94,32 +85,17 @@ class KPSTExecutor(object):
         self.unit_crop_r = cfg.dataset.common.get('unit_r', None)
         self.args.voxel_max = cfg.dataset.test.voxel_max
         self.cfg = cfg 
-        # Notice: voxel_size is not set by cfg, you need to run self.set_pcd_voxel_size() mannually.  
 
     def print_kpst_model(self):
         print(f"cfg_file_path={self.args.cfg}")
     
     def set_desc(self, desc):
-
-        # self.desc = 'None'
-        # self.desc_feat = np.random.randn(512)
-
-        # clip_open_safe_fp = 'results/exec_save/clip_feat'
-        # clip_open_safe_fp = os.path.join(clip_open_safe_fp, desc+'.npy')
-        # if not os.path.exists(clip_open_safe_fp):
-        #     os.makedirs('results/exec_save/clip_feat', exist_ok=True)
         desc = ' '.join(desc.split('_'))
         self.desc = desc
         inputs = self.clip_model['tokenizer'](desc, padding=True, return_tensors="pt")
         text_features = self.clip_model['model'].get_text_features(**inputs)             # (1, 512)
         text_features = text_features.detach().numpy().reshape(-1)                       # (512)
         self.desc_feat = text_features
-        #     np.save(clip_open_safe_fp, self.desc_feat)
-        # else:
-        #     self.desc = desc
-        #     print("load pre_clip_feature!")
-        #     self.desc_feat = np.load(clip_open_safe_fp)
-
         print(f"Set Desc: {desc}.")
 
     def set_camera(self, camera, H=0, W=0):
@@ -152,11 +128,6 @@ class KPSTExecutor(object):
         return points
     
     def segment_robot_body(self, image, robot_anchor, robot_anchor_label, vis_dir=None, commit=''):
-        # robot_anchor: (N, 2), (h,w)-format, numpy
-
-        # robot_anchor = np.array([[935, 1042]])
-        # robot_anchor_label = np.ones(robot_anchor.shape[0]).astype(np.uint32)
-
         if robot_anchor is None:
             robot_anchor = KPSTExecutor.display_and_capture_points(image, title='robot mask')
             robot_anchor = [[int(x[1]), int(x[0])] for x in robot_anchor]   # (w, h) --> (h, w)
@@ -199,8 +170,6 @@ class KPSTExecutor(object):
         return cx, cy, fx, fy
 
     def find_corresponding_3d_point(self, gripper_2d_pos, pcd_scene, depth_image):
-        # pdb.set_trace()
-        # gripper_2d_pos: (h,w)-format
         gripper_2d_pos = gripper_2d_pos.astype(np.int32)
         depth_value = depth_image[gripper_2d_pos[0], gripper_2d_pos[1]]
 
@@ -221,7 +190,6 @@ class KPSTExecutor(object):
         self.args.voxel_size = voxel_size
 
     def pcd_cut(self, pcd, area_bound):
-        # pdb.set_trace()
         pcd_pos = np.asarray(pcd.points)
         is_available = (pcd_pos[:, 0] > area_bound[0]) & (pcd_pos[:, 0] < area_bound[1]) & \
                         (pcd_pos[:, 1] > area_bound[2]) & (pcd_pos[:, 1] < area_bound[3]) & \
@@ -233,9 +201,8 @@ class KPSTExecutor(object):
 
     def geometric_generation(self, rgb_image, depth_image, gripper_pos, mask=None, area_bound=None):
         """
-        NOTE: 这里的 depth_image 的尺度是 mm
+        NOTE: depth_image: unit mm
         """
-        # pdb.set_trace()
         color_raw = o3d.geometry.Image(rgb_image[:, :, :3])      # (H, W, C)
         depth_scene = depth_image.copy()                          
         if mask is not None: 
@@ -257,7 +224,6 @@ class KPSTExecutor(object):
         voxel_down_pcd = pcd_scene.voxel_down_sample(voxel_size=self.args.voxel_size)
 
         if self.unit_crop_r is not None:
-            # pdb.set_trace()
             coord, feat = np.asarray(voxel_down_pcd.points), np.asarray(voxel_down_pcd.colors)
             is_available = (coord[:, 0] > gripper_3d_pos[0] - self.unit_crop_r) & \
                            (coord[:, 0] < gripper_3d_pos[0] + self.unit_crop_r) & \
@@ -274,7 +240,7 @@ class KPSTExecutor(object):
     
     def get_kps_3d(self, pcd, gripper_3d_pos, radius=0.08, kps_max=256):
         """
-        筛选出 pcd 中距离 gripper_3d_pos 一定范围内的点
+        Filter out points in pcd that are within a certain range of gripper_3d_pos
         """
         kps = np.array(pcd.points)
         dist = np.linalg.norm(kps - gripper_3d_pos, axis=1)
@@ -287,7 +253,6 @@ class KPSTExecutor(object):
         weights = 1 / (dist + self.args.weight_beta)
 
         if kps.shape[0] < kps_max:
-            # pdb.set_trace()
             repeat_idx = np.random.choice(kps.shape[0], size=kps_max - kps.shape[0], replace=True)
             kps = np.concatenate([kps, kps[repeat_idx]], axis=0)
             weights = np.concatenate([weights, weights[repeat_idx]])
@@ -295,8 +260,6 @@ class KPSTExecutor(object):
         return kps, weights
     
     def get_kpst_model_prediction(self, data, return_np=False, inference_num=20):
-        # pdb.set_trace()
-        # data = {'pos': coord, 'x': feat, 'dtraj': qry_pos, 'text_feat': text_features}, Tensor
         pos, feat = data['pos'], data['x']                         
         feat = torch.concat([feat, pos], axis=-1)                     
         dtraj, text_feat = data['dtraj'], data['text_feat']                       # (Q, T=5, 3)        
@@ -313,7 +276,6 @@ class KPSTExecutor(object):
         qry = query.unsqueeze(-2).repeat(traj_prediction.shape[0], 1, 1, 1)   # (M, Q, 1, 3)
         kpst = torch.cat([qry, traj_prediction], -2)                          # (M, Q, T=5, 3)
 
-        # pdb.set_trace()
         dist = torch.mean(torch.sum(torch.norm(kpst[:, :, :-1] - kpst[:, :, 1:], dim=-1), dim=-1), dim=-1) 
         uid = torch.argmax(dist, dim=0)
         kpst = kpst[uid: uid+1]
@@ -324,7 +286,6 @@ class KPSTExecutor(object):
         return kpst
     
     def get_kpst_prediction(self, pcd, kps_3d, return_np=False):
-        # pdb.set_trace()
         qry_pos = kps_3d[:, np.newaxis, :]   # (Q, 1, 3), = (Q, T, 3)
         pcd_coord = np.array(pcd.points)         # (N, 3)
         pcd_feat = np.array(pcd.colors)          # (N, 3)
@@ -340,7 +301,6 @@ class KPSTExecutor(object):
             'text_feat': self.desc_feat
         }
         data = self.data_transform(data)
-        # norm_coord = coord.mean(0)               # (3, ), numpy
         norm_coord = qry_pos.mean(0).mean(0)
 
         kpst = self.get_kpst_model_prediction(data, return_np=return_np)    # (M, Q, T, 3), Tensor
@@ -354,7 +314,6 @@ class KPSTExecutor(object):
         return kpst
 
     def rigid_transform_3d(self, A, B, weights=None, weight_threshold=0):
-        # pdb.set_trace()
         """ 
         CodeBase: https://github.com/zhongcl-thu/3D-Implicit-Transporter
         Input:
@@ -366,13 +325,10 @@ class KPSTExecutor(object):
         Output:
             - R, t 
         """
-        # pdb.set_trace()
         bs = A.shape[0]
         if weights is None:
             weights = torch.ones_like(A[:, :, 0])
         weights[weights < weight_threshold] = 0
-        # weights = weights / (torch.sum(weights, dim=-1, keepdim=True) + 1e-6)
-        # import pdb;pdb.set_trace()
         # find mean of point cloud
         centroid_A = torch.sum(A * weights[:, :, None], dim=1, keepdim=True) / (torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6)
         centroid_B = torch.sum(B * weights[:, :, None], dim=1, keepdim=True) / (torch.sum(weights, dim=1, keepdim=True)[:, :, None] + 1e-6)
@@ -394,8 +350,6 @@ class KPSTExecutor(object):
             eye[:, -1, -1] = delta_UV
             R = Vt @ eye @ U.permute(0, 2, 1)
             t = centroid_B.permute(0,2,1) - R @ centroid_A.permute(0,2,1)
-            # warp_A = transform(A, integrate_trans(R,t))
-            # RMSE = torch.sum( (warp_A - B) ** 2, dim=-1).mean()
             return R, t, True
         except:
             print("Fail to Generation.")
@@ -403,7 +357,8 @@ class KPSTExecutor(object):
 
     def get_motion_planning(self, kpst, weights, plan_step=1, commit=''):
         """
-        基于输入的关键点时间序列轨迹(kpst)和权重(weights)，计算一系列刚体变换(旋转和平移)，从而生成运动规划路径
+        Based on the input key point time series trajectory (kpst) and weights (weights), 
+        a series of rigid body transformations (rotation and translation) are calculated to generate a motion planning path
         """
         if plan_step > kpst.shape[2]:
             raise ValueError(f"plan_step={plan_step} should be smaller than KPST.Length={kpst.shape[2]}")
@@ -435,21 +390,20 @@ class KPSTExecutor(object):
         vis_dir=None
     ):
         """
-            rgb_image: (H, W, 3), RGB, uint8.
-            depth_image: (H, W), Depth, float32. (scale: meter)
-            gripper_pos: (3, ), the 3d position of gripper. or (2, ) with (h,w)-format, the 2d position of the gripper.
-            policy_radius: float, the radius for kps sampling & policy generation.
-            policy_env: 'voxel' or 'origin', get kps from voxel-downsampling or origin point cloud.
-            robot_anchor: (N, 2), (h,w)-format, numpy, Point or BBox SAM prompt for robot-body segmentation.
-            plan_step: int, the step for close-loop motion planning.
-            commit: str, the commit for saving the results.
+        rgb_image: (H, W, 3), RGB, uint8.
+        depth_image: (H, W), Depth, float32. (scale: meter)
+        gripper_pos: (3, ), the 3d position of gripper. or (2, ) with (h,w)-format, the 2d position of the gripper.
+        policy_radius: float, the radius for kps sampling & policy generation.
+        policy_env: 'voxel' or 'origin', get kps from voxel-downsampling or origin point cloud.
+        robot_anchor: (N, 2), (h,w)-format, numpy, Point or BBox SAM prompt for robot-body segmentation.
+        plan_step: int, the step for close-loop motion planning.
+        commit: str, the commit for saving the results.
         """
         print(f"KPST-MOTION EXECUSION, Description=[{self.desc}].")
         mask = self.segment_robot_body(rgb_image, robot_anchor, robot_anchor_label, commit=commit, vis_dir=vis_dir)
-        # 获取三维点云和 contact_3d
         pcd, gripper_3d_pos, pcd_org = self.geometric_generation(rgb_image, depth_image, gripper_pos, mask=mask, area_bound=area_bound)
 
-        # 获取 contact_3d 附近的点
+        # Get points near contact_3d
         if policy_env == 'voxel':
             kps_3d, weights = self.get_kps_3d(pcd, gripper_3d_pos, radius=policy_radius, kps_max=policy_kps_max)
         else:
@@ -479,7 +433,6 @@ class KPSTExecutor(object):
         }
         if len(commit) > 0:
             commit = '_' + commit
-        # desc_id = self.desc.replace(' ', '_')
         save_fp = os.path.join(vis_dir, f'robot_exec.pkl')
         save_pickle(save_fp, result)
         return result
@@ -487,13 +440,11 @@ class KPSTExecutor(object):
 def get_generalFlow(
     frame, 
     instruction: str, 
-    # save_dir: str,
     visualize=False
 ):
     """
     frame: Frame
-    
-    对于一个 Frame 提取 general_flow
+    Extract general_flow from a frame
     """
     parser = argparse.ArgumentParser('KPST Model Execusion')
     parser.add_argument('--voxel_size', type=float, default=0.01, help='the voxel size for downsampling the input point cloud')
@@ -505,36 +456,28 @@ def get_generalFlow(
     
     args, opts = parser.parse_known_args()
     args.cfg = '/'.join(args.pretrained_path.split('/')[:-2] + ['cfg.yaml']) 
-    # args.save_dir = save_dir
     cfg = load_easyconfig_from_yaml(args.cfg)
-    # print(f"cfg_file_path={args.cfg}")
     cfg.update(opts)
     if cfg.seed is None: 
         cfg.seed = 0
-    # os.makedirs(args.save_dir, exist_ok=True)
     print("Loading General Flow Model...")
     exec_model = KPSTExecutor(args, cfg)
     H, W = frame.rgb.shape[0], frame.rgb.shape[1]
     exec_model.set_camera(camera=frame.K, H=H, W=W)
     exec_model.set_desc(instruction)
 
-    # (w, h) --> (h, w)
-    # contact_uv = frame.contact2d
-    # 从这个 frame 保存的 Tph2w 中获取 contact_uv
     contact_uv = world_to_image(frame.Tph2w[:3, -1][None], frame.K, frame.Tw2c)[0]
-    
     gripper_pos = np.array([contact_uv[1], contact_uv[0]])
-    # 获取三维点云和 contact_3d
     pcd, gripper_3d_pos, pcd_org = exec_model.geometric_generation(
         rgb_image=frame.rgb,
-        # 由于 general_flow 的 exec_model 使用的单位是 mm, 这里需要对于单位进行转换
+        # Since the unit used by general_flow's exec_model is mm, we need to convert the unit here.
         depth_image=frame.depth * 1000.0,
         gripper_pos=gripper_pos,
         mask=frame.robot_mask,
         area_bound=None
     )
 
-    # 获取 contact_3d 附近的点, (Q, 3)
+    # Get points near contact_3d, (Q, 3)
     kps_3d, weights = exec_model.get_kps_3d(
         pcd=pcd,
         gripper_3d_pos=gripper_3d_pos,
@@ -554,8 +497,6 @@ def get_generalFlow(
     if visualize:
         pcd_numpy = np.concatenate([pcd_org.points, pcd_org.colors], axis=-1)
         pcd_numpy[:, 3:] = pcd_numpy[:, 3:] * 255.0
-        
-        # print(f"Number of Points: {pcd_numpy.shape[0]}")
         data = {
             'description': instruction,
             'model': args.pretrained_path,
@@ -592,17 +533,18 @@ def test_get_generalFlow():
 
 class GeneralFlow_ManipEnv(ManipulateEnv):
     """
-    GeneralFlow baseline 的策略是在 joint_state = 0 的情况下进行一次的 contact transfer, 并进行 joint param 的估计
-    之后操作时通过一次 contact transfer 得到抓取位姿, 然后按照 joint state = 0 时估计的 model 进行操作
+    The GeneralFlow baseline strategy performs a contact transfer with joint_state = 0 and estimates the joint parameters. 
+    Subsequent operations are performed using a contact transfer to obtain the grasping pose, 
+    and then the operation is performed according to the estimated model when joint state = 0.
     """
     def __init__(self, cfg):
         """
-        这里的 cfg 来自于 akm 测试的那些 cfg
+        The cfg here comes from those tested by akm
         """
         self.cfg = cfg
         ManipulateEnv.__init__(self, cfg)
         
-        # 清空来自 embodied analogy 的 obj_repr 中的 joint_dict
+        # Clear the joint_dict in obj_repr from the embodied analogy
         self.obj_repr.Tw2c = self.camera_extrinsic
         self.obj_repr.coarse_joint_dict = None
         self.obj_repr.fine_joint_dict = None
@@ -611,19 +553,12 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
     
     def get_contact_2d(self, frame, manip_type, visualize=False):
         """
-        获取当前帧上的 contact 2d
+        Get the contact 2d on the current frame.
         manip_type: "open" or "close"
         """
         from akm.utility.proposal.ram_proposal import get_ram_affordance_2d
-        
-        # frame: Frame
-        # self.base_step()
-        # self.initial_frame = self.capture_frame()
-        
-        # 只在第一次进行 contact transfer, 之后直接进行复用
         self.logger.log(logging.INFO, "Start transfering 2d contact pount to current frame...")
         
-        # self.task_cfg["instruction"]
         modified_instruction = manip_type + " the " + self.obj_env_cfg["obj_description"]
         affordance_map_2d = get_ram_affordance_2d(
             query_rgb=frame.rgb,
@@ -641,27 +576,20 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         
     def recon_stage_general_flow(self, visualize=False):
         """
-        基于 self.obj_repr 的 initial_frame 估计 generalFlow, 并得到 joint model 的估计
+        Estimate generalFlow based on the initial_frame of self.obj_repr and get the estimate of the joint model
         """
-        # self.base_step()
-        # frame = self.capture_frame()
-        
-        # if frame.contact2d is None or frame.obj_mask is None:
-        #     self.get_contact_2d(frame=frame, manip_type="open", visualize=visualize)
-        
         frame = self.obj_repr.frames[0]
         
         # (M, T, 3) in camera frame
         general_flow = get_generalFlow(
             frame=frame, 
-            # 由于 coarse estimation 本身就是假设轨迹是 open 的, 所以这里设置为固定的 open instruction
+            # Since coarse estimation itself assumes that the trajectory is open, it is set to a fixed open instruction here
             instruction="open_Storage_Furniture", 
             visualize=visualize
         )
         # (M, T, 3) - > (T, M, 3)
         general_flow = np.transpose(general_flow, (1, 0, 2))
         self.general_flow_c = general_flow
-        
         
         if self.recon_env_cfg["use_gt_joint_type"]:
             joint_type = self.obj_repr.gt_joint_dict["joint_type"]
@@ -684,7 +612,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
                 num_R_augmented=self.recon_env_cfg["num_R_augmented"]
             )
         
-        # 将 joint_dict 转换到世界坐标系下
+        # Convert joint_dict to world coordinates
         joint_dict["general_flow_c"] = self.general_flow_c
         self.obj_repr.coarse_joint_dict = joint_dict
         self.obj_repr.fine_joint_dict = joint_dict
@@ -696,26 +624,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         return result
     
     def recon_main(self):
-        # self.explore_result = {
-        #     "num_tries": 1,
-        #     "has_valid_explore": True,
-        #     "joint_type": self.obj_env_cfg["joint_type"],
-        #     "joint_state_start": 0,
-        #     # 设置为 1, 方便 manipulate 认定 explore 一定成功
-        #     "joint_state_end": 1 
-        # }
-        
-        # if self.exp_cfg["save_result"]:
-        #     save_json_path = os.path.join(
-        #         self.exp_cfg["exp_folder"],
-        #         str(self.task_cfg["task_id"]),
-        #         "explore_result.json"
-        #     )
-        #     with open(save_json_path, 'w', encoding='utf-8') as json_file:
-        #         json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
-                
         try:
-        # if True:
             self.recon_result = {}
             
             if self.explore_result["has_valid_explore"]:
@@ -751,7 +660,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
                 
     def manip_general_flow_deprecated(self, manip_type, visualize=False):
         """
-        根据将 cur_frame 找到一个 grasp, 并按照 articulation mdoel 进行操作
+        Find a grasp according to cur_frame, and follow the articulation mdoel
         """
         self.base_step()
         frame: Frame = self.capture_frame()
@@ -759,7 +668,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         if frame.contact2d is None or frame.obj_mask is None:
             self.get_contact_2d(frame=frame, manip_type=manip_type, visualize=visualize)
             
-        # 确保 frame 的 contact2d 和 obj_mask 已经准备好
+        # Make sure the frame's contact2d and obj_mask are ready
         frame.detect_grasp(
             use_anygrasp=self.cfg["algo_cfg"]["use_anygrasp"],
             world_frame=True,
@@ -778,14 +687,10 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             raise Exception("No grasp_group found for current frame in manipulation stage.")
         
         for grasp_w in frame.grasp_group:
-            # 根据 best grasp 得到 pre_ph_grasp 和 ph_grasp 的位姿
-            # 从 general_flow_c 中找到 dir_out_c
             first_frame_flow_c = self.general_flow_c[1, :, :] - self.general_flow_c[0, :, :] # M, 3
-            # 由于已经运行了 detect_grasp, 所以 contact_3d 已经被设置过了
             nearest_flow = np.argmin(
                 np.linalg.norm(frame.contact3d - self.general_flow_c[0], axis=-1) # M
             ) # M
-            # 由于我们产生 flow 的 prompt 固定是 open, 所以现在的 flow 天然的就是 out 
             dir_out_c = first_frame_flow_c[nearest_flow]
             dir_out_c = dir_out_c / max(np.linalg.norm(dir_out_c), 1e-8)
             dir_out_w = np.linalg.inv(frame.Tw2c)[:3, :3] @ dir_out_c
@@ -813,7 +718,6 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
                     )
                 break
         
-        # 没有成功的 planning 结果, 直接返回 False
         if result_pre is None:
             raise Exception("No valid planning result for detected grasp_group during manipulation stage...")
         
@@ -843,16 +747,15 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
 
     def manip_general_flow(self):
         """
-        根据将 initial_frame 的 grasp 迁移到 cur_frame, 并按照 articulation mdoel 进行操作
+        According to the initial_frame grasp migration to cur_frame, and follow the articulation mdoel operation
         """
         self.base_step()
         self.cur_frame: Frame = self.capture_frame()
         
-        # 使用 gt 的 reloc joint state
+        # Use gt's reloc joint state
         self.obj_repr.frames[0].joint_state = self.obj_repr.frames[0].gt_joint_state
         self.cur_frame.joint_state = self.cur_frame.gt_joint_state
         self.ref_ph_to_tgt(
-            # ref_frame=self.obj_repr.kframes[0],
             ref_frame=self.obj_repr.frames[0],
             tgt_frame=self.cur_frame,
             use_gt_joint_dict=self.manip_env_cfg["use_gt_ref_ph_to_tgt"]
@@ -871,7 +774,6 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         if result_pre is None:
             self.logger.log(logging.INFO, "Get None planning result in manip_once(), thus do nothing")
         else:
-            # 实际执行
             self.follow_path(result_pre)
             self.open_gripper()
             self.clear_planner_pc()
@@ -881,7 +783,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             )
             self.close_gripper()
             
-            # 转换 joint_dict 到世界坐标系
+            # Convert joint_dict to world coordinates
             Tc2w = np.linalg.inv(self.camera_extrinsic)
             self.move_along_axis(
                 joint_type=self.obj_repr.fine_joint_dict["joint_type"],
@@ -898,11 +800,9 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         return result_dict
     
     def main(self):
-        # 保存 explore_result, 和 initial_frame 的 contact point, grasp pose
+        # Save explore_result, contact point with initial_frame, grasp pose
         ExploreEnv.main(self)
-        
         self.recon_main()
-        
         self.manip_result = {}
         
         for k, v in self.manip_env_cfg["tasks"].items():
@@ -918,17 +818,13 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             )
             tmp_manip_result.update({0: self.evaluate()})
             try:
-            # if True:
                 if self.recon_result["has_valid_recon"]:
                     self.logger.log(logging.INFO, f'Valid reconstruction detected, thus start manipulation...')
-                    # manip_type = "open" if manip_end_state > manip_start_state else "close"
                     tmp_manip_result.update(self.manip_general_flow())
                 
             except Exception as e:
                 self.logger.log(logging.ERROR, f'Encouter {e} when manipulating, thus only save current state', exc_info=True)
-                # self.manip_result["has_valid_manip"] = False
                 tmp_manip_result["exception"] = str(e)
-                # tmp_manip_result.update({0: self.evaluate()})
 
             self.manip_result.update({
                 k: tmp_manip_result
@@ -942,15 +838,3 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
-    
-    
-if __name__ == "__main__":
-    yaml_path = "/home/zby/Programs/AKM/assets/logs/6_11/115/115.yaml"
-    with open(yaml_path, "r") as f:
-        import yaml
-        cfg = yaml.safe_load(f)
-    
-    cfg["exp_cfg"]["exp_folder"] = "/home/zby/Programs/AKM/assets/logs/6_17"
-    env = GeneralFlow_ManipEnv(cfg=cfg)
-    env.main()
-    

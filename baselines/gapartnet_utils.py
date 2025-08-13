@@ -1,30 +1,18 @@
-import copy
 import os
-# import json
-# import pickle
-# import argparse
-import numpy as np
-# import matplotlib.pyplot as plt
-# import cv2
-# from pathlib import Path
-# from scipy.optimize import linear_sum_assignment
-# from mpl_toolkits.mplot3d import Axes3D
-# from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import torch
 import sys
+import copy
+import torch
+import numpy as np
 from einops import rearrange, repeat
 
 from akm.project_config import PROJECT_ROOT, ASSET_PATH
-# sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "AKM", "GAPartNet"))
 sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
-# from structure.gapartnet import ObjIns
 from structure.utils import _load_perception_model
 from gapartnet.structure.point_cloud import PointCloud
 from gapartnet.dataset.gapartnet import apply_voxelization
 from gapartnet.network.grouping_utils import filter_invalid_proposals, apply_nms
 from gapartnet.misc.pose_fitting import estimate_pose_from_npcs
 
-from akm.representation.obj_repr import Obj_repr
 from akm.utility.utils import visualize_pc
 from akm.utility.estimation.coarse_joint_est import (
     coarse_R_from_tracks_3d_augmented,
@@ -45,7 +33,7 @@ def load_gapartnet_model(ckpt_path=None):
 
 def extract_point_clouds_with_segmentation(obj_repr):
     """
-    从 explore 阶段得到的 frames 的首尾帧分别提取物体点云
+    Extract the object point cloud from the first and last frames of the frames obtained in the exploration phase
     """
     print(f"Extracting point clouds from frames...")
     from akm.representation.basic_structure import Frame
@@ -57,7 +45,7 @@ def extract_point_clouds_with_segmentation(obj_repr):
     first_frame: Frame = obj_repr.frames[0]
     last_frame: Frame = obj_repr.frames[-1]
 
-    # 先 check 一下两个 Frame 的 obj_mask 都是有的
+    # First check that the obj_mask of both frames are present.
     if first_frame.obj_mask is None:
         first_frame.segment_obj( 
             obj_description=obj_repr.obj_description,
@@ -79,21 +67,20 @@ def extract_point_clouds_with_segmentation(obj_repr):
         use_robot_mask=True, 
         use_height_filter=True,
         world_frame=False
-        # world_frame=True
     ) 
     last_pc, last_pc_colors = last_frame.get_obj_pc(
         use_robot_mask=True,
         use_height_filter=True,
         world_frame=False
-        # world_frame=True
     )
-    # get_obj_pc 返回的 point color 是 0-255
     first_pc_colors = first_pc_colors / 255
     last_pc_colors = last_pc_colors / 255
     return first_pc, first_pc_colors, last_pc, last_pc_colors
 
 def create_pointcloud_input(pc_xyz, pc_colors, device="cuda"):
-    """Create PointCloud input with PROPER GAPartNet coordinate handling"""
+    """
+    Create PointCloud input with PROPER GAPartNet coordinate handling
+    """
     # Store original statistics for inverse transformation
     center = np.mean(pc_xyz, axis=0)
     max_radius = np.max(np.linalg.norm(pc_xyz - center, axis=1))
@@ -147,14 +134,11 @@ def create_pointcloud_input(pc_xyz, pc_colors, device="cuda"):
     # Apply voxelization
     def downsample(pc: PointCloud, *, max_points: int = 20000) -> PointCloud:
         pc = copy.copy(pc)
-
         num_points = pc.points.shape[0]
 
         if num_points > max_points:
             indices = np.random.choice(num_points, max_points, replace=False)
-            # 根据索引采样点
             pc.points = pc.points[indices]
-
         return pc
 
     pc = pc.to_tensor()
@@ -164,7 +148,9 @@ def create_pointcloud_input(pc_xyz, pc_colors, device="cuda"):
     return pc, max_radius, center
 
 def run_gapartnet_inference(pc_xyz, pc_colors, gapartnet_model, use_nms=True):
-    """Run GAPartNet inference following the EXACT training procedure with optional GT segmentation"""
+    """
+    Run GAPartNet inference following the EXACT training procedure with optional GT segmentation
+    """
     # Create input following the EXACT training procedure
     pc, max_radius, center = create_pointcloud_input(pc_xyz, pc_colors)
 
@@ -175,7 +161,6 @@ def run_gapartnet_inference(pc_xyz, pc_colors, gapartnet_model, use_nms=True):
         points = data_batch.points
         batch_indices = data_batch.batch_indices
         pt_xyz = points[:, :3]
-
         pc_feature = gapartnet_model.forward_backbone(pc_batch=data_batch)
 
         # Step 2: Semantic segmentation
@@ -201,7 +186,6 @@ def run_gapartnet_inference(pc_xyz, pc_colors, gapartnet_model, use_nms=True):
 
         if proposals is None:
             raise Exception("No proposals generated")
-
         print(f"    Found {len(proposals.proposal_offsets) - 1} proposals")
 
         # Step 5: Proposal scoring
@@ -309,9 +293,6 @@ def calculate_bbox_size_feature(bbox):
         dict with keys: 'dimensions', 'volume', 'surface_area', 'diagonal'
         or None if bbox is invalid
     """
-    # Calculate dimensions
-    # 首先找到三个维度上的边长
-    # 由于 bbox 的 8*3 对应的 line set 是 [0 1 4 2], [3, 5, 7, 6], 以及对应的边长
     dimensions = [0, 0, 0]
     dimensions[0] = np.linalg.norm(bbox[1] - bbox[0])
     dimensions[1] = np.linalg.norm(bbox[2] - bbox[0])
@@ -340,8 +321,6 @@ def calculate_bbox_size_feature(bbox):
 def calculate_bbox_pair_score(bbox1, bbox2, moving_tracks3d):
     """
     Calculate bbox similarity
-    额外使用 center 来进行匹配
-    
     Args:
         bbox1, bbox2: numpy arrays of shape (8, 3) representing bounding box corners
 
@@ -361,14 +340,11 @@ def calculate_bbox_pair_score(bbox1, bbox2, moving_tracks3d):
     diagonal_sim = similarity_score(metrics1['diagonal'], metrics2['diagonal'])
 
     # Dimension-wise similarity
-    dim_sim = np.mean([similarity_score(metrics1['dimensions'][i], metrics2['dimensions'][i])
-                      for i in range(3)])
+    dim_sim = np.mean([similarity_score(metrics1['dimensions'][i], metrics2['dimensions'][i]) for i in range(3)])
 
     # Weighted combination
     size_score = 0.3 * volume_sim + 0.2 * surface_sim + 0.2 * diagonal_sim + 0.3 * dim_sim
 
-    # 判断 center 距离 moving tracks 的最近距离是否足够小
-    
     bbox1_center = np.mean(bbox1, axis=0)
     bbox2_center = np.mean(bbox2, axis=0)
     
@@ -376,7 +352,7 @@ def calculate_bbox_pair_score(bbox1, bbox2, moving_tracks3d):
     nearset_dis2 = np.min(np.linalg.norm(bbox2_center[None] - moving_tracks3d[-1], axis=1))
     moving_score = np.exp(-nearset_dis1) * np.exp(-nearset_dis2)
     
-    # 看一下 center 按照最近的 tracks 的轨迹进行移动, 是否还会停止在另一个 center 附近的位置
+    # See if the center moves along the trajectory of the nearest tracks and stops near another center.
     nearest_idx_in_tracks = np.argmin(np.linalg.norm(bbox1_center[None] - moving_tracks3d[0], axis=1))
     transformed_center = bbox1_center + moving_tracks3d[-1, nearest_idx_in_tracks, :] - moving_tracks3d[0, nearest_idx_in_tracks, :]
     dynamic_score = np.exp(-np.linalg.norm(transformed_center - bbox2_center))
@@ -407,7 +383,7 @@ def identify_matched_bboxes(bboxes_first, bboxes_last, obj_repr):
         for j, bbox_last in enumerate(bboxes_last):
             sim_matrix[i, j] = calculate_bbox_pair_score(bbox_first, bbox_last, moving_tracks)
             
-    # 找到使得 sim_matrix[i, j] 最大的 i, j, 返回 bboxes_first[i] 和 bboxes_last[j]
+    # Find i, j that maximizes sim_matrix[i, j], and return bboxes_first[i] and bboxes_last[j]
     max_indices = np.unravel_index(np.argmax(sim_matrix, axis=None), sim_matrix.shape)
     i, j = max_indices
     
@@ -420,9 +396,7 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
     print("Running COMPLETELY CORRECTED GAPartNet reconstruction...")
 
     if gapartnet_model is None:
-        gapartnet_model = load_gapartnet_model(
-            "/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt"
-        )
+        gapartnet_model = load_gapartnet_model("/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt")
         
     # Get ground truth for guidance
     gt_joint_type = obj_repr.gt_joint_dict.get("joint_type", "prismatic")
@@ -447,29 +421,13 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
         use_nms=True
     )
 
-    if visualize and False:
-        visualize_pc(first_pc, colors=first_pc_colors, bboxes=bboxes_first)
-        visualize_pc(last_pc, colors=last_pc_colors, bboxes=bboxes_last)
-        
-    # Create frame stats for compatibility
-    frame_stats = [
-        {'bboxes': len(bboxes_first), 'scores': bbox_scores_first, 'sem_labels': bbox_sem_labels_first},
-        {'bboxes': len(bboxes_last), 'scores': bbox_scores_last, 'sem_labels': bbox_sem_labels_last}
-    ]
-
     # Use tracking-based moving part identification
     moving_bbox_first, moving_bbox_last = identify_matched_bboxes(bboxes_first, bboxes_last, obj_repr)
 
     if visualize:
-        # visualize the paired bounding boxes
         visualize_pc(first_pc, colors=first_pc_colors, bboxes=[moving_bbox_first, moving_bbox_last])
     
     # Estimate joint parameters
-    # joint_estimation = estimate_joint_from_bboxes(
-    #     moving_bbox_first=moving_bbox_first,
-    #     moving_bbox_last=moving_bbox_last,
-    #     joint_type=gt_joint_type
-    # )
     if use_gt_joint_type:
         if gt_joint_type == "prismatic":
             joint_dict, loss = coarse_t_from_tracks_3d(np.stack([moving_bbox_first, moving_bbox_last], axis=0))
@@ -487,8 +445,7 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
 def estimate_joint_from_bboxes(moving_bbox_first, moving_bbox_last, joint_type):
     """
     Estimate joint parameters directly from GAPartNet bounding boxes
-    
-    返回一个 dict, 里面包含了 joint_dir 和 joint_start
+    Returns a dict containing joint_dir and joint_start
     """
     if moving_bbox_first is None or moving_bbox_last is None:
         raise Exception("One of Input to estimate_joint_from_bboxes() is None.")
@@ -521,7 +478,6 @@ def estimate_revolute_joint(bbox_first, bbox_last):
     """Estimate revolute joint from bounding box transformation"""
     points_first = bbox_first
     points_last = bbox_last
-
     print(f"  Using {len(points_first)} points for rotation estimation")
 
     # Find the rotation axis and center using absolute positions
@@ -598,14 +554,3 @@ def estimate_revolute_joint(bbox_first, bbox_last):
         'joint_start': best_rotation_center,
         'movement_magnitude': best_angle
     }
-
-
-if __name__ == "__main__":
-    gapartnet_model = load_gapartnet_model(
-        # "/home/zby/Programs/AKM/assets/ckpts/gapartnet/release.ckpt"
-        "/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt"
-    )
-    obj_repr = Obj_repr.load(
-        "/home/zby/Programs/AKM/assets/unit_test/gapartnet/obj_repr.npy"
-    )
-    gapartnet_result = gapartnet_reconstruct(obj_repr, gapartnet_model, visualize=True)
