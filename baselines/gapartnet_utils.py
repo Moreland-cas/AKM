@@ -14,7 +14,7 @@ import torch
 import sys
 from einops import rearrange, repeat
 
-from embodied_analogy.project_config import PROJECT_ROOT, ASSET_PATH
+from akm.project_config import PROJECT_ROOT, ASSET_PATH
 # sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "Embodied_Analogy", "GAPartNet"))
 sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
 # from structure.gapartnet import ObjIns
@@ -24,9 +24,9 @@ from gapartnet.dataset.gapartnet import apply_voxelization
 from gapartnet.network.grouping_utils import filter_invalid_proposals, apply_nms
 from gapartnet.misc.pose_fitting import estimate_pose_from_npcs
 
-from embodied_analogy.representation.obj_repr import Obj_repr
-from embodied_analogy.utility.utils import visualize_pc
-from embodied_analogy.utility.estimation.coarse_joint_est import (
+from akm.representation.obj_repr import Obj_repr
+from akm.utility.utils import visualize_pc
+from akm.utility.estimation.coarse_joint_est import (
     coarse_R_from_tracks_3d_augmented,
     coarse_t_from_tracks_3d,
     coarse_estimation
@@ -48,8 +48,8 @@ def extract_point_clouds_with_segmentation(obj_repr):
     从 explore 阶段得到的 frames 的首尾帧分别提取物体点云
     """
     print(f"Extracting point clouds from frames...")
-    from embodied_analogy.representation.basic_structure import Frame
-    from embodied_analogy.representation.obj_repr import Obj_repr
+    from akm.representation.basic_structure import Frame
+    from akm.representation.obj_repr import Obj_repr
     
     obj_repr: Obj_repr
 

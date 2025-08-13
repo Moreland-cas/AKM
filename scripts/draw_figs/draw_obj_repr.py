@@ -6,17 +6,17 @@ import os
 import numpy as np
 import open3d as o3d
 from PIL import Image
-from embodied_analogy.representation.obj_repr import Obj_repr
-from embodied_analogy.representation.basic_structure import Frame
-from embodied_analogy.utility.proposal.affordance import Affordance_map_2d
+from akm.representation.obj_repr import Obj_repr
+from akm.representation.basic_structure import Frame
+from akm.utility.proposal.affordance import Affordance_map_2d
 from PIL import Image, ImageDraw, ImageFont
-from embodied_analogy.project_config import (
+from akm.project_config import (
     BACKGROUND_LABEL,
     STATIC_LABEL,
     MOVING_LABEL,
     UNKNOWN_LABEL,
 )
-from embodied_analogy.utility.utils import (
+from akm.utility.utils import (
     draw_points_on_image,
     visualize_pc,
     depth_image_to_pointcloud,
@@ -616,7 +616,7 @@ if visualize_manipulate:
                     G = Grasp(np.array(g_array))
                     Grasps.append(G)
                 
-                from embodied_analogy.utility.grasp.anygrasp import detect_grasp_anygrasp
+                from akm.utility.grasp.anygrasp import detect_grasp_anygrasp
                 new_grasp = detect_grasp_anygrasp(
                     points=np.concatenate([manip_first_frame_static_pc, manip_first_frame_mobile_pc]), 
                     colors=mobile_pc_color[None] * mobile_mask[:, None] + static_pc_color[None] * (1 - mobile_mask[:, None]),

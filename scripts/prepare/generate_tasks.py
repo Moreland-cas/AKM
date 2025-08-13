@@ -3,10 +3,10 @@ import os
 import copy
 import numpy as np
 import argparse
-from embodied_analogy.utility.constants import ASSET_PATH, PROJECT_ROOT, SEED
-from embodied_analogy.utility.randomize_obj_pose import randomize_obj_load_pose
-from embodied_analogy.utility.utils import set_random_seed
-from embodied_analogy.utility.constants import (
+from akm.utility.constants import ASSET_PATH, PROJECT_ROOT, SEED
+from akm.utility.randomize_obj_pose import randomize_obj_load_pose
+from akm.utility.utils import set_random_seed
+from akm.utility.constants import (
     # NUM_EXP_PER_SETTING,
     PRISMATIC_JOINT_MAX_RANGE,
     # PRISMATIC_TEST_JOINT_DELTAS,

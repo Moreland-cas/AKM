@@ -5,14 +5,14 @@
 /assets
 /baselines
 /cfgs
-/embodied_analogy
+/akm
 /scripts
 /third_party
 setup.py            # For Installation of Our Package
 ```
 
 ## Installation
-We first provide the conda environment setup to run our method, as shown in `/Embodied_Analogy/scripts/prepare/create_akm_env.sh`. Conda Environments of baseline methods `GeneralFlow` and `GAPartnet` can be installed on the basis of our `AKM` environment, as shown in `create_gflow_env.sh` and `create_gpnet_env.sh`.
+We first provide the conda environment setup to run our method, as shown in `/AKM/scripts/prepare/create_akm_env.sh`. Conda Environments of baseline methods `GeneralFlow` and `GAPartnet` can be installed on the basis of our `AKM` environment, as shown in `create_gflow_env.sh` and `create_gpnet_env.sh`.
 
 ## Preparation
 In this section we show how to prepare the required dataset and pretrained model checkpoints from third-party methods.
@@ -75,7 +75,7 @@ The [RAM](https://github.com/yxKryptonite/RAM_code) affordance memory used in ou
 
 Then run the `pre_extract_dift_feat.py` scripts to pre-extract [DIFT](https://github.com/Tsingularity/dift) feature for the reference images in the RAM affordance memory to accelerate the exploration stage in our method:
 ```
-cd /Embodied_Analogy/scripts/prepare
+cd /AKM/scripts/prepare
 conda activate akm
 python pre_extract_dift_feat.py
 ```
@@ -89,14 +89,15 @@ assets/RAM_memory/customize/open_the_dishwasher
 ```
 
 ## Test our method in Simulation
+### Test script
 We use [SAPIEN](https://github.com/haosulab/SAPIEN) simulator as our testbed, to run the code, use the `test_batch.py` in `scripts`:
 ```
-cd /Embodied_Analogy/scripts/test_whole_pipeline
+cd /AKM/scripts/test_whole_pipeline
 python test_batch.py --ts n_ts --cs cs_idx --byp base_yaml_path --task_cfgs_folder path_to_task_cfgs
 ```
 This script will test all the preset precise manipulation task as shown in,
 ```
-/Embodied_Analogy/cfgs/task_cfgs_new
+/AKM/cfgs/task_cfgs_new
 ├── 0.yaml
 ├── 1.yaml
 ├── 2.yaml
@@ -168,9 +169,9 @@ manip_env_cfg:
 ```
 which defines a unique way of loading an articulated object, and upon this, with 12 different task that alter the joint state in a different way.
 
-`--ts n_ts` means to seperate the 116 objects into n_ts total split, and `--cs cs_idx` means to run the `cs_idx`th split. The result will be saved to `/Embodied_Analogy/assets/logs_batch` as,
+`--ts n_ts` means to seperate the 116 objects into n_ts total split, and `--cs cs_idx` means to run the `cs_idx`th split. The result will be saved to `/AKM/assets/logs_batch` as,
 ```
-/Embodied_Analogy/assets/logs_batch/ours_1
+/AKM/assets/logs_batch/ours_1
 ├── 0
 │   ├── 0.yaml
 │   ├── explore_result.json
@@ -186,12 +187,12 @@ which defines a unique way of loading an articulated object, and upon this, with
 ```
 The saved path is indicated by the cfg file of a run.
 
-`--byp base_yaml_path` indicate where to find the cfg for this run, where method to be tested and hyperparameters are set, e.g. in `/Embodied_Analogy/cfgs/ours_1.yaml`, hyperparameters for each stage are listed as,
+`--byp base_yaml_path` indicate where to find the cfg for this run, where method to be tested and hyperparameters are set, e.g. in `/AKM/cfgs/ours_1.yaml`, hyperparameters for each stage are listed as,
 ```
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zby/Programs/Embodied_Analogy/assets/logs_batch/ours_1"
+  exp_folder: "/home/zby/Programs/AKM/assets/logs_batch/ours_1"
   method_name: "ours"
   save_cfg: True
   save_obj_repr: False
@@ -252,6 +253,7 @@ manip_env_cfg:
   revolute_whole_traj_success_thresh: 3
 ```
 
-### Evaluate result
-### Aggregate Analysis from multiple run
+### Evaluate Result 
+
 ## Test our method in Real-World 
+We also modify our `Env` class to support real-world deployment, the code are in `/AKM/akm/realworld_environment`

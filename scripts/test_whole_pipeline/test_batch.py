@@ -6,7 +6,7 @@ import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import yaml
 
-from embodied_analogy.utility.constants import *
+from akm.utility.constants import *
 
 def update_dict(a, b):
     for key, value in b.items():
@@ -83,7 +83,7 @@ def test_one(base_yaml_path, specific_yaml_path):
     
     # 否则执行
     if method_name == "ours":
-        from embodied_analogy.environment.manipulate_env import ManipulateEnv as env_class
+        from akm.environment.manipulate_env import ManipulateEnv as env_class
     elif method_name == "gflow":
         sys.path.append(PROJECT_ROOT)
         from baselines.generalflow_env import GeneralFlow_ManipEnv as env_class

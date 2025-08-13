@@ -1,1 +1,0 @@
-from embodied_analogy.project_config import *

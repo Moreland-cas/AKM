@@ -2,15 +2,15 @@ import json
 import os
 import numpy as np
 from PIL import Image
-from embodied_analogy.utility.utils import (
+from akm.utility.utils import (
     visualize_pc,
     add_text_to_image,
     camera_to_image
 )
-from embodied_analogy.representation.obj_repr import Obj_repr
-from embodied_analogy.representation.basic_structure import Frame
+from akm.representation.obj_repr import Obj_repr
+from akm.representation.basic_structure import Frame
 from graspnetAPI.grasp import Grasp
-from embodied_analogy.utility.constants import MOVING_LABEL, STATIC_LABEL
+from akm.utility.constants import MOVING_LABEL, STATIC_LABEL
 
 from PIL import Image, ImageDraw
 import math

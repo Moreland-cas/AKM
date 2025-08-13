@@ -3,11 +3,11 @@ import logging
 import sys
 import numpy as np
 import json
-from embodied_analogy.project_config import PROJECT_ROOT, ASSET_PATH
-from embodied_analogy.environment.explore_env import ExploreEnv
-from embodied_analogy.environment.manipulate_env import ManipulateEnv
-from embodied_analogy.representation.basic_structure import Frame
-from embodied_analogy.utility.utils import numpy_to_json
+from akm.project_config import PROJECT_ROOT, ASSET_PATH
+from akm.environment.explore_env import ExploreEnv
+from akm.environment.manipulate_env import ManipulateEnv
+from akm.representation.basic_structure import Frame
+from akm.utility.utils import numpy_to_json
 
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from gapartnet_utils import gapartnet_reconstruct

@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='embodied_analogy',  
+    name='akm',  
     version='1.0',  
     packages=find_packages(),  
     install_requires=[
@@ -17,6 +17,4 @@ setup(
         "mplib==0.2.1",
         "pyglet<2"
     ],
-    author='Boyuan Zhang',
-    author_email='zhangboyuan17@mails.ucas.ac.cn',
 )

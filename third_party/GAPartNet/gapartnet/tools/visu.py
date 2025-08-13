@@ -4,7 +4,7 @@ import yaml
 from os.path import join as pjoin
 import os
 import argparse
-from embodied_analogy.project_config import PROJECT_ROOT, ASSET_PATH
+from akm.project_config import PROJECT_ROOT, ASSET_PATH
 import sys
 sys.path.append(os.path.join(PROJECT_ROOT, "third_party", "GAPartNet"))
 import importlib

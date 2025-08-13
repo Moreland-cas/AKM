@@ -26,17 +26,17 @@ from tool_repos.FastSAM.fastsam import FastSAM
 from fastsam_prompt import FastSAMPrompt
 from PIL import Image
 
-from embodied_analogy.utility.constants import *
-from embodied_analogy.representation.basic_structure import Frame
-from embodied_analogy.environment.explore_env import ExploreEnv
-from embodied_analogy.environment.manipulate_env import ManipulateEnv
-from embodied_analogy.utility.estimation.coarse_joint_est import (
+from akm.utility.constants import *
+from akm.representation.basic_structure import Frame
+from akm.environment.explore_env import ExploreEnv
+from akm.environment.manipulate_env import ManipulateEnv
+from akm.utility.estimation.coarse_joint_est import (
     coarse_t_from_tracks_3d,
     coarse_R_from_tracks_3d,
     coarse_estimation,
     coarse_R_from_tracks_3d_augmented
 )
-from embodied_analogy.utility.utils import (
+from akm.utility.utils import (
     visualize_pc,
     set_random_seed,
     numpy_to_json,
@@ -614,7 +614,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
         获取当前帧上的 contact 2d
         manip_type: "open" or "close"
         """
-        from embodied_analogy.utility.proposal.ram_proposal import get_ram_affordance_2d
+        from akm.utility.proposal.ram_proposal import get_ram_affordance_2d
         
         # frame: Frame
         # self.base_step()

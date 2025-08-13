@@ -2,14 +2,14 @@ import json
 import os
 import numpy as np
 from PIL import Image
-from embodied_analogy.utility.utils import (
+from akm.utility.utils import (
     visualize_pc,
     add_text_to_image,
     depth_image_to_pointcloud
 )
-from embodied_analogy.representation.obj_repr import Obj_repr
-from embodied_analogy.representation.basic_structure import Frame
-from embodied_analogy.utility.constants import MOVING_LABEL, STATIC_LABEL
+from akm.representation.obj_repr import Obj_repr
+from akm.representation.basic_structure import Frame
+from akm.utility.constants import MOVING_LABEL, STATIC_LABEL
 
 from PIL import Image, ImageDraw
 
@@ -100,7 +100,7 @@ def find_medium_alpha(pos, dir, K):
     """
     # import pdb;pdb.set_trace()
     alpha = np.linspace(-2, 2, 100)
-    from embodied_analogy.utility.utils import camera_to_image
+    from akm.utility.utils import camera_to_image
     mid_points = pos[None] + (alpha[:, None] + 0.5) * dir[None]
     uv, depth = camera_to_image(mid_points, K)
     W, H = K[0, -1] * 2, K[1, -1] * 2
