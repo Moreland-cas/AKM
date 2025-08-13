@@ -1,4 +1,8 @@
-# Code for Paper "Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects"
+<div align="center">
+  AKM
+</div>
+
+Code for Paper "Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects", RAL 2025 in submission.
 
 ## File Structure
 ```
