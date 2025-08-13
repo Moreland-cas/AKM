@@ -1,15 +1,15 @@
-import os
 import logging
-import json
 import numpy as np
 import sapien.core as sapien
-from akm.simulated_envs.robot_env import RobotEnv
+
+from akm.utility.constants import ASSET_PATH
 from akm.representation.obj_repr import Obj_repr
+from akm.simulated_envs.robot_env import RobotEnv
 from akm.utility.sapien_utils import (
     parse_urdf_config,
     check_urdf_config,
 )
-from akm.utility.constants import ASSET_PATH
+
 
 class ObjEnv(RobotEnv):
     def __init__(self, cfg):        
@@ -23,7 +23,7 @@ class ObjEnv(RobotEnv):
 
     def capture_frame(self, visualize=False):
         frame = super().capture_frame(visualize=False)
-        # 在这里获得 gt joint state, 并进行保存到 frame 中
+        # Get the gt joint state here and save it to the frame
         frame.gt_joint_state = self.get_active_joint_state()
         if visualize:
             frame.visualize()
@@ -39,7 +39,6 @@ class ObjEnv(RobotEnv):
         loader.scale = obj_cfg["load_scale"]
         loader.fix_root_link = True
         
-        # 在这里设置 load 时的 config
         urdf_config = {
             "_materials": {
                 "gripper" : {
@@ -68,16 +67,17 @@ class ObjEnv(RobotEnv):
             self.logger.log(logging.ERROR, f'{ASSET_PATH}/{data_path}/mobility.urdf load None')
             raise Exception("obj asset load failed.")
         
-        # 改为 load obj_cfg 中的 load_pose, load_quat, load_scale
+        # Change to load_pose, load_quat, load_scale in load obj_cfg
         sapien_pose = sapien.Pose(p=obj_cfg["load_pose"], q=obj_cfg["load_quat"])
         self.obj.set_root_pose(sapien_pose)
         
-        # 设置物体关节的参数, 把回弹关掉
+        # Set the parameters of the object joint and turn off the rebound
         initial_states = []
         for i, joint in enumerate(self.obj.get_active_joints()):
             joint.set_drive_property(stiffness=0, damping=0.1)
             
-            # 在这里判断当前的 joint 是不是我们关注的需要改变状态的关节, 如果是, 则初始化读取状态的函数, 以及当前状态
+            # Here we determine whether the current joint is the joint we are concerned about and need to change the state. 
+            # If so, initialize the function to read the state and the current state
             if joint.get_name() == obj_cfg["active_joint_name"]:
                 self.active_joint = joint
                 initial_states.append(obj_cfg["load_joint_state"])
@@ -86,16 +86,14 @@ class ObjEnv(RobotEnv):
                 joint.set_limits(np.array([[0, 0]]))
         self.obj.set_qpos(initial_states)
         
-        # 在这里调用一个 base step 以实际 load 物体
+        # Call a base step here to actually load the object
         self.base_step()
         
         self.obj_repr = Obj_repr()
         self.obj_repr.setup_logger(self.logger)
         
-        # 在这里要顺便把 gt_joint_param 也进行保存
-        # 首先获取 parent link 的位置 
-        # NOTE: parent link 一般是物体的主体部分, child link 一般是 mobing part 对应的 link
-        # active_joint = self.obj.get_active_joints()[self.active_joint_idx]
+        # First, get the location of the parent link.
+        # NOTE: The parent link is usually the main part of the object, and the child link is usually the link corresponding to the mobing part.
         if active_link_name != self.active_joint.get_child_link().get_name():
             self.logger.log(logging.ERROR, "active_link_name is not consistent with active_joint_name!")
             raise Exception("active_link_name is not consistent with active_joint_name!")
@@ -103,7 +101,7 @@ class ObjEnv(RobotEnv):
         Tparent2w = self.active_joint.get_parent_link().get_pose().to_transformation_matrix() # Tparent2w
         joint_in_parent = self.active_joint.get_pose_in_parent().to_transformation_matrix()
         Tjoint2w = Tparent2w @ joint_in_parent
-        # 不管是 prismatic joint 还是 revolute joint, joint_dir 都是由 joint 坐标系的 x 轴决定的
+        # Whether it is a prismatic joint or a revolute joint, joint_dir is determined by the x-axis of the joint coordinate system
         self.obj_repr.gt_joint_dict = {
             "joint_type": obj_cfg["joint_type"],
             "joint_dir": Tjoint2w[:3, 0],
@@ -112,7 +110,6 @@ class ObjEnv(RobotEnv):
         }
         
         if visualize:
-            # 获取一帧的点云
             frame = self.capture_frame(visualize=False)
             frame.obj_mask = np.ones_like(frame.depth).astype(np.bool_)
             pc, colors = frame.get_obj_pc(world_frame=True)
@@ -127,14 +124,13 @@ class ObjEnv(RobotEnv):
     
     def set_active_joint_state(self, joint_state):
         """
-        对 active joint state 进行设置
+        setup active joint state
         """
         self.obj.set_qpos(joint_state)
         
     def get_active_joint_state(self):
         """
-        获取我们关心的关节的状态值
+        Get the status value of the joint we care about
         """
-        # NOTE: 对于 RGBManip 的数据集, 只有一个关节不是 fixed, 因此直接读取就行
-        # return self.obj.get_qpos()[self.active_joint_idx]
+        # NOTE: For the RGBManip dataset, only one joint is not fixed, so just read it directly
         return self.obj.get_qpos()[0]

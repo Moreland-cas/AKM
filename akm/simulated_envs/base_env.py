@@ -1,16 +1,17 @@
-import yaml
 import os
+import yaml
 import logging
 import numpy as np
-from transforms3d.quaternions import qmult
 import sapien.core as sapien
-from sapien.utils.viewer import Viewer
 from PIL import Image, ImageColor
+from sapien.utils.viewer import Viewer
+from transforms3d.quaternions import qmult
 from scipy.spatial.transform import Rotation as R
-from akm.representation.basic_structure import Frame
 
 from akm.utility.utils import visualize_pc
 from akm.utility.constants import ASSET_PATH
+from akm.representation.basic_structure import Frame
+
 
 class BaseEnv():
     def __init__(self, cfg):     
@@ -90,7 +91,7 @@ class BaseEnv():
         self.step = self.base_step
         self.load_camera()
         
-        # 设置 logger
+        # setup logger
         self.setup_logger(
             cfg=cfg, 
             txt_path=os.path.join(
@@ -101,7 +102,6 @@ class BaseEnv():
         )
     
     def setup_logger(self, cfg, txt_path):
-        # 将 txt_path 生成
         os.makedirs(os.path.dirname(txt_path), exist_ok=True)
         logger = logging.getLogger(f'logger_{cfg["task_cfg"]["task_id"]}')
         
@@ -117,10 +117,7 @@ class BaseEnv():
         elif level == "CRITICAL":            
             logger.setLevel(logging.CRITICAL)
         
-        # 设置格式化
         formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s')
-        
-        # 设置流
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
@@ -131,9 +128,6 @@ class BaseEnv():
         self.logger = logger
     
     def get_viewer_param(self):
-        """
-        返回
-        """
         p = self.viewer.window.get_camera_position()
         q = qmult(self.viewer.window.get_camera_rotation(), [0.5, -0.5, 0.5, 0.5])
         return p, q
@@ -142,16 +136,6 @@ class BaseEnv():
         # camera config
         near, far = 0.1, 100
         width, height = 800, 600
-        
-        """ 
-            intrinsic matrix should be:
-            W, 0, W//2
-            0, W, H//2
-            0, 0, 1
-            fx = fy = W
-            fovy = 2 * np.arctan(H / (2*W))
-        """
-        
         camera = self.scene.add_camera(
             name="camera",
             width=width,
@@ -160,27 +144,6 @@ class BaseEnv():
             near=near,
             far=far,
         )
-        """
-            set pose method 1
-            sapien中的相机坐标系为: forward(x), left(y) and up(z)
-            Camera to World 也就是相机在世界坐标系下的位姿
-            C2W 中的 t 是相机在世界坐标系下的坐标
-            C2W 中的 R 的三列从左到右依次是相机坐标系的 x,y,z 轴在世界坐标系下的坐标向量
-        """
-        # cam_pos = np.array([-1, 1, 2])
-        # forward = -cam_pos / np.linalg.norm(cam_pos)
-        # left = np.cross([0, 0, 1], forward)
-        # left = left / np.linalg.norm(left)
-        # up = np.cross(forward, left)
-        # mat44 = np.eye(4)
-        # mat44[:3, :3] = np.stack([forward, left, up], axis=1)
-        # mat44[:3, 3] = cam_pos
-        # camera.entity.set_pose(sapien.Pose(mat44)) # C2W
-        
-        """
-            set pose method 2
-            这里的 set_local_pose 其实是指定了 Tc2w
-        """
         if pose is None:
             pose = sapien.Pose(
                 [-0.04706102,  0.47101435,  1.0205718],
@@ -189,7 +152,6 @@ class BaseEnv():
         camera.set_local_pose(pose)
         self.camera = camera
         
-        # 记录相机的内参和外参
         self.camera_intrinsic = self.camera.get_intrinsic_matrix() # [3, 3], K
         Tw2c = self.camera.get_extrinsic_matrix() # [3, 4] Tw2c
         self.camera_extrinsic = Tw2c
@@ -198,42 +160,35 @@ class BaseEnv():
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
-        # 渲染rgb图像
+        # render rgb image
         rgba = camera.get_float_texture('Color')  # [H, W, 4]
-        # An alias
-        # rgba = camera.get_color_rgba()  
         rgb = rgba[..., :3]
         rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
-        # rgb_pil = Image.fromarray(rgb_numpy)
         return rgb_numpy
     
     def capture_rgb_sapien3(self):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
-        # 渲染rgb图像
-        rgba = camera.get_picture("Color")  # 获取RGBA图像，格式为[H, W, 4]
+        rgba = camera.get_picture("Color")  
         rgb = rgba[..., :3]
         rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
-        # rgb_pil = Image.fromarray(rgb_numpy)
         return rgb_numpy
     
     def capture_rgbd_sapien2(self, return_pc=False, visualize=False):
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
-        # 渲染过程
-        # get rgb image
-        rgba = camera.get_float_texture("Color")  # 获取RGBA图像，格式为[H, W, 4]
+        rgba = camera.get_float_texture("Color") 
         rgb = rgba[..., :3]
         rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
-        # rgb_pil = Image.fromarray(rgb_numpy)
     
         # get pointcloud
-        position = camera.get_float_texture("Position")  # [H, W, 4], 格式为(x, y, z, render_depth), 其中 render_depth < 1 的点是有效的
+        position = camera.get_float_texture("Position")  
         points_opengl = position[..., :3][position[..., 3] < 1] # num_valid_points, 3
         points_color = rgba[position[..., 3] < 1] # num_valid_points, 4
-        model_matrix = camera.get_model_matrix() # opengl camera to world, must be called after scene.update_render()
+        # opengl camera to world, must be called after scene.update_render()
+        model_matrix = camera.get_model_matrix() 
         points_world = points_opengl @ model_matrix[:3, :3].T + model_matrix[:3, 3] # N. 3
         points_world = points_world.astype(np.float64)
         points_color = (np.clip(points_color, 0, 1)).astype(np.float64)
@@ -245,10 +200,6 @@ class BaseEnv():
         # get depth image
         depth = -position[..., 2] # H, W, in meters
         depth_numpy = np.array(depth)
-        # depth_numpy = (depth * 1000.0).astype(np.uint16)
-        # depth_pil = Image.fromarray(depth_numpy)
-        depth_valid_mask = position[..., 3] < 1 # H, W
-        depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
         
         if return_pc:
             return rgb_numpy, depth_numpy, points_world, points_color
@@ -259,15 +210,13 @@ class BaseEnv():
         camera = self.camera
         camera.take_picture()  # submit rendering jobs to the GPU
         
-        # 渲染过程
         # get rgb image
-        rgba = camera.get_picture("Color")  # 获取RGBA图像，格式为[H, W, 4]
+        rgba = camera.get_picture("Color")  
         rgb = rgba[..., :3]
         rgb_numpy = (rgb * 255).clip(0, 255).astype("uint8") # numpy array, 255
-        # rgb_pil = Image.fromarray(rgb_numpy)
     
         # get pointcloud
-        position = camera.get_picture("Position")  # [H, W, 4], 格式为(x, y, z, render_depth), 其中 render_depth < 1 的点是有效的
+        position = camera.get_picture("Position")  # [H, W, 4]
         points_opengl = position[..., :3][position[..., 3] < 1] # num_valid_points, 3
         points_color = rgba[position[..., 3] < 1] # num_valid_points, 4
         model_matrix = camera.get_model_matrix() # opengl camera to world, must be called after scene.update_render()
@@ -282,10 +231,6 @@ class BaseEnv():
         # get depth image
         depth = -position[..., 2] # H, W, in meters
         depth_numpy = np.array(depth)
-        # depth_numpy = (depth * 1000.0).astype(np.uint16)
-        # depth_pil = Image.fromarray(depth_numpy)
-        depth_valid_mask = position[..., 3] < 1 # H, W
-        depth_valid_mask_pil = Image.fromarray(depth_valid_mask)
         
         if return_pc:
             return rgb_numpy, depth_numpy, points_world, points_color
@@ -297,19 +242,7 @@ class BaseEnv():
         camera.take_picture()
         # visual_id is the unique id of each visual shape
         seg_labels = camera.get_picture("Segmentation")  # [H, W, 4]
-        mesh_np = seg_labels[..., 0].astype(np.uint8)  # mesh-level [H, W]
         actor_np = seg_labels[..., 1].astype(np.uint8)  # actor-level [H, W]
-        
-        # Or you can use aliases below
-        # label0_image = camera.get_visual_segmentation()
-        # label1_image = camera.get_actor_segmentation()
-        
-        colormap = sorted(set(ImageColor.colormap.values()))
-        color_palette = np.array(
-            [ImageColor.getrgb(color) for color in colormap], dtype=np.uint8
-        )
-        mesh_pil = Image.fromarray(color_palette[mesh_np])
-        actor_pil = Image.fromarray(color_palette[actor_np])
         return actor_np # [H, W]
     
     def capture_frame(self, visualize=False) -> Frame:
@@ -328,7 +261,7 @@ class BaseEnv():
     
     def base_step(self):
         self.scene.step()
-        self.scene.update_render() # 记得在 render viewer 或者 camera 之前调用 update_render()
+        self.scene.update_render() 
         if not self.offscreen:
             self.viewer.render()
         self.cur_steps += 1
@@ -336,15 +269,3 @@ class BaseEnv():
     def delete(self):
         if not self.offscreen:
             self.viewer.close()
-        
-
-if __name__ == "__main__":
-    env = BaseEnv()
-    
-    env.step()
-    env.capture_frame()
-    
-    # for i in range(100):
-    while True:
-        env.step()
-        # env.capture_rgbd_sapien2(visualize=True)

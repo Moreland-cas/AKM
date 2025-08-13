@@ -1,16 +1,15 @@
-import json
 import os
+import json
 import logging
 import numpy as np
+
 from akm.utility.utils import (
-    initialize_napari,
     joint_data_to_transform_np,
     numpy_to_json
 )
-initialize_napari()
 from akm.representation.obj_repr import Obj_repr
-from akm.simulated_envs.explore_env import ExploreEnv
 from akm.representation.basic_structure import Frame
+from akm.simulated_envs.explore_env import ExploreEnv
 
 
 class ReconEnv(ExploreEnv):
@@ -24,7 +23,7 @@ class ReconEnv(ExploreEnv):
     
     def update_cur_frame(self, init_guess=None, visualize=False):
         """
-        会更新 self.cur_frame 和 self.cur_state
+        Will update self.cur_frame and self.cur_state
         """
         self.obj_repr: Obj_repr
         self.base_step()
@@ -37,13 +36,13 @@ class ReconEnv(ExploreEnv):
         )
         self.cur_state = cur_frame.joint_state
         self.cur_frame = cur_frame
-        # 这里打印的 Extimated Current State 是 recon 算法预测的 offset + load_joint_state 得到的
+        # The Extimated Current State printed here is the offset predicted by the recon algorithm + load_joint_state
         self.logger.log(logging.DEBUG, f'Estimated Current State: {self.cur_state + self.obj_env_cfg["load_joint_state"]}')
         self.logger.log(logging.DEBUG, f"GT Current State: {self.get_active_joint_state()}")
         
     def transform_grasp(self, Tph2w_ref, ref_state, tgt_state):
         """
-        根据 joint_dict_w 将 ref_state 下的 grasp_pose (Tph2w_ref) 转换到 target_state 下得到 Tph2w_tgt
+        According to joint_dict_w, grasp_pose (Tph2w_ref) under ref_state is converted to target_state to obtain Tph2w_tgt
         """
         joint_dict_w = self.obj_repr.get_joint_param(
             resolution="fine",
@@ -60,11 +59,12 @@ class ReconEnv(ExploreEnv):
 
     def ref_ph_to_tgt(self, ref_frame: Frame, tgt_frame: Frame, use_gt_joint_dict: bool = False):
         """
-        将 ref_frame 中的 panda_hand grasp_pose 转换到 target_frame 中去
-        
-        NOTE: 
-            由于现在的抓取模块不是很强, 所以需要这个函数, 也就是说我们 transfer 的不是 contact_3d, 
-            而是 explore 阶段已经证实比较好的一个 panda_hand grasp pose
+        Transfer the panda_hand grasp_pose in the ref_frame to the target_frame.
+
+        NOTE:
+        This function is necessary because the current grasping module is not very powerful. 
+        This means we are not transferring the contact_3d pose,
+        but rather the panda_hand grasp pose that has been proven to be good during the exploration phase.
         """
         Tph2w_ref = ref_frame.Tph2w
         Tph2c_ref = self.obj_repr.Tw2c @ Tph2w_ref
@@ -77,7 +77,6 @@ class ReconEnv(ExploreEnv):
         else:
             fine_joint_dict = self.obj_repr.fine_joint_dict
             
-        # Tref2tgt 是 camera 坐标系下的一个变换
         Tref2tgt_c = joint_data_to_transform_np(
             joint_type=fine_joint_dict["joint_type"],
             joint_dir=fine_joint_dict["joint_dir"],
@@ -91,11 +90,9 @@ class ReconEnv(ExploreEnv):
         
     def transfer_Tph2w(self, Tph2w_ref, ref_state, tgt_state):
         """
-        将 Tph2w 从 ref_state 转换到 tgt_state
+        Transition Tph2w from ref_state to tgt_state
         """
         Tph2c_ref = self.obj_repr.Tw2c @ Tph2w_ref
-        
-        # Tref2tgt 是 camera 坐标系下的一个变换
         Tref2tgt_c = joint_data_to_transform_np(
             joint_type=self.obj_repr.fine_joint_dict["joint_type"],
             joint_dir=self.obj_repr.fine_joint_dict["joint_dir"],
@@ -120,22 +117,12 @@ class ReconEnv(ExploreEnv):
             evaluate=True
         )
         self.logger.log(logging.INFO, self.recon_result)
-        
-        # if self.exp_cfg["save_obj_repr"]:
-        #     save_path = os.path.join(
-        #         self.exp_cfg["exp_folder"],
-        #         str(self.task_cfg["task_id"]),
-        #         "obj_repr.npy"
-        #     )
-        #     self.obj_repr.save(save_path)
         return self.recon_result
     
-    ###########################################################
     def main(self):
         super().main()
         
         try:
-        # if True:
             self.recon_result = {}
             
             if self.explore_result["has_valid_explore"]:
@@ -160,17 +147,3 @@ class ReconEnv(ExploreEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
-        
-if __name__ == "__main__":
-    cfg = {
-        "num_kframes": 5,
-        "fine_lr": 1e-3,
-    }
-    env = ReconEnv(cfg)
-    
-    env.recon_stage(
-        load_path=f"/home/zby/Programs/AKM/assets/logs/test_explore_4_11/40147_1_prismatic/explore/obj_repr.npy",    
-        save_path=None,
-        evaluate=True,
-        visualize=False
-    )
