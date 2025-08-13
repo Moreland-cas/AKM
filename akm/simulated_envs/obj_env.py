@@ -138,18 +138,3 @@ class ObjEnv(RobotEnv):
         # NOTE: 对于 RGBManip 的数据集, 只有一个关节不是 fixed, 因此直接读取就行
         # return self.obj.get_qpos()[self.active_joint_idx]
         return self.obj.get_qpos()[0]
-
-
-if __name__ == "__main__":
-    test_cfgs_path = "/home/zby/Programs/AKM/scripts/test_cfgs.json"
-    with open(test_cfgs_path, 'r', encoding='utf-8') as f:
-        test_cfgs = json.load(f)
-        
-    for test_cfg in test_cfgs:
-        objEnv = ObjEnv(test_cfg)
-        for i in range(200):
-            objEnv.step()
-        objEnv.delete()
-        # 这里写 del 没用, 必须用 objEnv.viewer.close()
-        # del objEnv
-        
