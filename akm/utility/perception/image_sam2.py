@@ -132,7 +132,6 @@ def sam2_on_image(
     input_point = np.empty((0, 2))
     input_label = np.empty(0)
 
-    # 记录已使用的点
     used_positive_points = set()
     used_negative_points = set()
     

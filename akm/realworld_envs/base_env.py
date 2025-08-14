@@ -143,7 +143,7 @@ class BaseEnv():
         temporal_filter.set_option(rs.option.holes_fill, 7)  # Valid in 1/8
         
         threshold_filter = rs.threshold_filter()  
-        threshold_filter.set_option(rs.option.min_distance, 0.2)  # 最小深度 0.1 米
+        threshold_filter.set_option(rs.option.min_distance, 0.2)  
         threshold_filter.set_option(rs.option.max_distance, 4.0)
         
         """

@@ -131,7 +131,6 @@ def cluster_tracks_3d_spectral(tracks_3d, feat_type="diff", visualize=False):
         viewer = napari.Viewer(ndisplay=3)
         viewer.title = "cluster 3d tracks (spectral clustering)"
         
-        # 解决 napari 坐标系显示
         napari_tracks_3d = np.copy(tracks_3d)
         napari_tracks_3d[..., -1] *= -1
         viewer.add_points(napari_time_series_transform(napari_tracks_3d[:, moving_mask]), size=0.01, name='moving part', opacity=0.8, face_color="red")

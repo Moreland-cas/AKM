@@ -368,7 +368,7 @@ class RobotEnv(BaseEnv):
             joint_waypoint_motion_list.append(joint_waypoint)
         joint_waypoint_motion = JointWaypointMotion(joint_waypoint_motion_list)
         
-        if reaction_motion is not None: #TODO 添加 default的
+        if reaction_motion is not None: 
             joint_waypoint_motion.add_reaction(reaction_motion)
         self.franky_robot.move(joint_waypoint_motion)
 
@@ -394,7 +394,7 @@ class RobotEnv(BaseEnv):
         pc_ground = np.concatenate([pc_ground_xy, pc_ground_z], axis=1)
         
         # Filter out points with a distance < 0.15 from the origin
-        dist2 = np.sum(pc_ground ** 2, axis=1) ** 0.5      # 平方距离
+        dist2 = np.sum(pc_ground ** 2, axis=1) ** 0.5     
         pc_ground = pc_ground[dist2 >= 0.2]
         pc_update.append(pc_ground)
         

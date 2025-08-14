@@ -685,7 +685,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
     if contact_point is not None:
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
         sphere.translate(contact_point)
-        sphere.paint_uniform_color([1, 0, 0])  # 紅色
+        sphere.paint_uniform_color([1, 0, 0])  
         mat = o3d.visualization.rendering.MaterialRecord()
         mat.shader = "defaultLit"
         mat.base_color = [1.0, 0.0, 0.0, 1.0]
