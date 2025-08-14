@@ -1,31 +1,23 @@
-import logging
-from akm.utility.utils import initialize_napari
-initialize_napari()
 import os
 import sys
-from akm.utility.constants import PROJECT_ROOT
+import cv2
+import time
+import torch
+import logging
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+
 relative_path = os.path.join(PROJECT_ROOT, "third_party", "RAM_code")
 sys.path.append(relative_path)
-
-import cv2
-import numpy as np
-import torch
-import time
-from PIL import Image
-
 from vision.featurizer.run_featurizer import match_fts
 from vision.featurizer.utils.visualization import IMG_SIZE
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
 
-import matplotlib
-import matplotlib.pyplot as plt
-# matplotlib.use('svg') # NOTE: fix backend error while GPU is in use
-
-from akm.utility.proposal.affordance import Affordance_map_2d
 from akm.utility.constants import *
-from akm.utility.utils import (
-    draw_points_on_image,
-)
+from akm.utility.utils import draw_points_on_image
+from akm.utility.proposal.affordance import Affordance_map_2d
+
 
 def draw_arrows_on_img(img, pixel, normals_2d_directions):
     """
@@ -40,9 +32,8 @@ def draw_arrows_on_img(img, pixel, normals_2d_directions):
         dx, dy = normals_2d_directions[i]
         cv2.arrowedLine(img_, (x, y), (x + int(dx * 50), y + int(dy * 50)), (0, 0, 255 * i / num_array), 2)
         plt.arrow(x, y, dx * 100, dy * 100, color=(0, 0, 1 - i / num_array), linewidth=2.5, head_width=12)
-    # revert to RGB
-    # img_ = cv2.cvtColor(img_, cv2.COLOR_RGB2BGR)
     return Image.fromarray(img_)
+        
         
 def project_normals(img, pixel, normals, visualize=False):
     '''
@@ -67,6 +58,7 @@ def project_normals(img, pixel, normals, visualize=False):
 
     return normals_2d_direction_normalized
     
+    
 @torch.no_grad()
 def get_ram_affordance_2d(
     query_rgb, # H, W, 3 in numpy
@@ -77,8 +69,8 @@ def get_ram_affordance_2d(
     logger=None
 ):
     """
-        instruction: open the drawer (task description)
-        prompt: used to extract dift feature
+    instruction: open the drawer (task description)
+    prompt: used to extract dift feature
     """
     logger.log(logging.INFO, "Initializing SubsetRetrievePipeline ...")
     subset_retrieve_pipeline = SubsetRetrievePipeline(
@@ -105,7 +97,7 @@ def get_ram_affordance_2d(
     ref_imgs_np = topk_retrieved_data_dict['masked_img']
     ref_imgs_PIL = [Image.fromarray(ref_img_np).convert('RGB') for ref_img_np in ref_imgs_np]
     
-    # Note: 这些 query 都是 cropped 之后的结果
+    # Note: These queries are the results after cropping
     query_mask = topk_retrieved_data_dict["query_mask"][..., 0].astype(np.bool_)
     query_feat = topk_retrieved_data_dict["query_feat"]
     query_region = topk_retrieved_data_dict["query_region"]
@@ -120,7 +112,7 @@ def get_ram_affordance_2d(
         cos_map = match_fts(ref_ft, query_feat, ref_pos)
         break
 
-    # 进一步将 cos_map 转换为一个概率分布
+    # Further convert cos_map into a probability distribution
     logger.log(logging.INFO, "Initializing Affordance_map_2d from DIFT similarity ...")
     affordance_map_2d = Affordance_map_2d(
         rgb_img=query_rgb,
@@ -128,84 +120,11 @@ def get_ram_affordance_2d(
         cropped_mask=query_mask,
         cropped_region=query_region,
     )
-    # 保存 affordance map 2d 的输入方便后续 debug
-    if False:
-        np.savez(
-            "/home/zby/Programs/AKM/assets/unit_test/ram_proposal/affordance_map_2d_input.npz",
-            rgb_img=query_rgb,
-            cos_map=cos_map,
-            cropped_mask=query_mask,
-            cropped_region=query_region,
-        )
     
     if visualize:
-        # viewer = napari.Viewer()
-        # viewer.add_image(topk_retrieved_data_dict["query_img"], name="query_img")
-        # viewer.add_image(topk_retrieved_data_dict["query_mask"] * 255, name="query_mask")
-        # viewer.add_image(topk_retrieved_data_dict["masked_query"], name="masked_query")
-
-        # viewer.title = "retrieved reference data by RAM"
-        
-        # for i in range(len(topk_retrieved_data_dict["img"])):
-        #     viewer.add_image(topk_retrieved_data_dict["img"][i], name=f"ref_img_{i}")
-        #     masked_img = topk_retrieved_data_dict["masked_img"][i]
-        #     masked_img = np.array(draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5))
-        #     viewer.add_image(masked_img, name=f"masked_ref_img_{i}")
-        #     viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
-        #     # viewer.add_image(prob_maps[i], name=f"prob_map_{i}", colormap="viridis")
-        # napari.run()
-        
-        # Image.fromarray(topk_retrieved_data_dict["query_img"]).show()
-        # Image.fromarray(topk_retrieved_data_dict["query_mask"] * 255).show()
-        # Image.fromarray(topk_retrieved_data_dict["masked_query"]).show()
-        
         for i in range(len(topk_retrieved_data_dict["img"])):
-            # Image.fromarray(topk_retrieved_data_dict["img"][i]).show()
             masked_img = topk_retrieved_data_dict["masked_img"][i]
             masked_img = draw_points_on_image(masked_img, [topk_retrieved_data_dict["traj"][i][0]], 5)
             masked_img.show()
-            # Image.fromarray(topk_retrieved_data_dict["mask"][i] * 255).show()
-            # Image.fromarray((cos_maps[i] + 1) / 2 * 255).show()
-            break
     torch.cuda.empty_cache()
     return affordance_map_2d
-
-
-if __name__ == "__main__":
-    import sys
-    query_rgb = np.asarray(Image.open("/home/zby/Programs/AKM/akm/dev/ram_proposal/rgb.png"))
-    query_depth = np.load("/home/zby/Programs/AKM/akm/dev/ram_proposal/depth.npy")
-    # query_mask = np.load("/home/zby/Programs/AKM/akm/dev/ram_proposal/mask.npy")
-    
-    affordance_map_2d = get_ram_affordance_2d(
-        query_rgb, # H, W, 3 in numpy
-        instruction="open the drawer",
-        data_source="droid",
-        visualize=False
-    )
-    
-    K = np.array(
-        [[300.,   0., 400.],
-       [  0., 300., 300.],
-       [  0.,   0.,   1.]], dtype=np.float32)
-    
-    Tw2c = np.array(
-        [[-4.8380834e-01, -8.7517393e-01,  5.1781535e-07,  4.5627734e-01],
-       [-1.6098598e-01,  8.8994741e-02, -9.8293614e-01,  3.8961503e-01],
-       [ 8.6024004e-01, -4.7555280e-01, -1.8394715e-01,  8.8079178e-01],
-       [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]],
-    )
-    Rw2c = Tw2c[:3, :3]
-    
-    input_data = np.load("/home/zby/Programs/AKM/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
-    # 测试一下 Affordance_map_2d
-    # affordance_map_2d = Affordance_map_2d(
-    #     rgb_img=input_data["rgb_img"],
-    #     cos_map=input_data["cos_map"],
-    #     cropped_mask=input_data["cropped_mask"],
-    #     cropped_region=input_data["cropped_region"],
-    # )
-    
-    obj_mask = affordance_map_2d.get_obj_mask(visualize=False) # H, W
-    contact_uv = affordance_map_2d.sample_highest(visualize=True)
-    

@@ -1,16 +1,13 @@
+import numpy as np
 from flask import Flask, request, jsonify
 from akm.utility.grasp.anygrasp import prepare_any_grasp_model
-import numpy as np
-from graspnetAPI import GraspGroup
 
 
-app = Flask(__name__)
-# 定义函数 y = f(x) = x^2
 def run_anygrasp_helper(points_input, colors, lims):
     points_input = points_input.astype(np.float32)
     colors = colors.astype(np.float32)
     model = prepare_any_grasp_model(
-        asset_path="/media/zby/MyBook2/embody_analogy_data/assets/ckpts/anygrasp/checkpoint_detection.tar"
+        asset_path="/home/zby/Programs/AKM/assets/ckpts/anygrasp/checkpoint_detection.tar"
     )
     gg, _ = model.get_grasp(
         points_input,
@@ -22,10 +19,10 @@ def run_anygrasp_helper(points_input, colors, lims):
     )
     return gg
 
-# 定义API接口
+app = Flask(__name__)
+
 @app.route('/api/calculate', methods=['POST'])
 def calculate():
-    # 获取请求中的数据
     data = request.json
     
     # list
@@ -50,5 +47,7 @@ def calculate():
         }
     return jsonify(response)
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)  # 0.0.0.0 表示允许外部访问
+    # 0.0.0.0 means external access is allowed
+    app.run(host='0.0.0.0', port=5000) 

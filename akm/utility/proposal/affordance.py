@@ -1,11 +1,12 @@
-import numpy as np
 import cv2
+import numpy as np
 from PIL import Image
 from matplotlib import cm
 from akm.utility.utils import (
     draw_points_on_image,
     concatenate_images
 )
+
 
 class Affordance_map_2d:
     def __init__(
@@ -17,17 +18,17 @@ class Affordance_map_2d:
         # alpha: float=20
     ):
         """
-            rgb_img: 
-                H, W, 3 要在这个 rgb 图上采样接触点的位置
-            cos_map:
-                cropped_H, cropped_W, 值在 (-1, 1) 之间
-            cropped_mask: 
-                cropped_H, cropped_W, boolen type
-                代表 cropped region 中物体的分割 mask
-            cropped_region:
-                (x_min, y_min, x_max, y_max)
-                代表 cropped_region 在原始的 rgb_img 中的位置
-            NOTE: cos_map 的大小与 cropped mask/region 并不一样
+        rgb_img:
+            H, W, 3: The locations of the contact points to be sampled on this RGB image
+        cos_map:
+            cropped_H, cropped_W, values between (-1, 1)
+        cropped_mask:
+            cropped_H, cropped_W, bool type
+        Represents the segmentation mask of the object in the cropped region
+        cropped_region:
+            (x_min, y_min, x_max, y_max)
+        Represents the position of the cropped_region in the original RGB_img
+        NOTE: The size of the cos_map is different from the cropped mask/region 
         """
         self.rgb_img = rgb_img
         self.cos_map = cos_map # H, W, in range [-1, 1]
@@ -54,8 +55,8 @@ class Affordance_map_2d:
     
     def rgb_to_cos_frame(self, u_rgb, v_rgb):
         """
-            将 rgb_img 中的 (u, v) 转换为 cos_map 中的 (u, v)
-            (u_rgb, v_rgb) -> (normalized_u, normalized_v) ->  (u_cos, v_cos)
+        Convert (u, v) in rgb_img to (u, v) in cos_map
+        (u_rgb, v_rgb) -> (normalized_u, normalized_v) -> (u_cos, v_cos) 
         """
         normalized_u = (u_rgb - self.cropped_region[0]) / self.cropped_W
         normalized_v = (v_rgb - self.cropped_region[1]) / self.cropped_H
@@ -67,8 +68,8 @@ class Affordance_map_2d:
     
     def cos_to_rgb_frame(self, u_cos, v_cos):
         """
-            将 cos_map 中的 (u, v) 转换为 rgb_img 中的 (u, v)
-            (u_cos, v_cos) -> (normalized_u, normalized_v) -> (u_rgb, v_rgb)
+        Convert (u, v) in cos_map to (u, v) in rgb_img
+        (u_cos, v_cos) -> (normalized_u, normalized_v) -> (u_rgb, v_rgb)
         """
         normalized_u = u_cos/ self.cos_map.shape[1]
         normalized_v = v_cos / self.cos_map.shape[1]
@@ -79,7 +80,7 @@ class Affordance_map_2d:
         return (u_rgb, v_rgb)
     
     def get_obj_mask(self, visualize=False):
-        # 返回一个大小与 rgb_img 一样的 mask, 其中 cropped_region 区域用 cropped_mask 填充
+        # Return a mask of the same size as rgb_img, where the cropped_region area is filled with cropped_mask
         obj_mask = np.zeros(self.rgb_img.shape[:2]).astype(np.bool_) # H, W
         obj_mask[self.cropped_region[1]:self.cropped_region[3], self.cropped_region[0]:self.cropped_region[2]] = self.cropped_mask
         
@@ -89,12 +90,12 @@ class Affordance_map_2d:
     
     def mask_cos_map(self):
         """
-            将 cos_map 中不在 cropped_mask 中的点值设置为 -1
+        Set the value of points in cos_map that are not in cropped_mask to -1 
         """
-        # 首先需要将 cropped_mask 缩放到 cos_map 大小（插值的方式）
-        mask_uint8 = self.cropped_mask.astype(np.uint8)  # 将 True 转换为 255，False 转换为 0
+        # First, you need to scale the cropped_mask to the size of cos_map (interpolation method)
+        mask_uint8 = self.cropped_mask.astype(np.uint8) 
 
-        # 使用cv2.resize进行最近邻插值
+        # Use cv2.resize for nearest neighbor interpolation
         cos_w = self.cos_map.shape[1]
         cos_h = self.cos_map.shape[0]
         resized_mask = cv2.resize(mask_uint8, (cos_w, cos_h), interpolation=cv2.INTER_NEAREST)
@@ -103,30 +104,24 @@ class Affordance_map_2d:
         
     def uninit_cosmap(self):
         """
-            将 cos_map 中不在 cropped_mask 中的点值设置为 -1,
-            在 cropped_mask 中的点设置为 1
+        Set the values of points in cos_map that are not in cropped_mask to -1, and those in cropped_mask to 1.  
         """
         self.mask_cos_map()
-        # 首先需要将 cropped_mask 缩放到 cos_map 大小（插值的方式）
-        mask_uint8 = self.cropped_mask.astype(np.uint8)  # 将 True 转换为 255，False 转换为 0
+        # First, you need to scale the cropped_mask to the size of cos_map (interpolation method)
+        mask_uint8 = self.cropped_mask.astype(np.uint8)  
 
-        # 使用cv2.resize进行最近邻插值
         cos_w = self.cos_map.shape[1]
         cos_h = self.cos_map.shape[0]
         resized_mask = cv2.resize(mask_uint8, (cos_w, cos_h), interpolation=cv2.INTER_NEAREST)
         resized_mask = resized_mask > 0
-        # self.cos_map[~resized_mask] = -1
         self.cos_map[resized_mask] = 1
         
     def sample_prob(self, alpha=10, num_samples=1, return_rgb_frame=True, visualize=False):
         """
-            首先根据 cos_map 得到 prob_map, 然后随机 sample 一个, 并且保证该点落在 cropped_mask 中
+        First, get the prob_map based on the cos_map, then randomly sample a point and ensure that it falls within the cropped_mask  
         """
-        # if self.cos_map.max() == -1:
-        #     assert False, "cos_map 中没有值"
-            
-        self.mask_cos_map() # 把 mask 外的部分的 cos sim 变为 -1
-        prob_map = (self.cos_map + 1.) / 2 # 值域变为 (0, 1)
+        self.mask_cos_map() 
+        prob_map = (self.cos_map + 1.) / 2 
         prob_map_scaled = prob_map * np.exp(prob_map * alpha)
         prob_map_normalized = prob_map_scaled / prob_map_scaled.sum()
         self.prob_map = prob_map_normalized
@@ -137,7 +132,8 @@ class Affordance_map_2d:
         v_cos, u_cos = np.unravel_index(indices, self.cos_map.shape)
         u_rgb, v_rgb = zip(*[self.cos_to_rgb_frame(u, v) for u, v in zip(u_cos, v_cos)])
         
-        # 由于 cos_map/prob_map 的大小是经过缩放的, 和 cropped_region 的像素坐标并不严格对应, 因此从 prob_map 中采样出的点应该是经过归一化的
+        # Since the size of cos_map/prob_map is scaled and does not strictly correspond to the pixel coordinates of cropped_region,
+        # the points sampled from prob_map should be normalized
         if visualize:
             image_cos = self.get_colored_cos_map()
             image_cos = draw_points_on_image(
@@ -146,7 +142,6 @@ class Affordance_map_2d:
                 radius=1,
                 normalized_uv=False
             )
-            # image_cos.show()
             
             image_rgb = draw_points_on_image(
                 image=self.rgb_img,
@@ -154,16 +149,6 @@ class Affordance_map_2d:
                 radius=1,
                 normalized_uv=False
             )
-            # image_rgb.show()
-            
-            # image_mask = draw_points_on_image(
-            #     image=Image.fromarray(self.cropped_mask * 255.).convert("RGB"),
-            #     uv_list=[(u, v)],
-            #     radius=5,
-            #     normalized_uv=True
-            # )
-            # image_mask.show()
-            
             concatenate_images(image_cos, image_rgb).show()
         
         if return_rgb_frame:
@@ -173,18 +158,15 @@ class Affordance_map_2d:
     
     def sample_highest(self, visualize=False):
         """
-            在 cos_map 上 sample 出值最大的点, 并且保证该点落在 cropped_mask 中
+        Sample the point with the maximum value on cos_map and ensure that the point falls within the cropped_mask
         """
-        # if self.cos_map.max() == -1:
-        #     assert False, "cos_map 中没有值"
-            
         self.mask_cos_map()
         max_index = np.unravel_index(np.argmax(self.cos_map), self.cos_map.shape)
-        # max_index 是 (v, u) 的形式
         v_cos, u_cos = max_index
         u_rgb, v_rgb = self.cos_to_rgb_frame(u_cos, v_cos)
         
-        # 由于 cos_map/prob_map 的大小是经过缩放的, 和 cropped_region 的像素坐标并不严格对应, 因此从 prob_map 中采样出的点应该是经过归一化的
+        # Since the size of cos_map/prob_map is scaled and does not strictly correspond to the pixel coordinates of cropped_region, 
+        # the points sampled from prob_map should be normalized
         if visualize:
             image_cos = self.get_colored_cos_map()
             image_cos = draw_points_on_image(
@@ -193,35 +175,23 @@ class Affordance_map_2d:
                 radius=5,
                 normalized_uv=False
             )
-            # image_cos.show()
-            
             image_rgb = draw_points_on_image(
                 image=self.rgb_img,
                 uv_list=[(u_rgb, v_rgb)],
                 radius=5,
                 normalized_uv=False
             )
-            # image_rgb.show()
-            
-            # image_mask = draw_points_on_image(
-            #     image=Image.fromarray(self.cropped_mask * 255.).convert("RGB"),
-            #     uv_list=[(u, v)],
-            #     radius=5,
-            #     normalized_uv=True
-            # )
-            # image_mask.show()
-            
             concatenate_images(image_cos, image_rgb).show()
         return np.array([u_rgb, v_rgb])  
        
     def update(self, neg_uv_rgb, update_sigma=0.05, visualize=False):
         """
-        neg_uv_rgb: 
-            失败的尝试点 (u_rgb, v_rgb) 
-        根据 neg_uv_rgb 来更新 self.cos_map, 由于 cos_map 的值在 (-1, 1), 所以更新时要考虑这个值域
+        neg_uv_rgb:
+        Failed attempt point (u_rgb, v_rgb)
+        Update self.cos_map based on neg_uv_rgb. Since the value of cos_map is in the range (-1, 1), this range must be considered when updating.
         """
-        assert neg_uv_rgb is not None, "neg_uv_rgb 不能为空"
-        # 将失败的 RGB 坐标转换为 cos_map 坐标
+        assert neg_uv_rgb is not None, "neg_uv_rgb cannot be zero"
+        # Convert failed RGB coordinates to cos_map coordinates
         u_cos, v_cos = self.rgb_to_cos_frame(neg_uv_rgb[0], neg_uv_rgb[1])
 
         if visualize:
@@ -233,27 +203,24 @@ class Affordance_map_2d:
                 normalized_uv=False
             )
 
-        # 定义全图更新的高斯核标准差
+        # Define the Gaussian kernel standard deviation for full image update
         sigma = int(self.cos_map.shape[0] * update_sigma)
 
-        # 生成坐标网格
+        # Generate coordinate grid
         u_indices = np.arange(self.cos_map.shape[1])
         v_indices = np.arange(self.cos_map.shape[0])
         u_grid, v_grid = np.meshgrid(u_indices, v_indices)
 
-        # 计算距离
+        # compute distance
         distances = np.sqrt((u_grid - u_cos) ** 2 + (v_grid - v_cos) ** 2)
 
-        # 使用高斯函数计算权重
+        # Calculate weights using Gaussian function
         weights = np.exp(-distances ** 2 / (2 * sigma ** 2))
 
-        # 更新 cos_map，使用权重降低值
+        # Update cos_map, using weights to reduce values
         self.cos_map -= weights * 0.5  
-        # self.cos_map *= (1 - 0.5 * weights)
-        # self.cos_map = np.clip(self.cos_map, -1, 1)  # 确保不低于 -1
 
         if visualize:
-            # 可视化更新后的 cos_map
             image_cos_new = self.get_colored_cos_map()
             u_rgb, v_rgb = self.sample_highest()
             u_cos, v_cos = self.rgb_to_cos_frame(u_rgb, v_rgb)
@@ -264,30 +231,3 @@ class Affordance_map_2d:
                 normalized_uv=False
             )
             concatenate_images(image_cos_old, image_cos_new).show()
-
-class Affordance_map_3d(Affordance_map_2d):
-    def __init__(self, rgb_img, cos_map, cropped_mask, cropped_region):
-        super().__init__(rgb_img, cos_map, cropped_mask, cropped_region)
-        
-    def sample_grasp(self):
-        # sample 一个 grasp 和 post_grasp dir
-        pass 
-
-if __name__ == "__main__":
-    input_data = np.load("/home/zby/Programs/AKM/assets/unit_test/ram_proposal/affordance_map_2d_input.npz")
-    # 测试一下 Affordance_map_2d
-    affordance_map_2d = Affordance_map_2d(
-        rgb_img=input_data["rgb_img"],
-        cos_map=input_data["cos_map"],
-        cropped_mask=input_data["cropped_mask"],
-        cropped_region=input_data["cropped_region"],
-    )
-    affordance_map_2d.get_obj_mask(False)
-    uv_rgb = affordance_map_2d.sample_prob(alpha=30, num_samples=1000, return_rgb_frame=False, visualize=False)
-    affordance_map_2d.fit_GMM(data=uv_rgb, visualize=True)
-    # uv_rgb = affordance_map_2d.sample_highest(visualize=True)
-    # affordance_map_2d.update(uv_rgb, visualize=False)
-    # uv_rgb = affordance_map_2d.sample_highest(visualize=True)
-    # affordance_map_2d.update(uv_rgb, visualize=False)
-    # uv_rgb = affordance_map_2d.sample_highest(visualize=True)
-    
