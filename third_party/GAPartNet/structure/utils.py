@@ -402,7 +402,6 @@ def farthest_point_sample(xyz, npoint, use_cuda = True):
     return sampled_points_ids
 
 def map2image(pts, rgb, K, HEIGHT, WIDTH):
-    # input为每个shape的info，取第idx行
     image_rgb = np.ones((HEIGHT, WIDTH, 3), dtype=np.uint8) * 255
     # K = np.array([[1268.637939453125, 0, 400, 0], [0, 1268.637939453125, 400, 0],
     #              [0, 0, 1, 0], [0, 0, 0, 1]], dtype=np.float32)
@@ -421,7 +420,6 @@ def map2image(pts, rgb, K, HEIGHT, WIDTH):
         y_new = (np.around(y * K[1][1] / z + K[1][2])).astype(dtype=int)
         point2image[i] = (y_new, x_new)
 
-    # 还原原始的RGB图
     for i in range(num_point):
         # print(i, point2image[i][0], point2image[i][1])
         if point2image[i][0]+1 >= HEIGHT or point2image[i][0] < 0 or point2image[i][1]+1 >= WIDTH or point2image[i][1] < 0:
@@ -437,7 +435,6 @@ def map2image(pts, rgb, K, HEIGHT, WIDTH):
 
 
 def map2image_single(pts, rgb, K, HEIGHT, WIDTH):
-    # input为每个shape的info，取第idx行
     image_rgb = np.ones((HEIGHT, WIDTH, 3), dtype=np.uint8) * 255
     # K = np.array([[1268.637939453125, 0, 400, 0], [0, 1268.637939453125, 400, 0],
     #              [0, 0, 1, 0], [0, 0, 0, 1]], dtype=np.float32)
@@ -462,7 +459,6 @@ def map2image_single(pts, rgb, K, HEIGHT, WIDTH):
         y_new = (np.around(y * K[1][1] / z + K[1][2])).astype(dtype=int)
         point2image[i] = (y_new, x_new)
 
-    # 还原原始的RGB图
     for i in range(num_point):
         # print(i, point2image[i][0], point2image[i][1])
         if point2image[i][0]+1 >= HEIGHT or point2image[i][0] < 0 or point2image[i][1]+1 >= WIDTH or point2image[i][1] < 0:

@@ -81,7 +81,7 @@ def segment_everything(
     wider=False,
     mask_random_color=True,
 ):
-    input_size = int(input_size)  # 确保 imgsz 是整数
+    input_size = int(input_size)
     # Thanks for the suggestion by hysts in HuggingFace.
     w, h = input.size
     scale = input_size / max(w, h)
@@ -128,7 +128,7 @@ def segment_with_points(
     global global_points
     global global_point_label
     
-    input_size = int(input_size)  # 确保 imgsz 是整数
+    input_size = int(input_size)
     # Thanks for the suggestion by hysts in HuggingFace.
     w, h = input.size
     scale = input_size / max(w, h)
@@ -175,7 +175,6 @@ def get_points_with_draw(image, label, evt: gr.SelectData):
     
     print(x, y, label == 'Add Mask')
     
-    # 创建一个可以在图像上绘图的对象
     draw = ImageDraw.Draw(image)
     draw.ellipse([(x - point_radius, y - point_radius), (x + point_radius, y + point_radius)], fill=point_color)
     return image

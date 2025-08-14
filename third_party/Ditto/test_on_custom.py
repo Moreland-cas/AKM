@@ -102,9 +102,7 @@ def sum_downsample_points(point_list, voxel_size=0.01, nb_neighbors=20, std_rati
     return pcd
 
 def voxel_downsample(points, voxel_size):
-    # 计算每个点的体素索引
     voxel_indices = np.floor(points / voxel_size).astype(np.int32)
-    # 使用字典来存储每个体素中的点
     voxel_dict = {}
     
     for idx, voxel in enumerate(voxel_indices):
@@ -113,7 +111,6 @@ def voxel_downsample(points, voxel_size):
             voxel_dict[voxel_key] = []
         voxel_dict[voxel_key].append(points[idx])
     
-    # 计算每个体素的中心点
     downsampled_points = []
     for voxel_key, voxel_points in voxel_dict.items():
         downsampled_points.append(np.mean(voxel_points, axis=0))
@@ -172,13 +169,6 @@ def sample_point_cloud(pc, num_point):
     return pc[idxs], idxs
 
 def get_normalize_param(pcd):
-    """
-    返回一个最小的 axis_aligned 点云 bbox 以包裹输入点云
-    pcd: (N, 3)
-    return: 
-        center
-        scaled
-    """
     min_bound = np.min(pcd, 0)
     max_bound = np.max(pcd, 0)
     center = (min_bound + max_bound) / 2
@@ -186,9 +176,6 @@ def get_normalize_param(pcd):
     return center, scale
 
 def normalize_point_cloud(pcd, center, scale):
-    """
-    对于输入 pcd 做归一化处理, 使其处于 unit_cube 中
-    """
     return (pcd - center) / scale
 
 def get_ditto_model():
@@ -235,13 +222,9 @@ def unnormalize_joint_param(joint_axis, pivot_point, center, scale):
     return joint_dir, joint_start
 
 def run_ditto(pc_start, pc_end, model=None, generator=None, visualize=False):
-    """
-        pc_start 和 pc_end 需要在世界坐标系下
-    """
     if model is None or generator is None:
         model, generator = get_ditto_model()
         
-    # 处理输入
     center, scale = get_normalize_param(np.concatenate([pc_start, pc_end]))
 
     pc_start_normalized = normalize_point_cloud(pc_start, center, scale)
@@ -319,9 +302,7 @@ def run_ditto(pc_start, pc_end, model=None, generator=None, visualize=False):
 
         Image.fromarray(rgb).show()
     
-    # 将 normalized 坐标系下的 joint_param 缩放回世界坐标系下
     joint_dir, joint_start = unnormalize_joint_param(joint_axis_pred, pivot_point_pred, center, scale)
-    # 返回一个 joint_dict
     joint_dict = {
         "joint_type": joint_type,
         "joint_dir": joint_dir,

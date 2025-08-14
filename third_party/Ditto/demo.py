@@ -171,9 +171,6 @@ for idx in range(len(transforms)):
     dst_data.append((rgbd, np.array(transforms[idx])))
     
 
-# TODO: 在这里需要读取 ref 和 tgt 的点云
-# 做预处理，比如降采样，和去噪
-# 并且需要根据两帧点云计算 bbox
 # crop out the object
 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(0.3, -0.5, 0.03), max_bound=(0.7, 0.16, 1))
 
@@ -194,7 +191,6 @@ scale = (np.max(src_fused_pc, 0) - np.min(src_fused_pc, 0)).max()
 scale *= 1.1
 
 # back project and normalize point cloud
-# TODO 需要计算世界坐标系和归一化坐标系直接的转换矩阵, 从而用来将估计出的 axis 变换回去
 src_pcd_list = []
 for rgbd, trans in src_data:
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsics)
@@ -289,7 +285,6 @@ norm_center = (bound_max + bound_min) / 2
 norm_scale = (bound_max - bound_min).max() * 1.1
 pc_start = (pc_start - norm_center) / norm_scale
 pc_end = (pc_end - norm_center) / norm_scale
-# 在这里准备好两个 normalized 点云即可
 pc_start, _ = sample_point_cloud(pc_start, 8192)
 pc_end, _ = sample_point_cloud(pc_end, 8192)
 sample = {

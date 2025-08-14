@@ -97,7 +97,6 @@ def fast_show_mask(
     mask_sum = annotation.shape[0]
     height = annotation.shape[1]
     weight = annotation.shape[2]
-    # 将annotation 按照面积 排序
     areas = np.sum(annotation, axis=(1, 2))
     sorted_indices = np.argsort(areas)[::1]
     annotation = annotation[sorted_indices]
@@ -143,7 +142,6 @@ def fast_show_mask_gpu(
     areas = torch.sum(annotation, dim=(1, 2))
     sorted_indices = torch.argsort(areas, descending=False)
     annotation = annotation[sorted_indices]
-    # 找每个位置第一个非零值下标
     index = (annotation != 0).to(torch.long).argmax(dim=0)
     if random_color:
         color = torch.rand((mask_sum, 1, 1, 3)).to(device)
@@ -154,11 +152,9 @@ def fast_show_mask_gpu(
     transparency = torch.ones((mask_sum, 1, 1, 1)).to(device) * 0.6
     visual = torch.cat([color, transparency], dim=-1)
     mask_image = torch.unsqueeze(annotation, -1) * visual
-    # 按index取数，index指每个位置选哪个batch的数，把mask_image转成一个batch的形式
     mask = torch.zeros((height, weight, 4)).to(device)
     h_indices, w_indices = torch.meshgrid(torch.arange(height), torch.arange(weight))
     indices = (index[h_indices, w_indices], h_indices, w_indices, slice(None))
-    # 使用向量化索引更新show的值
     mask[h_indices, w_indices, :] = mask_image[indices]
     mask_cpu = mask.cpu().numpy()
     if bbox is not None:

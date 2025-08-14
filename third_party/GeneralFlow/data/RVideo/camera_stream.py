@@ -43,7 +43,6 @@ class ROSCameraStream(object):
         self.camera_depth_sub = rospy.Subscriber(CFG_camera_depth, Image, self.camera_depth_cb)
         self.camera_info_sub = rospy.Subscriber(CFG_camera_info, CameraInfo, self.camera_info_cb)
 
-        # 设置帧率控制器
         # self.rate = rospy.Rate(FPS)
 
     def camera_rgb_cb(self, msg):
@@ -109,7 +108,7 @@ def display_frames(pipeline, args):
         # print(key)
 
         if key == ord('r'):
-            recording = not recording  # 切换录制状态
+            recording = not recording
             if recording is True: print("[STATE]: Recording.")
             else: print("[STATE] Waiting.")
             if recording is True:
@@ -147,6 +146,5 @@ if __name__ == "__main__":
     # display_frames(ros_aligned_stream, args)
 
     print("Press [r] to start & end record. Press [q] to leave.")
-    # # 创建一个线程来处理图形界面
     display_thread = threading.Thread(target=display_frames, args=(ros_aligned_stream, args))
     display_thread.start()

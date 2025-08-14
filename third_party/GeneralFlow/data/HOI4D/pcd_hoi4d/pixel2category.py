@@ -34,7 +34,6 @@ def f(img_path, category):
         arrs.append(valid)
         labels_motion.append(i + 1)
     
-    # arrs: LIST( ndarray[] ), 其中满足条件的像素点为1, 否则为0 <motion segmentation>
     return arrs, np.array(labels_motion)
 
     

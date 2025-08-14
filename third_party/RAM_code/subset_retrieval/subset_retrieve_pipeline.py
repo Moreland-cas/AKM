@@ -16,7 +16,6 @@ MAX_IMD_RANKING_NUM = 30 # change this for different levels of efficiency
 
 def segment_images(frames, trajs, obj_description, visualize=False, asset_path=None):
     from akm.utility.perception.grounded_sam import run_grounded_sam
-    # 重写了这个函数, 用 akm 的 grounded sam 来完成
     masked_frames = []
     frame_masks = []
     for idx, frame in enumerate(frames):
@@ -25,7 +24,7 @@ def segment_images(frames, trajs, obj_description, visualize=False, asset_path=N
             rgb_image=frame,
             obj_description=obj_description, # drawer
             positive_points=None,
-            negative_points=None, # 如果有遮挡的话, 在这里需要加入 negative points, 默认在初始时没有遮挡
+            negative_points=None,
             num_iterations=5,
             acceptable_thr=0.9,
             visualize=visualize,
@@ -170,7 +169,6 @@ class SubsetRetrievePipeline:
         task_list_hoi4d = os.listdir(os.path.join(subset_dir, "HOI4D"))
         task_list_customize = os.listdir(os.path.join(subset_dir, "customize"))
         print(task_list_droid, task_list_hoi4d, task_list_customize)
-        # 如果 fully_zeroshot, 在这里将 cabinet 类进行过滤
         if fully_zeroshot:
             task_list_droid = [task for task in task_list_droid if not task.endswith("cabinet")]
             task_list_hoi4d = [task for task in task_list_hoi4d if not task.endswith("cabinet")]
@@ -183,7 +181,6 @@ class SubsetRetrievePipeline:
             "hoi4d": [task.replace("_", " ") for task in task_list_hoi4d],
             "customize": [task.replace("_", " ") for task in task_list_customize]
         }
-        # 将三个列表合并为一个, 并且将其中的 pickup 类删除
         task_list = task_list_droid + task_list_hoi4d + task_list_customize
         task_list = [task for task in task_list if not task.startswith("pickup")]
 
@@ -294,7 +291,6 @@ class SubsetRetrievePipeline:
         result_img.save(os.path.join(self.save_root, save_name))
     
     def imd_ranking(self, sorted_retrieved_data_dict, obj_prompt):
-        # 排序, 并且保留前 5 的结果
         src_ft = extract_ft(Image.fromarray(sorted_retrieved_data_dict['masked_query']).convert("RGB"), prompt=obj_prompt, ftype='sd') # 1,c,h,w
         src_mask = sorted_retrieved_data_dict["query_mask"]
         imd_distances = []
@@ -337,7 +333,6 @@ class SubsetRetrievePipeline:
         return topk_retrieved_data_dict
 
     def load_retrieved_task_from_pkl(self, retrieved_task):
-        # 首先在这里根据 retrieved_task 解析出对应的 data_source 然后进行 load 
         data_source = None
         for source, tasks in self.task_dict.items():
             if retrieved_task in tasks:
@@ -411,17 +406,4 @@ class SubsetRetrievePipeline:
                 viewer.add_image(topk_retrieved_data_dict["mask"][i] * 255, name=f"ref_img_mask_{i}")
             napari.run()
         
-        """
-        这里的 query_mask 和 masked_query 都是 cropped 过的
-        topk_retrieved_data_dict = {
-            "query_img": sorted_retrieved_data_dict["query_img"],
-            "query_mask": sorted_retrieved_data_dict["query_mask"],
-            "masked_query": sorted_retrieved_data_dict["masked_query"],
-            "query_region": sorted_retrieved_data_dict["query_region"],
-            "img": [],
-            "traj": [],
-            "masked_img": [],
-            "mask": []
-        }
-        """
         return topk_retrieved_data_dict

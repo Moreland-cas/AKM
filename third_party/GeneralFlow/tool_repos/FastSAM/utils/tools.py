@@ -81,7 +81,6 @@ def get_bbox_from_mask(mask):
     if len(contours) > 1:
         for b in contours:
             x_t, y_t, w_t, h_t = cv2.boundingRect(b)
-            # 将多个bbox合并成一个
             x1 = min(x1, x_t)
             y1 = min(y1, y_t)
             x2 = max(x2, x_t + w_t)
@@ -205,7 +204,6 @@ def fast_show_mask(
     msak_sum = annotation.shape[0]
     height = annotation.shape[1]
     weight = annotation.shape[2]
-    # 将annotation 按照面积 排序
     areas = np.sum(annotation, axis=(1, 2))
     sorted_indices = np.argsort(areas)
     annotation = annotation[sorted_indices]
@@ -226,7 +224,6 @@ def fast_show_mask(
         np.arange(height), np.arange(weight), indexing="ij"
     )
     indices = (index[h_indices, w_indices], h_indices, w_indices, slice(None))
-    # 使用向量化索引更新show的值
     show[h_indices, w_indices, :] = mask_image[indices]
     if bbox is not None:
         x1, y1, x2, y2 = bbox
@@ -274,7 +271,6 @@ def fast_show_mask_gpu(
     areas = torch.sum(annotation, dim=(1, 2))
     sorted_indices = torch.argsort(areas, descending=False)
     annotation = annotation[sorted_indices]
-    # 找每个位置第一个非零值下标
     index = (annotation != 0).to(torch.long).argmax(dim=0)
     if random_color == True:
         color = torch.rand((msak_sum, 1, 1, 3)).to(annotation.device)
@@ -285,13 +281,11 @@ def fast_show_mask_gpu(
     transparency = torch.ones((msak_sum, 1, 1, 1)).to(annotation.device) * 0.6
     visual = torch.cat([color, transparency], dim=-1)
     mask_image = torch.unsqueeze(annotation, -1) * visual
-    # 按index取数，index指每个位置选哪个batch的数，把mask_image转成一个batch的形式
     show = torch.zeros((height, weight, 4)).to(annotation.device)
     h_indices, w_indices = torch.meshgrid(
         torch.arange(height), torch.arange(weight), indexing="ij"
     )
     indices = (index[h_indices, w_indices], h_indices, w_indices, slice(None))
-    # 使用向量化索引更新show的值
     show[h_indices, w_indices, :] = mask_image[indices]
     show_cpu = show.cpu().numpy()
     if bbox is not None:
@@ -356,10 +350,10 @@ def crop_image(annotations, image_like):
         if np.sum(mask["segmentation"]) <= 100:
             continue
         origin_id.append(_)
-        bbox = get_bbox_from_mask(mask["segmentation"])  # mask 的 bbox
-        cropped_boxes.append(segment_image(image, bbox))  # 保存裁剪的图片
+        bbox = get_bbox_from_mask(mask["segmentation"])
+        cropped_boxes.append(segment_image(image, bbox))
         # cropped_boxes.append(segment_image(image,mask["segmentation"]))
-        cropped_images.append(bbox)  # 保存裁剪的图片的bbox
+        cropped_images.append(bbox)
     return cropped_boxes, cropped_images, not_crop, origin_id, annotations
 
 
@@ -391,7 +385,7 @@ def box_prompt(masks, bbox, target_height, target_width):
     return masks[max_iou_index].cpu().numpy(), max_iou_index
 
 
-def point_prompt(masks, points, point_label, target_height, target_width):  # numpy 处理
+def point_prompt(masks, points, point_label, target_height, target_width):
     h = masks[0]["segmentation"].shape[0]
     w = masks[0]["segmentation"].shape[1]
     if h != target_height or w != target_width:

@@ -8,9 +8,7 @@ export CUDA_HOME=/home/zby/Cudas/cuda-12.1
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-# 检查conda环境是否存在
 if ! conda info --envs | grep -q $CLONED_ENV_NAME; then
-    # 如果不存在，克隆环境
     echo "Conda environment $CLONED_ENV_NAME not found, cloned from existing environment $SOURCE_ENV_NAME."
     conda create --name $CLONED_ENV_NAME --clone $SOURCE_ENV_NAME
 fi
