@@ -1,14 +1,14 @@
 import os
-import numpy as np
 import cv2
 import torch
+import numpy as np
 from PIL import Image
 from torchvision.ops import box_convert
 import groundingdino.datasets.transforms as T
-from akm.utility.utils import initialize_napari
-initialize_napari()
 from groundingdino.util.inference import load_model, predict, annotate
+
 from akm.utility.constants import ASSET_PATH, PROJECT_ROOT
+
 
 def load_groundingDINO_model():
     groundingDINO_home = os.path.join(PROJECT_ROOT, "third_party", "GroundingDINO")
@@ -16,6 +16,7 @@ def load_groundingDINO_model():
     CONFIG_PATH = os.path.join(groundingDINO_home, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
     model = load_model(CONFIG_PATH, WEIGHTS_PATH)
     return model
+    
     
 def run_groundingDINO(
     image,
@@ -39,7 +40,7 @@ def run_groundingDINO(
         image_np = np.asarray(image)
         
     h, w, _ = image_np.shape
-    # 处理 image
+    # process image
     transform = T.Compose(
         [
             T.RandomResize([800], max_size=1333),
@@ -58,14 +59,13 @@ def run_groundingDINO(
         text_threshold=0.25
     )
 
-    # 在这里添加异常处理
+    # Handle Exception
     if len(boxes) == 0:
         raise Exception("No bbox returned in run_groundingDino")
     
     if visualize:
         annotated_frame_BGR = annotate(image_source=image_np, boxes=boxes, logits=logits, phrases=phrases)
         annotated_frame_RGB = cv2.cvtColor(annotated_frame_BGR, cv2.COLOR_BGR2RGB)
-        # Image.fromarray(annotated_frame_RGB).show()
         
         viewer = napari.view_image(annotated_frame_RGB, rgb=True)
         viewer.title = "groundingDINO"
@@ -81,13 +81,3 @@ def run_groundingDINO(
     bbox_score_sorted = bbox_score[sorted_indices]
     
     return bbox_scaled_sorted, bbox_score_sorted
-
-
-
-if __name__ == "__main__":
-    bbox_scaled, bbox_score = run_groundingDINO(
-        image="/home/zby/Programs/AKM/akm/dev/sapien_test.png",
-        obj_description="object",
-        dino_model=load_groundingDINO_model(),
-        visualize=True
-    )

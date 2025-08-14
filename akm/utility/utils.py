@@ -1,19 +1,20 @@
-import torch
-from sklearn.cluster import SpectralClustering
-import random
-from PIL import Image
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 import cv2
+import torch
+import random
+import numpy as np
 import open3d as o3d
 import graspnetAPI
-from pytorch_lightning import seed_everything
 import matplotlib.pyplot as plt
-from scipy.spatial.distance import cdist
-from typing import List, Union
+from typing import List
+from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import torch.nn.functional as F
-from scipy.spatial.transform import Rotation as R
 from scipy.spatial import cKDTree
+from scipy.spatial.distance import cdist
+from scipy.spatial.transform import Rotation as R
+from sklearn.cluster import SpectralClustering
+from pytorch_lightning import seed_everything
+
 from akm.utility.constants import *
 
 def initialize_napari():
@@ -32,194 +33,179 @@ def clean_pc_np(
     points: np.ndarray,
     voxel_size=0.01,
     sor_k=20, sor_std=2.0,
-    clustering_threshold=0.1,  # 点数较少的类别占总点数的比例阈值
-    num_iterations=5,  # 聚类迭代次数
+    # The threshold value of the proportion of categories with fewer points to the total points
+    clustering_threshold=0.1, 
+    # Number of clustering iterations
+    num_iterations=5,  
 ) -> np.ndarray:
     """
-    输入: (N,3) np.ndarray
-    输出: (M,3) np.ndarray  (M <= N)
+    Input: (N,3) np.ndarray
+    Output: (M,3) np.ndarray (M <= N)
     """
     # 1) np.ndarray → o3d.PointCloud
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
 
-    # 2) 下采样
+    # 2) downsample
     pcd = pcd.voxel_down_sample(voxel_size)
     
-    # 3) 统计离群点移除
+    # 3) Statistical outlier removal
     _, ind_sor = pcd.remove_statistical_outlier(
         nb_neighbors=sor_k,
         std_ratio=sor_std
     )
     pcd = pcd.select_by_index(ind_sor)
 
-    # 4) 多次二分聚类过滤
+    # 4) Multiple binary clustering filtering
     points_after_sor = np.asarray(pcd.points)
     for _ in range(num_iterations):
         if len(points_after_sor) < 2:
-            break  # 如果点数少于2个，无法继续聚类
+            # If the number of points is less than 2, clustering cannot continue
+            break  
 
-        # 使用 SpectralClustering 进行二分聚类
+        # Use SpectralClustering for bipartite clustering
         clustering = SpectralClustering(n_clusters=2, affinity='nearest_neighbors')
         labels = clustering.fit_predict(points_after_sor)
 
-        # 统计每个聚类的点数
+        # Count the number of points in each cluster
         unique_labels, label_counts = np.unique(labels, return_counts=True)
 
-        # 检查两个聚类的点数
+        # Check the number of points in the two clusters
         if len(label_counts) == 2:
             if label_counts[0] / len(points_after_sor) < clustering_threshold:
-                # 如果第一个聚类的点数太少，保留第二个聚类
+                # If the first cluster has too few points, keep the second cluster.
                 points_after_sor = points_after_sor[labels == 1]
             elif label_counts[1] / len(points_after_sor) < clustering_threshold:
-                # 如果第二个聚类的点数太少，保留第一个聚类
+                # If the second cluster has too few points, keep the first cluster.
                 points_after_sor = points_after_sor[labels == 0]
             else:
-                # 如果两个聚类的点数都足够多，保留所有点
+                # If both clusters have enough points, keep all the points
                 break
         else:
-            # 如果只有一个聚类，直接退出循环
+            # If there is only one cluster, exit the loop directly
             break
-
-    # 5) 返回结果
     return points_after_sor
 
-def add_text_to_image(image: Image.Image, text: str, font_scale: float = 0.05, text_color: tuple = (255, 255, 255), position_ratio: tuple = (0.05, 0.05)) -> Image.Image:
+
+def add_text_to_image(
+    image: Image.Image, 
+    text: str, 
+    font_scale: float = 0.05, 
+    text_color: tuple = (255, 255, 255), 
+    position_ratio: tuple = (0.05, 0.05)
+) -> Image.Image:
     """
-    在图片上添加文本,字体大小和位置根据图像大小动态确定,使用 Times New Roman 字体
-    
+    Adds text to an image. The font size and position are dynamically determined based on the image size, using the Times New Roman font.
+
     Args:
-        image: PIL Image对象
-        text: 要添加的文本
-        font_scale: 字体大小相对于图像高度的比例(默认0.05,即5%)
-        text_color: 文本颜色,RGB元组格式 (R, G, B)
-        position_ratio: 文本位置相对于图像宽度和高度的比例 (x_ratio, y_ratio),默认(0.05, 0.05)
-    
+        image: PIL Image object
+        text: The text to be added
+        font_scale: The ratio of the font size to the image height (default 0.05, i.e. 5%)
+        text_color: The text color, in RGB tuple format (R, G, B)
+        position_ratio: The ratio of the text position to the image width and height (x_ratio, y_ratio), default (0.05, 0.05)
+
     Returns:
-        PIL Image对象,包含添加的文本
+        PIL Image object containing the added text
     """
-    # 创建图片副本以避免修改原图
     new_image = image.copy()
     new_image = new_image.resize((3200, 2400), Image.Resampling.LANCZOS)
     draw = ImageDraw.Draw(new_image)
     
-    # 获取图像尺寸
     img_width, img_height = new_image.size
     
-    # 动态计算字体大小(基于图像高度的比例)
+    # Dynamically calculate font size (based on the ratio of image height)
     font_size = int(img_height * font_scale)
     
-    # 尝试加载 Times New Roman 字体
     try:
-        font_path = "/home/zby/Programs/AKM/scripts/times.ttf"  # 系统字体路径,例如 Windows: "C:/Windows/Fonts/times.ttf"
+        font_path = "/home/zby/Programs/AKM/scripts/times.ttf" 
         font = ImageFont.truetype(font_path, font_size)
     except Exception as e:
-        print(f"无法加载 Times New Roman 字体: {e}, 使用默认字体")
+        print(f"Unable to load Times New Roman font: {e}, using default font")
         font = ImageFont.load_default()
     
-    # 动态计算文字位置(基于图像尺寸的比例)
+    # Dynamically calculate text position (based on the ratio of image size)
     position = (int(img_width * position_ratio[0]), int(img_height * position_ratio[1]))
     
-    # 在指定位置绘制文本
+    # Draw text at the specified location
     draw.text(position, text, font=font, fill=text_color)
-    
     return new_image
 
+
 def pil_to_pygame(pil_image):
-    pil_image = pil_image.convert("RGB")  # 转换为 RGB 格式
+    pil_image = pil_image.convert("RGB")  
     return pygame.image.fromstring(np.array(pil_image).tobytes(), pil_image.size, "RGB")
 
-# 更新图像函数
+
 def update_image_old(screen, rgb_pil, depth_pil, mask_pil):
-    # 获取每个图像的尺寸
     width1, height1 = rgb_pil.size
     width2, height2 = depth_pil.size
     width3, height3 = mask_pil.size
 
-    # 计算最终合并图像的尺寸：宽度是三个图像的宽度之和,高度取最大值
     total_width = width1 + width2 + width3
     max_height = max(height1, height2, height3)
 
-    # 创建一个空白图像来存放合并后的图像
     merged_image = Image.new("RGB", (total_width, max_height))
 
-    # 将三个图像粘贴到合并图像上
-    merged_image.paste(rgb_pil, (0, 0))  # (0, 0) 是第一个图像的位置
-    merged_image.paste(depth_pil, (width1, 0))  # 第二个图像紧接着第一个
-    merged_image.paste(mask_pil, (width1 + width2, 0))  # 第三个图像紧接着第二个
+    merged_image.paste(rgb_pil, (0, 0))  
+    merged_image.paste(depth_pil, (width1, 0))  
+    merged_image.paste(mask_pil, (width1 + width2, 0)) 
     
-    # 将PIL图片转换为pygame可以显示的格式
     pygame_image = pil_to_pygame(merged_image)
-    
-    # 填充背景
     screen.fill((0, 0, 0))
-    
-    # 绘制图片
     screen.blit(pygame_image, (0, 0))
-    
-    # 更新屏幕显示
     pygame.display.update()
+    
 
 def update_image(screen, rgb_pil):
-    # 将PIL图片转换为pygame可以显示的格式
+    # Convert the PIL image to a format that can be displayed by pygame
     pygame_image = pil_to_pygame(rgb_pil)
-    
-    # 填充背景
     screen.fill((0, 0, 0))
-    
-    # 绘制图片
     screen.blit(pygame_image, (0, 0))
-    
-    # 更新屏幕显示
     pygame.display.update()
+    
     
 def world_to_camera(world_points, Tw2c):
     """
-    将世界坐标点转换到相机坐标系。
+    Converts a point in world coordinates to the camera coordinate system.
 
     Args:
-        world_points (np.ndarray): 3D世界坐标点, 形状 (B, 3)
-        Tw2c (np.ndarray): 相机外参矩阵 (4x4),从世界坐标系到相机坐标系的变换矩阵
+        world_points (np.ndarray): 3D world coordinate points, shape (B, 3)
+        Tw2c (np.ndarray): Camera extrinsic matrix (4x4), transform from world coordinates to camera coordinates
 
     Returns:
-        np.ndarray: 相机坐标系中的点,形状 (B, 3)
+        np.ndarray: Point in the camera coordinate system, shape (B, 3)
     """
-    # 将世界坐标点扩展为齐次坐标
+    # Expand world coordinate points to homogeneous coordinates
     world_points_homogeneous = np.hstack((world_points, np.ones((world_points.shape[0], 1))))  # (B, 4)
-
-    # 使用外参矩阵进行批量转换
+    # Batch conversion using extrinsic matrix
     camera_points_homogeneous = np.dot(world_points_homogeneous, Tw2c.T)  # (B, 4)
-
-    # 转换为非齐次坐标
+    # Convert to non-homogeneous coordinates
     camera_points = camera_points_homogeneous[:, :3]  # (B, 3)
-
     return camera_points
+
 
 def camera_to_image(camera_points, K, image_width=None, image_height=None, normalized_uv=False):
     """
-    将相机坐标点投影到图像平面,并归一化到 [0, 1] 范围。
+    Projects camera points onto the image plane and normalizes them to the range [0, 1].
 
     Args:
-        camera_points (np.ndarray): 相机坐标点,形状 (B, 3)
-        K (np.ndarray): 相机内参矩阵,形状 (3, 3)
-        image_width (int): 图像宽度
-        image_height (int): 图像高度
+        camera_points (np.ndarray): Camera points, shape (B, 3)
+        K (np.ndarray): Camera intrinsic parameter matrix, shape (3, 3)
+        image_width (int): Image width
+        image_height (int): Image height
 
     Returns:
-        np.ndarray: 归一化像素坐标,形状 (B, 2)
+        np.ndarray: Normalized pixel coordinates, shape (B, 2)
     """
-    # 使用内参矩阵进行投影
+    # Projection using the intrinsic matrix
     projected_points = np.dot(camera_points, K.T)  # (B, 3)
 
-    # 转换为非齐次像素坐标
+    # Convert to non-homogeneous pixel coordinates
     u = projected_points[:, 0] / projected_points[:, 2]  # (B,)
     v = projected_points[:, 1] / projected_points[:, 2]  # (B,)
     uv = np.vstack((u, v)).T  # (B, 2)
     
-    # 提取深度值
     depth = projected_points[:, 2]  # (B,)
-    
-    # 归一化到 [0, 1]
     if normalized_uv:
         assert image_width is not None and image_height is not None, \
             "image_width and image_height must be provided when normalized_uv is True"
@@ -228,32 +214,30 @@ def camera_to_image(camera_points, K, image_width=None, image_height=None, norma
 
     return uv, depth  # (B, 2), (B, )
 
+
 def camera_to_image_torch(camera_points, K, image_width=None, image_height=None, normalized_uv=False):
     """
-    将相机坐标点投影到图像平面,并归一化到 [0, 1] 范围。
+    Projects camera points onto the image plane and normalizes them to the range [0, 1].
 
     Args:
-        camera_points (torch.Tensor): 相机坐标点,形状 (B, 3)
-        K (torch.Tensor): 相机内参矩阵,形状 (3, 3)
-        image_width (int): 图像宽度
-        image_height (int): 图像高度
+        camera_points (torch.Tensor): Camera points, shape (B, 3)
+        K (torch.Tensor): Camera intrinsic parameter matrix, shape (3, 3)
+        image_width (int): Image width
+        image_height (int): Image height
 
     Returns:
-        torch.Tensor: 归一化像素坐标,形状 (B, 2)
-        torch.Tensor: 深度值,形状 (B,)
+        torch.Tensor: Normalized pixel coordinates, shape (B, 2)
+        torch.Tensor: Depth value, shape (B,)
     """
-    # 使用内参矩阵进行投影
+    # Projection using the intrinsic matrix
     projected_points = torch.matmul(camera_points, K.T)  # (B, 3)
 
-    # 转换为非齐次像素坐标
+    # Convert to non-homogeneous pixel coordinates
     u = projected_points[:, 0] / projected_points[:, 2]  # (B,)
     v = projected_points[:, 1] / projected_points[:, 2]  # (B,)
     uv = torch.stack((u, v), dim=1)  # (B, 2)
 
-    # 提取深度值
     depth = projected_points[:, 2]  # (B,)
-
-    # 归一化到 [0, 1]
     if normalized_uv:
         assert image_width is not None and image_height is not None, \
             "image_width and image_height must be provided when normalized_uv is True"
@@ -266,43 +250,42 @@ def camera_to_image_torch(camera_points, K, image_width=None, image_height=None,
 
 def world_to_image(world_points, K, Tw2c, image_width=None, image_height=None, normalized_uv=False):
     """
-    将世界坐标点转换为归一化像素坐标 (u, v) [0, 1]。
+    Converts a world point to normalized pixel coordinates (u, v) [0, 1].
 
     Args:
-        world_points (np.ndarray): 世界坐标点,形状 (B, 3)
-        K (np.ndarray): 相机内参矩阵,形状 (3, 3)
-        Tw2c (np.ndarray): 相机外参矩阵 (4x4),从世界坐标系到相机坐标系的变换矩阵
-        image_width (int): 图像宽度
-        image_height (int): 图像高度
+        world_points (np.ndarray): World points, shape (B, 3)
+        K (np.ndarray): Camera intrinsic parameter matrix, shape (3, 3)
+        Tw2c (np.ndarray): Camera extrinsic parameter matrix (4x4), transform from world coordinates to camera coordinates
+        image_width (int): Image width
+        image_height (int): Image height
 
     Returns:
-        np.ndarray: 归一化像素坐标,形状 (B, 2)
+        np.ndarray: Normalized pixel coordinates, shape (B, 2)
     """
-    # 转换到相机坐标系
+    # Convert to camera coordinate system
     camera_points = world_to_camera(world_points, Tw2c)
-
-    # 投影到图像平面并归一化
+    # Project to the image plane and normalize
     uv, depth = camera_to_image(camera_points, K, image_width, image_height, normalized_uv)
-
     return uv # B, 2
+
 
 def draw_points_on_image(image, uv_list, radius=1, normalized_uv=False):
     """
     Args:
-        image: PIL.Image 对象, 或是一个 np.array。
-        uv_list: 一个包含 (u, v) 坐标的列表,表示要绘制的点。
-        返回一个 pil image
+        image: A PIL.Image object, or an np.array.
+        uv_list: A list of (u, v) coordinates representing the points to be drawn.
+        Returns a PIL image.
     """
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
         
-    # 获取图像的宽度和高度
+    # Get the width and height of an image
     width, height = image.size
     image_draw = image.copy()
     draw = ImageDraw.Draw(image_draw)
     
     for u, v in uv_list:
-        # 将归一化坐标转换为像素坐标
+        # Convert normalized coordinates to pixel coordinates
         if normalized_uv:
             x = int(u * width)
             y = int(v * height)
@@ -310,64 +293,52 @@ def draw_points_on_image(image, uv_list, radius=1, normalized_uv=False):
             x = int(u)
             y = int(v)
         
-        # 在 (x, y) 位置画一个红色的点 (填充颜色为红色)
+        # Draw a red dot at position (x, y) (fill color is red)
         if radius == 1:
-            draw.point((x, y), fill=(255, 0, 0))  # (255, 0, 0) 表示红色
+            draw.point((x, y), fill=(255, 0, 0))  # (255, 0, 0) 
         else:
             draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 0, 0))
     return image_draw
 
+
 def pil_images_to_mp4(pil_images, output_filename, fps=30):
     """
-    将一系列PIL图像保存为MP4视频。
+    Save a sequence of PIL images as an MP4 video.
 
     Args:
-        pil_images (list of PIL.Image): PIL图像对象的列表。
-        output_filename (str): 输出视频文件的路径。
-        fps (int): 每秒的帧数,控制视频的帧率。
+        pil_images (list of PIL.Image): List of PIL image objects.
+        output_filename (str): Path to the output video file.
+        fps (int): Frames per second, controls the frame rate of the video.
     """
-    # 获取图像的尺寸 (假设所有图像的大小相同)
     width, height = pil_images[0].size
-
-    # 定义视频编写器
-    fourcc = cv2.VideoWriter_fourcc(*'X264')  # 使用 mp4 编码
+    fourcc = cv2.VideoWriter_fourcc(*'X264')  
     video_writer = cv2.VideoWriter(output_filename, fourcc, fps, (width, height))
-
-    # 将 PIL 图像逐一转换为 NumPy 数组并写入视频
     for pil_img in pil_images:
-        # 将 PIL 图像转换为 NumPy 数组
         img_array = np.array(pil_img)
-
-        # 将 RGB 图像转换为 BGR（OpenCV 默认的颜色顺序是 BGR）
         img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-
-        # 写入视频帧
         video_writer.write(img_array)
-
-    # 释放资源
     video_writer.release()
     print(f"Video saved as {output_filename}")
     
 
 def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalized_uv=False):
     """
-    将归一化的像素坐标和深度值转换为三维空间中的点（相机坐标系）。
-    
-    参数:
-    - uv (np.array): 形状为 (B, 2),每个点的 [u, v] 坐标,值域为 [0, 1]。
-    - depth (np.array): 形状为 (B,),每个点的深度值,单位：米。
-    - K (np.array): 相机内参矩阵 (3x3),包括焦距和主点坐标。
-    - image_width (int): 图像的宽度（单位：像素）。
-    - image_height (int): 图像的高度（单位：像素）。
-    
-    返回:
-    - (np.array): 形状为 (B, 3) 的点云数组,每个点的三维坐标 (X, Y, Z)。
-    """
-    # 1. 提取 uv 坐标
-    u = uv[:, 0]  # 水平像素坐标
-    v = uv[:, 1]  # 垂直像素坐标
+    Converts normalized pixel coordinates and depth values to points in 3D space (camera coordinate system).
 
-    # 2. 计算实际的像素坐标
+    Parameters:
+        - uv (np.array): Shape (B, 2), [u, v] coordinates of each point, range [0, 1].
+        - depth (np.array): Shape (B,), depth value of each point, unit: meters.
+        - K (np.array): Camera intrinsic parameter matrix (3x3), including focal length and principal point coordinates.
+        - image_width (int): Image width (unit: pixels).
+        - image_height (int): Image height (unit: pixels).
+
+    Return:
+        - (np.array): A point cloud array with shape (B, 3), 3D coordinates (X, Y, Z) of each point.
+    """
+    u = uv[:, 0] 
+    v = uv[:, 1] 
+
+    # Calculate the actual pixel coordinates
     if normalized_uv:
         x_pixel = u * image_width
         y_pixel = v * image_height
@@ -375,94 +346,89 @@ def image_to_camera(uv, depth, K, image_width=None, image_height=None, normalize
         x_pixel = u
         y_pixel = v
 
-    # 3. 获取相机内参
-    f_x = K[0, 0]  # 水平焦距 (单位: 像素)
-    f_y = K[1, 1]  # 垂直焦距 (单位: 像素)
-    c_x = K[0, 2]  # 主点 x 坐标 (单位: 像素)
-    c_y = K[1, 2]  # 主点 y 坐标 (单位: 像素)
+    f_x = K[0, 0] 
+    f_y = K[1, 1]  
+    c_x = K[0, 2]  
+    c_y = K[1, 2]  
     
-    # 4. 计算三维坐标 (X, Y, Z)
-    Z = depth  # 深度值,单位：米
+    Z = depth  
     X = (x_pixel - c_x) * Z / f_x
     Y = (y_pixel - c_y) * Z / f_y
     
-    # 5. 返回点云 (B, 3)
-    # point_cloud = torch.stack((X, Y, Z), dim=1)  # 将 X, Y, Z 合并成 (B, 3)
+    # return pointcloud (B, 3)
     point_cloud = np.stack((X, Y, Z), axis=-1)
     return point_cloud
 
 
 def depth_image_to_pointcloud(depth_image, mask, K):
     """
-    将深度图像转换为相机坐标系中的点云。
+    Converts a depth image to a point cloud in the camera coordinate system.
 
     Args:
-    - depth_image (np.array): 深度图像,大小为 (H, W),单位：米
-    - K (np.array): 相机内参矩阵 (3x3),包括焦距和主点坐标
-    - mask (np.array, optional): 掩码,大小为 (H, W),布尔类型。如果提供,只保留 mask 为 True 的点
+        - depth_image (np.array): Depth image, size (H, W), units: meters
+        - K (np.array): Camera intrinsic parameter matrix (3x3), including focal length and principal point coordinates
+        - mask (np.array, optional): Mask, size (H, W), Boolean type. If provided, only points where mask is True are retained.
 
     Returns:
-    - pointcloud (np.array): 点云,大小为 (N, 3),表示每个像素点在相机坐标系下的三维坐标
+        - pointcloud (np.array): Point cloud, size (N, 3), representing the 3D coordinates of each pixel in the camera coordinate system
     """
     assert depth_image.ndim == 2, "depth_image must be a 2D array"
     if mask is not None:
         assert mask.dtype == np.bool_, "mask must be a boolean array"
-    # 获取相机内参
-    f_x = K[0, 0]  # 水平焦距 (单位: 像素)
-    f_y = K[1, 1]  # 垂直焦距 (单位: 像素)
-    c_x = K[0, 2]  # 主点 x 坐标 (单位: 像素)
-    c_y = K[1, 2]  # 主点 y 坐标 (单位: 像素)
+        
+    f_x = K[0, 0]  
+    f_y = K[1, 1]  
+    c_x = K[0, 2]  
+    c_y = K[1, 2]  
 
-    # 生成像素网格
+    # Generate pixel grid
     image_height, image_width = depth_image.shape
     u, v = np.meshgrid(np.arange(image_width), np.arange(image_height))
 
-    # 计算归一化坐标
+    # Calculate normalized coordinates
     x_normalized = (u - c_x) / f_x
     y_normalized = (v - c_y) / f_y
 
-    # 获取深度值
-    Z = depth_image  # 深度图像直接作为 Z 值
-
-    # 计算相机坐标系中的三维坐标
+    Z = depth_image  
     X = x_normalized * Z
     Y = y_normalized * Z
 
-    # 合并为点云 (H, W, 3)
     pointcloud = np.stack((X, Y, Z), axis=-1)
 
-    # 如果提供了掩码,仅保留掩码为 True 的点
     if mask is not None:
         pointcloud = pointcloud[mask]
 
     pointcloud = pointcloud.reshape(-1, 3)
     return pointcloud
 
+
 def camera_to_world(point_camera, extrinsic_matrix):
     """
-    将相机坐标系中的点转换到世界坐标系。
-    
+    Converts a point in the camera coordinate system to the world coordinate system.
+
     Args:
         point_camera:
-            np.array([N, 3]), 相机坐标系中的点
-        extrinsic_matrix (np.array): 
-            Tw2c, 外参矩阵(3, 4)或者(4, 4), 形式为 [R | t]
-    
+        np.array([N, 3]), point in the camera coordinate system
+        extrinsic_matrix (np.array):
+        Tw2c, extrinsic matrix (3, 4) or (4, 4), in the form [R | t]
+
     Returns:
         point_world np.array([N, 3])
     """
-    # 从外参矩阵中提取旋转矩阵 R 和平移向量 t
+    # Extract the rotation matrix R and translation vector t from the extrinsic matrix
     Rw2c = extrinsic_matrix[:3, :3]  # (3, 3)
     tw2c = extrinsic_matrix[:3, 3]   # (3)
     tc2w = -Rw2c.T @ tw2c
 
-    # 计算从相机坐标系到世界坐标系的转换
+    # Calculate the transformation from camera coordinate system to world coordinate system
     point_world = point_camera @ Rw2c + tc2w
-    
     return point_world
 
+
 def create_cylinder(start, end, radius=0.01):
-    """创建一个圆柱体来模拟线段,给定起点、终点和半径"""
+    """
+    Create a cylinder to simulate a line segment, given the start point, end point and radius
+    """
     start = np.array(start)
     end = np.array(end)
     direction = end - start
@@ -470,67 +436,63 @@ def create_cylinder(start, end, radius=0.01):
     if length == 0:
         return None
 
-    # 归一化方向
     direction = direction / length
-
-    # 创建圆柱体
     cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=radius, height=length)
     cylinder.compute_vertex_normals()
 
-    # 计算圆柱体的旋转和位置
-    center = (start + end) / 2  # 圆柱体的中心
+    # Calculate the rotation and position of the cylinder
+    center = (start + end) / 2 
     z_axis = np.array([0, 0, 1])
 
-    # 计算旋转矩阵
+    # Calculate the rotation matrix
     if np.allclose(direction, z_axis):
-        R = np.eye(3)  # 如果方向是Z轴,保持不变
+        # If the direction is the Z axis, keep it unchanged
+        R = np.eye(3)  
     elif np.allclose(direction, -z_axis):
-        # 如果方向与Z轴相反,旋转180度绕X轴
+        # If the direction is opposite to the Z axis, rotate 180 degrees around the X axis
         rotation_axis = np.array([1, 0, 0])
         rotation_angle = np.pi
         R = o3d.geometry.get_rotation_matrix_from_axis_angle(rotation_axis * rotation_angle)
     else:
-        # 计算旋转轴和旋转角度
+        # Calculate the rotation axis and rotation angle
         rotation_axis = np.cross(z_axis, direction)
-        rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)  # 归一化旋转轴
+        rotation_axis = rotation_axis / np.linalg.norm(rotation_axis) 
         rotation_angle = np.arccos(np.dot(z_axis, direction))
         R = o3d.geometry.get_rotation_matrix_from_axis_angle(rotation_axis * rotation_angle)
 
-    # 旋转和移动圆柱体
-    cylinder.rotate(R, center=cylinder.get_center())  # 绕圆柱体自身中心旋转
-    cylinder.translate(center)  # 平移到正确位置
-
+    # Rotating and moving the cylinder
+    cylinder.rotate(R, center=cylinder.get_center())  
+    cylinder.translate(center)
     return cylinder
 
 
 def farthest_point_sampling(point_cloud, M):
     N = point_cloud.shape[0]
-    # 随机选择一个初始点
+    # Randomly select an initial point
     indices = np.zeros(M, dtype=np.int32)
     farthest_index = np.random.randint(0, N)
     indices[0] = farthest_index
 
-    # 计算每个点到已选择点的距离
+    # Calculate the distance from each point to the selected point
     distances = np.full(N, np.inf)
 
     for i in range(1, M):
-        # 更新每个点到最近已选择点的距离
+        # Update the distance from each point to the nearest selected point
         dist = np.linalg.norm(point_cloud - point_cloud[farthest_index], axis=1)
         distances = np.minimum(distances, dist)
 
-        # 选择距离最远的点
+        # Select the point with the greatest distance
         farthest_index = np.argmax(distances)
         indices[i] = farthest_index
-
     return indices
 
 
 def create_bbox(bbox, radius=0.01):
     """
-    创建一个长方体 bbox
-    center: 中心点坐标 [x, y, z]
-    half_x, half_y, half_z: 半长、半宽、半高
-    color: 颜色
+    Create a rectangular bbox
+    center: Center coordinates [x, y, z]
+    half_x, half_y, half_z: Half-length, half-width, half-height
+    color: Color
     """
     edges = [
         [0, 1], [0, 2], [2, 4], [4, 1],
@@ -573,15 +535,18 @@ def create_bbox(bbox, radius=0.01):
     
     return geometries
 
+
 def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution=10, cylinder_per=0.7):
     """
-    创建一个从 start_point 到 end_point 的带箭头的圆柱体
-    start_point: (3,) 起点坐标
-    end_point: (3,) 终点坐标
-    thickness: float 圆柱体和圆锥体的粗细（半径）
-    resolution: int 圆柱体和圆锥体的分辨率
-    返回：包含圆柱体和圆锥体的几何体列表，圆锥体尖端对齐 end_point
-    假设总长度为1，圆柱体高度为0.8，圆锥体高度为0.2
+    Creates a cylinder with an arrow pointing from start_point to end_point.
+
+        start_point: (3,) Starting coordinates
+        end_point: (3,) Ending coordinates
+        thickness: float The thickness (radius) of the cylinder and cone
+        resolution: int The resolution of the cylinder and cone
+
+    Returns: A list of geometries containing the cylinder and cone, with the cone tip aligned at end_point
+    Assuming the total length is 1, the cylinder height is 0.8, and the cone height is 0.2
     """
     start_point = np.asarray(start_point)
     end_point = np.asarray(end_point)
@@ -591,9 +556,7 @@ def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution
         return []
     
     direction = direction / length
-    # 圆柱体：高度为总长度的0.8
     cylinder_height = length * cylinder_per
-    cylinder_end = start_point + direction * cylinder_height
     cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=thickness, height=cylinder_height, resolution=resolution)
     z_axis = np.array([0, 0, 1])
     axis = np.cross(z_axis, direction)
@@ -604,41 +567,40 @@ def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution
         cylinder.rotate(rotation_matrix)
     cylinder.translate(start_point + direction * cylinder_height / 2)
     
-    cylinder.compute_vertex_normals()  # 计算法向量以支持光照
-    cylinder.paint_uniform_color([0.5, 0.5, 0.5])  # 默认灰色，增强光影对比
+    cylinder.compute_vertex_normals()  
+    cylinder.paint_uniform_color([0.5, 0.5, 0.5])  
     
-    # 圆锥体：高度为总长度的0.2，尖端对齐 end_point
+    # Cone: height is 0.2 of total length, tip is aligned with end_point
     cone_height = length * (1 - cylinder_per)
     cone = o3d.geometry.TriangleMesh.create_cone(radius=thickness * 2, height=cone_height, resolution=resolution)
     if np.linalg.norm(axis) > 1e-6:
         cone.rotate(rotation_matrix)
-    cone.translate(end_point - direction * cone_height)  # 尖端对齐 end_point
-    
-    cone.compute_vertex_normals()  # 计算法向量以支持光照
-    cone.paint_uniform_color([0.5, 0.5, 0.5])  # 默认灰色，增强光影对比
-
+    cone.translate(end_point - direction * cone_height)  
+    cone.compute_vertex_normals()  
+    cone.paint_uniform_color([0.5, 0.5, 0.5])  
     return [cylinder, cone]
+
 
 def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None, grasp=None, contact_point=None, post_contact_dirs=None, 
                  bboxes=None, bbox_radius=0.01, tracks_3d=None, tracks_3d_colors=None, pivot_point=None, joint_axis=None,
                  tracks_t_step=1, tracks_n_step=1, tracks_norm_threshold=1e-3, visualize_origin=False,
                  camera_intrinsic=None, camera_extrinsic=None, zoom_in_scale=2, online_viewer=False):
     """
-    可视化点云、抓取、接触点、边界框、3D轨迹和关节
-    points: List[np.ndarray],每個元素為 Nx3 點雲座標
-    point_size: List[float] 或 float,每個點雲的點大小,若為單一值則應用於所有點雲
-    colors: List[np.ndarray],每個元素為 Nx3 (RGB, 0-1) 或 Nx4 (RGBA) 點雲顏色,或 None(默認綠色)
-    alpha: List[float],每個點雲的透明度(0-1),若為 None 則默認 1.0
-    grasp: Grasp 或 GraspGroup 对象
-    contact_point: 接触点坐标
-    post_contact_dirs: 接触点方向列表
-    tracks_3d: (T, N, 3) 3D轨迹,T是时间步,N是轨迹数量
-    tracks_3d_colors: (N, 3) 每条轨迹的颜色 (0-1),或 None(随机颜色)
-    pivot_point: (3,) 关节的枢轴点坐标
-    joint_axis: (3,) 关节轴的方向向量
-    tracks_t_step: int 时间步降采样间隔(默认1,即不降采样)
-    tracks_n_step: int 轨迹数量降采样间隔(默认1,即不降采样)
-    tracks_norm_threshold: float 轨迹线段长度的阈值,小于此值不绘制(默认1e-3)
+    Visualize point clouds, grasps, contact points, bounding boxes, 3D tracks, and joints.
+
+    points: List[np.ndarray], each element is an Nx3 point cloud coordinate.
+    point_size: List[float] or float, the point size for each point cloud. A single value applies to all point clouds.
+    colors: List[np.ndarray], each element is an Nx3 (RGB, 0-1) or Nx4 (RGBA) point cloud color, or None (defaults to green).
+    alpha: List[float], the transparency of each point cloud (0-1). If None, defaults to 1.0.
+    grasp: Grasp or GraspGroup object.
+    contact_point: contact point coordinates.
+    post_contact_dirs: list of contact point directions.
+    tracks_3d: (T, N, 3) 3D tracks, where T is the time step and N is the number of tracks.
+    tracks_3d_colors: (N, 3) color for each track (0-1), or None (random color). pivot_point: (3,) Joint pivot coordinates
+    joint_axis: (3,) Joint axis direction vector
+    tracks_t_step: int Time step downsampling interval (default 1, no downsampling)
+    tracks_n_step: int Track number downsampling interval (default 1, no downsampling)
+    tracks_norm_threshold: float Track segment length threshold; segments below this threshold are not drawn (default 1e-3)
     """
     geometries_to_draw = []
     
@@ -656,52 +618,50 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         alpha = [alpha] * len(points)
     
     if not (len(points) == len(colors) == len(point_size) == len(alpha)):
-        raise ValueError("points, colors, point_size 和 alpha 的長度必須相同")
+        raise ValueError("points, colors, point_size and alpha must be the same length")
 
-    # 处理點雲
     for i, (pts, clr, size, alp) in enumerate(zip(points, colors, point_size, alpha)):
         pts = np.asarray(pts)
         if pts.ndim != 2 or pts.shape[1] != 3:
-            raise ValueError(f"points[{i}] 必須是 Nx3 陣列")
+            raise ValueError(f"points[{i}] must be Nx3")
         print(pts.shape, colors)
         
         pcd = o3d.t.geometry.PointCloud(o3d.core.Tensor(pts))
         if voxel_size is not None:
             try:
                 pcd = pcd.voxel_down_sample(voxel_size)
-                pts = pcd.point.positions.numpy()  # 更新点云坐标
+                pts = pcd.point.positions.numpy()  
             except Exception as e:
-                raise RuntimeError(f"点云[{i}] 下采样失败: {str(e)}")
+                raise RuntimeError(f"pointcloud [{i}] downsample failed: {str(e)}")
             
-        # 处理顏色
         if clr is None:
             clr = np.zeros((pts.shape[0], 4))
-            clr[:, 1] = 1.0  # 默認綠色
-            clr[:, 3] = alp  # 使用指定的透明度
+            clr[:, 1] = 1.0 
+            clr[:, 3] = alp  
         elif clr.ndim == 1:
             clr = np.tile(clr, (pts.shape[0], 1))
         else:
             clr = np.asarray(clr)
             if clr.shape[0] != pts.shape[0]:
-                raise ValueError(f"colors[{i}] 的點數必須與 points[{i}] 匹配")
+                raise ValueError(f"points, colors, point_size and alpha must be the same length")
             if clr.shape[1] == 3:
                 clr = np.concatenate([clr, np.ones((clr.shape[0], 1)) * alp], axis=1)
             elif clr.shape[1] != 4:
-                raise ValueError(f"colors[{i}] 必須是 Nx3 (RGB) 或 Nx4 (RGBA)")
+                raise ValueError(f"colors[{i}] must be Nx3 (RGB) or Nx4 (RGBA)")
         
-        pcd.point.colors = o3d.core.Tensor(clr[:, :3])  # Tensor 點雲僅儲存 RGB
+        pcd.point.colors = o3d.core.Tensor(clr[:, :3])  
         mat = o3d.visualization.rendering.MaterialRecord()
         mat.shader = "defaultLitTransparency"
         mat.point_size = size
         mat.base_color = np.concatenate([clr[0, :3] if clr.shape[0] > 0 else [0.0, 1.0, 0.0], [alp]])
         geometries_to_draw.append({"name": f"pcd_{i}", "geometry": pcd, "material": mat})
     
-    # 处理 grasp
+    # process grasp
     if isinstance(grasp, graspnetAPI.grasp.Grasp):
         grasp_o3d = grasp.to_open3d_geometry()
         mat = o3d.visualization.rendering.MaterialRecord()
         mat.shader = "defaultUnlit"
-        mat.base_color = [0.0, 1.0, 0.0, 1.0]  # 綠色，不透明
+        mat.base_color = [0.0, 1.0, 0.0, 1.0] 
         mat.line_width = 2.0
         geometries_to_draw.append({"name": "grasp", "geometry": grasp_o3d, "material": mat})
     elif isinstance(grasp, list):
@@ -721,7 +681,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
             mat.line_width = 2.0
             geometries_to_draw.append({"name": f"grasp_group_{i}", "geometry": grasp_o3d, "material": mat})
     
-    # 处理 contact_point
+    # process contact_point
     if contact_point is not None:
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
         sphere.translate(contact_point)
@@ -734,7 +694,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         mat.base_reflectance = 0.9
         geometries_to_draw.append({"name": "contact_point", "geometry": sphere, "material": mat})
         
-    # 处理 contact_point 和 post_contact_dirs
+    # process contact_point and post_contact_dirs
     if contact_point is not None and post_contact_dirs is not None:
         for i, post_contact_dir in enumerate(post_contact_dirs):
             start_point = contact_point
@@ -742,20 +702,20 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
             line_set = o3d.geometry.LineSet()
             line_set.points = o3d.utility.Vector3dVector([start_point, end_point])
             line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
-            line_set.paint_uniform_color([1, 0, 0])  # 紅色
+            line_set.paint_uniform_color([1, 0, 0])  
             mat = o3d.visualization.rendering.MaterialRecord()
             mat.shader = "defaultUnlit"
             mat.base_color = [1.0, 0.0, 0.0, 1.0]
             mat.line_width = 2.0
             geometries_to_draw.append({"name": f"contact_dir_{i}", "geometry": line_set, "material": mat})
             
-    # 绘制坐标系
+    # draw axis
     if visualize_origin:
         axis_length = 0.1
         axes = [
-            ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]),  # X軸 (紅色)
-            ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]),  # Y軸 (綠色)
-            ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]),  # Z軸 (藍色)
+            ([0, 0, 0], [axis_length, 0, 0], [1, 0, 0]), 
+            ([0, 0, 0], [0, axis_length, 0], [0, 1, 0]), 
+            ([0, 0, 0], [0, 0, axis_length], [0, 0, 1]), 
         ]
         
         for i, (start, end, color) in enumerate(axes):
@@ -770,7 +730,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
                 mat.base_reflectance = 0.9
                 geometries_to_draw.append({"name": f"axis_{i}", "geometry": cylinder, "material": mat})
     
-    # 处理边界框
+    # Processing bounding boxes
     if bboxes is not None:
         for i, bbox in enumerate(bboxes):
             bbox_line_sets = create_bbox(bbox, radius=bbox_radius)
@@ -784,23 +744,21 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
                 mat.base_reflectance = 0.9
                 geometries_to_draw.append({"name": f"bbox_{i}_{j}", "geometry": line_set, "material": mat})
     
-    # 处理3D轨迹
+    # Processing 3D trajectories
     if tracks_3d is not None:
         T, N, D = tracks_3d.shape
         if D != 3:
-            raise ValueError("轨迹的最后一维必须是3(x,y,z坐标)")
+            raise ValueError("The last dimension of the trajectory must be 3 (x, y, z coordinates)")
         
-        # 如果未提供颜色,生成随机颜色
+        # If no color is provided, a random color is generated.
         if tracks_3d_colors is None:
-            tracks_3d_colors = np.random.rand(N, 3)  # 每条轨迹随机颜色
+            tracks_3d_colors = np.random.rand(N, 3) 
         elif tracks_3d_colors.ndim == 1:
             tracks_3d_colors = np.tile(tracks_3d_colors, (N, 1))
         else:
             tracks_3d_colors = np.asarray(tracks_3d_colors)
-            # if tracks_3d_colors.shape != (N, 3):
-            #     raise ValueError("tracks_3d_colors 形状必须为 (N, 3)")
         
-        # 降采样轨迹：按 tracks_n_step 选择轨迹,按 tracks_t_step 选择时间步
+        # Downsampled tracks: Select the track by tracks_n_step and the time step by tracks_t_step
         if tracks_n_step is None:
             tracks_n_step = N - 1
         n_indices = np.linspace(0, N-1, tracks_n_step, dtype=int)
@@ -808,9 +766,9 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
             tracks_t_step = T - 1
         t_indices = np.linspace(0, T-1, tracks_t_step, dtype=int)
         print(t_indices)
-        for i in n_indices:  # 遍历降采样的轨迹
-            points = tracks_3d[t_indices, i, :]  # shape: (T', 3),T' 为降采样后的时间步数
-            # 在轨迹起点添加小球
+        for i in n_indices: 
+            points = tracks_3d[t_indices, i, :] 
+            # Add a ball at the starting point of the trajectory
             if len(points) > 0:
                 start_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.003)
                 start_sphere.translate(points[0])
@@ -823,27 +781,25 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
                 mat.base_reflectance = 0.9
                 geometries_to_draw.append({"name": f"track_sphere_{i}", "geometry": start_sphere, "material": mat})
             
-            if len(points) > 1:  # 确保至少有两个点
+            # Make sure there are at least two points
+            if len(points) > 1: 
                 start_point = points[0]
                 end_point = points[-1]
                 track_vector = end_point - start_point
                 track_norm = np.linalg.norm(track_vector)
-                # print(f"Track {i}, start-to-end norm: {track_norm}")  # 调试输出
                 if track_norm < tracks_norm_threshold:
-                    # print(f"Track {i} skipped due to norm {track_norm} < {tracks_norm_threshold}")  # 调试输出
-                    continue  # 跳过首尾距离小于阈值的轨迹
+                    continue  
             
-                # 为每对连续点绘制带箭头的圆柱体
+                # Draw a cylinder with an arrow for each pair of consecutive points
                 for j in range(len(points)-1):
                     start_point = points[j]
                     end_point = points[j+1]
-                    # 检查线段长度
+                    # Check line segment length
                     segment_vector = end_point - start_point
                     segment_norm = np.linalg.norm(segment_vector)
                     if segment_norm < tracks_norm_threshold:
-                        continue  # 跳过长度小于阈值的线段
+                        continue  
                     
-                    # 使用 create_directed_cylinder 绘制
                     directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.002)
                     for k, geom in enumerate(directed_cylinder):
                         geom.paint_uniform_color(tracks_3d_colors[i])
@@ -852,22 +808,22 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
                         mat.base_color = np.concatenate([tracks_3d_colors[i], [1.0]])
                         geometries_to_draw.append({"name": f"track_cyl_{i}_{j}_{k}", "geometry": geom, "material": mat})
     
-    # 处理关节(pivot_point 和 joint_axis)
+    # process joint (pivot_point and joint_axis)
     if pivot_point is not None and joint_axis is not None:
         pivot_point = np.asarray(pivot_point)
         joint_axis = np.asarray(joint_axis)
         if pivot_point.shape != (3,) or joint_axis.shape != (3,):
-            raise ValueError("pivot_point 和 joint_axis 必须是形状为 (3,) 的向量")
+            raise ValueError("pivot_point and joint_axis must be vectors of shape (3,)")
         
-        # 归一化 joint_axis
+        # normalize joint_axis
         joint_axis = joint_axis / np.linalg.norm(joint_axis)
         start_point = pivot_point
         end_point = pivot_point + joint_axis * 0.3
         
-        # 使用 create_directed_cylinder 绘制关节
+        # Draw joints using create_directed_cylinder
         directed_cylinder = create_directed_cylinder(start_point, end_point, thickness=0.01, resolution=20)
         for i, geom in enumerate(directed_cylinder):
-            geom.paint_uniform_color([1, 0.5, 0])  # 橙色
+            geom.paint_uniform_color([1, 0.5, 0]) 
             mat = o3d.visualization.rendering.MaterialRecord()
             mat.shader = "defaultLit"
             mat.base_color = [1.0, 0.5, 0.0, 1.0]
@@ -879,7 +835,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
     if online_viewer:
         o3d.visualization.draw(
             geometries_to_draw,
-            bg_color=(1, 1, 1, 1.0),  # 深灰色背景
+            bg_color=(1, 1, 1, 1.0), 
             show_skybox=False,
             width=800,
             height=600
@@ -898,64 +854,21 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         )
         scene = renderer.scene
         scene.set_background(np.array([1., 1., 1., 1.]))
-        # 设置光源
         scene.set_lighting(scene.LightingProfile.SOFT_SHADOWS, [0, 0, 0])
     
         for item in geometries_to_draw:
             scene.add_geometry(item["name"], item["geometry"], item["material"])
             
         image = renderer.render_to_image()
-        rgb_image = np.asarray(image)  # shape: (image_height, image_width, 3), uint8
+        # shape: (image_height, image_width, 3), uint8
+        rgb_image = np.asarray(image)  
         return rgb_image
         
-
-@torch.no_grad()
-def plot_matching(image1, image2, hr1, hr2, span):
-    seed_everything(0)
-    [hr_feats_pca_1, hr_feats_pca_2], _ = pca([hr1.unsqueeze(0), hr2.unsqueeze(0)])
-    fig, ax = plt.subplots(1, 5, figsize=(25, 5))
-    
-    ax[0].imshow(image1.permute(1, 2, 0).detach().cpu())
-    ax[0].set_title("Image 1")
-    ax[1].imshow(image2.permute(1, 2, 0).detach().cpu())
-    ax[1].set_title("Image 2")
-    ax[2].imshow(hr_feats_pca_1[0].permute(1, 2, 0).detach().cpu())
-    ax[2].set_title("Features 1")
-    ax[3].imshow(hr_feats_pca_2[0].permute(1, 2, 0).detach().cpu())
-    ax[3].set_title("Features 2")
-    ax[4].imshow(span.detach().cpu(), cmap='jet') # "viridis"
-    ax[4].set_title("Span")
-    remove_axes(ax)
-    plt.show()
-    
-@torch.no_grad()
-def plot_matching_2(feat1, feat2, similarity_map, uv_1):
-    """
-        feat1: 1, C, H, W
-        similarity_map: H, W
-        uv_1: [0.5, 0.5]
-    """
-    seed_everything(0)
-    [feat1_pca, feat2_pca], _ = pca([feat1, feat2])
-    fig, ax = plt.subplots(1, 3, figsize=(5 * 3, 5))
-
-    ax0_img = feat1_pca[0].permute(1, 2, 0).detach().cpu().numpy() # H, W, C
-    ax0_img = Image.fromarray((ax0_img * 255).astype(np.uint8))
-    ax0_img = draw_points_on_image(image=ax0_img, uv_list=[uv_1], radius=3)
-    ax[0].imshow(ax0_img) 
-    ax[0].set_title("Features 1")
-    ax[1].imshow(feat2_pca[0].permute(1, 2, 0).detach().cpu())
-    ax[1].set_title("Features 2")
-    ax[2].imshow(similarity_map.detach().cpu(), cmap='jet') # "viridis"
-    ax[2].set_title("Similarity Map")
-    remove_axes(ax)
-    plt.show()
 
 def match_point_on_featmap(
     feat_1: torch.Tensor, 
     feat_2: torch.Tensor,
     uv_1: List[float],
-    visualize: bool=False, 
 ):
     """_summary_
 
@@ -967,29 +880,28 @@ def match_point_on_featmap(
     return:
         similarity_map (torch.Tensor): H2, W2, range [0, 1]
     """
-    # 获取左图指定点的坐标 (u, v),并转换为像素坐标
+    # Get the coordinates (u, v) of the specified point in the left image and convert them to pixel coordinates
     u, v = uv_1
-    h1, w1 = feat_1.shape[2], feat_1.shape[3]  # 获取高和宽
-    left_pixel_x = int(u * w1)  # 对应的像素坐标
-    left_pixel_y = int(v * h1)  # 对应的像素坐标
-    
-    # 获取左图指定点的特征
-    left_point_feature = feat_1[0, :, left_pixel_y, left_pixel_x]  # (feature_dim, )
+    h1, w1 = feat_1.shape[2], feat_1.shape[3]
+    left_pixel_x = int(u * w1)
+    left_pixel_y = int(v * h1)
 
-    # 计算左图指定点与右图所有点的余弦相似度
-    # 将左图指定点的特征扩展到右图的每个位置进行比较
-    right_features = feat_2.view(feat_2.size(1), -1).T  # shape: (seq_length, feature_dim)
+    # Get the features of the specified point in the left image
+    left_point_feature = feat_1[0, :, left_pixel_y, left_pixel_x] # (feature_dim, )
 
-    # 计算余弦相似度
+    # Calculate the cosine similarity between the specified point in the left image and all points in the right image
+    # Expand the features of the specified point in the left image to each position in the right image for comparison
+    right_features = feat_2.view(feat_2.size(1), -1).T # shape: (seq_length, feature_dim)
+
+    # Calculate cosine similarity
     similarity = F.cosine_similarity(left_point_feature.unsqueeze(0), right_features, dim=1) # 65536
 
-    # 提取匹配点的坐标
-    h2, w2 = feat_2.shape[2], feat_2.shape[3]  # 获取高和宽
+    # Extract the coordinates of the matching points
+    h2, w2 = feat_2.shape[2], feat_2.shape[3] # Get the height and width
     similarity_map = similarity.reshape(h2, w2)
     
-    if visualize:
-        plot_matching_2(feat_1, feat_2, similarity_map, uv_1)
     return similarity_map
+
 
 def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
     """
@@ -1027,187 +939,177 @@ def nms_selection(points_uv, probs, threshold=5 / 800., max_points=5):
     
     return np.array(selected_points), np.array(selected_probs)
     
+    
 def reconstruct_mask(mask1: np.ndarray, mask2: np.ndarray) -> np.ndarray:
     """
-    根据初始布尔掩码 (mask1) 和筛选掩码 (mask2),返回最终筛选后的布尔掩码。
+    Returns the final filtered Boolean mask given an initial Boolean mask (mask1) and a filter mask (mask2).
 
-    参数:
-    - mask1: np.ndarray (H, W)  -> 初始布尔掩码
-    - mask2: np.ndarray (N,)     -> 选中的N个点的筛选掩码
+    Parameters:
+        - mask1: np.ndarray (H, W) -> Initial Boolean mask
+        - mask2: np.ndarray (N,) -> Filter mask for the selected N points
 
-    返回:
-    - new_mask: np.ndarray (H, W) -> 仅包含 mask2 选中像素点的布尔掩码
+    Returns:
+        - new_mask: np.ndarray (H, W) -> Boolean mask containing only the pixels selected by mask2
     """
-    assert mask1.dtype == np.bool_, "mask1 必须是 bool 类型"
-    assert mask2.dtype == np.bool_, "mask2 必须是 bool 类型"
+    assert mask1.dtype == np.bool_, "mask1 must be of type bool"
+    assert mask2.dtype == np.bool_, "mask2 must be of type bool"
     
-    # 获取 mask1 中为 True 的索引
-    indices = np.argwhere(mask1)  # (N, 2) 形状数组,每行是 (y, x)
+    # Get the indices of True in mask1
+    indices = np.argwhere(mask1)  
     
-    # 选出最终保留的 M 个像素点
-    selected_indices = indices[mask2]  # (M, 2) 形状
-
-    # 构造新的 (H, W) 掩码
+    selected_indices = indices[mask2] 
     new_mask = np.zeros_like(mask1, dtype=bool)
-    
-    # 设置 M 个有效位置为 True
     new_mask[selected_indices[:, 0], selected_indices[:, 1]] = True
-    
     return new_mask
+
 
 def tracksNd_variance_torch(tracks: torch.Tensor) -> torch.Tensor:
     """
-    计算 T, M, 3 形状的 3D 轨迹数据的平均方差 (PyTorch 版本)。
+    Computes the mean squared error of 3D trajectory data of shape T, M, 3 (PyTorch version).
 
-    参数:
-        tracks (torch.Tensor): 形状为 (T, M, Nd) 的张量,表示 T 个时刻 M 个点的 2D/3D 轨迹。
+    Parameters:
+        tracks (torch.Tensor): A tensor of shape (T, M, Nd) representing the 2D/3D trajectory of M points at T time instants.
 
-    返回:
-        torch.Tensor: M 个点的方差均值（标量）。
+    Returns:
+        torch.Tensor: The mean squared error of M points (scalar).
     """
-    # 计算每个点在 T 个时刻的方差 (M, 3)
-    pointwise_variance = torch.var(tracks, dim=0, unbiased=False)  # 计算 M 个点的 3 维方差
-    
-    # 计算每个点的总方差（对 3 维坐标求均值）
-    pointwise_variance_mean = torch.mean(pointwise_variance, dim=1)  # (M,)
+    # Compute the variance of each point at T time steps (M, 3)
+    pointwise_variance = torch.var(tracks, dim=0, unbiased=False) # Compute the 3D variance of M points
 
-    # 计算所有点的方差均值
+    # Compute the total variance of each point (average the 3D coordinates)
+    pointwise_variance_mean = torch.mean(pointwise_variance, dim=1) # (M,)
+
+    # Compute the mean variance of all points
     average_variance = torch.mean(pointwise_variance_mean)
-
     return average_variance
+
 
 def tracksNd_variance_np(tracks: np.ndarray) -> float:
     """
-    计算形状为 (T, M, Nd) 的 2D/3D 轨迹数据的平均方差 (NumPy 版本)。
+    Computes the mean variance of 2D/3D trajectory data of shape (T, M, Nd) (NumPy version).
 
-    参数:
-        tracks (np.ndarray): 形状为 (T, M, Nd) 的数组,表示 T 个时刻 M 个点的 2D/3D 轨迹。
+    Parameters:
+        tracks (np.ndarray): An array of shape (T, M, Nd) representing the 2D/3D trajectory of M points at T time instants.
 
-    返回:
-        float: M 个点的方差均值（标量）。
+    Return:
+        float: The mean variance of the M points (scalar).
     """
-    # 计算每个点在 T 个时刻的方差 (M, Nd)
-    pointwise_variance = np.var(tracks, axis=0, ddof=0)  # 计算 M 个点的 Nd 维方差
+    # Compute the variance of each point at T time steps (M, Nd)
+    pointwise_variance = np.var(tracks, axis=0, ddof=0) # Compute the Nd-dimensional variance of M points
 
-    # 计算每个点的总方差（对 Nd 维坐标求均值）
-    pointwise_variance_mean = np.mean(pointwise_variance, axis=1)  # (M,)
+    # Compute the total variance of each point (average the Nd-dimensional coordinates)
+    pointwise_variance_mean = np.mean(pointwise_variance, axis=1) # (M,)
 
-    # 计算所有点的方差均值
+    # Compute the mean variance of all points
     average_variance = np.mean(pointwise_variance_mean)
-
     return average_variance
+
 
 def farthest_scale_sampling(arr, M, include_first=True):
     """
-    从一维数组中选择 M 个点,确保它们之间的距离尽可能大（最大最小距离采样）。
-    
-    参数:
-    arr (np.ndarray): 输入的一维数据数组。
-    M (int): 需要选择的数据点数量。
+    Select M points from a one-dimensional array, ensuring that the distances between them are as large as possible 
+    (maximum and minimum distance sampling).
 
-    返回:
-    np.ndarray: 选择出的代表性数据点。
+    Parameters:
+        arr (np.ndarray): Input one-dimensional array of data.
+        M (int): Number of data points to select.
+
+    Return:
+        np.ndarray: The selected representative data points.
     """
     arr = np.array(arr)
     N = len(arr)
     
     if M >= N:
-        return arr  # 如果需要的点数大于等于数组长度,直接返回原数组
+        return arr  
 
-    # 随机选择第一个点（也可以选择固定的起点,如最小值或最大值）
     if include_first:
         selected_indices = [0]
     else:
         selected_indices = [np.random.randint(0, N)]
     
-    # 迭代选择剩余的点
+    # for the remaining points
     for _ in range(1, M):
-        # 计算未选点到已选点的最小距离
+        # Calculate the minimum distance from an unselected point to a selected point
         remaining_indices = list(set(range(N)) - set(selected_indices))
         min_distances = np.array([
             min(abs(arr[i] - arr[j]) for j in selected_indices)
             for i in remaining_indices
         ])
         
-        # 选择最小距离最大的点
+        # Select the point with the largest minimum distance
         next_index = remaining_indices[np.argmax(min_distances)]
         selected_indices.append(next_index)
     
-    # 返回排序后的抽样点,方便阅读
-    # return arr[np.sort(selected_indices)]
+    # Returns sorted sampling points for easy reading
     return np.sort(selected_indices)
 
 
 def sample_array(arr, k):
     """
-    从大小为 N x d 的数组中随机采样 k 个样本,并返回 k x d 的数组。
-    :param arr: 输入的 N x d 的 numpy 数组
-    :param k: 需要采样的样本数量
-    :return: 返回大小为 k x d 的数组
+    Randomly samples k samples from an N x d array and returns a k x d array.
+        :param arr: Input N x d numpy array
+        :param k: Number of samples to be sampled
+        :return: Returns a k x d array
     """
-    # 确保 k 不大于数组的行数
-    assert k <= arr.shape[0], "k 不能大于数组的行数"
+    # Make sure k is not greater than the number of rows in the array
+    assert k <= arr.shape[0], "k cannot be greater than the number of rows in the array"
     
-    # 随机选择 k 个索引
+    # Randomly select k indices
     indices = np.random.choice(arr.shape[0], size=k, replace=False)
     
-    # 根据索引提取行,并取前两列
+    # Extract the row by index and take the first two columns
     sampled_array = arr[indices]
-    
     return sampled_array
+
 
 def sample_points_within_bbox_and_mask(bbox, mask, N):
     """
-    从给定的bbox和mask中采样N个有效的(u, v)点。
-    
-    参数：
-    - bbox: 形状为(4,)的bbox数组,格式为[u_left, v_left, u_right, v_right]。
-    - mask: 大小为(H, W)的布尔数组,表示图像中每个像素是否有效。
-    - N: 需要采样的点数。
-    
-    返回：
-    - 一个形状为(N, 2)的numpy数组,表示采样的(u, v)坐标。
-      其中,N是有效采样点的数量。
-    """
-    # 获取bbox的坐标
-    u_left, v_left, u_right, v_right = bbox
+    Samples N valid (u, v) points from the given bbox and mask.
 
-    # bbox的宽高
+    Parameters:
+    - bbox: A bbox array of shape (4,) in the format [u_left, v_left, u_right, v_right].
+    - mask: A Boolean array of size (H, W) indicating whether each pixel in the image is valid.
+    - N: The number of points to sample.
+
+    Returns:
+    - A numpy array of shape (N, 2) representing the sampled (u, v) coordinates.
+
+    Where N is the number of valid sampling points.
+    """
+    u_left, v_left, u_right, v_right = bbox
     bbox_u_range = u_right - u_left
     bbox_v_range = v_right - v_left
 
-    # 计算步长,使得采样点的数量接近N
+    # Calculate the step size so that the number of sampling points is close to N
     step_size_u = np.sqrt(bbox_u_range * bbox_v_range / N)
-    step_size_v = step_size_u * bbox_v_range / bbox_u_range  # 保持长宽比
+    step_size_v = step_size_u * bbox_v_range / bbox_u_range  
 
-    # 计算采样点的数量
+    # Calculate the number of sampling points
     num_u = int(np.floor(bbox_u_range / step_size_u))
     num_v = int(np.floor(bbox_v_range / step_size_v))
 
-    # 生成均匀采样的点
+    # Generate uniformly sampled points
     u_coords = np.linspace(u_left, u_right, num_u)
     v_coords = np.linspace(v_left, v_right, num_v)
 
-    # 使用meshgrid生成(u, v)坐标网格
     u_grid, v_grid = np.meshgrid(u_coords, v_coords)
 
-    # 将(u_grid, v_grid)展平为一维数组
     u_flat = u_grid.flatten()
     v_flat = v_grid.flatten()
-
-    # 转换为 (N, 2) 形状
     points = np.stack([u_flat, v_flat], axis=1)
 
-    # 在mask中检查这些点是否有效
+    # Check if the points are valid in the mask
     valid_points = points[mask[points[:, 1].astype(int), points[:, 0].astype(int)]]
 
     return valid_points
 
+
 def napari_time_series_transform(original_data):
     """
-        将原始的时序数据转换为 napari 可视化所需的格式。
+    Convert the original time series data to the format required for Napari visualization.
         original_data: np.ndarray, (T, N, d)
-        returned_data: np.ndarray, (T*N, 1+d), 1代表时间维度
+        returned_data: np.ndarray, (T*N, 1+d), where 1 represents the time dimension
     """
     T = len(original_data)
     napari_data = []
@@ -1218,6 +1120,7 @@ def napari_time_series_transform(original_data):
     napari_data = np.concatenate(napari_data, axis=0)
     return napari_data
 
+
 def joint_data_to_transform_np(
     joint_type, # "prismatic" or "revolute"
     joint_dir, # unit vector np.array([3, ])
@@ -1225,15 +1128,13 @@ def joint_data_to_transform_np(
     joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
 ):
     """
-    计算 ref_frame 和 tgt_frame 上的对应点在 camera 坐标系下坐标的转换矩阵
+    Calculate the transformation matrix of the corresponding points on ref_frame and tgt_frame in the camera coordinate system
     """
-    # 根据 joint_type 和 joint_dir 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
+    # Get T_ref2tgt based on joint_type and joint_dir and (joint_state2 - joint_state1)
     T_ref2tgt = np.eye(4)
     if joint_type == "prismatic":
-        # coor_tgt = coor_ref + joint_dir * (joint_state_tgt - joint_state_ref)
         T_ref2tgt[:3, 3] = joint_dir * joint_state_ref2tgt
     elif joint_type == "revolute":
-        # coor_tgt = (coor_ref - joint_start) @ Rref2tgt.T + joint_start
         Rref2tgt = R.from_rotvec(joint_dir * joint_state_ref2tgt).as_matrix()
         T_ref2tgt[:3, :3] = Rref2tgt
         T_ref2tgt[:3, 3] = joint_start @ (np.eye(3) - Rref2tgt.T) 
@@ -1248,15 +1149,13 @@ def joint_data_to_transform_torch(
     joint_start,
     joint_state_ref2tgt # joint_state_tgt - joint_state_ref, a constant
 ):
-    # 根据 joint_type 和 joint_dir 和 (joint_state2 - joint_state1) 得到 T_ref2tgt
+    # Get T_ref2tgt based on joint_type and joint_dir and (joint_state2 - joint_state1)
     T_ref2tgt = torch.eye(4, device=joint_dir.device)
     joint_dir = joint_dir / torch.norm(joint_dir)
     
     if joint_type == "prismatic":
-        # coor_tgt = coor_ref + joint_dir * (joint_state_tgt - joint_state_ref)
         T_ref2tgt[:3, 3] = joint_dir * joint_state_ref2tgt
     elif joint_type == "revolute":
-        # coor_tgt = (coor_ref - joint_start) @ Rref2tgt.T + joint_start
         _K = torch.zeros((3, 3), device=joint_dir.device)
         _K[0, 1] = -joint_dir[2]
         _K[0, 2] = joint_dir[1]
@@ -1273,26 +1172,27 @@ def joint_data_to_transform_torch(
         assert False, "joint_type must be either prismatic or revolute"
     return T_ref2tgt
 
+
 def set_random_seed(seed: int):
     """
-    设置 Python, NumPy 和 PyTorch 的随机种子,确保实验的可重复性
-    :param seed: 要设置的随机种子
+    Sets the random seeds for Python, NumPy, and PyTorch to ensure reproducibility of experiments.
+    :param seed: The random seed to set.
     """
-    # 设置 Python 的随机种子
+    # Set the Python random seed.
     random.seed(seed)
-    
-    # 设置 NumPy 的随机种子
+
+    # Set the NumPy random seed.
     np.random.seed(seed)
-    
-    # 设置 PyTorch 的随机种子
+
+    # Set the PyTorch random seed.
     torch.manual_seed(seed)
-    
-    # 如果使用 GPU,还需要设置 CUDA 随机种子
+
+    # If using a GPU, also set the CUDA random seed.
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)  # 设置所有 GPU 的种子
-        
-    # 为了确保结果可重复,设置 cudnn 的确定性算法
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # Set the seed for all GPUs.
+
+    # To ensure reproducible results, set the deterministic CUDA algorithm.
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     
@@ -1300,33 +1200,35 @@ def set_random_seed(seed: int):
 def extract_tracked_depths(depth_seq, pred_tracks):
     """
     Args:
-        depth_seq (np.ndarray): 
-            深度图视频,形状为 (T, H, W)
-        pred_tracks (torch.Tensor): 
-            (T, M, 2)
-            每个点的坐标形式为 [u, v],值域为 [0, W) 和 [0, H)。
-        
-    返回:
-        torch.Tensor: 点的深度值,形状为 (T, M),每个点的深度值。
+    depth_seq (np.ndarray):
+    Depth map video, shape (T, H, W)
+    pred_tracks (torch.Tensor):
+    (T, M, 2)
+    The coordinates of each point are in the form [u, v], with a range of [0, W) and [0, H].
+
+    Returns:
+    torch.Tensor: The depth value of each point, shape (T, M), the depth value of each point.
     """
     T, H, W = depth_seq.shape
     # _, M, _ = pred_tracks.shape
 
-    # 确保 pred_tracks 是整数坐标
-    u_coords = pred_tracks[..., 0].clamp(0, W - 1).long()  # 水平坐标 u
-    v_coords = pred_tracks[..., 1].clamp(0, H - 1).long()  # 垂直坐标 v
+    # Ensure pred_tracks are integer coordinates
+    u_coords = pred_tracks[..., 0].clamp(0, W - 1).long() # Horizontal coordinate u
+    v_coords = pred_tracks[..., 1].clamp(0, H - 1).long() # Vertical coordinate v
 
-    # 将 depth_seq 转为 torch.Tensor
-    depth_tensor = torch.from_numpy(depth_seq).cuda()  # Shape: (T, H, W)
+    # Convert depth_seq to torch.Tensor
+    depth_tensor = torch.from_numpy(depth_seq).cuda() # Shape: (T, H, W)
 
-    # 使用高级索引提取深度值
-    depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords]  # Shape: (T, M)
+    # Extract depth values using advanced indexing
+    depth_tracks = depth_tensor[torch.arange(T).unsqueeze(1), v_coords, u_coords] # Shape: (T, M)
     return depth_tracks.cpu()
+
 
 def filter_tracks_by_visibility(pred_visibility, threshold=0.9):
     """
-        pred_visibility: torch.tensor([T, M])
-        返回一个大小为 M 的布尔数组,表示每个点的可见性，如果一个点在 T * thre 的 frame 都是可见的, 则认为他是 visible 的
+    pred_visibility: torch.tensor([T, M])
+    Returns a boolean array of size M, representing the visibility of each point.
+    If a point is visible in T * thre frames, it is considered visible.
     """
     T, M = pred_visibility.shape
     required_visible_count = int(threshold * T)
@@ -1339,93 +1241,89 @@ def filter_tracks_by_visibility(pred_visibility, threshold=0.9):
     
     return visible_mask
 
+
 def filter_tracks2d_by_depth_mask_seq(pred_tracks_2d, depthSeq_mask):
     """
-    筛选出那些不曾落到 invalid depth_mask 中的 tracks
+    Filter out tracks that do not fall within the invalid depth_mask.
     Args:
         pred_tracks_2d: torch.tensor([T, M, 2])
         depthSeq_mask: np.array([T, H, W], dtype=np.bool_)
     """
     T = pred_tracks_2d.shape[0]
-    # 首先读取出 pred_tracks_2d 在对应位置的 mask 的值
+    # First read out the mask value of pred_tracks_2d at the corresponding position
     pred_tracks_2d_floor = torch.floor(pred_tracks_2d).long() # T M 2 (u, v)
     t_index = torch.arange(T, device=pred_tracks_2d.device).view(T, 1)  # (T, M)
     pred_tracks_2d_mask = depthSeq_mask[t_index, pred_tracks_2d_floor[:, :, 1], pred_tracks_2d_floor[:, :, 0]] # T M
     
-    # 然后在时间维度上取交, 得到一个大小为 M 的 mask, 把其中一直为 True 的保留下来并返回
+    # Then intersect in the time dimension to get a mask of size M, retain the ones that are always True and return
     mask_and = np.all(pred_tracks_2d_mask, axis=0) # M
     pred_tracks_2d = pred_tracks_2d[:, mask_and, :]
-    
     return pred_tracks_2d
+
 
 def filter_tracks_by_consistency(tracks, threshold=0.1):
     """
-    根据 tracks 的 3d consistency 来筛选出平稳变化的 tracks
-    tracks: T, M, 3
-    return: 
-        consis_mask: (M, ), boolen
+    Filters smoothly varying tracks based on their 3D consistency.
+        tracks: T, M, 3
+    return:
+        consist_mask: (M, ), boolen
     """
-    # 获取时间步数 T 和轨迹数量 M
+    # Get the number of time steps T and tracks M
     T, M, _ = tracks.shape
-    
-    # 初始化一致性掩码
+
+    # Initialize the consistency mask
     consis_mask = np.ones(M, dtype=bool)
-    
-    # 遍历每个轨迹
+
+    # Iterate over each track
     for m in range(M):
-        # 计算该轨迹的变化量
+    # Calculate the variance of this track
         diffs = np.linalg.norm(tracks[1:T, m] - tracks[0:T-1, m], axis=1)
-        
-        # 如果有任意变化量超过阈值，则标记为不一致
+
+        # If any variance exceeds a threshold, mark it as inconsistent
         if np.any(diffs > threshold):
             consis_mask[m] = False
-    
     return consis_mask
 
 
 def classify_dynamic(mask, moving_points, static_points):
     """
-    根据A和B点集的最近邻分类让mask中为True的点分类。
+    Classify points where the mask is True based on the nearest neighbor classification of point sets A and B.
 
-    参数:
-        mask (np.ndarray): 大小为(H, W)的应用匹配网络,mask=True的点需要分类
-        moving_points (np.ndarray): 大小为(M, 2)的A类点集,具有(u, v)坐标
-        static_points (np.ndarray): 大小为(N, 2)的B类点集,具有(u, v)坐标
+    Parameters:
+        mask (np.ndarray): A set of points of size (H, W) to which the matching network is applied. 
+        Points where mask=True need to be classified.
+        moving_points (np.ndarray): A set of points of size (M, 2) with coordinates (u, v).
+        static_points (np.ndarray): A set of points of size (N, 2) with coordinates (u, v).
 
-    返回:
-        dynamic_mask (np.ndarray): 大小为(H, W)的分类结果
+    Returns:
+        dynamic_mask (np.ndarray): The classification result of size (H, W).
     """
     H, W = mask.shape
 
-    # 构建KD树以加快最近邻搜索,确保用(v, u)坐标格式
     tree_A = cKDTree(moving_points[:, [1, 0]])
     tree_B = cKDTree(static_points[:, [1, 0]])
 
-    # 找到mask中为True的点坐标
     mask_indices = np.argwhere(mask) # N, 2 (v, u)
 
-    # 对每个True点计算自A和B集合的最近距离
     distances_A, _ = tree_A.query(mask_indices)
     distances_B, _ = tree_B.query(mask_indices)
 
-    # 初始化结果网络
     dynamic_mask = np.zeros((H, W), dtype=np.uint8)
 
-    # 根据最近邻距离分类
     A_closer = distances_A < distances_B # N
     B_closer = ~A_closer
 
-    # 将分类结果填入到对应位置
     dynamic_mask[mask_indices[A_closer, 0], mask_indices[A_closer, 1]] = MOVING_LABEL
     dynamic_mask[mask_indices[B_closer, 0], mask_indices[B_closer, 1]] = STATIC_LABEL
 
     return dynamic_mask
 
+
 def get_depth_mask(depth, K, Tw2c, height=0.02):
     """
-    返回一个 mask, 标记出 depth 不为 0, 且重投影会世界坐标系不在地面上的点
-    depth: np.array([H, W])
-    height: 默认高于 2 cm 的点才会保留
+    Returns a mask that marks points where depth is non-zero and where the reprojected world coordinate system is not on the ground.
+        depth: np.array([H, W])
+        height: By default, only points higher than 2 cm are retained.
     """
     H, W = depth.shape
     pc_camera = depth_image_to_pointcloud(depth, None, K) # H*W, 3
@@ -1434,62 +1332,59 @@ def get_depth_mask(depth, K, Tw2c, height=0.02):
     depth_mask = (depth > 0.0) & height_mask
     return depth_mask
 
+
 def get_depth_mask_seq(depth_seq, K, Tw2c, height=0.01):
     """
-    返回一个 mask, 标记出 depth 不为 0, 且重投影会世界坐标系不在地面上的点
-    depth: np.array([H, W])
-    height: 默认高于 1 cm 的点才会保留
+    Returns a mask that marks points where depth is non-zero and where the reprojected world coordinate system is not on the ground.
+        depth: np.array([H, W])
+        height: By default, only points higher than 1 cm are retained.
     """
     depth_mask_seq = depth_seq > 0
     for i in range(len(depth_seq)):
         depth_mask_seq[i] = get_depth_mask(depth_seq[i], K, Tw2c, height)
     return depth_mask_seq
 
+
 def quantile_sampling(arr, M):
     """
-    从数组中按分位数抽样,返回代表性数据点。
-    
-    参数:
-    arr (np.ndarray): 输入的一维数据数组。
-    M (int): 要抽取的数据点数量。
+    Samples quantiles from an array and returns representative data points.
 
-    返回:
-    np.ndarray: 抽取的代表性数据点。
+    Parameters:
+        arr (np.ndarray): The input 1D array of data.
+        M (int): The number of data points to sample.
+
+    Returns:
+        np.ndarray: The sampled representative data points.
     """
-    # 确保输入为NumPy数组并排序
     arr_sorted = np.sort(arr)
-    
-    # 计算分位数对应的索引
     quantiles = np.linspace(0, 1, M)
     indices = (quantiles * (len(arr_sorted) - 1)).astype(int)
-    
-    # 根据索引抽取数据
     sampled_data = arr_sorted[indices]
     return sampled_data
 
+
 def compute_normals(target_pc, k_neighbors=30):
     """
-    计算目标点云的法向量
-    :param target_pc: numpy 数组,形状为 (N, 3),目标点云
-    :param k_neighbors: 计算法向量时的近邻数
-    :return: 法向量数组,形状为 (N, 3)
+    Calculate the normal vector of the target point cloud.
+        :param target_pc: NumPy array of shape (N, 3), target point cloud.
+        :param k_neighbors: The number of neighbors to use when calculating the normal vector.
+        :return: Normal vector array of shape (N, 3).
     """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(target_pc)
-    # pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=k_neighbors))
     pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=k_neighbors))
     normals = np.asarray(pcd.normals)
     return normals
 
+
 def find_correspondences(ref_pc, target_pc, max_distance=0.01):
     """
-    使用 KD-Tree 进行最近邻搜索,找到参考点云 ref_pc 在目标点云 target_pc 中的最近邻
-    :param ref_pc: numpy 数组,形状 (M, 3),参考点云
-    :param target_pc: numpy 数组,形状 (N, 3),目标点云
-    :param max_distance: 最大距离,超过这个距离的点会被忽略
-    :return: 匹配的索引数组
+    Use a KD-Tree nearest neighbor search to find the nearest neighbors of the reference point cloud ref_pc in the target point cloud target_pc.
+        :param ref_pc: NumPy array, shape (M, 3), reference point cloud
+        :param target_pc: NumPy array, shape (N, 3), target point cloud
+        :param max_distance: Maximum distance; points exceeding this distance will be ignored
+        :return: Array of matching indices
     """
-    # TODO: 将 leafsize 和 num_workers 再优化
     tree = cKDTree(target_pc)
     distances, indices = tree.query(ref_pc, workers=4)
     
@@ -1499,80 +1394,76 @@ def find_correspondences(ref_pc, target_pc, max_distance=0.01):
         valid_mask = np.ones(distances.shape, dtype=np.bool_)
     return indices, distances, valid_mask
 
+
 def rotation_matrix_between_vectors(a, b):
     """
-    假设满足 R @ a = b, 求R
+    Assume that R @ a = b, find R
     """
-    
-    # 确保 a 和 b 是单位向量
     a = a / np.linalg.norm(a)
     b = b / np.linalg.norm(b)
     
-    # 计算旋转轴 u 和旋转角度 theta
-    u = np.cross(a, b)  # 旋转轴是 a 和 b 的叉积
+    # Calculate the rotation axis u and the rotation angle theta
+    u = np.cross(a, b)  # The rotation axis is the cross product of a and b
     sin_theta = np.linalg.norm(u)
-    cos_theta = np.dot(a, b)  # 夹角余弦
-    u = u / sin_theta if sin_theta != 0 else u  # 归一化旋转轴
+    cos_theta = np.dot(a, b)  
+    u = u / sin_theta if sin_theta != 0 else u  
 
-    # 计算旋转矩阵
+    # compute rotation matrix
     I = np.eye(3)
-    u_cross = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]])  # 叉积矩阵
+    u_cross = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]]) 
 
     R = I + np.sin(np.arccos(cos_theta)) * u_cross + (1 - cos_theta) * np.dot(u_cross, u_cross)
     return R
 
 
-# 从点云中获取 bbox
 def compute_bbox_from_pc(points, offset=0):
     """
-    计算点云的边界框,并根据offset扩张bbox。
+    Calculates the bounding box of a point cloud and expands the bbox by the offset.
 
-    参数:
-    - points: numpy数组,形状为 (N, 3),表示点云的坐标。
-    - offset: 浮点数,表示bbox的扩张量。
+    Parameters:
+        - points: A numpy array of shape (N, 3) representing the coordinates of the point cloud.
+        - offset: A floating point number representing the amount to expand the bbox.
 
-    返回:
-    - bbox_min: numpy数组,形状为 (3,),表示bbox的最小角点。
-    - bbox_max: numpy数组,形状为 (3,),表示bbox的最大角点。
+    Returns:
+        - bbox_min: A numpy array of shape (3,) representing the minimum corner of the bbox.
+        - bbox_max: A numpy array of shape (3,) representing the maximum corner of the bbox.
     """
     bbox_min = np.min(points, axis=0) - offset
     bbox_max = np.max(points, axis=0) + offset
     return bbox_min, bbox_max
 
+
 def sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples):
     """
-    在bbox的表面上采样一些点。
+    Sample some points on the surface of the bbox.
 
-    参数:
-    - bbox_min: numpy数组,形状为 (3,),表示bbox的最小角点。
-    - bbox_max: numpy数组,形状为 (3,),表示bbox的最大角点。
-    - num_samples: 整数,表示要采样的点的数量。
+    Parameters:
+        - bbox_min: A numpy array of shape (3,) representing the minimum corner of the bbox.
+        - bbox_max: A numpy array of shape (3,) representing the maximum corner of the bbox.
+        - num_samples: An integer representing the number of points to sample.
 
-    返回:
-    - samples: numpy数组,形状为 (num_samples, 3),表示采样点的坐标。
+    Return:
+        - samples: A numpy array of shape (num_samples, 3) representing the coordinates of the sample points.
     """
-    # 计算bbox的尺寸
-    bbox_size = bbox_max - bbox_min
-
-    # 采样点在6个面上均匀分布
+    # The sampling points are evenly distributed on the 6 faces
     samples_per_face = num_samples // 6
     samples = []
 
     for i in range(6):
         if i < 2:
-            # 前后两个面 (x轴方向)
+            # Front and back surfaces (x-axis direction)
             x = bbox_min[0] if i == 0 else bbox_max[0]
             x = np.ones(samples_per_face) * x
             y = np.random.uniform(bbox_min[1], bbox_max[1], samples_per_face)
             z = np.random.uniform(bbox_min[2], bbox_max[2], samples_per_face)
         elif i < 4:
-            # 左右两个面 (y轴方向)
+            # Left and right surfaces (y-axis direction)
             y = bbox_min[1] if i == 2 else bbox_max[1]
             y = np.ones(samples_per_face) * y
             x = np.random.uniform(bbox_min[0], bbox_max[0], samples_per_face)
             z = np.random.uniform(bbox_min[2], bbox_max[2], samples_per_face)
         else:
-            # 上下两个面 (z轴方向)
+            # Upper and lower surfaces (z-axis direction)
             z = bbox_min[2] if i == 4 else bbox_max[2]
             z = np.ones(samples_per_face) * z
             x = np.random.uniform(bbox_min[0], bbox_max[0], samples_per_face)
@@ -1581,21 +1472,20 @@ def sample_points_on_bbox_surface(bbox_min, bbox_max, num_samples):
         face_samples = np.column_stack((x, y, z))
         samples.append(face_samples)
 
-    # 合并所有面的采样点
     samples = np.vstack(samples)
-
     return samples
+
 
 def normalize_cos_map_exp(cosine_similarity_map, sharpen_factor=5):
     """
-    对于输入的 cosine_similarity_map 进行归一化变为一个概率分布
-    sharpen_factor: 用于调整分布的相对大小, sharpen_factor 越大分布越尖锐
+    Normalizes the input cosine_similarity_map into a probability distribution.
+    sharpen_factor: Used to adjust the relative size of the distribution. 
+    A larger sharpen_factor makes the distribution sharper.
     """
-    # 使用 exp(cos) 计算
     exp_map = np.exp(cosine_similarity_map * sharpen_factor)
-    # 转换为概率图
     probability_map = exp_map / np.sum(exp_map)
     return probability_map
+
 
 def concatenate_images(image1, image2, direction='h'):
     """
@@ -1632,41 +1522,44 @@ def concatenate_images(image1, image2, direction='h'):
 
     return new_image
 
+
 def crop_nearby_points(point_clouds, contact3d, radius=0.1):
     '''Return a boolean mask indicating points close to a given point.'''
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(point_clouds)
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)
-    # 通过KDTree搜索找到在给定半径内的点
+    # Find points within a given radius through KDTree search
     [k, idx, _] = pcd_tree.search_radius_vector_3d(contact3d, radius)
     
-    # 创建一个布尔掩码，初始化为全False
+    # Create a Boolean mask, initialized to all False
     mask = np.zeros(len(point_clouds), dtype=bool)
-    # 将在给定半径内的点对应的索引位置设为True
+    
+    # Set the index position corresponding to the point within the given radius to True
     mask[idx] = True
     return mask
 
+
 def fit_plane_normal(points):
     """
-        输入一个点云, 用一个平面拟合它, 并返回该平面的单位法向量
-        point_cloud: np.array([N, 3])
+    Input a point cloud, fit a plane to it, and return the unit normal vector of the plane.
+    point_cloud: np.array([N, 3])
     """
-    # 计算点的均值
+    # Calculate the mean of the points
     centroid = np.mean(points, axis=0)
 
-    # 中心化点云
+    # Center the point cloud
     centered_points = points - centroid
 
-    # 计算协方差矩阵
+    # Calculate the covariance matrix
     cov_matrix = np.cov(centered_points, rowvar=False)
 
-    # 进行特征值分解
+    # Perform eigenvalue decomposition
     _, _, vh = np.linalg.svd(cov_matrix)
 
-    # 法向量是特征值分解的最后一个特征向量
+    # The normal vector is the last eigenvector of the eigenvalue decomposition
     normal_vector = vh[-1]
 
-    # 归一化法向量
+    # Normalize the normal vector
     normalized_normal_vector = normal_vector / np.linalg.norm(normal_vector)
 
     return centroid, normalized_normal_vector
@@ -1674,10 +1567,10 @@ def fit_plane_normal(points):
 
 def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False):
     """
-    使用 RANSAC 算法从点云中拟合一个平面，并返回该平面的单位法向量
-    points: np.array([N, 3]) - 输入的点云
-    threshold: float - 允许的最大距离，超过该距离的点被视为离群点
-    max_iterations: int - RANSAC 的最大迭代次数
+    Fits a plane to a point cloud using the RANSAC algorithm and returns the unit normal to the plane.
+        points: np.array([N, 3]) - Input point cloud
+        threshold: float - Maximum distance allowed before a point is considered an outlier
+        max_iterations: int - Maximum number of RANSAC iterations
     """
     if len(points) < 3:
         print("Less than 3 points in fit_plane_ransac")
@@ -1688,21 +1581,15 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
     best_inliers_count = 0
 
     for _ in range(max_iterations):
-        # 随机选择 3 个点来定义一个平面
         indices = np.random.choice(points.shape[0], 3, replace=False)
         sample_points = points[indices]
 
-        # 计算平面的法向量
         _, normal_vector = fit_plane_normal(sample_points)
-
-        # 计算每个点到平面的距离
         dists = np.abs(np.dot(points - sample_points[0], normal_vector))
 
-        # 计算内点
         inliers_mask = dists < threshold
         inliers_count = inliers_mask.sum()
 
-        # 更新最佳平面
         if inliers_count > best_inliers_count:
             best_inliers_count = inliers_count
             best_normal = normal_vector
@@ -1713,7 +1600,6 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
     if visualize:
         v_points = points
         v_colors = np.zeros_like(points)
-        # inliers 用绿色, outliers 用红色
         v_colors[best_inliers_mask, 1] = 1
         v_colors[~best_inliers_mask, 0] = 1
         visualize_pc(
@@ -1727,18 +1613,13 @@ def fit_plane_ransac(points, threshold=0.01, max_iterations=100, visualize=False
 
 def remove_dir_component(vector, direction, return_normalized=False):
     """
-        返回去除掉 direction 上分量后的 vector
+    Returns the vector without the direction component.
         vector: np.array([3, ])
         direction: np.array([3, ])
     """
-    # 计算方向的单位向量
     direction_unit = direction / np.linalg.norm(direction)
-    
-    # 计算原始向量在方向上的投影
     projection_length = np.dot(vector, direction_unit)
     projection = projection_length * direction_unit
-    
-    # 去除方向上的分量
     result_vector = vector - projection
     
     if return_normalized:
@@ -1749,16 +1630,16 @@ def remove_dir_component(vector, direction, return_normalized=False):
 
 def classify_open_close(tracks3d, moving_mask, visualize=False):
     """
-    判断输入轨迹到底是打开物体还是关闭物体
-    tracks3d: T, N, 3, 来自于 filter 过后的 tracks3d
-    moving_mask: N
+    Determines whether the input track represents an open or closed object.
+        tracks3d: T, N, 3, derived from the filtered tracks3d.
+        moving_mask: N
     """
     static_mask = ~moving_mask
     tracks_3d_moving_c, tracks_3d_static_c = tracks3d[:, moving_mask, :], tracks3d[:, static_mask, :]
     moving_mean_start, moving_mean_end = tracks_3d_moving_c[0].mean(0), tracks_3d_moving_c[-1].mean(0)
     static_mean_start, static_mean_end = tracks_3d_static_c[0].mean(0), tracks_3d_static_c[-1].mean(0)
     
-    # 首先根据 tracks3d_moving 和 tracks3d_static 类中心的方差判断当前 track 随着时间是 open 还是 close
+    # First, we determine whether the current track is open or closed over time based on the variance of the tracks3d_moving and tracks3d_static class centers.
     if np.linalg.norm(moving_mean_start - static_mean_start) > np.linalg.norm(moving_mean_end - static_mean_end):
         track_type = "close"
     else:
@@ -1784,10 +1665,8 @@ def classify_open_close(tracks3d, moving_mask, visualize=False):
     
     return track_type
 
+
 def reverse_joint_dict(joint_dict):
-    """
-    将 joint_dict 中存储的 joint_dir 进行反转，并同步更改 joint_states
-    """
     joint_dict["joint_dir"] = -joint_dict["joint_dir"]
     joint_dict["joint_states"] = -joint_dict["joint_states"]
     
@@ -1820,23 +1699,22 @@ def make_bbox(bbox_extents):
 
     return bbox_rect
 
+
 def filter_dynamic(
-    K, # 相机内参
+    K, 
     query_depth, # H, W
     query_dynamic, # H, W
     ref_depths,  # T, H, W
-    # ref_dynamics, # T, H, W
     joint_type,
     joint_dir,
     joint_start,
     query_state,
     ref_states,
-    depth_tolerance=0.01, # 能容忍 1cm 的深度不一致
+    depth_tolerance=0.01, # 1cm tolerance
     visualize=False
 ):
     """
-        根据当前的 joint state
-        验证所有的 moving points, 把不确定的 points 标记为 unknown
+    Based on the current joint state, verify all moving points and mark uncertain points as unknown.   
     """
     Tquery2refs = [
         joint_data_to_transform_np(
@@ -1850,7 +1728,7 @@ def filter_dynamic(
     T, H, W = ref_depths.shape
     query_dynamic_updated = query_dynamic.copy()
     
-    # 获取当前帧 MOVING_LABEL 的像素坐标
+    # Get the pixel coordinates of the current frame MOVING_LABEL
     moving_mask = query_dynamic == MOVING_LABEL
     if not np.any(moving_mask):
         return query_dynamic_updated        
@@ -1859,108 +1737,68 @@ def filter_dynamic(
     pc_moving = depth_image_to_pointcloud(query_depth, moving_mask, K)  # (N, 3)
     pc_moving_aug = np.concatenate([pc_moving, np.ones((len(pc_moving), 1))], axis=1)  # (N, 4)
     
-    # 批量计算 moving_pc 在其他帧的 3d 坐标
+    # Batch calculate the 3D coordinates of moving_pc in other frames
     pc_pred = np.einsum('tij,jk->tik', Tquery2refs, pc_moving_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
     
-    # 投影到所有帧
+    # Project to all frames
     uv_pred, depth_pred = camera_to_image(pc_pred.reshape(-1, 3), K) # T*N, 2
     uv_pred_int = np.floor(uv_pred.reshape(T, len(pc_moving), 2)).astype(int) # T, N, 2
     depth_pred = depth_pred.reshape(T, len(pc_moving)) # T, N
     
-    # 在这里进行一个筛选, 把那些得不到有效 depth_obs 的 moving point 也标记为 Unknown TODO: 这里会不会过于严格
+    # Perform a filter here and mark those moving points that do not get valid depth_obs as Unknown
     valid_idx = (uv_pred_int[..., 0] >= 0) & (uv_pred_int[..., 0] < W) & \
                 (uv_pred_int[..., 1] >= 0) & (uv_pred_int[..., 1] < H) # T, N
-    # 且只有一个时间帧观测不到就认为得不到有效观测
+                
+    # If only one time frame is not observed, it is considered that no valid observation is obtained.
     valid_idx = valid_idx.all(axis=0) # N
     uv_pred_int = uv_pred_int[:, valid_idx] # T, M, 2
     depth_pred = depth_pred[:, valid_idx] # T, M
     
-    # TODO: 是否要严格到必须 score_moving > score_static 的点才被保留
-    # TODO：获取目标帧的真实深度, 是不是要考虑 depth_ref 等于 0 的情况是否需要拒绝
-    
     T_idx = np.arange(T)[:, None]
     depth_obs = ref_depths[T_idx, uv_pred_int[..., 1], uv_pred_int[..., 0]]  # T, M
     
-    # 计算误差并更新 dynamic_mask， M, 只要有一帧拒绝，则置为 UNKNOWN
+    # Calculate the error and update dynamic_mask, M, if there is a frame rejection, it is set to UNKNOWN
     unknown_mask = (depth_pred + depth_tolerance < depth_obs).any(axis=0)  # M
     query_dynamic_updated[y[valid_idx][unknown_mask], x[valid_idx][unknown_mask]] = UNKNOWN_LABEL
     
     if visualize:
         viewer = napari.view_image((query_dynamic != 0).astype(np.int32), rgb=False)
         viewer.title = "filter current dynamic mask using other frames"
-        # viewer.add_labels(mask_seq.astype(np.int32), name='articulated objects')
         viewer.add_labels(query_dynamic.astype(np.int32), name='before filtering')
         viewer.add_labels(query_dynamic_updated.astype(np.int32), name='after filtering')
         napari.run()
-    
     return query_dynamic_updated  
-
-
-def vis_tracks2d_napari(image_frames, tracks_2d, colors=None, viewer_title="napari"):
-    """
-    Args:
-        image_frames: np.array([T, H, W, C])
-        tracks_2d: np.array of shape (T, M, 2), (u, v)
-        colors: np.array of shape (M, 3)
-    """
-    if isinstance(tracks_2d, torch.Tensor):
-        tracks_2d = tracks_2d.cpu().numpy()
-        
-    T, M, _ = tracks_2d.shape
-    viewer = napari.view_image(image_frames, rgb=True)
-    viewer.title = viewer_title
-    
-    # 把 tracks_2d 转换成 napari 支持的格式
-    napari_data = []
-    for i in range(T):
-        track_2d = tracks_2d[i] # M, 2
-        track_2d_with_t = np.concatenate([np.ones((track_2d.shape[0], 1)) * i, track_2d], axis=1) # M, 3
-        # 把 (u, v) 两个维度交换
-        track_2d_with_t = track_2d_with_t[:, [0, 2, 1]]
-        napari_data.append(track_2d_with_t)
-    napari_data = np.concatenate(napari_data, axis=0)
-    
-    if colors is None:
-        colors = np.random.rand(M, 3)
-        # 将 M, 3 大小的 colors 变换为 T*M, 3 的大小
-    colors = np.tile(colors, (T, 1))
-        
-    viewer.add_points(napari_data, size=3, name='tracks_2d', opacity=1., face_color=colors)
-    
-    napari.run()
 
 
 def line_to_line_distance(P1, d1, P2, d2):
     """
-    计算三维空间中两条直线的最短距离
-    
-    参数:
-        P1 (np.array): 直线1上一点的坐标，形状 (3,)
-        d1 (np.array): 直线1的单位方向向量，形状 (3,)
-        P2 (np.array): 直线2上一点的坐标，形状 (3,)
-        d2 (np.array): 直线2的单位方向向量，形状 (3,)
-    
-    返回:
-        float: 两条直线的最短距离
+    Calculates the shortest distance between two lines in 3D space
+
+    Parameters:
+        P1 (np.array): Coordinates of a point on line 1, shape (3,)
+        d1 (np.array): Unit direction vector of line 1, shape (3,)
+        P2 (np.array): Coordinates of a point on line 2, shape (3,)
+        d2 (np.array): Unit direction vector of line 2, shape (3,)
+
+    Returns:
+        Float: The shortest distance between the two lines
     """
-    # 计算连接向量 v = P2 - P1
     v = P2 - P1
     
-    # 计算方向向量的叉积 n = d1 × d2
+    # Compute the cross product of the direction vector n = d1 × d2
     n = np.cross(d1, d2)
     
-    # 计算叉积的范数 ||n||
+    # Compute the norm of the cross product ||n||
     n_norm = np.linalg.norm(n)
     
-    if n_norm > 1e-10:  # 如果两条直线不平行（n 不是零向量）
-        # 最短距离 = |v · n| / ||n||
+    if n_norm > 1e-10: 
         distance = np.abs(np.dot(v, n)) / n_norm
-    else:  # 如果两条直线平行（n ≈ 0）
-        # 计算 v 在 d1 垂直方向的分量：v_perp = v - (v·d1) * d1
+    else:  
+        # If the two lines are parallel (n ≈ 0)
+        # Calculate the component of v in the direction perpendicular to d1: v_perp = v - (v·d1) * d1
         v_parallel = np.dot(v, d1) * d1
         v_perp = v - v_parallel
         distance = np.linalg.norm(v_perp)
-    
     return distance
 
 
@@ -1968,20 +1806,20 @@ def custom_linspace(a, b, delta):
     if delta <= 0:
         raise ValueError("delta must be positive")
     
-    # 确定递增/递减方向
+    # Determine the increasing/decreasing direction
     direction = 1 if b >= a else -1
     diff = abs(b - a)
     
-    # 计算最大完整步数
+    # Calculate the maximum number of full steps
     n = int(np.floor(diff / delta))
     
-    # 生成基础点序列
+    # Generate basic point sequence
     if n == 0:
         return np.array([b])
     else:
         points = a + direction * delta * np.arange(1, n+1)
         
-        # 判断是否需要追加端点b
+        # Determine whether endpoint b needs to be added
         last = points[-1]
         if (direction == 1 and not np.isclose(last, b) and last < b) or \
            (direction == -1 and not np.isclose(last, b) and last > b):
@@ -1992,21 +1830,18 @@ def custom_linspace(a, b, delta):
 
 def extract_pos_quat_from_matrix(T):
     """
-    从 4x4 变换矩阵中提取位置和四元数
-    输入:
-        T: Tph2w, np.array(4, 4), 变换矩阵
-    输出:
-        pos: np.array([3, ]), 位置向量
-        quat: np.array([4, ]), 四元数 (w, x, y, z) 顺序
+    Extract position and quaternion from a 4x4 transformation matrix
+    Input:
+        T: Tph2w, np.array(4, 4), transformation matrix
+    Output:
+        pos: np.array([3, ]), position vector
+        quat: np.array([4, ]), quaternion in (w, x, y, z) order
     """
-    # 提取位置向量
     pos = T[:3, 3]
-
-    # 提取旋转矩阵并转换为四元数
     R_matrix = T[:3, :3]
-    quat = R.from_matrix(R_matrix).as_quat(scalar_first=False)  # 返回 (x, y, z, w) 顺序
-    quat = np.array([quat[3], quat[0], quat[1], quat[2]])  # 转换为 (w, x, y, z) 顺序
-
+    # Return (x, y, z, w) order
+    quat = R.from_matrix(R_matrix).as_quat(scalar_first=False) 
+    quat = np.array([quat[3], quat[0], quat[1], quat[2]]) 
     return pos, quat
 
 
@@ -2024,7 +1859,7 @@ def dis_point_to_range(point, range):
     
 def distance_between_transformation(mat1, mat2):
     """
-    计算两个 Transformation 之间的距离
+    Calculate the distance between two Transformations
     mat1: (4, 4)
     """
     def translation_distance(mat1, mat2):
@@ -2035,32 +1870,19 @@ def distance_between_transformation(mat1, mat2):
     def rotation_difference(mat1, mat2):
         R1 = mat1[:3, :3]
         R2 = mat2[:3, :3]
-        # 计算旋转矩阵之间的差异
         angle_diff = np.arccos((np.trace(R1.T @ R2) - 1) / 2)
         return angle_diff
     
     trans_dist = translation_distance(mat1, mat2)
     rot_dist = rotation_difference(mat1, mat2)
-    return trans_dist + rot_dist  # 或者其他加权方式
+    return trans_dist + rot_dist  
 
 
 def numpy_to_json(obj):
     if isinstance(obj, np.ndarray):
-        return obj.tolist()  # 将 NumPy 数组转换为列表
+        return obj.tolist() # Convert a NumPy array to a list
     elif isinstance(obj, np.float32):
-        return float(obj)  # 将 NumPy float32 转换为 Python float
-    elif isinstance(obj, np.int32):
-        return int(obj)  # 将 NumPy int32 转换为 Python int
+        return float(obj) # Convert a NumPy float32 to a Python float
+    elif isinstance(obj, np.ints32):
+        return int(obj) # Convert a NumPy int32 to a Python int
     raise TypeError(f"Type {type(obj)} not serializable")
-
-
-
-    
-    
-if __name__ == "__main__":
-    print(custom_linspace(5, 1, 2.5))   # [2.5, 1.0]
-    print(custom_linspace(0, 5, 1))      # [1., 2., 3., 4., 5.]
-    print(custom_linspace(10, 5, 2))     # [8., 6., 5.]
-    print(custom_linspace(3, 3, 0.5))    # [3]
-    print(custom_linspace(2, 5, 0.5))    # [2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
-

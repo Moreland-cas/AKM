@@ -317,21 +317,15 @@ def extract_features(image_path, img_size=[768, 768], upsample_feat=True):
         ft = F.interpolate(ft, size=img_tensor.shape[-2:], mode='bilinear', align_corners=False)
     return ft
 
+
 def match_points_dift_sd(
     image_path_1, 
     image_path_2, 
     uv_1, # [0.3, 0.7]
-    # top_k=100, 
-    # max_return=5,
-    resize=800, # 不能太小 
-    device="cuda", 
-    # nms_threshold=0.05,
+    resize=800, 
     visualize=False, 
 ):
-    # 提取特征
     hr_feats_1 = extract_features(image_path_1, img_size=[resize, resize], upsample_feat=True)  # shape: (1, feature_dim, h, w)
     hr_feats_2 = extract_features(image_path_2, img_size=[resize, resize], upsample_feat=True)  # shape: (1, feature_dim, h, w)
     similarity_map = match_point_on_featmap(hr_feats_1, hr_feats_2, uv_1, visualize) # H, W
     return similarity_map
-
-    
