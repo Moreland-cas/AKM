@@ -1189,12 +1189,12 @@ def set_random_seed(seed: int):
 
     # If using a GPU, also set the CUDA random seed.
     if torch.cuda.is_available():
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed) # Set the seed for all GPUs.
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed) # Set the seed for all GPUs.
 
-    # To ensure reproducible results, set the deterministic CUDA algorithm.
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+        # To ensure reproducible results, set the deterministic CUDA algorithm.
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     
 
 def extract_tracked_depths(depth_seq, pred_tracks):
