@@ -6,23 +6,31 @@ Here’s the complete code for our paper “Active Kinematic Modelling for Preci
 
 <!-- TODO video, paper link -->
 
-## Quick Installation
-We use python 3.10, CUDA 12.1 and torch 2.5.1. Clone the repo and set up the main AKM conda environment.
-```
+## Quick Start
+### 1. Prerequisites
+- Python 3.10  
+- CUDA 12.1  
+- PyTorch 2.5.1  
+
+### 2. Install Main Environment
+Clone the repo and create the `AKM` Conda environment in one shot:
+```bash
 git clone https://github.com/Moreland-cas/AKM
 cd AKM
-# create conda environment
 bash scripts/prepare/create_akm_env.sh
 ```
-(Optional) To set up the baseline methods, simply execute the matching script; it will automatically clone the AKM environment and create a dedicated Conda environment for you.
-```
+
+(Optional) To run baseline methods, simply execute the corresponding script. They will automatically clone the `AKM` environment and create dedicated Conda environments.
+```bash
 # GeneralFlow
 bash scripts/prepare/create_gflow_env.sh
 # GAPartNet
 bash scripts/prepare/create_gpnet_env.sh
 ```
-Note: Make sure to change the CUDA_PATH in the scripts to your actual path!
-```
+
+**Important**
+Make sure to update `CUDA_HOME` in the scripts to your actual CUDA path:
+```bash
 export CUDA_HOME=YOUR_ACTUAL_CUDA_PATH
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH 
