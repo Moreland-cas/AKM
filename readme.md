@@ -29,6 +29,7 @@ bash scripts/prepare/create_gpnet_env.sh
 ```
 
 **Important**
+
 Make sure to update `CUDA_HOME` in the scripts to your actual CUDA path:
 ```bash
 export CUDA_HOME=YOUR_ACTUAL_CUDA_PATH
