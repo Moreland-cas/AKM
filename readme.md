@@ -2,24 +2,34 @@
   AKM
 </div>
 
-Code for Paper "Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects", RAL 2025 in submission.
+Here’s the complete code for our paper “Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects,” currently under review at RAL.
 
-## File Structure
+<!-- TODO video, paper link -->
+
+## Quick Installation
+We use python 3.10, CUDA 12.1 and torch 2.5.1. Clone the repo and set up the main AKM conda environment.
 ```
-/assets
-/baselines
-/cfgs
-/akm
-/scripts
-/third_party
-setup.py            # For Installation of Our Package
+git clone https://github.com/Moreland-cas/AKM
+cd AKM
+# create conda environment
+bash scripts/prepare/create_akm_env.sh
+```
+(Optional) To set up the baseline methods, simply execute the matching script; it will automatically clone the AKM environment and create a dedicated Conda environment for you.
+```
+# GeneralFlow
+bash scripts/prepare/create_gflow_env.sh
+# GAPartNet
+bash scripts/prepare/create_gpnet_env.sh
+```
+Note: Make sure to change the CUDA_PATH in the scripts to your actual path!
+```
+export CUDA_HOME=YOUR_ACTUAL_CUDA_PATH
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH 
 ```
 
-## Installation
-We first provide the conda environment setup to run our method, as shown in `/AKM/scripts/prepare/create_akm_env.sh`. Conda Environments of baseline methods `GeneralFlow` and `GAPartnet` can be installed on the basis of our `AKM` environment, as shown in `create_gflow_env.sh` and `create_gpnet_env.sh`.
-
-## Preparation
-In this section we show how to prepare the required dataset and pretrained model checkpoints from third-party methods.
+## Data and Checkpoints
+We provide script to download the assets for simulation environment and model checkpoints of third-party methods.
 
 The pretrained model checkpoints are stored in `/assets/ckpts` folder, as,
 ```
@@ -265,3 +275,4 @@ manip_env_cfg:
 We also modify our `Env` class to support real-world deployment, the code are in `/AKM/akm/realworld_envs`.
 We use a Franka Robot Arm and RealSense D455 camera for real-world deployment.
 To callibrate the intrinsic and extrinsic of the D455 camera, use the `/scripts/collect_and_calibrate.py`.
+To test the three stages of our framework, use scripts in `/AKM/scripts/test_rw`.

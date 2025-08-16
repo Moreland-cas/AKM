@@ -3,27 +3,14 @@
 set -e
 set -o pipefail
 
-EXPECTED_PATH="/home/zby/Programs/AKM"
-CURRENT_PATH=$(pwd)
+SCRIPT_PATH=$(realpath "$0")     
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+PROJECT_PATH=$(dirname "$(dirname "$SCRIPT_DIR")")
+ENV_NAME="akm"
 
-if [[ "$CURRENT_PATH" != "$EXPECTED_PATH" ]]; then
-    echo "Error: This script must be run from the directory: $EXPECTED_PATH"
-    echo "Current path is: $CURRENT_PATH"
-    exit 1
-fi
-
-if [[ -z "$1" ]]; then
-    echo "Error: No environment name provided."
-    echo "Usage: $0 <environment_name>"
-    exit 1
-fi
-ENV_NAME="$1"
-
-# Check if the environment already exists
-if conda info --envs | grep -q "$ENV_NAME"; then
-    echo "Conda environment '$ENV_NAME' already exists. Removing it..."
-    conda remove -n $ENV_NAME -y
-fi
+export CUDA_HOME=/home/zby/Cudas/cuda-12.1
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH 
 
 echo "Creating Conda environment '$ENV_NAME'..."
 conda create -n $ENV_NAME python=3.10 -y
@@ -39,45 +26,42 @@ pip install pytorch-lightning==2.5.0.post0
 pip install flask requests
 pip install --upgrade pip setuptools
 
-export CUDA_HOME=/home/zby/Cudas/cuda-12.1
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH 
-
 # install MinkowskiEngine
 echo "Installing MinkowskiEngine..."
 cp $CONDA_PREFIX/lib/libopenblas.so* $CONDA_PREFIX/lib/python3.10/site-packages/torch/lib/.
-cd $EXPECTED_PATH/third_party/MinkowskiEngine
+cd $PROJECT_PATH/third_party/MinkowskiEngine
 python setup.py install --blas_include_dirs=${CONDA_PREFIX}/include --blas=openblas
 
 # install graspnetAPI
 echo "Installing graspnetAPI..."
-cd $EXPECTED_PATH/third_party/graspnetAPI
+cd $PROJECT_PATH/third_party/graspnetAPI
 pip install -e .
 
 # install pointnet2
-cd $EXPECTED_PATH/third_party/pointnet2
+cd $PROJECT_PATH/third_party/pointnet2
 python setup.py install
 
 # install co-tracker
 echo "Installing co-tracker..."
 # git clone https://github.com/facebookresearch/co-tracker.git
-cd $EXPECTED_PATH/third_party/co-tracker
+cd $PROJECT_PATH/third_party/co-tracker
 pip install -e .
 
 # install SAM 2
 echo "Installing SAM 2..."
 # git clone https://github.com/facebookresearch/sam2.git 
-cd $EXPECTED_PATH/third_party/sam2
+cd $PROJECT_PATH/third_party/sam2
 pip install -e ".[notebooks]"
 
 # install Grounding DINO
-echo "Installing Grounding DINO..."
+echo "Installing GroundingDINO..."
 # git clone git@github.com:IDEA-Research/GroundingDINO.git
-cd $EXPECTED_PATH/third_party/GroundingDINO
+cd $PROJECT_PATH/third_party/GroundingDINO
 # pip install -e .
 python3 setup.py install
 
 # install RAM
+echo "Installing RAM dependencies..."
 pip install diffusers==0.15.0 
 pip install transformers==4.49.0 
 pip install ipympl==0.9.6 
@@ -88,7 +72,7 @@ pip install open_clip_torch==2.31.0 einops openai
 
 # install AKM
 echo "Installing AKM..."
-cd $EXPECTED_PATH/
+cd $PROJECT_PATH/
 pip install -e .
 
-echo "Setup complete!"
+echo "Setup complete! Activate command: conda activate akm"
