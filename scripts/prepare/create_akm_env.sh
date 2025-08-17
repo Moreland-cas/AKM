@@ -8,7 +8,7 @@ SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
 PROJECT_PATH=$(dirname "$(dirname "$SCRIPT_DIR")")
 ENV_NAME="akm"
 
-export CUDA_HOME=/home/zby/Cudas/cuda-12.1
+export CUDA_HOME=/home/Cudas/cuda-12.1
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH 
 

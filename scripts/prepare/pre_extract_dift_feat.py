@@ -4,7 +4,7 @@ import pickle
 from tqdm import tqdm
 from PIL import Image
 
-sys.path.append("/home/zby/Programs/AKM/third_party/RAM_code")
+sys.path.append("/home/Programs/AKM/third_party/RAM_code")
 from subset_retrieval.subset_retrieve_pipeline import SubsetRetrievePipeline
 from vision.featurizer.run_featurizer import extract_ft
 
@@ -43,6 +43,6 @@ class PreExtractDiftFeat(SubsetRetrievePipeline):
                         print(f"Features saved to {save_path}")
 
 if __name__ == "__main__":
-    my_class = PreExtractDiftFeat(subset_dir="/home/zby/Programs/AKM/assets/RAM_memory")
+    my_class = PreExtractDiftFeat(subset_dir="./assets/RAM_memory")
     my_class.pre_extract()
     

@@ -1,10 +1,10 @@
 #!/usr/bin/env zsh
 
-WS_PATH="/home/zby/Programs/AKM"
+WS_PATH="/home/Programs/AKM"
 CLONED_ENV_NAME="general_flow"
 SOURCE_ENV_NAME="ea_v2"
 
-export CUDA_HOME=/home/zby/Cudas/cuda-12.1
+export CUDA_HOME=/home/Cudas/cuda-12.1
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 

@@ -7,7 +7,7 @@ def run_anygrasp_helper(points_input, colors, lims):
     points_input = points_input.astype(np.float32)
     colors = colors.astype(np.float32)
     model = prepare_any_grasp_model(
-        asset_path="/home/zby/Programs/AKM/assets/ckpts/anygrasp/checkpoint_detection.tar"
+        asset_path="/home/Programs/AKM/assets/ckpts/anygrasp/checkpoint_detection.tar"
     )
     gg, _ = model.get_grasp(
         points_input,

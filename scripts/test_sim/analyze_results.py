@@ -17,7 +17,7 @@ MANIP_RELATIVE_VALID_THRESHS = [0.1, 0.2, 0.5]
 class ExpDataPiece():
     def __init__(
         self,
-        cfgs_path: str,         # "/home/zby/Programs/AKM/cfgs"
+        cfgs_path: str,         # "/home/Programs/AKM/cfgs"
         run_name: str,          # 6_22
         obj_idx: str,           # 104
         range_transition: str   # i_j
@@ -386,21 +386,21 @@ def analyze(run_name="6_21"):
                     continue
                 data_list.append(
                     ExpDataPiece(
-                        cfgs_path="/home/zby/Programs/AKM/cfgs",
+                        cfgs_path="/home/Programs/AKM/cfgs",
                         run_name=run_name,          
                         obj_idx=obj_idx,         
                         range_transition=f"{i}_{j}"
                     )
                 )
     dataAnalyze = DataAnalyze(datalist=data_list)
-    print_path = f"/home/zby/Programs/AKM/assets/analysis_batch/{run_name}.txt"
+    print_path = f"/home/Programs/AKM/assets/analysis_batch/{run_name}.txt"
     with open(print_path, "w") as f:
         sys.stdout = f
         dataAnalyze.summary_explore()
         dataAnalyze.summary_recon()
         dataAnalyze.summary_manip()
     
-    save_path = f"/home/zby/Programs/AKM/assets/analysis_batch/{run_name}.npy"
+    save_path = f"/home/Programs/AKM/assets/analysis_batch/{run_name}.npy"
     np.save(save_path, dataAnalyze.processed_data_dict)
 
 

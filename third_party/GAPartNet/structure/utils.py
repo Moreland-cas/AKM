@@ -330,7 +330,7 @@ def _load_perception_model(
     module_name = ".".join(class_path.split(".")[:-1])
     class_name = class_path.split(".")[-1]
     """
-    ckpt_path = '/home/zby/Programs/AKM/assets/ckpts/gapartnet/release.ckpt'
+    ckpt_path = '/home/Programs/AKM/assets/ckpts/gapartnet/release.ckpt'
     class_path = 'gapartnet.network.model.GAPartNet'
     """
     module = importlib.import_module(module_name)
@@ -338,7 +338,7 @@ def _load_perception_model(
     net = cls.load_from_checkpoint(
         checkpoint_path=ckpt_path, 
         strict=False,
-        # hparams_file="/home/zby/Programs/AKM/third_party/GAPartNet/gapartnet/gapartnet.yaml"
+        # hparams_file="/home/Programs/AKM/third_party/GAPartNet/gapartnet/gapartnet.yaml"
         num_part_classes=10,
         training_schedule=[5, 10],
         instance_seg_cfg = {

@@ -157,8 +157,8 @@ def farthest_point_sampling_2d(points, M):
 # read obj_repr
 # vis_idx = [3, 4, 7, 10, 78, 95, 97, 114]
 vis_idx = 3
-load_path = f"/home/zby/Programs/AKM/assets/logs/6_39/{vis_idx}/obj_repr.npy"
-save_folder = f"/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/pipeline_{vis_idx}"
+load_path = f"/home/Programs/AKM/assets/logs/6_39/{vis_idx}/obj_repr.npy"
+save_folder = f"/home/Programs/AKM/scripts/draw_figs/paper_figs/pipeline_{vis_idx}"
 os.makedirs(save_folder, exist_ok=True)
 obj_repr: Obj_repr = Obj_repr.load(load_path)
 

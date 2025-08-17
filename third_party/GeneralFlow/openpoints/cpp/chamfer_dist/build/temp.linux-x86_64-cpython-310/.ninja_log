@@ -1,5 +1,5 @@
 # ninja log v5
-0	7551	1747622211804753210	/home/zby/Programs/general_flow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer_cuda.o	6ef7b4dccc43b1c9
-0	25791	1747622230040409321	/home/zby/Programs/general_flow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer.o	4bf4f353c286363f
-6	12976	1747896673988256360	/home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer_cuda.o	844d1e73c8703af6
-5	45041	1747896706012856568	/home/zby/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer.o	38ac7395c89dda2e
+0	7551	1747622211804753210	/home/Programs/general_flow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer_cuda.o	6ef7b4dccc43b1c9
+0	25791	1747622230040409321	/home/Programs/general_flow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer.o	4bf4f353c286363f
+6	12976	1747896673988256360	/home/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer_cuda.o	844d1e73c8703af6
+5	45041	1747896706012856568	/home/Programs/AKM/baselines/GeneralFlow/openpoints/cpp/chamfer_dist/build/temp.linux-x86_64-cpython-310/chamfer.o	38ac7395c89dda2e

@@ -136,7 +136,7 @@ if __name__ == "__main__":
     
     # method_cfg for base yaml path
     parser.add_argument('--method_cfg', type=str, default="gflow_draw")
-    parser.add_argument('--task_cfgs_folder', type=str, default="/home/zby/Programs/AKM/cfgs/simulation_cfgs/tasks")
+    parser.add_argument('--task_cfgs_folder', type=str, default="/home/Programs/AKM/cfgs/simulation_cfgs/tasks")
     
     args = parser.parse_args()
     assert (args.cs >= 0) and (args.cs < args.ts)
@@ -146,7 +146,7 @@ if __name__ == "__main__":
         yaml_path_list.append(os.path.join(args.task_cfgs_folder, yaml_path))
     
     # filter yaml_path_list
-    base_yaml_path = os.path.join("/home/zby/Programs/AKM/cfgs/", f"{args.method_cfg}.yaml")
+    base_yaml_path = os.path.join("/home/Programs/AKM/cfgs/", f"{args.method_cfg}.yaml")
     yaml_path_list = filter_tasks(base_yaml_path, yaml_path_list)
     
     task_groups = distribute_tasks(yaml_path_list, args.ts)

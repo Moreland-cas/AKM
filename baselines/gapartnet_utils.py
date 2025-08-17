@@ -396,7 +396,7 @@ def gapartnet_reconstruct(obj_repr, gapartnet_model=None, visualize=False, use_g
     print("Running COMPLETELY CORRECTED GAPartNet reconstruction...")
 
     if gapartnet_model is None:
-        gapartnet_model = load_gapartnet_model("/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt")
+        gapartnet_model = load_gapartnet_model("/home/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt")
         
     # Get ground truth for guidance
     gt_joint_type = obj_repr.gt_joint_dict.get("joint_type", "prismatic")

@@ -38,80 +38,42 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 ```
 
 ## Data and Checkpoints
-We provide script to download the assets for simulation environment and model checkpoints of third-party methods.
+This section provides instructions for downloading the necessary data and model checkpoints to set up the simulation environment and third-party methods.
 
-The pretrained model checkpoints are stored in `/assets/ckpts` folder, as,
-```
-/assets/ckpts
-├── anygrasp
-│   └── checkpoint_detection.tar
-├── fastSAM
-│   ├── FastSAM-s.pt
-│   ├── FastSAM-x.pt
-│   └── FastSAM-X.pt
-├── gapartnet
-│   ├── all_best.ckpt
-│   └── release.ckpt
-├── generalFlow
-│   └── kpst_hoi4d
-│       ├── ScaleGFlow-B
-│       ├── ScaleGFlow-B.tar.gz
-│       ├── ScaleGFlow-L
-│       ├── ScaleGFlow-L.tar.gz
-│       ├── ScaleGFlow-S
-│       └── ScaleGFlow-S.tar.gz
-├── grounding_dino
-│   └── groundingdino_swint_ogc.pth
-├── gsnet
-│   ├── minkuresunet_kinect.tar
-│   └── minkuresunet_realsense.tar
-└── sam2
-    └── sam2.1_hiera_large.pt
-```
-the download link can be refered to the respective links.
-[AnyGrasp](https://github.com/graspnet/anygrasp_sdk)
-[gapartnet](https://github.com/PKU-EPIC/GAPartNet)
-[generalFlow](https://github.com/michaelyuancb/general_flow)
-[grounding_dino](https://github.com/IDEA-Research/GroundingDINO)
-[gsnet](https://github.com/graspnet/graspness_unofficial)
-[sam2](https://github.com/facebookresearch/sam2)
-[fastSAM](https://github.com/CASIA-IVA-Lab/FastSAM)
-
-The dataset used in our simulation environment is from [RGBManip](https://github.com/hyperplane-lab/RGBManip) and can be downloaded through [this_link](https://drive.google.com/file/d/154g8SzGFWOcLLjes40aTXFoREX47-ZPk/view), unzip the downloaded dataset.zip in `/assets/dataset` folder, and structure as:
-```
-/assets/dataset
-├── chair
-├── mugs
-├── one_door_cabinet
-├── one_drawer_cabinet
-└── pots
+### Downloading Articulated Object Assets
+To download the articulated object assets for simulation, run the following command:
+```bash
+bash scripts/prepare/download_data.sh
 ```
 
-The [RAM](https://github.com/yxKryptonite/RAM_code) affordance memory used in our method can be download through [this_link](https://drive.google.com/file/d/16cEIj8JHZ8KkGiRRub_qxdZoKB45ZXsa/view) and unzip as:
-```
-/assets/RAM_memory
-├── customize
-├── droid
-├── HOI4D
-└── memory_data.zip
+### Downloading Third-Party Model Checkpoints
+To download the checkpoints for third-party models, execute:
+```bash
+bash scripts/prepare/download_ckpts.sh
 ```
 
-Then run the `pre_extract_dift_feat.py` scripts to pre-extract [DIFT](https://github.com/Tsingularity/dift) feature for the reference images in the RAM affordance memory to accelerate the exploration stage in our method:
+### Downloading RAM Affordance Memory
+To download the RAM affordance memory, use:
+```bash
+bash scripts/prepare/download_ram.sh
 ```
-cd /AKM/scripts/prepare
+
+### Pre-Extracting DIFT Features for RAM Memory
+To significantly improve efficiency, we strongly recommend pre-extracting DIFT features for the RAM memory. Activate the environment and run the following commands:
+```bash
 conda activate akm
-python pre_extract_dift_feat.py
-```
-After running this script, there should be an additional `*_new_sd.pkl` file in each memory directory:
-```
-assets/RAM_memory/customize/open_the_dishwasher
-├── open_the_dishwasher.json
-├── open_the_dishwasher_new.pkl
-├── open_the_dishwasher_new_sd.pkl  (pre-extracted sd feature)
-└── vis
+python scripts/prepare/pre_extract_dift_feat.py
 ```
 
-To use the AnyGrasp Detector, TODO
+### Setting Up the AnyGrasp Detector
+To use the AnyGrasp Detector, you need to prepare a license file. Follow the [instructions](https://github.com/graspnet/anygrasp_sdk/tree/main/license_registration) in the license registration guide. Once obtained, place the license file in the `AKM/akm/utility/grasp` directory with the following structure:
+```
+├── anygrasp.py
+├── gsnet.py
+├── gsnet.so
+├── lib_cxx.so
+├── license
+```
 
 ## Test our method in Simulation
 ### Test script
@@ -217,7 +179,7 @@ The saved path is indicated by the cfg file of a run.
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zby/Programs/AKM/assets/logs_batch/ours_1"
+  exp_folder: "/home/Programs/AKM/assets/logs_batch/ours_1"
   method_name: "ours"
   save_cfg: True
   save_obj_repr: False
@@ -285,3 +247,13 @@ We also modify our `Env` class to support real-world deployment, the code are in
 We use a Franka Robot Arm and RealSense D455 camera for real-world deployment.
 To callibrate the intrinsic and extrinsic of the D455 camera, use the `/scripts/collect_and_calibrate.py`.
 To test the three stages of our framework, use scripts in `/AKM/scripts/test_rw`.
+
+[AnyGrasp](https://github.com/graspnet/anygrasp_sdk)
+[gapartnet](https://github.com/PKU-EPIC/GAPartNet)
+[generalFlow](https://github.com/michaelyuancb/general_flow)
+[grounding_dino](https://github.com/IDEA-Research/GroundingDINO)
+[gsnet](https://github.com/graspnet/graspness_unofficial)
+[sam2](https://github.com/facebookresearch/sam2)
+[fastSAM](https://github.com/CASIA-IVA-Lab/FastSAM)
+[RGBManip](https://github.com/hyperplane-lab/RGBManip)
+[RAM](https://github.com/yxKryptonite/RAM_code)

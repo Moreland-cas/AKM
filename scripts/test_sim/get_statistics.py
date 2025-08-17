@@ -90,7 +90,7 @@ if __name__ == "__main__":
         "gpnet_4",
         "gpnet_5"
     ]
-    result_path = "/home/zby/Programs/AKM/assets/analysis_batch"
+    result_path = "/home/Programs/AKM/assets/analysis_batch"
     
     # For each category of experiments, calculate the average value of explore, reconstruct and manipulate. 
     # Note that explore also includes generalflow and gpnet.

@@ -117,7 +117,7 @@ def add_text_to_image(
     font_size = int(img_height * font_scale)
     
     try:
-        font_path = "/home/zby/Programs/AKM/scripts/times.ttf" 
+        font_path = "/home/Programs/AKM/scripts/times.ttf" 
         font = ImageFont.truetype(font_path, font_size)
     except Exception as e:
         print(f"Unable to load Times New Roman font: {e}, using default font")

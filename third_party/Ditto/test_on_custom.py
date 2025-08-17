@@ -1,6 +1,6 @@
 import os, sys
-sys.path.append('/home/zby/Programs/Ditto/')
-sys.path.append('/home/zby/Programs/Ditto/src')
+sys.path.append('/home/Programs/Ditto/')
+sys.path.append('/home/Programs/Ditto/src')
 # os.environ["PYOPENGL_PLATFORM"] = "egl"
 
 import numpy as np
@@ -193,12 +193,12 @@ def get_ditto_model():
             overrides=[
                 'experiment=Ditto_s2m.yaml',
             ], return_hydra_config=True)
-    config.datamodule.opt.train.data_dir = '/home/zby/Programs/Ditto/data/'
-    config.datamodule.opt.val.data_dir = '/home/zby/Programs/Ditto/data/'
-    config.datamodule.opt.test.data_dir = '/home/zby/Programs/Ditto/data/'
+    config.datamodule.opt.train.data_dir = '/home/Programs/Ditto/data/'
+    config.datamodule.opt.val.data_dir = '/home/Programs/Ditto/data/'
+    config.datamodule.opt.test.data_dir = '/home/Programs/Ditto/data/'
 
     model = hydra.utils.instantiate(config.model)
-    ckpt = torch.load('/home/zby/Programs/Ditto/data/Ditto_s2m.ckpt')
+    ckpt = torch.load('/home/Programs/Ditto/data/Ditto_s2m.ckpt')
     device = torch.device(0)
     model.load_state_dict(ckpt['state_dict'], strict=True)
     model = model.eval().to(device)
@@ -312,7 +312,7 @@ def run_ditto(pc_start, pc_end, model=None, generator=None, visualize=False):
     return joint_dict
 
 if __name__ == "__main__":
-    data_path = "/home/zby/Programs/Ditto/data/custom_data"
+    data_path = "/home/Programs/Ditto/data/custom_data"
     pc_start = np.load(os.path.join(data_path, "pc_start.npy"))
     pc_end = np.load(os.path.join(data_path, "pc_start.npy"))
     run_ditto(pc_start, pc_end, visualize=True)

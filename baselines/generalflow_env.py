@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import sys
-sys.path.append("/home/zby/Programs/AKM/third_party/GeneralFlow")
+sys.path.append("/home/Programs/AKM/third_party/GeneralFlow")
 from openpoints.transforms import build_transforms_from_cfg
 from util import save_pickle, load_easyconfig_from_yaml
 from vis_exec import visualization_exec
@@ -516,7 +516,7 @@ def get_generalFlow(
     return kpst.detach().cpu().numpy()
 
 def test_get_generalFlow():  
-    input_dir = "/home/zby/Programs/general_flow/demo/input/safe_0_hand"
+    input_dir = "/home/Programs/general_flow/demo/input/safe_0_hand"
     frame = Frame(
         rgb=cv2.imread(os.path.join(input_dir, 'rgb.jpg'), cv2.IMREAD_COLOR),
         depth=cv2.imread(os.path.join(input_dir, 'dep.png'), cv2.IMREAD_ANYDEPTH).astype(np.float32),

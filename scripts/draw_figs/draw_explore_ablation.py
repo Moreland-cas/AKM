@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
-sys.path.append("/home/zby/Programs/AKM/scripts/test_whole_pipeline/")
+sys.path.append("/home/Programs/AKM/scripts/test_whole_pipeline/")
 from get_statistics import process_nested_dict
 
 
@@ -18,7 +18,7 @@ plt.rcParams.update({
 })
 
 
-def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Exploration Success Rate (%)", output_file="/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/explore_ablation_2.png"):
+def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Exploration Success Rate (%)", output_file="/home/Programs/AKM/scripts/draw_figs/paper_figs/explore_ablation_2.png"):
     """
     Plot time series with mean as lines and standard deviation as shaded error bands, and save as PNG.
     
@@ -26,7 +26,7 @@ def plot_timeseries(data, xlabel="Number of Interactions (times)", ylabel="Explo
     - data: Dict with method names as keys and {'means': [...], 'stds': [...]} as values.
     - xlabel: Label for x-axis (default: 'Number of Interactions (times)').
     - ylabel: Label for y-axis (default: 'Exploration Success Rate (%)').
-    - output_file: Path to save the PNG file (default: '/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/explore_ablation_2.png').
+    - output_file: Path to save the PNG file (default: '/home/Programs/AKM/scripts/draw_figs/paper_figs/explore_ablation_2.png').
     """
     plt.figure(figsize=(10, 5))
     colors = ['#4C78A8', '#F28C38', '#76B7B2', '#E15759', '#B07AA1', '#59A14F', '#EDC949']
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         "ours_zs_",
     ]
     draw_data = {}
-    result_path = "/home/zby/Programs/AKM/assets/analysis_batch"
+    result_path = "/home/Programs/AKM/assets/analysis_batch"
     
     for method in method_list:
         print("Method:", method)

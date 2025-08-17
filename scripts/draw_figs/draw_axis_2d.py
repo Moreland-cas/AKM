@@ -111,8 +111,8 @@ def draw_directed_axis(image, start_point, end_point, line_color=(255, 0, 0), li
     ], fill=line_color)
     return image
 
-data_path = "/home/zby/Programs/AKM/assets/logs_draw"
-save_folder = f"/home/zby/Programs/AKM/scripts/draw_figs/paper_figs/reconstruct"
+data_path = "/home/Programs/AKM/assets/logs_draw"
+save_folder = f"/home/Programs/AKM/scripts/draw_figs/paper_figs/reconstruct"
 method_names = ["gflow", "gpnet", "ours"]
 obj_idx_list = os.listdir(os.path.join(data_path, method_names[0]))
 
@@ -211,7 +211,7 @@ def idx_available(obj_idx):
     """
     Read recon_result.json under obj_idx for each of the three methods, and only draw if there is a valid recon
     """
-    data_path = "/home/zby/Programs/AKM/assets/logs_draw"
+    data_path = "/home/Programs/AKM/assets/logs_draw"
     ours_json = json.load(open(os.path.join(data_path, "ours", str(obj_idx), "recon_result.json"), "r"))
     gpnet_json = json.load(open(os.path.join(data_path, "gpnet", str(obj_idx), "recon_result.json"), "r"))
     gflow_json = json.load(open(os.path.join(data_path, "gflow", str(obj_idx), "recon_result.json"), "r"))

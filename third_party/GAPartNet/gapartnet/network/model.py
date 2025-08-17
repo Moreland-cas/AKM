@@ -131,7 +131,7 @@ class GAPartNet(lp.LightningModule):
 
         
         if ckpt != "":
-            ckpt = "/home/zby/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt"
+            ckpt = "/home/Programs/AKM/assets/ckpts/gapartnet/all_best.ckpt"
             print("Loading pretrained model from:", ckpt)
             state_dict = torch.load(
                 ckpt, map_location="cpu"

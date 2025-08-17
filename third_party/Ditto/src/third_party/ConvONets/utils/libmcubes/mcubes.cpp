@@ -4,11 +4,11 @@
 {
     "distutils": {
         "depends": [
-            "/home/zby/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/arrayobject.h",
-            "/home/zby/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/arrayscalars.h",
-            "/home/zby/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/ndarrayobject.h",
-            "/home/zby/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/ndarraytypes.h",
-            "/home/zby/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/ufuncobject.h",
+            "/home/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/arrayobject.h",
+            "/home/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/arrayscalars.h",
+            "/home/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/ndarrayobject.h",
+            "/home/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/ndarraytypes.h",
+            "/home/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include/numpy/ufuncobject.h",
             "src/third_party/ConvONets/utils/libmcubes/pyarray_symbol.h",
             "src/third_party/ConvONets/utils/libmcubes/pywrapper.h"
         ],
@@ -17,7 +17,7 @@
         ],
         "include_dirs": [
             "src/third_party/ConvONets/utils/libmcubes",
-            "/home/zby/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include"
+            "/home/ProgramFiles/anaconda3/envs/Ditto/lib/python3.10/site-packages/numpy/core/include"
         ],
         "language": "c++",
         "name": "src.third_party.ConvONets.utils.libmcubes.mcubes",

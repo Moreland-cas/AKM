@@ -141,7 +141,7 @@ def add_r_joint_to_scene(
 
 
 # read data
-root = '/home/zby/Programs/Ditto/data/real_laptop'
+root = '/home/Programs/Ditto/data/real_laptop'
 num_point_per_depth = 2048
 
 with open(os.path.join(root, 'camera2base.json')) as f:
@@ -255,12 +255,12 @@ with initialize(config_path='./configs'):
         overrides=[
             'experiment=Ditto_s2m.yaml',
         ], return_hydra_config=True)
-config.datamodule.opt.train.data_dir = '/home/zby/Programs/Ditto/data/'
-config.datamodule.opt.val.data_dir = '/home/zby/Programs/Ditto/data/'
-config.datamodule.opt.test.data_dir = '/home/zby/Programs/Ditto/data/'
+config.datamodule.opt.train.data_dir = '/home/Programs/Ditto/data/'
+config.datamodule.opt.val.data_dir = '/home/Programs/Ditto/data/'
+config.datamodule.opt.test.data_dir = '/home/Programs/Ditto/data/'
 
 model = hydra.utils.instantiate(config.model)
-ckpt = torch.load('/home/zby/Programs/Ditto/data/Ditto_s2m.ckpt')
+ckpt = torch.load('/home/Programs/Ditto/data/Ditto_s2m.ckpt')
 device = torch.device(0)
 model.load_state_dict(ckpt['state_dict'], strict=True)
 model = model.eval().to(device)

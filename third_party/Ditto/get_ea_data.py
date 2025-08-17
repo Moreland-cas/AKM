@@ -3,9 +3,9 @@ import numpy as np
 from akm.representation.basic_structure import Frame
 from akm.representation.obj_repr import Obj_repr
 
-# obj_folder = "/home/zby/Programs/AKM/asset_book/logs/explore_424/40147_1_prismatic"
-# obj_folder = "/home/zby/Programs/AKM/asset_book/logs/explore_424/45162_0_revolute"
-obj_folder = "/home/zby/Programs/AKM/asset_book/logs/explore_424/45168_0_prismatic"
+# obj_folder = "/home/Programs/AKM/asset_book/logs/explore_424/40147_1_prismatic"
+# obj_folder = "/home/Programs/AKM/asset_book/logs/explore_424/45162_0_revolute"
+obj_folder = "/home/Programs/AKM/asset_book/logs/explore_424/45168_0_prismatic"
 obj_repr: Obj_repr = Obj_repr.load(os.path.join(obj_folder, "obj_repr.npy"))
 
 frame_start: Frame = obj_repr.frames[0]
@@ -33,7 +33,7 @@ pc_end, _ = frame_end.get_obj_pc(
     visualize=True,
 )
 
-save_folder = "/home/zby/Programs/Ditto/data/custom_data"
+save_folder = "/home/Programs/Ditto/data/custom_data"
 np.save(
     os.path.join(save_folder, "pc_start.npy"),
     pc_start
