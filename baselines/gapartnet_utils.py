@@ -142,7 +142,7 @@ def create_pointcloud_input(pc_xyz, pc_colors, device="cuda"):
         return pc
 
     pc = pc.to_tensor()
-    pc = downsample(pc, max_points=20000) # zby
+    pc = downsample(pc, max_points=20000)
     pc = apply_voxelization(pc, voxel_size=(1. / 100, 1. / 100, 1. / 100))
 
     return pc, max_radius, center
