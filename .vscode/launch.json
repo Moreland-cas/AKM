@@ -2,21 +2,12 @@
     "version": "0.2.0",
     "configurations": [
       {
-        "name": "Python: 当前文件",
+        "name": "Python: Current File",
         "type": "python",
         "request": "launch",
         "program": "${file}",
         "console":"integratedTerminal",
-        "justMyCode": false,  // 如果为 true，调试器将仅调试当前文件中的代码
-        // "env": {
-        //     "PYTHONPATH": "${workspaceFolder}/third_party/RAM_code"
-        // }
-        // "args": [
-        //   "--run_name",
-        //   "gflow_522",
-        //   "--cfg_run_name",
-        //   "manip_512"
-        // ] 
+        "justMyCode": false,  
       }
     ]
   }
