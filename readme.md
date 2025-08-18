@@ -2,7 +2,9 @@
 # AKM
 </div> -->
 
-<h1 style="font-size: 48px;">AKM</h1>
+<!-- <h1 style="font-size: 48px;">AKM</h1> -->
+
+<p align="center" style="font-size: 48px;"> AKM </p>
 
 Here’s the complete code for our paper “Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects,” currently under review at RAL.
 
