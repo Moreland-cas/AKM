@@ -1,5 +1,5 @@
 <h1 align="center"> 
-  <a>AKM</a>
+  AKM
 </h1>
 
 Here’s the complete code for our paper “Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects,” currently under review at RAL.
