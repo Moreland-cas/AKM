@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/github_pics/real_world.jpg" alt="banner" style="width: 100%" />
+  <img src="./assets/github_pics/realworld.jpg" alt="banner" style="width: 100%" />
 </p>
 
 <h1 align="center"> 
