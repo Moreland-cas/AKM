@@ -1,5 +1,5 @@
 <div align="center">
-  # AKM
+# AKM
 </div>
 
 Here’s the complete code for our paper “Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects,” currently under review at RAL.
