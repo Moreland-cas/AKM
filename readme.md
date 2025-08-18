@@ -138,13 +138,33 @@ python scripts/test_sim/summarize_runs.py
 ```
 
 ## Running Real-World Experiments 
-We also modify our `Env` class to support real-world deployment, the code are in `/AKM/akm/realworld_envs`.
-We use a Franka Robot Arm and RealSense D455 camera for real-world deployment.
-To callibrate the intrinsic and extrinsic of the D455 camera, use the `/scripts/collect_and_calibrate.py`.
-To test the three stages of our framework, use scripts in `/AKM/scripts/test_rw`.
+
+### Hardware
+- Robot: Franka Emika Panda  
+- RGB-D Camera: Intel RealSense D455
+
+### Camera Calibration
+To obtain the intrinsic and extrinsic parameters of the D455:
+```bash
+python scripts/collect_and_calibrate.py
+```
+This script will command the robot to grasp a checkerboard, move the checkerboard to multiple poses while capturing images, then perform hand-eye calibration using OpenCV.
+
+### Running Three-Stages
+Evaluate the three stages of our pipeline directly on the real robot:
+```bash
+# 1. Exploration
+python scripts/test_rw/test_explore.py  
+
+# 2. Unsupervised Articulation Modeling
+python scripts/test_rw/test_modelling.py
+
+# 3. Closed-Loop Manipulation
+python scripts/test_rw/test_manipulate.py
+```
 
 ## Acknowledgement
-This project builds on solid earlier work—thank you to everyone who contributed.
+This project builds on solid earlier works, thank you to everyone who contributed!
 
 - AnyGrasp: https://github.com/graspnet/anygrasp_sdk
 - gapartnet: https://github.com/PKU-EPIC/GAPartNet
