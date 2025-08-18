@@ -2,6 +2,7 @@ import os
 import json
 import yaml
 import sys
+import argparse
 import numpy as np
 
 ################# HYPER_PARAMETERS #################
@@ -393,56 +394,20 @@ def analyze(run_name="6_21"):
                     )
                 )
     dataAnalyze = DataAnalyze(datalist=data_list)
-    print_path = f"/home/Programs/AKM/assets/analysis_batch/{run_name}.txt"
+    print_path = f"/home/Programs/AKM/assets/analysis/{run_name}.txt"
     with open(print_path, "w") as f:
         sys.stdout = f
         dataAnalyze.summary_explore()
         dataAnalyze.summary_recon()
         dataAnalyze.summary_manip()
     
-    save_path = f"/home/Programs/AKM/assets/analysis_batch/{run_name}.npy"
+    save_path = f"/home/Programs/AKM/assets/analysis/{run_name}.npy"
     np.save(save_path, dataAnalyze.processed_data_dict)
 
 
 if __name__ == "__main__":
-    run_names = [
-        "ours_1",
-        "ours_2",
-        "ours_3",
-        "ours_4",
-        "ours_5",
-        "ours_wo_IOR_1",
-        "ours_wo_IOR_2",
-        "ours_wo_IOR_3",
-        "ours_wo_IOR_4",
-        "ours_wo_IOR_5",
-        "ours_wo_AT_1",
-        "ours_wo_AT_2",
-        "ours_wo_AT_3",
-        "ours_wo_AT_4",
-        "ours_wo_AT_5",
-        "ours_wo_CA_1",
-        "ours_wo_CA_2",
-        "ours_wo_CA_3",
-        "ours_wo_CA_4",
-        "ours_wo_CA_5",
-        "ours_zs_1",
-        "ours_zs_2",
-        "ours_zs_3",
-        "ours_zs_4",
-        "ours_zs_5",
-        "gflow_1",
-        "gflow_2",
-        "gflow_3",
-        "gflow_4",
-        "gflow_5",
-        "gpnet_1",
-        "gpnet_2",
-        "gpnet_3",
-        "gpnet_4",
-        "gpnet_5"
-    ]
-    for run_name in run_names:
-        analyze(run_name)
-        # break
-        
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run_name')
+    
+    args = parser.parse_args()
+    analyze(args.run_name)

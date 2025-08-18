@@ -1,5 +1,5 @@
-<div align="center" style="font-size: 3em">
-  AKM
+<div align="center">
+  # AKM
 </div>
 
 Here’s the complete code for our paper “Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects,” currently under review at RAL.
@@ -58,15 +58,15 @@ To download the RAM affordance memory, use:
 bash scripts/prepare/download_ram.sh
 ```
 
-### Pre-Extracting DIFT Features for RAM Memory
-To significantly improve efficiency, we strongly recommend pre-extracting DIFT features for the RAM memory. Activate the environment and run the following commands:
+### (Optional) Pre-Extracting DIFT Features for RAM Memory
+To significantly improve efficiency, we strongly recommend pre-extracting DIFT features for the reference images in RAM memory. Activate the environment and run the following commands:
 ```bash
 conda activate akm
 python scripts/prepare/pre_extract_dift_feat.py
 ```
 
 ### Setting Up the AnyGrasp Detector
-To use the AnyGrasp Detector, you need to prepare a license file. Follow the [instructions](https://github.com/graspnet/anygrasp_sdk/tree/main/license_registration) in the license registration guide. Once obtained, place the license file in the `AKM/akm/utility/grasp` directory with the following structure:
+To use the [AnyGrasp](https://github.com/graspnet/anygrasp_sdk) Detector, you need to prepare a license file. Follow the [instructions](https://github.com/graspnet/anygrasp_sdk/tree/main/license_registration) in the license registration guide. Once obtained, place the license file in the `AKM/akm/utility/grasp` directory with the following structure:
 ```
 ├── anygrasp.py
 ├── gsnet.py
@@ -77,7 +77,7 @@ To use the AnyGrasp Detector, you need to prepare a license file. Follow the [in
 
 ## Running Simulation Experiments
 
-### Tasks and Method Configurations 
+### Tasks/Methods Configurations 
 Our simulation tasks utilize the 116 objects from [RGBManip](https://github.com/hyperplane-lab/RGBManip). For each object, random initial poses are generated using `scripts/prepare/generate_tasks.py` with a fixed random seed of 666. The resulting task configurations are stored in `cfgs/simulation_cfgs/tasks`.
 
 Configuration files for the evaluated methods are located in `cfgs/simulation_cfgs/methods`, including two baselines, our full method, and five ablations:
@@ -121,9 +121,19 @@ python test_batch.py --method_cfg xxx --task_cfgs_folder xxx --ts 4 --cs 2
 python test_batch.py --method_cfg xxx --task_cfgs_folder xxx --ts 4 --cs 3
 ```
 
-### Evaluation
+### Evaluation Statistics
+To summarize key statistics for a run, execute:
+```bash
+python scripts/test_sim/summarize_run.py --run_name ours
+```
+This script aggregates results across all 12 manipulation tasks for the 116 objects and saves the output to `assets/analysis/{run_name}`.
 
-## Run Real-World Experiments 
+To aggregate summarized outputs across multiple runs, execute:
+```bash
+python scripts/test_sim/summarize_runs.py
+```
+
+## Running Real-World Experiments 
 We also modify our `Env` class to support real-world deployment, the code are in `/AKM/akm/realworld_envs`.
 We use a Franka Robot Arm and RealSense D455 camera for real-world deployment.
 To callibrate the intrinsic and extrinsic of the D455 camera, use the `/scripts/collect_and_calibrate.py`.

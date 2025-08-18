@@ -3,6 +3,7 @@ import math
 import numpy as np
 from typing import List, Tuple, Any, Dict, Union
 
+
 def compute_stats(values: List[Union[int, float]]) -> Tuple[float, float]:
     """
     Calculate the mean and standard deviation (sample standard deviation) of a list of values
@@ -13,6 +14,7 @@ def compute_stats(values: List[Union[int, float]]) -> Tuple[float, float]:
     variance = sum((x - mean) ** 2 for x in values) / len(values) if len(values) >= 1 else 0.0
     std_dev = math.sqrt(variance)
     return mean, std_dev
+
 
 def collect_values(dict_list: List[Dict[str, Any]], path: List[str]) -> List[Union[int, float]]:
     """
@@ -25,6 +27,7 @@ def collect_values(dict_list: List[Dict[str, Any]], path: List[str]) -> List[Uni
             current = current[key]
         values.append(current)
     return values
+
 
 def process_nested_dict(dict_list: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
