@@ -39,3 +39,32 @@ def run_grounded_sam(
     )
     torch.cuda.empty_cache()
     return initial_bbox, initial_mask
+
+
+if __name__ == "__main__":
+    import cv2
+    img = cv2.imread("/home/zhangboyuan/Programs/AKM/assets/dev/cat.jpg")
+    import time
+    for i in range(10):
+        start_time = time.time()
+        # run_groundingDINO(
+        #     image=img,
+        #     obj_description="cat",
+        #     dino_model=None,
+        #     visualize=False,
+        # )
+        run_grounded_sam(
+            rgb_image=img,
+            obj_description="cat",
+            positive_points=None,  # np.array([N, 2])
+            negative_points=None,
+            num_iterations=3,
+            acceptable_thr=0.9,
+            dino_model=None,
+            sam2_image_model=None,
+            post_process_mask=True,
+            visualize=False,
+        )
+        end_time = time.time()
+        print(end_time - start_time)
+        time.sleep(0.5)

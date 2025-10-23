@@ -279,7 +279,7 @@ class ExploreEnv(ObjEnv):
         # if True:
             self.explore_result = {}
             self.explore_result = self.explore_stage()
-                    
+        # pass
         except Exception as e:
             self.logger.log(logging.ERROR, f"Explore exception occured: {e}", exc_info=True)
             

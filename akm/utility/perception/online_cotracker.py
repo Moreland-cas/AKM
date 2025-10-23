@@ -117,3 +117,23 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False):
     #     vis_tracks2d_napari(rgb_frames, pred_tracks, viewer_title="Cotracker returned tracks2d")
         
     return pred_tracks, pred_visibility
+
+
+if __name__ == "__main__":
+    import cv2
+    img = cv2.imread("/home/zhangboyuan/Programs/AKM/assets/dev/cat.jpg")
+    import time
+    for i in range(10):
+        start_time = time.time()
+        # run_groundingDINO(
+        #     image=img,
+        #     obj_description="cat",
+        #     dino_model=None,
+        #     visualize=False,
+        # )
+        rgb_frames = [img for i in range(10)]
+        track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False)
+        end_time = time.time()
+        print(end_time - start_time)
+        time.sleep(0.5)
+        

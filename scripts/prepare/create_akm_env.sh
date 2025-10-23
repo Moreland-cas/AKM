@@ -97,3 +97,6 @@ echo "Setup complete! Activate command: conda activate akm"
 # (4) Cannot find a suitable rendering device
 # https://github.com/haosulab/SAPIEN/issues/115
 # https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html
+
+# (5) libcrypto.so.1.1: cannot open shared object file: No such file or directory
+# conda install -c conda-forge openssl=1.1.1

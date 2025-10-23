@@ -38,7 +38,7 @@ def icp_loss_torch(
     assert Tref2tgt.requires_grad and "Tref2tgt tensor must requires grad to be optimized"
     assert loss_type in ["point_to_point", "point_to_plane"]
     
-    print(f"icp input len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    # print(f"icp input len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
     
     if min(len(ref_pc), len(tgt_pc)) < 100:
         return torch.tensor(0).cuda()
@@ -58,7 +58,7 @@ def icp_loss_torch(
         tgt_pc = tgt_pc[sampled_index]
         target_normals = target_normals[sampled_index]
     
-    print(f"downed sampled size len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
+    # print(f"downed sampled size len(ref_pc)={len(ref_pc)} len(tgt_pc)={len(tgt_pc)}")
     
     ref_pc = torch.tensor(ref_pc, dtype=torch.float32, device=Tref2tgt.device)
     target_pc = torch.tensor(tgt_pc, dtype=torch.float32, device=Tref2tgt.device)

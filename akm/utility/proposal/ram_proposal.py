@@ -1,4 +1,7 @@
 import os
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "1"
 import sys
 import cv2
 import time
@@ -73,7 +76,8 @@ def get_ram_affordance_2d(
     instruction: open the drawer (task description)
     prompt: used to extract dift feature
     """
-    logger.log(logging.INFO, "Initializing SubsetRetrievePipeline ...")
+    if logger:
+        logger.log(logging.INFO, "Initializing SubsetRetrievePipeline ...")
     subset_retrieve_pipeline = SubsetRetrievePipeline(
         subset_dir=os.path.join(ASSET_PATH, "RAM_memory"),
         lang_mode='clip',
@@ -92,7 +96,8 @@ def get_ram_affordance_2d(
         visualize=False
     )
     retrieve_end = time.time()
-    logger.log(logging.INFO, f"retrieve time: {retrieve_end - retrieve_start}")
+    if logger:
+        logger.log(logging.INFO, f"retrieve time: {retrieve_end - retrieve_start}")
     
     ref_trajs = topk_retrieved_data_dict['traj']
     ref_imgs_np = topk_retrieved_data_dict['masked_img']
@@ -114,7 +119,8 @@ def get_ram_affordance_2d(
         break
 
     # Further convert cos_map into a probability distribution
-    logger.log(logging.INFO, "Initializing Affordance_map_2d from DIFT similarity ...")
+    if logger:
+        logger.log(logging.INFO, "Initializing Affordance_map_2d from DIFT similarity ...")
     affordance_map_2d = Affordance_map_2d(
         rgb_img=query_rgb,
         cos_map=cos_map,
@@ -129,3 +135,21 @@ def get_ram_affordance_2d(
             masked_img.show()
     torch.cuda.empty_cache()
     return affordance_map_2d
+
+
+if __name__ == "__main__":
+    import cv2
+    img = cv2.imread("/home/zhangboyuan/Programs/AKM/assets/dev/cat.jpg")
+    for i in range(10):
+        start_time = time.time()
+        get_ram_affordance_2d(
+            query_rgb=img, # H, W, 3 in numpy
+            instruction="open the drawwer", # open the drawwer
+            obj_description="drawer", # drawer
+            fully_zeroshot=False,
+            visualize=False,
+            logger=None
+        )
+        end_time = time.time()
+        print(end_time - start_time)
+        time.sleep(0.5)

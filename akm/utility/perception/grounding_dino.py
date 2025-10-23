@@ -1,4 +1,7 @@
 import os
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "1"
 import cv2
 import torch
 import numpy as np
@@ -11,6 +14,7 @@ from akm.utility.constants import ASSET_PATH, PROJECT_ROOT
 
 
 def load_groundingDINO_model():
+    print("***load_groundingDINO_model***")
     groundingDINO_home = os.path.join(PROJECT_ROOT, "third_party", "GroundingDINO")
     WEIGHTS_PATH = os.path.join(ASSET_PATH, "ckpts", "grounding_dino/groundingdino_swint_ogc.pth")
     CONFIG_PATH = os.path.join(groundingDINO_home, "groundingdino/config/GroundingDINO_SwinT_OGC.py")
@@ -81,3 +85,19 @@ def run_groundingDINO(
     bbox_score_sorted = bbox_score[sorted_indices]
     
     return bbox_scaled_sorted, bbox_score_sorted
+
+
+if __name__ == "__main__":
+    img = cv2.imread("/home/zhangboyuan/Programs/AKM/assets/dev/cat.jpg")
+    import time
+    for i in range(10):
+        start_time = time.time()
+        run_groundingDINO(
+            image=img,
+            obj_description="cat",
+            dino_model=None,
+            visualize=False,
+        )
+        end_time = time.time()
+        print(end_time - start_time)
+        time.sleep(0.5)

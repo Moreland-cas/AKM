@@ -4,6 +4,11 @@ import json
 import copy
 import yaml
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# avoid huggingface from online connection
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "1"
+
 
 from akm.utility.constants import *
 
@@ -98,6 +103,7 @@ def test_batch(base_yaml_path, yaml_path_list):
     failed_list = []
     for specific_yaml_path in yaml_path_list:
         try:
+        # if True:
             test_one(
                 base_yaml_path=base_yaml_path,
                 specific_yaml_path=specific_yaml_path,
@@ -131,7 +137,7 @@ def distribute_tasks(tasks, num_groups):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=80)
+    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=1)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
     
     # method_cfg for base yaml path

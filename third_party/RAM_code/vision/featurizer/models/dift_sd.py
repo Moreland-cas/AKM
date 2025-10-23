@@ -190,7 +190,7 @@ class OneStepSDPipeline(StableDiffusionPipeline):
 class SDFeaturizer:
     def __init__(self, sd_id='stabilityai/stable-diffusion-2-1', null_prompt=''):
         unet = MyUNet2DConditionModel.from_pretrained(sd_id, subfolder="unet")
-        model_path = "/data/hf/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-1/snapshots/5cae40e6a2745ae2b01ad92ae5043f95f23644d6"
+        model_path = "/home/zhangboyuan/.cache/huggingface/hub/models--stabilityai--stable-diffusion-2-1/snapshots/5cae40e6a2745ae2b01ad92ae5043f95f23644d6"
         onestep_pipe = OneStepSDPipeline.from_pretrained(model_path, unet=unet, safety_checker=None)
         # onestep_pipe = OneStepSDPipeline.from_pretrained(sd_id, unet=unet, safety_checker=None)
         onestep_pipe.vae.decoder = None
