@@ -1,0 +1,14 @@
+{
+    "version": "3.1.0",
+    "feature_id": "1488248638934106618",
+    "public_key": "BoyuanZhang2.public_key",
+    "signature": "BoyuanZhang2.signature",
+    "license": "BoyuanZhang2.lic",
+    "toolbox": [
+        {
+            "name": "Basic",
+            "type": "PERMANENT",
+            "data": ""
+        }
+    ]
+}

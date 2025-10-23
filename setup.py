@@ -10,6 +10,9 @@ setup(
         'transforms3d',
         'trimesh',
         "mplib==0.2.1",
-        "pyglet<2"
+        "pyglet<2",
+        "pycocotools",
+        "yapf",
+        "supervision"
     ],
 )

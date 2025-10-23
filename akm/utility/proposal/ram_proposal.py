@@ -7,6 +7,7 @@ import logging
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+from akm.utility.constants import PROJECT_ROOT
 
 relative_path = os.path.join(PROJECT_ROOT, "third_party", "RAM_code")
 sys.path.append(relative_path)

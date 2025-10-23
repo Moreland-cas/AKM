@@ -1,0 +1,23 @@
+# ninja log v7
+3	12576	1761018113846750700	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points.o	7f93e5480a5a3856
+0	12632	1761018113843750646	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query.o	2f1a80a26adafe31
+1	12676	1761018113844750664	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/bindings.o	f5f91e765f4868c3
+4	12730	1761018113847750718	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate.o	fc2bf04969825eb
+5	12809	1761018113848750736	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling.o	56088f90c3bd253e
+2	13649	1761018113845750682	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query.o	dea0c3d66cb00600
+1	15372	1761018113844750664	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query_gpu.o	1f2a2cfb9ce997cd
+4	15648	1761018113847750718	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points_gpu.o	38e3d3e1c1c8619a
+4	15733	1761018113847750718	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate_gpu.o	29e35129bba8f719
+2	15747	1761018113845750682	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query_gpu.o	677a761600443a57
+5	15780	1761018113848750736	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling_gpu.o	4b78691338175031
+19	12494	1761030342793531002	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query.o	2db0a3e8d1221b81
+22	12650	1761030342796531038	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling.o	1bb5b4587aa2a006
+20	12771	1761030342794531014	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/bindings.o	abbe41ed5dae77ef
+20	12794	1761030342794531014	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query.o	8dc39e814dee71dd
+21	12809	1761030342795531026	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points.o	49b9dfa71b39a1bc
+21	12821	1761030342795531026	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate.o	c0eb5e56fbc9e127
+21	15413	1761030342795531026	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/group_points_gpu.o	fbe204eb0e0ce894
+20	15426	1761030342794531014	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/cylinder_query_gpu.o	a9df96ede08dcbd7
+22	15566	1761030342796531038	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/interpolate_gpu.o	eff2bbe1afe7d7dc
+19	15580	1761030342793531002	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/ball_query_gpu.o	d2df26b0097ae546
+23	15911	1761030342797531049	/home/zhangboyuan/Programs/AKM/third_party/pointnet2/build/temp.linux-x86_64-cpython-310/pointnet2/_ext_src/src/sampling_gpu.o	d91399c4a87a0ab6

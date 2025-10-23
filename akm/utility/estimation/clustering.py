@@ -7,7 +7,7 @@ from akm.utility.utils import (
     tracksNd_variance_torch,
     napari_time_series_transform,
 )
-from akm.utility.utils import vis_tracks2d_napari
+# from akm.utility.utils import vis_tracks2d_napari
 
 
 def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=False, viewer_title="napari"):
@@ -38,7 +38,7 @@ def cluster_tracks_2d(rgb_seq, tracks_2d, use_diff=True, visualize=False, viewer
         rigid_part_colors = np.zeros((tracks_2d.shape[1], 3)) # M, 3
         rigid_part_colors[moving_mask] = np.array([1, 0, 0]) # red
         rigid_part_colors[static_mask] = np.array([0, 0, 1]) # blue
-        vis_tracks2d_napari(rgb_seq, tracks_2d, colors=rigid_part_colors, viewer_title=viewer_title)
+        # vis_tracks2d_napari(rgb_seq, tracks_2d, colors=rigid_part_colors, viewer_title=viewer_title)
         
     return moving_mask, static_mask
 

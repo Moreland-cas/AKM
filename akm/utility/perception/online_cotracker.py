@@ -5,7 +5,7 @@ import numpy as np
 from cotracker.utils.visualizer import Visualizer
 from cotracker.predictor import CoTrackerOnlinePredictor
 
-from akm.utility.utils import vis_tracks2d_napari
+# from akm.utility.utils import vis_tracks2d_napari
 
 
 def mp4_to_numpy_array_list(mp4_path):
@@ -113,7 +113,7 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False):
     # Remove the batch dimension and transfer it to the CPU
     pred_tracks, pred_visibility = pred_tracks[0].cpu(), pred_visibility[0].cpu()
     
-    if visualize:
-        vis_tracks2d_napari(rgb_frames, pred_tracks, viewer_title="Cotracker returned tracks2d")
+    # if visualize:
+    #     vis_tracks2d_napari(rgb_frames, pred_tracks, viewer_title="Cotracker returned tracks2d")
         
     return pred_tracks, pred_visibility

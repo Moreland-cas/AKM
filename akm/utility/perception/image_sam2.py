@@ -6,6 +6,7 @@ import numpy as np
 from scipy import ndimage
 from skimage import morphology
 from sklearn.cluster import KMeans
+from akm.utility.constants import PROJECT_ROOT
 
 relative_path = os.path.join(PROJECT_ROOT, "third_party", "sam2")
 sys.path.append(relative_path)

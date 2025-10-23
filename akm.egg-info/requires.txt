@@ -1,0 +1,6 @@
+opencv-python-headless
+sapien==2.2.2
+transforms3d
+trimesh
+mplib==0.2.1
+pyglet<2
