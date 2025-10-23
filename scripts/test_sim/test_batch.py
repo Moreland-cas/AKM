@@ -59,6 +59,8 @@ def filter_tasks(base_yaml_path, yaml_path_list):
             with open(os.path.join(saved_prefix, "explore_result.json"), "r") as f:
                 explore_dict = json.load(f)
             if "exception" in explore_dict.keys():
+                if "Remote end closed connection without response" in explore_dict["exception"]:
+                    yaml_path_list_filtered.append(specific_yaml_path)
                 if "out of memory" in explore_dict["exception"]:
                     yaml_path_list_filtered.append(specific_yaml_path)
                 elif "cannot create buffer" in explore_dict["exception"]:

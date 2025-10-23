@@ -1,3 +1,4 @@
+import os
 import cv2
 import torch
 import numpy as np
@@ -5,6 +6,7 @@ import numpy as np
 from cotracker.utils.visualizer import Visualizer
 from cotracker.predictor import CoTrackerOnlinePredictor
 
+from akm.utility.constants import PROJECT_ROOT
 # from akm.utility.utils import vis_tracks2d_napari
 
 
@@ -82,7 +84,7 @@ def track_any_points(rgb_frames, queries=None, grid_size=30, visualize=False):
         queries = queries[None].cuda()
     
     grid_query_frame = 0
-    model = torch.hub.load("facebookresearch/co-tracker", "cotracker3_online")
+    model = torch.hub.load(os.path.join(PROJECT_ROOT, "third_party/co-tracker"), "cotracker3_online", source='local', trust_repo=True)
     model = model.to("cuda")
     window_frames = []
 
