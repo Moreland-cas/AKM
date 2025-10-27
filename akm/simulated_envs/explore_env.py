@@ -1,4 +1,5 @@
 import os
+import time
 import copy
 import json
 import math
@@ -12,6 +13,7 @@ from akm.utility.utils import (
 )
 from akm.simulated_envs.obj_env import ObjEnv
 from akm.utility.constants import ASSET_PATH
+from akm.utility.timer import Timer
 
 
 class ExploreEnv(ObjEnv):
@@ -35,6 +37,9 @@ class ExploreEnv(ObjEnv):
         
         self.joint_type = self.obj_env_cfg["joint_type"]
         
+        # Timer
+        self.explore_timer = Timer()
+        
     def explore_stage(self, visualize=False):
         """
         Explore multiple times until a matching sequence of operations is found, or exit after enough attempts.
@@ -47,6 +52,7 @@ class ExploreEnv(ObjEnv):
         initial_frame = super().capture_frame()
         
         self.logger.log(logging.INFO, "Start transfering 2d contact affordance map...")
+        get_ram_affordance_2d_start = time.time()
         self.affordance_map_2d = get_ram_affordance_2d(
             query_rgb=initial_frame.rgb,
             instruction=self.task_cfg["instruction"],
@@ -55,6 +61,8 @@ class ExploreEnv(ObjEnv):
             visualize=visualize,
             logger=self.logger
         )
+        get_ram_affordance_2d_end = time.time()
+        self.explore_timer.update("get_ram_affordance_2d", get_ram_affordance_2d_end - get_ram_affordance_2d_start)
         
         if not self.explore_env_cfg["contact_analogy"]:
             self.affordance_map_2d.uninit_cosmap()
@@ -99,7 +107,10 @@ class ExploreEnv(ObjEnv):
                 self.reset_robot_safe()
             
             self.logger.log(logging.INFO, f"[{self.num_tries + 1}|{self.max_tries}] Start exploring once...")
+            # explore_once_start = time.time()
             actually_tried, explore_uv = self.explore_once(visualize=visualize)
+            # explore_once_end = time.time()
+            # self.explore_timer.update("explore_once", explore_once_end - explore_once_start)
             self.num_tries += 1
             if not actually_tried:
                 self.logger.log(logging.INFO, "The planning path is not valid, update affordance map and try again...")
@@ -110,7 +121,11 @@ class ExploreEnv(ObjEnv):
                         self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
                 continue
             
-            if self.check_valid(visualize=visualize):
+            check_valid_start = time.time()
+            is_valid = self.check_valid(visualize=visualize)
+            check_valid_end = time.time()
+            self.explore_timer.update("check_valid", check_valid_end - check_valid_start)
+            if is_valid:
                 self.logger.log(logging.INFO, "Check valid, break explore loop")
                 break
             else:
@@ -155,6 +170,7 @@ class ExploreEnv(ObjEnv):
             explore_ok: bool, indicating whether the plan phase was successful.
             explore_uv: np.array([2,]), representing the UVs of the contact points in this attempt.
         """        
+        explore_once_prepare_start = time.time()
         Tw2c = self.camera_extrinsic
         Tc2w = np.linalg.inv(Tw2c)
         
@@ -175,6 +191,7 @@ class ExploreEnv(ObjEnv):
         cur_frame.contact2d = contact_uv
         
         # Here rgb_np, depth_np may be different from those stored in affordance_map_2d, but it should not be too different
+        detect_grasp_start = time.time()
         cur_frame.detect_grasp(
             use_anygrasp=self.algo_cfg["use_anygrasp"],
             world_frame=True,
@@ -182,6 +199,8 @@ class ExploreEnv(ObjEnv):
             asset_path=ASSET_PATH,
             logger=self.logger
         )
+        detect_grasp_end = time.time()
+        self.explore_timer.update("detect_grasp", detect_grasp_end - detect_grasp_start)
         
         if cur_frame.grasp_group is None:
             return False, contact_uv
@@ -219,6 +238,10 @@ class ExploreEnv(ObjEnv):
         if result_pre is None:
             return False, contact_uv
         
+        explore_once_prepare_end = time.time()
+        self.explore_timer.update("explore_once_prepare", explore_once_prepare_end - explore_once_prepare_start)
+        
+        explore_once_move_start = self.cur_steps * self.phy_timestep
         self.follow_path(result_pre)
         self.open_gripper()
         self.clear_planner_pc()
@@ -236,15 +259,16 @@ class ExploreEnv(ObjEnv):
             moving_distance=self.pertubation_distance,
             drop_large_move=False
         )
-        
+        explore_once_move_end = self.cur_steps * self.phy_timestep
+        self.explore_timer.update("explore_once_move", explore_once_move_end - explore_once_move_start)
         self.step = self.base_step 
         return True, contact_uv
     
     def explore_step(self):
         self.base_step()
         
-        self.cur_steps = self.cur_steps % self.record_interval
-        if self.cur_steps == 0:
+        cur_steps = self.cur_steps % self.record_interval
+        if cur_steps == 0:
             cur_frame = self.capture_frame()
             self.obj_repr.frames.append(cur_frame)
     
@@ -295,3 +319,6 @@ class ExploreEnv(ObjEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                
+            # save Timer info
+            self.explore_timer.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "explore_timer.json"))

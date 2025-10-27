@@ -1,4 +1,5 @@
 import os
+import time
 import copy
 import json
 import logging
@@ -9,12 +10,16 @@ from akm.utility.utils import numpy_to_json
 from akm.representation.obj_repr import Obj_repr
 from akm.representation.basic_structure import Frame
 from akm.simulated_envs.reconstruct_env import ReconEnv
+from akm.utility.timer import Timer
 
 
 class ManipulateEnv(ReconEnv):
     def __init__(self, cfg):       
         super().__init__(cfg)
         self.manip_env_cfg = cfg["manip_env_cfg"]
+        
+        # Timer
+        self.manip_timer = Timer()
           
     def manip_once(self):
         """
@@ -121,9 +126,19 @@ class ManipulateEnv(ReconEnv):
         results = {
             num_manip: self.evaluate()
         }
-        while(self.not_good_enough(range_transition=range_transition, visualize=visualize) and (num_manip < self.max_manip)):
+        
+        not_good = True
+        while(not_good and (num_manip < self.max_manip)):
+            reloc_time_start = time.time()
+            not_good = self.not_good_enough(range_transition=range_transition, visualize=visualize)
+            reloc_time_end = time.time()
+            self.manip_timer.update(f"reloc_{range_transition}", reloc_time_end - reloc_time_start)
+        
             self.logger.log(logging.INFO, f"Start manipulating, round {num_manip + 1}...")
+            manip_move_start = self.cur_steps * self.phy_timestep
             result = self.manip_once()
+            manip_move_end = self.cur_steps * self.phy_timestep
+            self.manip_timer.update(f"manip_move_{range_transition}", manip_move_end - manip_move_start)
             num_manip = num_manip + 1
             results[num_manip] = result
         
@@ -211,4 +226,7 @@ class ManipulateEnv(ReconEnv):
                 "obj_repr.npy"
             )
             self.obj_repr.save(save_path)
+        
+        # save Timer info
+        self.manip_timer.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "manip_timer.json"))
     

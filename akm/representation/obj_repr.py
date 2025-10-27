@@ -1,3 +1,4 @@
+import time
 import copy
 import logging
 import numpy as np
@@ -237,7 +238,10 @@ class Obj_repr(Data):
         """
         Recover the joint state dict from frames
         """
+        coarse_start_time = time.time()
         self.coarse_joint_estimation(visualize=visualize, num_R_augmented=num_R_augmented)
+        coarse_end_time = time.time()
+        fine_start_time = time.time()
         self.initialize_kframes(num_kframes=num_kframes, save_memory=save_memory)
         self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
         self.kframes.classify_dynamics(
@@ -246,7 +250,7 @@ class Obj_repr(Data):
             visualize=visualize
         )
         self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
-           
+        fine_end_time = time.time()
         result = None
         if evaluate:
             if self.gt_joint_dict["joint_type"] is None:
@@ -255,6 +259,8 @@ class Obj_repr(Data):
             self.logger.log(logging.INFO, "Reconstruction Result:")
             for k, v in result.items():
                 self.logger.log(logging.INFO, f"{k}, {v}")
+            result["coarse_time"] = coarse_end_time - coarse_start_time
+            result["fine_time"] = fine_end_time - fine_start_time
         return result
     
     def update_state(self, query_frame: Frame):

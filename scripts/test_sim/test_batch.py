@@ -139,8 +139,8 @@ def distribute_tasks(tasks, num_groups):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=1)
-    parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=0)
+    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=40)
+    parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
     
     # method_cfg for base yaml path
     parser.add_argument('--method_cfg', type=str, default="ours")

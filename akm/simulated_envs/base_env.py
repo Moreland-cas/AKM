@@ -32,6 +32,7 @@ class BaseEnv():
                 
         self.offscreen = self.base_env_cfg["offscreen"]
         phy_timestep = self.base_env_cfg["phy_timestep"]
+        self.phy_timestep = phy_timestep
         planner_timestep = self.base_env_cfg["planner_timestep"]
         use_sapien2 = self.base_env_cfg["use_sapien2"]
         self.use_sapien2 = use_sapien2

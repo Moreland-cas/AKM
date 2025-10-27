@@ -4,6 +4,7 @@ import yaml
 import sys
 import argparse
 import numpy as np
+from akm.utility.constants import PROJECT_ROOT
 
 ################# HYPER_PARAMETERS #################
 EXPLORE_PRISMATIC_VALID = 0.05 # m
@@ -387,27 +388,27 @@ def analyze(run_name="6_21"):
                     continue
                 data_list.append(
                     ExpDataPiece(
-                        cfgs_path="/home/Programs/AKM/cfgs",
+                        cfgs_path = os.path.join(PROJECT_ROOT, "cfgs/simulation_cfgs/methods"),
                         run_name=run_name,          
                         obj_idx=obj_idx,         
                         range_transition=f"{i}_{j}"
                     )
                 )
     dataAnalyze = DataAnalyze(datalist=data_list)
-    print_path = f"/home/Programs/AKM/assets/analysis/{run_name}.txt"
+    print_path = os.path.join(PROJECT_ROOT, f"assets/analysis/{run_name}.txt")
     with open(print_path, "w") as f:
         sys.stdout = f
         dataAnalyze.summary_explore()
         dataAnalyze.summary_recon()
         dataAnalyze.summary_manip()
     
-    save_path = f"/home/Programs/AKM/assets/analysis/{run_name}.npy"
+    save_path = os.path.join(PROJECT_ROOT, f"assets/analysis/{run_name}.npy")
     np.save(save_path, dataAnalyze.processed_data_dict)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run_name')
+    parser.add_argument('--run_name', default="ours_new")
     
     args = parser.parse_args()
     analyze(args.run_name)

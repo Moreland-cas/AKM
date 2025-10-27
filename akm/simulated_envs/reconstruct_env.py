@@ -10,6 +10,7 @@ from akm.utility.utils import (
 from akm.representation.obj_repr import Obj_repr
 from akm.representation.basic_structure import Frame
 from akm.simulated_envs.explore_env import ExploreEnv
+from akm.utility.timer import Timer
 
 
 class ReconEnv(ExploreEnv):
@@ -20,6 +21,9 @@ class ReconEnv(ExploreEnv):
         self.num_kframes = self.recon_env_cfg["num_kframes"]
         self.fine_lr = self.recon_env_cfg["fine_lr"]
         self.reloc_lr = self.recon_env_cfg["reloc_lr"]
+        
+        # Timer
+        self.recon_timer = Timer()
     
     def update_cur_frame(self, init_guess=None, visualize=False):
         """
@@ -108,6 +112,7 @@ class ReconEnv(ExploreEnv):
         if load_path is not None:
             self.obj_repr = Obj_repr.load(load_path)
         
+        # recon_start
         self.recon_result = self.obj_repr.reconstruct(
             num_kframes=self.num_kframes,
             obj_description=self.obj_description,
@@ -116,6 +121,8 @@ class ReconEnv(ExploreEnv):
             num_R_augmented=self.recon_env_cfg["num_R_augmented"],
             evaluate=True
         )
+        self.recon_timer.update("coarse_estimation", self.recon_result["coarse_time"])
+        self.recon_timer.update("fine_estimation", self.recon_result["fine_time"])
         self.logger.log(logging.INFO, self.recon_result)
         return self.recon_result
     
@@ -147,3 +154,6 @@ class ReconEnv(ExploreEnv):
             )
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
+                
+            # save Timer info
+            self.recon_timer.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "recon_timer.json"))

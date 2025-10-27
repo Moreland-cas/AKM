@@ -95,7 +95,8 @@ def detect_grasp_anygrasp(
     dir_out = dir_out / np.linalg.norm(dir_out)
     if augment:
         np.random.seed(666)
-        random_perturb = np.random.randn(20, 3) 
+        # random_perturb = np.random.randn(20, 3) 
+        random_perturb = np.random.randn(5, 3) 
         # Keep the original dir_out
         random_perturb[0] = random_perturb[0] * 0
         dir_outs = dir_out + random_perturb * 0.5 # N, 3

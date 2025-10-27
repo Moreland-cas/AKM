@@ -15,7 +15,8 @@ def icp_loss_torch(
     target_normals, # better provided
     loss_type, # plane_to_plane
     icp_select_range, # 0.1
-    num_sample_points=10000
+    num_sample_points=1000
+    # num_sample_points=10000
 ):
     """
     Calculates ICP loss (point-to-point or point-to-plane), supporting translation or rotation.
