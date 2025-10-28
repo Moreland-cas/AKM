@@ -1,7 +1,7 @@
 exp_cfg:
 # one experiment has multiple task, each has a unique task id
 # the related files of task id are saved under exp_folder/task_id
-  exp_folder: "/home/zhangboyuan/Programs/AKM/assets/logs_batch/ours_new"
+  exp_folder: "/home/zhangboyuan/Programs/AKM/assets/logs_batch/ours_base"
   method_name: "ours"
   save_cfg: True
   save_obj_repr: False
@@ -44,15 +44,15 @@ explore_env_cfg:
   update_sigma: 0.05
   max_tries: 25
   fully_zeroshot: False
-  num_initial_pts: 100
+  num_initial_pts: 1000
   use_IOR: True
   contact_analogy: True
 
 recon_env_cfg:
-  num_kframes: 5
+  num_kframes: 3
   fine_lr: 0.001
   reloc_lr: 0.003
-  num_R_augmented: 1000
+  num_R_augmented: 100
 
 manip_env_cfg:
   # max number of manipulations used for closed-loop control

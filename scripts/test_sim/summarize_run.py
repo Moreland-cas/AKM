@@ -50,6 +50,19 @@ class ExpDataPiece():
             self.manip_result = manip_result[range_transition]
             
         self.joint_type = self.task_yaml["obj_env_cfg"]["joint_type"]
+        
+        # Add timer result
+        with open(os.path.join(run_path, "explore_timer.json"), "r") as f:
+            explore_timer = json.load(f)
+            self.explore_timer = explore_timer
+        
+        with open(os.path.join(run_path, "recon_timer.json"), "r") as f:
+            recon_timer = json.load(f)
+            self.recon_timer = recon_timer
+            
+        with open(os.path.join(run_path, "manip_timer.json"), "r") as f:
+            manip_timer = json.load(f)
+            self.manip_timer = manip_timer
     
     def explore_actually_valid(self):
         """
@@ -152,6 +165,12 @@ class ExpDataPiece():
             
         self.actual_explore_valid = self.explore_actually_valid()
         
+        # explore timer
+        self.CA_time = self.explore_timer["get_ram_affordance_2d"][0]
+        self.AT_once_time = sum(self.explore_timer["check_valid"]) / len(self.explore_timer["check_valid"])
+        self.explore_move_time = sum(self.explore_timer["explore_once_move"]) / len(self.explore_timer["explore_once_move"])
+        self.explore_total_time = self.explore_timer["get_ram_affordance_2d"][0] + sum(self.explore_timer["explore_once_prepare"]) + sum(self.explore_timer["explore_once_move"]) + sum(self.explore_timer["check_valid"])
+        
         self.pred_type_right = self.reconstruct_type_right()
         self.coarse_recon_valid = [self.coarse_reconstruct_valid_under_thr(
             angle_thr_deg=angle_thr_deg,
@@ -162,11 +181,34 @@ class ExpDataPiece():
             pivot_thr_m=pivot_thr_m
         ) for (angle_thr_deg, pivot_thr_m) in zip(ANGLE_THRESHS, PIVOT_THRESHS)]
         
+        # recon timer
+        # only for those that pred to have valid interaction
+        # if self.pred_explore_valid:
+        if self.recon_timer != {}:
+            self.coarse_time = self.recon_timer["coarse_estimation"]
+            self.fine_time = self.recon_timer["fine_estimation"]
+            self.recon_total_time = [self.recon_timer["coarse_estimation"][0] + self.recon_timer["fine_estimation"][0]]
+        else:
+            self.coarse_time = []
+            self.fine_time = []
+            self.recon_total_time = []
+        
         self.manip_valid = []
         for i in range(self.task_yaml["manip_env_cfg"]["max_manip"] + 1):
             self.manip_valid.append([
                 self.manipulate_valid_under_thr(num_manip=i, rel_thr=thr) for thr in MANIP_RELATIVE_VALID_THRESHS
             ])
+        # manip timer
+        if self.manip_timer != {}:
+            manip_move_data = self.manip_timer[f"manip_move_{self.range_transition}"]
+            reloc_data = self.manip_timer[f"reloc_{self.range_transition}"]
+            self.manip_move_time = [sum(manip_move_data) / len(manip_move_data)]
+            self.reloc_time = [sum(reloc_data) / len(reloc_data)]
+            self.manip_total_time = [sum(manip_move_data) + sum(reloc_data)]
+        else:
+            self.manip_move_time = []
+            self.reloc_time = []
+            self.manip_total_time = []
         
         # padd self.loss_array to max_tries
         self.num_closed_loop_manip = len(self.loss_array)
@@ -181,6 +223,7 @@ def print_frac(prefix, numerator, denominator, use_percentage=True):
         print(f"{prefix}{numerator} / {denominator} = {frac_percentage:.2f}%")
     else:
         print(f"{prefix}{numerator} / {denominator} = {frac:.2f}")
+        
         
 class DataAnalyze():
     def __init__(self, datalist):
@@ -200,7 +243,12 @@ class DataAnalyze():
                 "Tries_1": {
                     "SR_pred": 0,
                     "SR_5_5": 0,
-                }
+                },
+                # timer
+                "total_time": 0,
+                "CA_time": 0,
+                "AT_once_time": 0,
+                "move_once_time": 0,
                 # ...
             },
             "Modeling": {
@@ -217,8 +265,15 @@ class DataAnalyze():
                     "SR_10_10": 0,
                     "SR_20_20": 0,
                 },
+                # Timer
+                "total_time": 0,
+                "coarse_est_time": 0,
+                "fine_est_time": 0,
             },
             "Manipulation": {
+                "total_time": 0,
+                "move_once_time": 0,
+                "reloc_once_time": 0,
                 "0th": {
                     "SR_0.1": 0,
                     "SR_0.2": 0,
@@ -265,6 +320,7 @@ class DataAnalyze():
         num_pred_valid = {i: 0 for i in range(1, max_tries + 1)}
         num_actual_valid = {i: 0 for i in range(1, max_tries + 1)}
         
+        
         # Process the results of each task
         for datapiece in self.datalist:
             datapiece: ExpDataPiece
@@ -278,6 +334,17 @@ class DataAnalyze():
         print_frac("SR (actual): ", num_actual_valid[max_tries], self.num_total_exp)
         print_frac("SR (pred): ", num_pred_valid[max_tries], self.num_total_exp)
         print_frac("Num Tries (all): ", tries_sum, self.num_total_exp, use_percentage=False)
+        
+        # print timer info
+        total_time_sum = sum([datapiece.explore_total_time for datapiece in self.datalist])
+        CA_time_sum = sum([datapiece.CA_time for datapiece in self.datalist])
+        AT_once_time_sum = sum([datapiece.AT_once_time for datapiece in self.datalist])
+        move_once_time_sum = sum([datapiece.explore_move_time for datapiece in self.datalist])
+        
+        print_frac("Total time (mean): ", total_time_sum, self.num_total_exp, use_percentage=False)
+        print_frac("CA time (mean): ", CA_time_sum, self.num_total_exp, use_percentage=False)
+        print_frac("AT once time (mean): ", AT_once_time_sum, self.num_total_exp, use_percentage=False)
+        print_frac("Move once time (mean): ", move_once_time_sum, self.num_total_exp, use_percentage=False)
     
         print("\nDetailed Results (All Joints):")
         for tries in range(1, max_tries + 1):
@@ -309,6 +376,19 @@ class DataAnalyze():
         sum_pred_type_right = sum([int(datapiece.pred_type_right) for datapiece in datalist_filtered])
         print_frac("Joint type pred SR: ", sum_pred_type_right, self.num_total_exp)
         
+        # Timer
+        coarse_time_list = []
+        fine_time_list = []
+        total_time_list = []
+        for datapiece in datalist_filtered:
+            coarse_time_list.extend(datapiece.coarse_time)
+            fine_time_list.extend(datapiece.fine_time)
+            total_time_list.extend(datapiece.recon_total_time)
+        # print(len(coarse_time_list), len(fine_time_list), len(total_time_list))
+        print_frac("coarse time (mean): ", sum(coarse_time_list), len(coarse_time_list), use_percentage=False)
+        print_frac("fine time (mean): ", sum(fine_time_list), len(fine_time_list), use_percentage=False)
+        print_frac("total time (mean): ", sum(total_time_list), len(total_time_list), use_percentage=False)
+        
         # for data save
         self.processed_data_dict["Modeling"]["Type_acc"] = sum_pred_type_right / self.num_total_exp * 100
         
@@ -329,6 +409,7 @@ class DataAnalyze():
         Average manip_error for all exp (including close_loop)
         Manip_sr for different thresh values:
         """
+        
         if range_transition_delta is None:
             datalist_filtered = self.datalist
         else:
@@ -375,6 +456,19 @@ class DataAnalyze():
             
     def summary_manip(self):
         print("\n************** Manipulation Stage Analysis **************")
+        # Timer
+        move_time_list = []
+        reloc_time_list = []
+        total_time_list = []
+        for datapiece in self.datalist:
+            move_time_list.extend(datapiece.manip_move_time)
+            reloc_time_list.extend(datapiece.reloc_time)
+            total_time_list.extend(datapiece.manip_total_time)
+        # print(len(coarse_time_list), len(fine_time_list), len(total_time_list))
+        print_frac("move time (mean): ", sum(move_time_list), len(move_time_list), use_percentage=False)
+        print_frac("reloc time (mean): ", sum(reloc_time_list), len(reloc_time_list), use_percentage=False)
+        print_frac("total time (mean): ", sum(total_time_list), len(total_time_list), use_percentage=False)
+        
         self.summary_manip_helper()
         print("****************************************************")
         

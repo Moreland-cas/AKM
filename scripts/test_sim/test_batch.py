@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
     
     # method_cfg for base yaml path
-    parser.add_argument('--method_cfg', type=str, default="ours")
+    parser.add_argument('--method_cfg', type=str, default="ours_base")
     parser.add_argument('--task_cfgs_folder', type=str, default=os.path.join(PROJECT_ROOT, "cfgs/simulation_cfgs/tasks"))
     
     args = parser.parse_args()
