@@ -37,7 +37,7 @@ def collect_data(
             "exp_folder": "/home/user/Programs/AKM/assets",
             "method_name": "ours",
             "save_cfg": False,
-            "save_obj_repr": False,
+            "save_vis": False,
             "save_result": False,
             "realworld": True
         },

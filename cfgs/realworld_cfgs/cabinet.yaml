@@ -2,7 +2,7 @@ exp_cfg:
   exp_folder: /home/user/Programs/AKM/assets/logs_rw/cabinet
   method_name: ours
   save_cfg: true
-  save_obj_repr: true
+  save_vis: true
   save_result: true
   realworld: true
 logging:

@@ -71,7 +71,7 @@ class ExploreEnv(ObjEnv):
             self.logger.log(logging.INFO, "Detected contact_analogy flag = True, use Contact Analogy")
         
         # Save the cos_map obtained when initializing the affordance map
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             self.obj_repr.save_for_vis.update({
                 "explore_cos_map": [np.copy(self.affordance_map_2d.cos_map)]
             })
@@ -110,7 +110,7 @@ class ExploreEnv(ObjEnv):
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=True)
                     
                     # Save the cos_map of the affordance map after update
-                    if self.exp_cfg["save_obj_repr"]:
+                    if self.exp_cfg["save_vis"]:
                         self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
                 continue
             
@@ -123,10 +123,10 @@ class ExploreEnv(ObjEnv):
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=True)
                 
                 # Save the cos_map of the affordance map after update
-                if self.exp_cfg["save_obj_repr"]:
+                if self.exp_cfg["save_vis"]:
                     self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
 
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             self.obj_repr.save_for_vis["aff_map"] = copy.deepcopy(self.affordance_map_2d)
                     
         # save explore data
@@ -372,7 +372,7 @@ class ExploreEnv(ObjEnv):
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.explore_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             save_path = os.path.join(
                 self.exp_cfg["exp_folder"],
                 str(self.task_cfg["task_id"]),

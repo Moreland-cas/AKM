@@ -20,7 +20,10 @@ class ManipulateEnv(ReconEnv):
         
         # Timer
         self.manip_timer = Timer()
-          
+        
+        # visualization
+        self.manip_vis = {}
+        
     def manip_once(self):
         """
         First, relocate the initial frame state and obtain the target state according to the instruction.
@@ -101,7 +104,7 @@ class ManipulateEnv(ReconEnv):
             # NOTE Here you need to modify repositioning to use the current frame instead of the initial frame
             self.target_state = self.cur_state + self.goal_delta
         
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             if range_transition not in self.obj_repr.save_for_vis:
                 self.obj_repr.save_for_vis[range_transition] = []
             self.cur_frame.target_state = self.target_state
@@ -219,13 +222,13 @@ class ManipulateEnv(ReconEnv):
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.manip_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             save_path = os.path.join(
                 self.exp_cfg["exp_folder"],
                 str(self.task_cfg["task_id"]),
                 "obj_repr.npy"
             )
-            self.obj_repr.save(save_path)
+            # self.obj_repr.save(save_path)
         
         # save Timer info
         self.manip_timer.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "manip_timer.json"))

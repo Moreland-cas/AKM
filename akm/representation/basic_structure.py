@@ -474,6 +474,8 @@ class Frames(Data):
         
     def get_rgb_seq(self):
         # T, H, W, C
+        if len(self.frame_list) == 0:
+            return None
         rgb_seq = np.stack([self.frame_list[i].rgb for i in range(self.num_frames())]) 
         return rgb_seq
         

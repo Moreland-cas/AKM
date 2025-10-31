@@ -29,6 +29,28 @@ def initialize_napari():
             QTimer().singleShot(time_in_msec, app.quit)
         viewer.close()
 
+def save_list_as_video(image_list, output_path, fps=30):
+    if image_list is None:
+        print(f"Input image list is None, thus skip!")
+        return
+
+    # 获取图像尺寸
+    H, W, _ = image_list[0].shape
+
+    # 定义视频编码器
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 或者 'XVID'
+    out = cv2.VideoWriter(output_path, fourcc, fps, (W, H))
+
+    for frame in image_list:
+        if frame.shape != (H, W, 3):
+            raise ValueError("All frames must have the same shape (H, W, 3)")
+        # OpenCV 使用 BGR 格式，而输入是 RGB，需要转换
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        out.write(frame_bgr)
+
+    out.release()
+    print(f"Video saved to {output_path}")
+    
 def clean_pc_np(
     points: np.ndarray,
     voxel_size=0.01,
@@ -1886,3 +1908,11 @@ def numpy_to_json(obj):
     elif isinstance(obj, np.ints32):
         return int(obj) # Convert a NumPy int32 to a Python int
     raise TypeError(f"Type {type(obj)} not serializable")
+
+
+if __name__ == "__main__":
+    def frames():
+    # 3 帧 120×160 RGB 图像
+        return [np.random.randint(0, 256, (120, 160, 3), dtype=np.uint8) for _ in range(100)]
+    out_file = "/home/zhangboyuan/Programs/AKM/assets/out.mp4"
+    save_list_as_video(frames(), str(out_file), fps=30)

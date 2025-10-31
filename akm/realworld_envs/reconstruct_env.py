@@ -211,7 +211,7 @@ class ReconEnv(ExploreEnv):
         )
         self.recon_result = self.recon_stage(visualize=True)
         
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             save_path = os.path.join(
                 self.exp_cfg["exp_folder"],
                 str(self.task_cfg["task_id"]),

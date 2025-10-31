@@ -4,7 +4,7 @@ exp_cfg:
   exp_folder: "/home/Programs/Embodied_Analogy/assets/logs_batch/gflow"
   method_name: "gflow"
   save_cfg: True
-  save_obj_repr: False
+  save_vis: False
   save_result: True
 
 logging:

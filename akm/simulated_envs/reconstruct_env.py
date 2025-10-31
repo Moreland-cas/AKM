@@ -24,7 +24,7 @@ class ReconEnv(ExploreEnv):
         
         # Timer
         self.recon_timer = Timer()
-    
+        
     def update_cur_frame(self, init_guess=None, visualize=False):
         """
         Will update self.cur_frame and self.cur_state
@@ -124,6 +124,7 @@ class ReconEnv(ExploreEnv):
         self.recon_timer.update("coarse_estimation", self.recon_result["coarse_time"])
         self.recon_timer.update("fine_estimation", self.recon_result["fine_time"])
         self.logger.log(logging.INFO, self.recon_result)
+        
         return self.recon_result
     
     def main(self):
@@ -157,3 +158,8 @@ class ReconEnv(ExploreEnv):
                 
             # save Timer info
             self.recon_timer.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "recon_timer.json"))
+        
+        if self.exp_cfg["save_vis"]:
+            pass
+            # self.obj_repr.frames.frame_list = []
+            # self.obj_repr.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "obj_repr.npy"))

@@ -650,7 +650,7 @@ class GeneralFlow_ManipEnv(ManipulateEnv):
             with open(save_json_path, 'w', encoding='utf-8') as json_file:
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
-        if self.exp_cfg["save_obj_repr"]:
+        if self.exp_cfg["save_vis"]:
             save_path = os.path.join(
                 self.exp_cfg["exp_folder"],
                 str(self.task_cfg["task_id"]),

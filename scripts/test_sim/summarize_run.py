@@ -502,7 +502,7 @@ def analyze(run_name="6_21"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run_name', default="ours_new")
+    parser.add_argument('--run_name', default="sigma_0.08")
     
     args = parser.parse_args()
     analyze(args.run_name)

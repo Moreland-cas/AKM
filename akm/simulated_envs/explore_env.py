@@ -9,7 +9,8 @@ import numpy as np
 from akm.utility.utils import (
     camera_to_world,
     visualize_pc,
-    numpy_to_json
+    numpy_to_json,
+    save_list_as_video
 )
 from akm.simulated_envs.obj_env import ObjEnv
 from akm.utility.constants import ASSET_PATH
@@ -39,6 +40,10 @@ class ExploreEnv(ObjEnv):
         
         # Timer
         self.explore_timer = Timer()
+        
+        # vis
+        # store initial affordance_map_2d, and each time the selected grasp and manip traj 
+        self.explore_vis = {}
         
     def explore_stage(self, visualize=False):
         """
@@ -70,10 +75,10 @@ class ExploreEnv(ObjEnv):
         else:
             self.logger.log(logging.INFO, "Detected contact_analogy flag = True, use Contact Analogy")
         
-        if self.exp_cfg["save_obj_repr"]:
-            self.obj_repr.save_for_vis.update({
-                "explore_cos_map": [np.copy(self.affordance_map_2d.cos_map)]
-            })
+        # if self.exp_cfg["save_vis"]:
+        #     self.explore_vis.update({
+        #         "explore_cos_map": [np.copy(self.affordance_map_2d.cos_map)]
+        #     })
             
         self.obj_repr.obj_description = self.obj_description
         self.obj_repr.K = self.camera_intrinsic
@@ -92,13 +97,6 @@ class ExploreEnv(ObjEnv):
             
         self.num_tries = 0
         while self.num_tries < self.max_tries:
-            if self.num_tries >= 1:
-                if self.exp_cfg["save_obj_repr"]:
-                    self.obj_repr.save_for_vis[str(self.num_tries)] = [
-                        copy.deepcopy(self.obj_repr.frames[0]),
-                        copy.deepcopy(self.obj_repr.frames[-1])
-                    ]
-                    
             self.obj_repr.clear_frames()
             
             if self.num_tries == 0:
@@ -117,14 +115,23 @@ class ExploreEnv(ObjEnv):
                 if self.explore_env_cfg["use_IOR"]:
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                     
-                    if self.exp_cfg["save_obj_repr"]:
-                        self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
+                    # if self.exp_cfg["save_vis"]:
+                    #     self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
                 continue
             
             check_valid_start = time.time()
             is_valid = self.check_valid(visualize=visualize)
             check_valid_end = time.time()
             self.explore_timer.update("check_valid", check_valid_end - check_valid_start)
+            
+            if self.exp_cfg["save_vis"]:
+                self.logger.log(logging.INFO, f"Append explore result {self.num_tries} video frames...")
+                if "video_frames" not in self.explore_vis:
+                    self.explore_vis.update({
+                        "video_frames": []
+                    })
+                self.explore_vis["video_frames"].append(self.obj_repr.frames.get_rgb_seq())
+                    
             if is_valid:
                 self.logger.log(logging.INFO, "Check valid, break explore loop")
                 break
@@ -133,11 +140,11 @@ class ExploreEnv(ObjEnv):
                 if self.explore_env_cfg["use_IOR"]:
                     self.affordance_map_2d.update(neg_uv_rgb=explore_uv, update_sigma=self.update_sigma, visualize=visualize)
                 
-                if self.exp_cfg["save_obj_repr"]:
-                    self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
+                # if self.exp_cfg["save_vis"]:
+                #     self.obj_repr.save_for_vis["explore_cos_map"].append(np.copy(self.affordance_map_2d.cos_map))
 
-        if self.exp_cfg["save_obj_repr"]:
-            self.obj_repr.save_for_vis["aff_map"] = copy.deepcopy(self.affordance_map_2d)
+        # if self.exp_cfg["save_vis"]:
+        #     self.obj_repr.save_for_vis["aff_map"] = copy.deepcopy(self.affordance_map_2d)
                     
         # save explore data
         if visualize:
@@ -322,3 +329,11 @@ class ExploreEnv(ObjEnv):
                 
             # save Timer info
             self.explore_timer.save(os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]), "explore_timer.json"))
+            
+            # save vis
+            if self.exp_cfg["save_vis"]:
+                self.logger.log(logging.INFO, f"Saving video ...")
+                for idx, thwc in enumerate(self.explore_vis["video_frames"]):
+                    save_prefix = os.path.join(self.exp_cfg["exp_folder"], str(self.task_cfg["task_id"]))
+                    save_path = os.path.join(save_prefix, f"explore_{idx}.mp4")
+                    save_list_as_video(thwc, save_path)
