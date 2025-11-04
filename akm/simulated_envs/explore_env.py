@@ -306,6 +306,9 @@ class ExploreEnv(ObjEnv):
             return False
         
     def main(self):
+        # self.logger.log(logging.INFO, "Starting Explore")
+        # return
+    
         try:
         # if True:
             self.explore_result = {}

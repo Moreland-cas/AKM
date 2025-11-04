@@ -52,7 +52,7 @@ def filter_tasks(base_yaml_path, yaml_path_list):
                 all_exist = False
                 # Found that the three files do not exist at the same time, so you need to run
                 yaml_path_list_filtered.append(specific_yaml_path)
-                continue
+                break
         
         if all_exist:
             # If the exception in explore is CUDA out of memory, you also need to run
@@ -61,7 +61,7 @@ def filter_tasks(base_yaml_path, yaml_path_list):
             if "exception" in explore_dict.keys():
                 if "Remote end closed connection without response" in explore_dict["exception"]:
                     yaml_path_list_filtered.append(specific_yaml_path)
-                if "out of memory" in explore_dict["exception"]:
+                elif "out of memory" in explore_dict["exception"]:
                     yaml_path_list_filtered.append(specific_yaml_path)
                 elif "cannot create buffer" in explore_dict["exception"]:
                     yaml_path_list_filtered.append(specific_yaml_path)
@@ -139,7 +139,7 @@ def distribute_tasks(tasks, num_groups):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=40)
+    parser.add_argument('--ts', help="total split, split the tasks into e.g. 4 split", type=int, default=80)
     parser.add_argument('--cs', help="current split, e.g. one of [0, 1, 2, 3] when total split is 4", type=int, default=1)
     
     # method_cfg for base yaml path
@@ -156,10 +156,11 @@ if __name__ == "__main__":
     # filter yaml_path_list
     base_yaml_path = os.path.join(PROJECT_ROOT, "cfgs/simulation_cfgs/methods", f"{args.method_cfg}.yaml")
     yaml_path_list = filter_tasks(base_yaml_path, yaml_path_list)
-    
+    # import pdb;pdb.set_trace()
+
     task_groups = distribute_tasks(yaml_path_list, args.ts)
     current_group = task_groups[args.cs]
-    
+    print(current_group)
     failed_list = test_batch(
         base_yaml_path=base_yaml_path,
         yaml_path_list=current_group,

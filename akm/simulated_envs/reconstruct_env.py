@@ -130,6 +130,9 @@ class ReconEnv(ExploreEnv):
     def main(self):
         super().main()
         
+        # self.logger.log(logging.INFO, "Starting Recon")
+        # return
+        
         try:
             self.recon_result = {}
             

@@ -103,8 +103,11 @@ class BaseEnv():
         )
     
     def setup_logger(self, cfg, txt_path):
-        os.makedirs(os.path.dirname(txt_path), exist_ok=True)
+        # os.makedirs(os.path.dirname(txt_path), exist_ok=True)
         logger = logging.getLogger(f'logger_{cfg["task_cfg"]["task_id"]}')
+        # print(f'**** {txt_path}  {cfg["task_cfg"]["task_id"]} ****')
+        if logger.hasHandlers():
+            logger.handlers.clear()
         
         level = cfg["logging"]["level"]
         if level == "DEBUG":

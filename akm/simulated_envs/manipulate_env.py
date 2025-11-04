@@ -181,6 +181,10 @@ class ManipulateEnv(ReconEnv):
         
     def main(self):
         super().main()
+        
+        # self.logger.log(logging.INFO, "Starting Manip")
+        # return
+    
         self.manip_result = {}
         
         for k, v in self.manip_env_cfg["tasks"].items():
