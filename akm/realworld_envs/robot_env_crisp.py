@@ -4,70 +4,22 @@ import logging
 import numpy as np
 import pybullet as p
 import pybullet_data
-from franky import *
+from franky import (
+    Gripper,
+    CartesianMotion,
+    Affine,
+    ReferenceType,
+    Reaction,
+    JointMotion
+)
+from crisp_py.robot import make_robot
+from crisp_py.utils.geometry import Pose
 import sapien.core as sapien
 from scipy.ndimage import binary_dilation
 from scipy.spatial.transform import Rotation as R
 
 from akm.utility.utils import clean_pc_np
 from akm.realworld_envs.base_env import BaseEnv
-
-
-class RealworldRobot():
-    def __init__(self, mplib_robot, franky_robot, franky_gripper):
-        self.mplib_robot = mplib_robot
-        self.franky_robot = franky_robot
-        self.franky_gripper = franky_gripper
-
-    def set_root_pose(self, pose):
-        self.mplib_robot.set_root_pose(pose)
-
-    def get_qlimits(self):
-        return self.mplib_robot.get_qlimits()
-
-    def get_active_joints(self):
-        return self.mplib_robot.get_active_joints()
-
-    def get_links(self):
-        return self.mplib_robot.get_links()
-
-    def get_qpos(self):
-        """
-        mplib requires an array of size (9,), but self.franky_robot directly returns an array of dimension (7,). This needs to be expanded.
-        return realworld robot qpos, np.array([9])
-        """
-        gripper_width = self.franky_gripper.width
-        gripper_qpos = gripper_width / 2.
-        qpos_7 = self.franky_robot.current_joint_state.position
-        qpos_9 = np.concatenate([qpos_7, [gripper_qpos, gripper_qpos]])
-        return qpos_9
-
-    def move(self, motion):
-        self.franky_robot.move(motion)
-
-    def get_ee_pose(self, as_matrix=False):
-        """
-        Get the ee_pos and ee_quat (Tph2w) of the end-effector (panda_hand)
-        ee_pos: np.array([3, ])
-        ee_quat: np.array([4, ]), scalar_first=False, in (x, y, z, w) order
-        """
-        # Get the robot's cartesian state
-        cartesian_state = self.franky_robot.current_cartesian_state
-        robot_pose = cartesian_state.pose  # Contains end-effector pose and elbow position
-        ee_pose = robot_pose.end_effector_pose
-
-        ee_pos = ee_pose.translation
-        ee_quat = ee_pose.quaternion # scalar_last
-        R_franky = R.from_quat(ee_quat, scalar_first=False).as_matrix()
-
-        if as_matrix:
-            T = np.eye(4) 
-            # NOTE For sapien, the quat returned by get_ee_pose is w-first, but for franky it is w_last
-            T[:3, :3] = R_franky
-            T[:3, 3] = ee_pos  
-            return T
-        else:
-            return ee_pos, ee_quat # scalar_last
     
     
 class RobotEnv(BaseEnv):
@@ -93,39 +45,28 @@ class RobotEnv(BaseEnv):
 
     def load_robot(self):
         # load Robot
+        self.franky_gripper = Gripper("172.16.0.2")
+        
+        self.crisp_robot = make_robot("fr3")
+        self.crisp_robot.wait_until_ready()
+        
         loader: sapien.URDFLoader = self.scene.create_urdf_loader()
         loader.fix_root_link = True
-
         self.mplib_robot: sapien.Articulation = loader.load(self.asset_prefix + "/panda/fr3.urdf")
-        # Replace this with your robot's IP
-        self.franky_robot = Robot("172.16.0.2")  
-        self.franky_gripper = Gripper("172.16.0.2")
-        self.robot = RealworldRobot(
-            mplib_robot=self.mplib_robot,
-            franky_robot=self.franky_robot,
-            franky_gripper=self.franky_gripper
-        )
+        self.mplib_robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
 
-        self.robot.set_root_pose(sapien.Pose([0, 0, 0], [1, 0, 0, 0]))
-
-        self.arm_qlimit = self.robot.get_qlimits()
+        self.arm_qlimit = self.mplib_robot.get_qlimits()
         self.arm_q_lower = self.arm_qlimit[:, 0]
         self.arm_q_higher = self.arm_qlimit[:, 1]
 
         # Setup control properties
-        self.active_joints = self.robot.get_active_joints()
+        self.active_joints = self.mplib_robot.get_active_joints()
         for joint in self.active_joints[:4]:
             joint.set_drive_property(stiffness=400, damping=40, force_limit=100)    # original: 160
         for joint in self.active_joints[4:-2]:
             joint.set_drive_property(stiffness=400, damping=40, force_limit=50)    # original: 160
         for joint in self.active_joints[-2:]:
             joint.set_drive_property(stiffness=160, damping=10, force_limit=50)
-
-        # Start slow (this lets the robot use a maximum of 5% of its velocity, acceleration, and jerk limits)
-        self.franky_robot.relative_dynamics_factor = 0.05
-        self.franky_robot.recover_from_errors()
-        self.gripper_speed = 0.04 # m/s
-        self.gripper_force = 5 # N
 
         self.setup_planner()
 
@@ -140,7 +81,7 @@ class RobotEnv(BaseEnv):
         H, W = self.frame_height, self.frame_width
         near, far = 0.01, 5
         camera_extrinsic, camera_intrinsic = self.camera_extrinsic, self.camera_intrinsic
-        qpos = self.robot.get_qpos()
+        qpos = self.get_qpos()
         
         # Set joint positions
         for i in range(7):
@@ -180,8 +121,8 @@ class RobotEnv(BaseEnv):
         return robot_mask        
 
     def setup_planner(self):
-        link_names = [link.get_name() for link in self.robot.get_links()]
-        joint_names = [joint.get_name() for joint in self.robot.get_active_joints()]
+        link_names = [link.get_name() for link in self.mplib_robot.get_links()]
+        joint_names = [joint.get_name() for joint in self.mplib_robot.get_active_joints()]
 
         self.planner = mplib.Planner(
             urdf=self.asset_prefix + "/panda/fr3.urdf",
@@ -192,8 +133,8 @@ class RobotEnv(BaseEnv):
             joint_vel_limits=np.ones(7),
             joint_acc_limits=np.ones(7))
 
-    def open_gripper(self, target=0.06):
-        self.franky_gripper.move(target, self.gripper_speed)
+    def open_gripper(self, target=0.06, gripper_speed=0.02):
+        self.franky_gripper.move(width=target, speed=gripper_speed)
 
     def close_gripper(self, target=0., gripper_force=10):
         if gripper_force is None:
@@ -202,46 +143,20 @@ class RobotEnv(BaseEnv):
             target = 0.
         self.franky_gripper.grasp(target, self.gripper_speed, gripper_force, epsilon_outer=1.0)
     
-    def close_gripper_safe(self, target=0.02, gripper_force=5):
-        shift_motion = CartesianMotion(
-            Affine([0.0, self.franky_gripper.width, 0.]), 
-            ReferenceType.Relative, 
-            relative_dynamics_factor=0.05
-        )
-        reaction_motion = CartesianMotion(
-            Affine([0.0, -(self.franky_gripper.width - 0.01) / 2, 0.0]), 
-            ReferenceType.Relative,
-            relative_dynamics_factor=0.1
-        )
-        reaction = Reaction(self.get_force() > gripper_force, reaction_motion)
-        shift_motion.add_reaction(reaction)
-        self.franky_robot.move(shift_motion)
-        self.franky_gripper.move(target, self.gripper_speed)
-
-    def get_force(self, dir_w=None):
-        """
-        Get the exernal force in the dir_w direction, if None, get all
-        """
-        if dir_w is None:
-            normal_force = (Measure.FORCE_X ** 2 + Measure.FORCE_Y ** 2 + Measure.FORCE_Z ** 2) ** 0.5
-        else:
-            dir_w = dir_w / np.linalg.norm(dir_w)
-            normal_force = (Measure.FORCE_X * dir_w[0] + Measure.FORCE_Y * dir_w[1] + Measure.FORCE_Z * dir_w[2]) **2 **0.5
-        return normal_force
-    
     def reset_robot(self):
         self.logger.log(logging.INFO, "Reset robot ...")
         self.open_gripper()
         
-        cur_ee_pose = self.robot.get_ee_pose(as_matrix=False)[0]
+        cur_ee_pose = self.get_ee_pose(as_matrix=False)[0]
         if np.linalg.norm(self.reset_ee_pose - cur_ee_pose) > 0.2: 
             # When the distance is far, retreat 1dm first
             self.move_forward(
                 moving_distance=-0.1,
                 drop_large_move=False
             )
-        joint_motion = JointMotion(self.reset_qpos[:7])
-        self.franky_robot.move(joint_motion)
+        # joint_motion = JointMotion(self.reset_qpos[:7])
+        # self.franky_robot.move(joint_motion)
+        self.crisp_robot.home()
         
     def reset_robot_safe(self):
         self.logger.log(logging.INFO,  "Call safe robot reset ...")
@@ -295,7 +210,7 @@ class RobotEnv(BaseEnv):
         try:
             result1 = self.planner.plan_pose(
                 goal_pose=mplib.Pose(target_pose1),
-                current_qpos=self.robot.get_qpos(),
+                current_qpos=self.get_qpos(),
                 time_step=self.planner_timestep,
                 rrt_range=0.1,
                 planning_time=1,
@@ -307,7 +222,7 @@ class RobotEnv(BaseEnv):
         try:
             result2 = self.planner.plan_pose(
                 goal_pose=mplib.Pose(target_pose2),
-                current_qpos=self.robot.get_qpos(),
+                current_qpos=self.get_qpos(),
                 time_step=self.planner_timestep,
                 rrt_range=0.1,
                 planning_time=1,
@@ -335,13 +250,42 @@ class RobotEnv(BaseEnv):
                 return result2
             return None
 
+    def get_qpos(self):
+        """
+        get np.array([9]) qpos of current robot actual state
+        NOTE: This can also be used to generate robot mask
+        """
+        gripper_width = self.franky_gripper.width
+        gripper_qpos = gripper_width / 2.
+        qpos_7 = self.crisp_robot.joint_values
+        qpos_9 = np.concatenate([qpos_7, [gripper_qpos, gripper_qpos]])
+        return qpos_9
+    
+    def get_ee_pose(self, as_matrix=False):
+        """
+        Get the ee_pos and ee_quat (Tph2w) of the end-effector (panda_hand)
+        ee_pos: np.array([3, ])
+        ee_quat: np.array([4, ]), scalar_first=False, in (x, y, z, w) order
+        """
+        # Get the robot's cartesian state
+        ee_pose = self.crisp_robot.end_effector_pose
+        ee_pos = ee_pose.position
+        ee_Rotation = ee_pose.orientation
+        
+        if as_matrix:
+            ee_pos, ee_Rotation.as_matrix()
+        else:
+            # scalar_last
+            return ee_pos, ee_Rotation.as_quat(scalar_first=False) 
+        
+        
     def plan_qpos(self, goal_qpos):
         """
         Call the plan_qpos method of self.planner, input a goal_qpos, and return a plan_result
         goal_qpos: np.ndarray, shape=(7,), dtype=np.float32
         """
         format_input = [goal_qpos]
-        current_qpos = self.robot.get_qpos()
+        current_qpos = self.get_qpos()
         result = self.planner.plan_qpos(
             goal_qposes=format_input,
             current_qpos=current_qpos,
@@ -354,23 +298,17 @@ class RobotEnv(BaseEnv):
         else:
             return result
         
-    def follow_path(self, result, reaction_motion=None):
+    def follow_path(self, result):
         n_step = result['position'].shape[0]
         self.logger.log(logging.INFO, f"n_step: {n_step}")
 
         if n_step == 0:
             return
         
-        joint_waypoint_motion_list = []
         for i in range(n_step):
-            position_target = result['position'][i].tolist() # 7
-            joint_waypoint = JointWaypoint(position_target)
-            joint_waypoint_motion_list.append(joint_waypoint)
-        joint_waypoint_motion = JointWaypointMotion(joint_waypoint_motion_list)
+            joint_target = result['position'][i].tolist() # 7
+            self.crisp_robot.set_target_joint(joint_target)
         
-        if reaction_motion is not None: 
-            joint_waypoint_motion.add_reaction(reaction_motion)
-        self.franky_robot.move(joint_waypoint_motion)
 
     def update_point_cloud_with_wall(self, pc_w=None):
         """
@@ -438,7 +376,7 @@ class RobotEnv(BaseEnv):
         else:
             self.follow_path(result_pre)
             # Get robot qpos here, which is the pre_qpos corresponding to pre_Tph2w
-            pre_qpos = self.robot.get_qpos()
+            pre_qpos = self.get_qpos()
             # Remove the collision pc before moving forward
             self.clear_planner_pc()
             self.move_forward(
@@ -531,7 +469,7 @@ class RobotEnv(BaseEnv):
         grasp_.rotation_matrix = R_final
         return grasp_
 
-    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance, drop_large_move, reaction_motion=None):
+    def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance):
         """
         Controls the panda_hand to move a certain distance along an axis or a certain angle around an axis, 
         while maintaining the relative position of the panda_hand and the object.
@@ -539,8 +477,11 @@ class RobotEnv(BaseEnv):
         joint_axis: 
             1) NOTE: In world coordinates!! 
             2) Satisfying the right-hand rule, the direction along the joint_axis is open.
+            
+        NOTE: This method needs cartesian control
         """
         self.logger.log(logging.INFO, "Start move_along_axis() ...")
+        # TODO switch to cartesian mode
         assert joint_type in ["prismatic", "revolute"]
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
@@ -550,9 +491,9 @@ class RobotEnv(BaseEnv):
             num_interp = max(3, int(moving_distance / 0.02))
 
         self.logger.log(logging.INFO, f"move_along_axis(): Need {num_interp} interpolations to execute...")
-        ee_pose, ee_quat = self.get_ee_pose() # Tph2w
+        ee_pose, Rph2w = self.get_ee_pose(as_matrix=True) # Tph2w
         # scalar_first=False means quat in (x, y, z, w) order
-        Rph2w = R.from_quat(ee_quat, scalar_first=False).as_matrix() # 3, 3
+        # Rph2w = R.from_quat(ee_quat, scalar_first=False).as_matrix() # 3, 3
 
         if joint_type == "prismatic":
             def T_with_delta(delta):
@@ -579,28 +520,19 @@ class RobotEnv(BaseEnv):
 
         actually_moved = False
         for Tph2w in T_list:
-            result = self.plan_path(target_pose=Tph2w, wrt_world=True)
-            if result is None:
-                self.logger.log(logging.WARNING, "move_along_axis(): skip None planning result")
-                continue
-            elif len(result["time"]) == 0:
-                self.logger.log(logging.WARNING, "move_along_axis(): skip len()=0 planning result")
-                continue
-            # For operations that require a large action, do not execute them directly, otherwise it will easily affect the state of the object.
-            else:
-                if len(result["time"]) > 300:
-                    big_steps = len(result["time"])
-                    self.logger.log(logging.WARNING, f"move_along_axis(): encounter large move ({big_steps} steps)")
-                    if drop_large_move:
-                        self.logger.log(logging.WARNING, f"move_along_axis(): drop large move")
-                        continue
-                self.follow_path(result, reaction_motion)
-                actually_moved = True
+            self.crisp_robot.move_to(
+                pose=Pose(
+                    position = Tph2w[:3, 3],
+                    orientation = R.from_matrix(Tph2w[:3, :3])
+                )
+            )
+        actually_moved = True
+        # TODO 这里可能要处理异步的视频录制
         # NOTE: Here you need to check whether all plan_results returned by Tph2w are None. 
         # If so, no RGBD frame will be recorded and you need to run some additional steps.
-        if not actually_moved:
-            for _ in range(int(1 / self.base_env_cfg["phy_timestep"])):
-                self.step()
+        # if not actually_moved:
+        #     for _ in range(int(1 / self.base_env_cfg["phy_timestep"])):
+        #         self.step()
 
     def move_forward(self, moving_distance, drop_large_move=False, reaction_motion=None):
         _, ee_quat = self.get_ee_pose() # Tph2w
@@ -616,11 +548,6 @@ class RobotEnv(BaseEnv):
             reaction_motion=reaction_motion
         )
 
-    def get_ee_pose(self, as_matrix=False):
-        """
-        Get ee_pos and ee_quat (Tph2w) of the end-effector (panda_hand)
-        """
-        return self.robot.get_ee_pose(as_matrix=as_matrix)
 
     def anyGrasp2ph(self, grasp):
         """
@@ -644,24 +571,9 @@ class RobotEnv(BaseEnv):
         # The smaller the offset, the shallower the gripper is inserted.
         Tph2w = Tgrasp2w @ T_with_offset(offset=-0.12)
         return Tph2w
-
-    def approach_safe(self, distance=0.1):
-        drawback_motion = CartesianMotion(
-            Affine([0., 0., -0.01]),
-            ReferenceType.Relative, 
-            relative_dynamics_factor=0.1
-        )
-        second_half = CartesianMotion(
-            Affine([0, 0, distance * 1]), 
-            ReferenceType.Relative, 
-            relative_dynamics_factor=0.1
-        )
-        drawback_reaction = Reaction(self.get_force() > 5, drawback_motion)
-        second_half.add_reaction(drawback_reaction)
-        self.robot.move(second_half)
     
-    def drawback_safe(self, distance=0.1, force=1):
-        init_Tph2w = self.robot.get_ee_pose(as_matrix=True)
+    def drawback(self, distance=0.1, force=1):
+        init_Tph2w = self.get_ee_pose(as_matrix=True)
         
         drawback_motion = CartesianMotion(
             Affine([0., 0., -distance]),
@@ -672,7 +584,7 @@ class RobotEnv(BaseEnv):
         drawback_motion.add_reaction(drawback_reaction)
         self.robot.move(drawback_motion)
         
-        cur_Tph2w = self.robot.get_ee_pose(as_matrix=True)
+        cur_Tph2w = self.get_ee_pose(as_matrix=True)
         
         z_diff = init_Tph2w[2, -1] - cur_Tph2w[2, -1] # >0
         if abs(z_diff - distance) < 0.01:
@@ -689,64 +601,6 @@ class RobotEnv(BaseEnv):
         )
         self.robot.move(second_half)
         
-    def move_dx(self, distance=0.01):
-        dx = distance
-        dy = 0.0
-        dz = 0.0
-        motion = CartesianMotion(Affine([dx, dy, dz]), ReferenceType.Relative)
-        self.robot.move(motion)
-    
-    def move_dy(self, distance=0.01):
-        dx = 0.0
-        dy = distance
-        dz = 0.0
-        motion = CartesianMotion(Affine([dx, dy, dz]), ReferenceType.Relative)
-        self.robot.move(motion)
-    
-    def move_dz(self, distance=0.01):
-        dx = 0.0
-        dy = 0.0
-        dz = distance
-        motion = CartesianMotion(Affine([dx, dy, dz]), ReferenceType.Relative)
-        self.robot.move(motion)
-    
-    def move_dxyz(self, distance=np.array([0, 0, 0])):
-        motion = CartesianMotion(Affine(distance.tolist()), ReferenceType.Relative, relative_dynamics_factor=0.5)
-        self.robot.move(motion)
-            
-    def rot_dx(self, deg=10):
-        dx = np.deg2rad(deg)
-        dy = 0.0
-        dz = 0.0
-        quat = R.from_euler("xyz", [dx, dy, dz]).as_quat()
-        motion = CartesianMotion(Affine([0, 0, 0], quat), ReferenceType.Relative)
-        self.robot.move(motion)
-    
-    def rot_dy(self, deg=10):
-        dx = 0.0
-        dy = np.deg2rad(deg)
-        dz = 0.0
-        quat = R.from_euler("xyz", [dx, dy, dz]).as_quat()
-        motion = CartesianMotion(Affine([0, 0, 0], quat), ReferenceType.Relative)
-        self.robot.move(motion)
-    
-    def rot_dz(self, deg=10):
-        dx = 0.0
-        dy = 0.0
-        dz = np.deg2rad(deg)
-        quat = R.from_euler("xyz", [dx, dy, dz]).as_quat()
-        motion = CartesianMotion(Affine([0, 0, 0], quat), ReferenceType.Relative)
-        self.robot.move(motion)
-    
-    def rot_dxyz(self, deg=np.array([0, 0, 0])):
-        """
-        Requires the input quat to have scalar_first=False
-        """
-        rad = np.deg2rad(deg)
-        quat = R.from_euler("xyz", rad.tolist()).as_quat()
-        motion = CartesianMotion(Affine([0, 0, 0], quat), ReferenceType.Relative, relative_dynamics_factor=0.5)
-        self.robot.move(motion)
-        
     def calibrate_reset(self, init_qpos=None):
         reset_motion = JointMotion(init_qpos[:7])
         self.robot.move(reset_motion)
@@ -754,4 +608,36 @@ class RobotEnv(BaseEnv):
     def delete(self):
         super().delete()
         self.pybullet_handle.disconnect()
+        self.crisp_robot.shutdown()
         
+
+if __name__ == "__main__":
+    import yaml
+    with open("/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml") as f:
+        cfg = yaml.safe_load(f)
+    re = RobotEnv(cfg=cfg)
+    print("done")
+    
+    # re.crisp_robot.home()
+    # re.move_along_axis(
+    #     joint_type="prismatic",
+    #     joint_axis=np.array([0, 0 ,1]),
+    #     joint_start=np.array([0, 0, 0]),
+    #     moving_distance=0.05
+    # )
+    print("start moving")
+    re.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
+    prefix = "/home/user/Programs/AKM/third_party/crisp_py/"
+    re.crisp_robot.cartesian_controller_parameters_client.load_param_config(
+        # file_path=prefix + "config/control/gravity_compensation.yaml"
+        # file_path=prefix + "config/control/default_operational_space_controller.yaml"
+        file_path=prefix + "config/control/clipped_cartesian_impedance.yaml"
+        # file_path=prefix + "config/control/default_cartesian_impedance.yaml"
+        # file_path=prefix + "config/control/soft_cartesian_impedance.yaml"
+    )
+    x, y, z = re.crisp_robot.end_effector_pose.position
+    re.crisp_robot.move_to(position=[x, y, z-0.1], speed=0.05)
+    # re.crisp_robot.move_to(position=np.array([0.30613281, -0.00094238,  0.28579984]))
+    print("end moving")
+    re.crisp_robot.home()
+    re.delete()
