@@ -1,0 +1,76 @@
+[workspace]
+preview = ["pixi-build"]
+authors = [
+    "Maximilian Dösch <doesch.maximilian@gmail.com>",
+    "Daniel San José Pro <42489409+danielsanjosepro@users.noreply.github.com>"
+]
+channels = ["https://fast.prefix.dev/conda-forge"]
+name = "crisp_py"
+platforms = ["linux-64"]
+
+[activation]
+scripts = ["scripts/set_ros_env.sh"]
+
+[dependencies]
+python = "*"
+compilers = "*"
+cmake = "*"
+pkg-config = "*"
+make = "*"
+ninja = "*"
+
+[tasks]
+test_raw = "pytest --cov=crisp_py --cov-report=html"
+test = [{task="test_raw", environment="humble"}]
+view_diagnostics = "python scripts/view_diagnostics.py"
+view_diagnostics_humble = [{task="view_diagnostics", environment="humble"}]
+
+
+
+[target.linux.dependencies]
+libgl-devel = "*"
+
+[environments]
+humble = { features = ["humble", "crisp-py", "extra", "dev"] }
+jazzy = { features = ["jazzy", "crisp-py", "extra", "dev"] }
+humble-clean = { features = ["humble"] }
+
+# humble
+[feature.humble]
+channels = ["https://prefix.dev/robostack-humble"]
+
+[feature.humble.dependencies]
+ros-humble-desktop = "*"
+colcon-common-extensions = "*"
+ros-humble-ros2-control = "*"
+ros-humble-ros2-controllers = "*"
+ros-humble-rmw-zenoh-cpp = "*"
+ros-humble-rmw-cyclonedds-cpp = "*"
+rosdep = "*"
+
+# jazzy
+[feature.jazzy]
+channels = ["https://prefix.dev/robostack-jazzy"]
+
+[feature.jazzy.dependencies]
+ros-jazzy-desktop = "*"
+ros-jazzy-ros2-control = "*"
+ros-jazzy-ros2-controllers = "*"
+colcon-common-extensions = "*"
+rosdep = "*"
+
+[feature.dev.pypi-dependencies]
+ruff= "*"
+bumpver = "*"
+build = "*"
+twine = "*"
+pre-commit = "*"
+pytest = "*"  # for testing
+
+[feature.crisp-py.pypi-dependencies]
+crisp_python = { path = ".", editable = true }
+# crisp_python = "1.0.x"  # if added from pypi
+
+[feature.extra.pypi-dependencies]
+rich = "*"  # For nice prints
+matplotlib = "*"  # to do some plots

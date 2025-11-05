@@ -1,0 +1,20 @@
+crisp_py/__pycache__
+crisp_py/control/__pycache__
+crisp_py/gripper/__pycache__
+crisp_py/camera/__pycache__
+.ros_env.sh
+crisp_py.egg-info
+.pypirc
+build/lib/crisp_py
+build/lib/crisp_py
+dist
+
+# pixi environments
+.pixi
+*.egg-info
+build
+scripts/personal_ros_env.sh
+crisp_py/sensors/__pycache__
+crisp_py/utils/__pycache__
+tests/__pycache__
+tests/unit/__pycache__

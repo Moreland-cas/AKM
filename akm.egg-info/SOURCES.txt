@@ -12,6 +12,7 @@ akm/realworld_envs/manipulate_env.py
 akm/realworld_envs/obj_env.py
 akm/realworld_envs/reconstruct_env.py
 akm/realworld_envs/robot_env.py
+akm/realworld_envs/robot_env_crisp.py
 baselines/__init__.py
 baselines/gapartnet_env.py
 baselines/gapartnet_utils.py

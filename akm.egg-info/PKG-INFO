@@ -7,4 +7,7 @@ Requires-Dist: transforms3d
 Requires-Dist: trimesh
 Requires-Dist: mplib==0.2.1
 Requires-Dist: pyglet<2
+Requires-Dist: pycocotools
+Requires-Dist: yapf
+Requires-Dist: supervision
 Dynamic: requires-dist

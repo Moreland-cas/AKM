@@ -72,6 +72,11 @@ pip install accelerate==1.4.0
 pip install urllib3==2.3.0 
 pip install open_clip_torch==2.31.0 einops openai
 
+# install Crisp-py for real-world franka impedance control
+echo "Installing Crisp-py..."
+cd $PROJECT_PATH/third_party/crisp_py/
+pip install -e .
+
 # install AKM
 echo "Installing AKM..."
 cd $PROJECT_PATH/
