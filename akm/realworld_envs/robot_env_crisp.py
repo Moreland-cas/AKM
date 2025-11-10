@@ -6,10 +6,6 @@ import pybullet as p
 import pybullet_data
 from franky import (
     Gripper,
-    CartesianMotion,
-    Affine,
-    ReferenceType,
-    Reaction,
     JointMotion
 )
 from crisp_py.robot import make_robot
@@ -133,258 +129,29 @@ class RobotEnv(BaseEnv):
             joint_vel_limits=np.ones(7),
             joint_acc_limits=np.ones(7))
 
-    def open_gripper(self, target=0.06, gripper_speed=0.02):
-        self.franky_gripper.move(width=target, speed=gripper_speed)
+    def anyGrasp2ph(self, grasp):
+        """
+        Extract Tph2w from grasp output by anygrasp, that is, perform a Tgrasp2w to Tph2w conversion.
+        grasp: Grasp object
+        """
+        # Convert the grasp coordinate system to the panda_hand coordinate system, i.e. Tph2w
+        def T_with_offset(offset):
+            Tph2grasp = np.array([
+                [0, 0, 1, offset],  
+                [0, 1, 0, 0],
+                [-1, 0, 0, 0],
+                [0, 0, 0, 1]
+            ])
+            return Tph2grasp
 
-    def close_gripper(self, target=0., gripper_force=10):
-        if gripper_force is None:
-            gripper_force = self.gripper_force
-        if target is None:
-            target = 0.
-        self.franky_gripper.grasp(target, self.gripper_speed, gripper_force, epsilon_outer=1.0)
+        R_grasp2w = grasp.rotation_matrix # 3, 3
+        t_grasp2w = grasp.translation # 3
+        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
+        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
+        # The smaller the offset, the shallower the gripper is inserted.
+        Tph2w = Tgrasp2w @ T_with_offset(offset=-0.12)
+        return Tph2w
     
-    def reset_robot(self):
-        self.logger.log(logging.INFO, "Reset robot ...")
-        self.open_gripper()
-        
-        cur_ee_pose = self.get_ee_pose(as_matrix=False)[0]
-        if np.linalg.norm(self.reset_ee_pose - cur_ee_pose) > 0.2: 
-            # When the distance is far, retreat 1dm first
-            self.move_forward(
-                moving_distance=-0.1,
-                drop_large_move=False
-            )
-        # joint_motion = JointMotion(self.reset_qpos[:7])
-        # self.franky_robot.move(joint_motion)
-        self.crisp_robot.home()
-        
-    def reset_robot_safe(self):
-        self.logger.log(logging.INFO,  "Call safe robot reset ...")
-        self.open_gripper()
-        self.move_forward(
-            moving_distance=-0.1,
-            drop_large_move=False
-        )
-        
-        tmp_frame = self.capture_frame()
-        tmp_frame.segment_obj(
-            obj_description="cabinet",
-            post_process_mask=True,
-            filter=True,
-            visualize=False
-        )
-        
-        tmp_pc = tmp_frame.get_obj_pc(
-            use_robot_mask=True,
-            use_height_filter=False,
-            world_frame=True
-        )[0]
-        tmp_pc = clean_pc_np(tmp_pc)
-        self.update_point_cloud_with_wall(tmp_pc)
-        
-        try:
-            result = self.plan_qpos(goal_qpos=self.reset_qpos)
-        except Exception as e:
-            result = None
-            
-        if result is not None:
-            self.follow_path(result)
-        else:
-            self.logger.log(logging.WARNING, "Get None result in reset_robot_safe function, executing reset() instead...")
-            self.reset_robot()
-
-    def clear_planner_pc(self):
-        self.update_point_cloud_with_wall(pc_w=None)
-
-    def plan_path(self, target_pose: np.ndarray, wrt_world: bool = True):
-        """
-        NOTE: Return the target_pose with the smallest result (rotating 180 degrees around the z-axis is another good move).
-        The target_pose passed in is Tph2w
-        """
-        target_pose1 = np.copy(target_pose)
-        target_pose2 = np.copy(target_pose)
-        target_pose2[:, 0] *= -1
-        target_pose2[:, 1] *= -1
-        
-        result1, result2 = None, None
-        try:
-            result1 = self.planner.plan_pose(
-                goal_pose=mplib.Pose(target_pose1),
-                current_qpos=self.get_qpos(),
-                time_step=self.planner_timestep,
-                rrt_range=0.1,
-                planning_time=1,
-                wrt_world=wrt_world
-            )
-        except Exception as e:
-            self.logger.log(logging.WARNING, f"Encounter {e} during RobotEnv.plan_path()")
-            
-        try:
-            result2 = self.planner.plan_pose(
-                goal_pose=mplib.Pose(target_pose2),
-                current_qpos=self.get_qpos(),
-                time_step=self.planner_timestep,
-                rrt_range=0.1,
-                planning_time=1,
-                wrt_world=wrt_world
-            )
-        except Exception as e:
-            self.logger.log(logging.WARNING, f"Encounter {e} during RobotEnv.plan_path()")
-
-        def result_valid(result):
-            return (result is not None) and (result['status'] == "Success")
-        
-        if result_valid(result1):
-            if not result_valid(result2):
-                return result1
-            else:
-                # Compare the two results and return the one with the shorter planned path.
-                n_step1 = result1['position'].shape[0]
-                n_step2 = result2['position'].shape[0]
-                if n_step1 < n_step2:
-                    return result1
-                else:
-                    return result2
-        else:
-            if result_valid(result2):
-                return result2
-            return None
-
-    def get_qpos(self):
-        """
-        get np.array([9]) qpos of current robot actual state
-        NOTE: This can also be used to generate robot mask
-        """
-        gripper_width = self.franky_gripper.width
-        gripper_qpos = gripper_width / 2.
-        qpos_7 = self.crisp_robot.joint_values
-        qpos_9 = np.concatenate([qpos_7, [gripper_qpos, gripper_qpos]])
-        return qpos_9
-    
-    def get_ee_pose(self, as_matrix=False):
-        """
-        Get the ee_pos and ee_quat (Tph2w) of the end-effector (panda_hand)
-        ee_pos: np.array([3, ])
-        ee_quat: np.array([4, ]), scalar_first=False, in (x, y, z, w) order
-        """
-        # Get the robot's cartesian state
-        ee_pose = self.crisp_robot.end_effector_pose
-        ee_pos = ee_pose.position
-        ee_Rotation = ee_pose.orientation
-        
-        if as_matrix:
-            ee_pos, ee_Rotation.as_matrix()
-        else:
-            # scalar_last
-            return ee_pos, ee_Rotation.as_quat(scalar_first=False) 
-        
-        
-    def plan_qpos(self, goal_qpos):
-        """
-        Call the plan_qpos method of self.planner, input a goal_qpos, and return a plan_result
-        goal_qpos: np.ndarray, shape=(7,), dtype=np.float32
-        """
-        format_input = [goal_qpos]
-        current_qpos = self.get_qpos()
-        result = self.planner.plan_qpos(
-            goal_qposes=format_input,
-            current_qpos=current_qpos,
-            time_step=self.planner_timestep,
-            rrt_range=0.1,
-            planning_time=1
-        )
-        if result["status"] != "Success":
-            return None
-        else:
-            return result
-        
-    def follow_path(self, result):
-        n_step = result['position'].shape[0]
-        self.logger.log(logging.INFO, f"n_step: {n_step}")
-
-        if n_step == 0:
-            return
-        
-        for i in range(n_step):
-            joint_target = result['position'][i].tolist() # 7
-            self.crisp_robot.set_target_joint(joint_target)
-        
-
-    def update_point_cloud_with_wall(self, pc_w=None):
-        """
-        Not only does it update the object point cloud pc_w in the world coordinate system, 
-        it also updates the indoor walls and the cylinder where the camera is located, as well as the desktop information
-        """
-        pc_update = []
-        
-        if pc_w is not None:
-            pc_update.append(pc_w)
-        
-        # add wall, (1000, 3)
-        pc_wall_yz = np.random.uniform(-1, 1, (1000, 2))
-        pc_wall_x = np.ones((1000, 1)) * -0.3
-        pc_wall = np.concatenate([pc_wall_x, pc_wall_yz], axis=1)
-        pc_update.append(pc_wall)
-        
-        # add ground
-        pc_ground_xy = np.random.uniform(-1, 1, (1000, 2))
-        pc_ground_z = np.ones((1000, 1)) * 0.01
-        pc_ground = np.concatenate([pc_ground_xy, pc_ground_z], axis=1)
-        
-        # Filter out points with a distance < 0.15 from the origin
-        dist2 = np.sum(pc_ground ** 2, axis=1) ** 0.5     
-        pc_ground = pc_ground[dist2 >= 0.2]
-        pc_update.append(pc_ground)
-        
-        # Add the cylinder where the camera is located, here we use a plane instead
-        pc_camera_yz = np.random.uniform(-1, 1, (1000, 2))
-        pc_camera_x = np.ones((1000, 1)) * 0.8
-        pc_camera = np.concatenate([pc_camera_x, pc_camera_yz], axis=1)
-        pc_update.append(pc_camera)
-        
-        self.planner.update_point_cloud(
-            points=np.concatenate(pc_update, axis=0)
-        )
-    
-    def move_to_pose(self, pose: mplib.pymp.Pose, wrt_world: bool):
-        # pose: Tph2w
-        result = self.plan_path(target_pose=pose, wrt_world=wrt_world)
-        if result is not None:
-            self.follow_path(result)
-        else:
-            self.logger.log(logging.WARNING, "Get None result in move_to_pose function, not executing...")
-
-    def move_to_pose_safe(self, Tph2w, reserved_distance=0.05):
-        """
-        Control panda_hand to move to the target position of Tph2w. 
-        The difference is that the environmental point cloud and reserved_distance must be considered during the movement.
-        """
-        frame = self.capture_frame()
-        pc_w, _ = frame.get_env_pc(
-            use_robot_mask=True,
-            use_height_filter=False,
-            world_frame=True
-        )
-        self.planner.update_point_cloud(pc_w)
-
-        Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
-        result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
-
-        if result_pre is None:
-            self.logger.log(logging.WARNING, "move_to_pose_safe(): planning to pre_grasp_pose failed")
-            return None
-        else:
-            self.follow_path(result_pre)
-            # Get robot qpos here, which is the pre_qpos corresponding to pre_Tph2w
-            pre_qpos = self.get_qpos()
-            # Remove the collision pc before moving forward
-            self.clear_planner_pc()
-            self.move_forward(
-                moving_distance=reserved_distance,
-                drop_large_move=False
-            )
-            return pre_qpos
-
     def get_translated_ph(self, Tph2w, distance):
         """
         Outputs Tph2w: A ph pose that is a certain distance forward or backward along the current model. 
@@ -469,6 +236,206 @@ class RobotEnv(BaseEnv):
         grasp_.rotation_matrix = R_final
         return grasp_
 
+    def open_gripper(self, target=0.06, speed=0.02):
+        self.franky_gripper.move(width=target, speed=speed)
+
+    def close_gripper(self, target=0., gripper_force=10, speed=0.02):
+        if target is None:
+            target = 0.
+        self.franky_gripper.grasp(target, speed, gripper_force, epsilon_outer=1.0)
+
+    def clear_planner_pc(self):
+        self.update_point_cloud_with_wall(pc_w=None)
+
+    def plan_path(self, target_pose: np.ndarray, wrt_world: bool = True):
+        """
+        NOTE: Return the target_pose with the smallest result (rotating 180 degrees around the z-axis is another good move).
+        The target_pose passed in is Tph2w
+        """
+        target_pose1 = np.copy(target_pose)
+        target_pose2 = np.copy(target_pose)
+        target_pose2[:, 0] *= -1
+        target_pose2[:, 1] *= -1
+        
+        result1, result2 = None, None
+        try:
+            result1 = self.planner.plan_pose(
+                goal_pose=mplib.Pose(target_pose1),
+                current_qpos=self.get_qpos(),
+                time_step=self.planner_timestep,
+                rrt_range=0.1,
+                planning_time=1,
+                wrt_world=wrt_world
+            )
+        except Exception as e:
+            self.logger.log(logging.WARNING, f"Encounter {e} during RobotEnv.plan_path()")
+            
+        try:
+            result2 = self.planner.plan_pose(
+                goal_pose=mplib.Pose(target_pose2),
+                current_qpos=self.get_qpos(),
+                time_step=self.planner_timestep,
+                rrt_range=0.1,
+                planning_time=1,
+                wrt_world=wrt_world
+            )
+        except Exception as e:
+            self.logger.log(logging.WARNING, f"Encounter {e} during RobotEnv.plan_path()")
+
+        def result_valid(result):
+            return (result is not None) and (result['status'] == "Success")
+        
+        if result_valid(result1):
+            if not result_valid(result2):
+                return result1
+            else:
+                # Compare the two results and return the one with the shorter planned path.
+                n_step1 = result1['position'].shape[0]
+                n_step2 = result2['position'].shape[0]
+                if n_step1 < n_step2:
+                    return result1
+                else:
+                    return result2
+        else:
+            if result_valid(result2):
+                return result2
+            return None
+
+    def get_qpos(self):
+        """
+        get np.array([9]) qpos of current robot actual state
+        NOTE: This can also be used to generate robot mask
+        """
+        gripper_width = self.franky_gripper.width
+        gripper_qpos = gripper_width / 2.
+        qpos_7 = self.crisp_robot.joint_values
+        qpos_9 = np.concatenate([qpos_7, [gripper_qpos, gripper_qpos]])
+        return qpos_9
+    
+    def get_ee_pose(self, as_matrix=False):
+        """
+        Get the ee_pos and ee_quat (Tph2w) of the end-effector (panda_hand)
+        ee_pos: np.array([3, ])
+        ee_quat: np.array([4, ]), scalar_first=False, in (x, y, z, w) order
+        """
+        # Get the robot's cartesian state
+        ee_pose = self.crisp_robot.end_effector_pose
+        ee_pos = ee_pose.position
+        ee_Rotation = ee_pose.orientation
+        
+        if as_matrix:
+            return ee_pos, ee_Rotation.as_matrix()
+        else:
+            # scalar_last
+            return ee_pos, ee_Rotation.as_quat(scalar_first=False) 
+        
+    def switch_mode(self, mode="joint_impedance"):
+        assert mode in ["cartesian_impedance_soft", "cartesian_impedance_hard", "joint_impedance"]
+        if mode == "cartesian_impedance_soft":
+            self.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
+            self.crisp_robot.cartesian_controller_parameters_client.load_param_config(
+                file_path="/home/user/Programs/AKM/third_party/crisp_py/crisp_py/config/control/soft_cartesian_impedance.yaml"
+            )
+        elif mode == "cartesian_impedance_hard":
+            self.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
+            self.crisp_robot.cartesian_controller_parameters_client.load_param_config(
+                file_path="/home/user/Programs/AKM/third_party/crisp_py/crisp_py/config/control/default_cartesian_impedance.yaml"
+            )
+        elif mode == "joint_impedance":
+            self.crisp_robot.controller_switcher_client.switch_controller("joint_impedance_controller")
+        
+    def follow_path(self, result):
+        """
+        Follow the planning result, only called when under joint_impedance
+        """
+        n_step = result['position'].shape[0]
+        self.logger.log(logging.INFO, f"n_step: {n_step}")
+
+        if n_step == 0:
+            return
+        
+        self.switch_mode("joint_impedance")
+        for i in range(n_step):
+            joint_target = result['position'][i].tolist() # 7
+            self.crisp_robot.set_target_joint(joint_target)
+        
+    def update_point_cloud_with_wall(self, pc_w=None):
+        """
+        Not only does it update the object point cloud pc_w in the world coordinate system, 
+        it also updates the indoor walls and the cylinder where the camera is located, as well as the desktop information
+        """
+        pc_update = []
+        
+        if pc_w is not None:
+            pc_update.append(pc_w)
+        
+        # add wall, (1000, 3)
+        pc_wall_yz = np.random.uniform(-1, 1, (1000, 2))
+        pc_wall_x = np.ones((1000, 1)) * -0.3
+        pc_wall = np.concatenate([pc_wall_x, pc_wall_yz], axis=1)
+        pc_update.append(pc_wall)
+        
+        # add ground
+        pc_ground_xy = np.random.uniform(-1, 1, (1000, 2))
+        pc_ground_z = np.ones((1000, 1)) * 0.01
+        pc_ground = np.concatenate([pc_ground_xy, pc_ground_z], axis=1)
+        
+        # Filter out points with a distance < 0.15 from the origin
+        dist2 = np.sum(pc_ground ** 2, axis=1) ** 0.5     
+        pc_ground = pc_ground[dist2 >= 0.2]
+        pc_update.append(pc_ground)
+        
+        # Add the cylinder where the camera is located, here we use a plane instead
+        pc_camera_yz = np.random.uniform(-1, 1, (1000, 2))
+        pc_camera_x = np.ones((1000, 1)) * 0.8
+        pc_camera = np.concatenate([pc_camera_x, pc_camera_yz], axis=1)
+        pc_update.append(pc_camera)
+        
+        self.planner.update_point_cloud(
+            points=np.concatenate(pc_update, axis=0)
+        )
+    
+    def move_to_pregrasp(self, Tph2w, reserved_distance=0.05):
+        """
+        Control panda_hand to move to the target position of Tph2w. 
+        The difference is that the environmental point cloud and reserved_distance must be considered during the movement.
+        """
+        frame = self.capture_frame()
+        pc_w, _ = frame.get_env_pc(
+            use_robot_mask=True,
+            use_height_filter=False,
+            world_frame=True
+        )
+        self.planner.update_point_cloud(pc_w)
+
+        Tph2w_pre = self.get_translated_ph(Tph2w, -reserved_distance)
+        result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
+
+        if result_pre is None:
+            self.logger.log(logging.WARNING, "move_to_pose_safe(): planning to pre_grasp_pose failed")
+            return None
+        else:
+            self.switch_mode("joint_impedance")
+            self.follow_path(result_pre)
+            # Get robot qpos here, which is the pre_qpos corresponding to pre_Tph2w
+            pre_qpos = self.get_qpos()
+            # Remove the collision pc before moving forward
+            self.clear_planner_pc()
+            self.switch_mode("cartesian_impedance_hard")
+            self.move_dz(distance=reserved_distance, soeed=0.01)
+            return pre_qpos
+
+    def move_dz(self, distance=0.05, speed=0.02):
+        # 首先获取当前坐标
+        cur_position = self.crisp_robot.end_effector_pose.position
+        # print(cur_position)
+        cur_Rotation = self.crisp_robot.end_effector_pose.orientation
+        z_dir = cur_Rotation.as_matrix()[:, -1]
+        # print(z_dir)
+        tgt_position = cur_position + distance * z_dir
+        # print(tgt_position)
+        self.crisp_robot.move_to(position=tgt_position, speed=speed)
+    
     def move_along_axis(self, joint_type, joint_axis, joint_start, moving_distance):
         """
         Controls the panda_hand to move a certain distance along an axis or a certain angle around an axis, 
@@ -518,7 +485,6 @@ class RobotEnv(BaseEnv):
         deltas = np.linspace(0, moving_distance, num_interp)
         T_list = [T_with_delta(delta) for delta in deltas]
 
-        actually_moved = False
         for Tph2w in T_list:
             self.crisp_robot.move_to(
                 pose=Pose(
@@ -526,84 +492,16 @@ class RobotEnv(BaseEnv):
                     orientation = R.from_matrix(Tph2w[:3, :3])
                 )
             )
-        actually_moved = True
-        # TODO 这里可能要处理异步的视频录制
-        # NOTE: Here you need to check whether all plan_results returned by Tph2w are None. 
-        # If so, no RGBD frame will be recorded and you need to run some additional steps.
-        # if not actually_moved:
-        #     for _ in range(int(1 / self.base_env_cfg["phy_timestep"])):
-        #         self.step()
-
-    def move_forward(self, moving_distance, drop_large_move=False, reaction_motion=None):
-        _, ee_quat = self.get_ee_pose() # Tph2w
-        # scalar_first=False means quat in (x, y, z, w) order
-        Rph2w = R.from_quat(ee_quat, scalar_first=False).as_matrix() # 3, 3
-        moving_direction = Rph2w @ np.array([0, 0, 1]) # 3
-        self.move_along_axis(
-            joint_type="prismatic",
-            joint_axis=moving_direction,
-            joint_start=None,
-            moving_distance=moving_distance,
-            drop_large_move=drop_large_move,
-            reaction_motion=reaction_motion
-        )
-
-
-    def anyGrasp2ph(self, grasp):
-        """
-        Extract Tph2w from grasp output by anygrasp, that is, perform a Tgrasp2w to Tph2w conversion.
-        grasp: Grasp object
-        """
-        # Convert the grasp coordinate system to the panda_hand coordinate system, i.e. Tph2w
-        def T_with_offset(offset):
-            Tph2grasp = np.array([
-                [0, 0, 1, offset],  
-                [0, 1, 0, 0],
-                [-1, 0, 0, 0],
-                [0, 0, 0, 1]
-            ])
-            return Tph2grasp
-
-        R_grasp2w = grasp.rotation_matrix # 3, 3
-        t_grasp2w = grasp.translation # 3
-        Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
-        Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
-        # The smaller the offset, the shallower the gripper is inserted.
-        Tph2w = Tgrasp2w @ T_with_offset(offset=-0.12)
-        return Tph2w
     
-    def drawback(self, distance=0.1, force=1):
-        init_Tph2w = self.get_ee_pose(as_matrix=True)
-        
-        drawback_motion = CartesianMotion(
-            Affine([0., 0., -distance]),
-            ReferenceType.Relative, 
-            relative_dynamics_factor=0.1
-        )
-        drawback_reaction = Reaction(self.get_force() > force, CartesianStopMotion())
-        drawback_motion.add_reaction(drawback_reaction)
-        self.robot.move(drawback_motion)
-        
-        cur_Tph2w = self.get_ee_pose(as_matrix=True)
-        
-        z_diff = init_Tph2w[2, -1] - cur_Tph2w[2, -1] # >0
-        if abs(z_diff - distance) < 0.01:
-            return
-        else:
-            self.open_gripper(0.06)
-            self.move_dz(-abs(z_diff - distance))
-        
-    def approach(self, distance=0.1):
-        second_half = CartesianMotion(
-            Affine([0, 0, distance]), 
-            ReferenceType.Relative, 
-            relative_dynamics_factor=0.1
-        )
-        self.robot.move(second_half)
+    def reset(self):
+        self.open_gripper()
+        self.switch_mode("cartesian_impedance_hard")
+        self.move_dz(distance=-0.05, speed=0.02)
+        self.crisp_robot.home()
         
     def calibrate_reset(self, init_qpos=None):
-        reset_motion = JointMotion(init_qpos[:7])
-        self.robot.move(reset_motion)
+        self.switch_mode("joint_impedance")
+        self.crisp_robot.set_target_joint(init_qpos[:7])
         
     def delete(self):
         super().delete()
@@ -612,27 +510,43 @@ class RobotEnv(BaseEnv):
         
 
 if __name__ == "__main__":
+    """
+    总结一下需要什么功能
+    1) move to pre-grasp
+    2) approach (降低碰撞的刚度)
+    3) safe-grasp (降低 y 方向刚度然后关闭 gripper, 达到稳定状态之后更新 Tph2w, 重新 move_to 一下)
+    4) move_along_axis (只能稍微有一点 impedance)
+    5) draw_back
+    
+    解耦一下能力：
+    1) 切换 impedance 方式，包括切换到 joint control
+    2) 沿着 z 轴的运动
+    """
+    
     import yaml
     with open("/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml") as f:
         cfg = yaml.safe_load(f)
     re = RobotEnv(cfg=cfg)
     print("done")
     
-    # re.crisp_robot.home()
-    # re.move_along_axis(
-    #     joint_type="prismatic",
-    #     joint_axis=np.array([0, 0 ,1]),
-    #     joint_start=np.array([0, 0, 0]),
-    #     moving_distance=0.05
-    # )
+    re.crisp_robot.home()
+    re.switch_mode("cartesian_impedance_hard")
+    re.move_dz(distance=0.05, speed=0.03)
+    # re.switch_mode("cartesian_impedance_soft")
+    re.move_along_axis(
+        joint_type="revolute",
+        joint_axis=np.array([1, 0 ,0]),
+        joint_start=np.array([0, 0, 0]),
+        moving_distance=np.deg2rad(15)
+    )
     print("start moving")
     re.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
     prefix = "/home/user/Programs/AKM/third_party/crisp_py/"
     re.crisp_robot.cartesian_controller_parameters_client.load_param_config(
         # file_path=prefix + "config/control/gravity_compensation.yaml"
         # file_path=prefix + "config/control/default_operational_space_controller.yaml"
-        file_path=prefix + "config/control/clipped_cartesian_impedance.yaml"
-        # file_path=prefix + "config/control/default_cartesian_impedance.yaml"
+        # file_path=prefix + "config/control/clipped_cartesian_impedance.yaml"
+        file_path=prefix + "config/control/default_cartesian_impedance.yaml"
         # file_path=prefix + "config/control/soft_cartesian_impedance.yaml"
     )
     x, y, z = re.crisp_robot.end_effector_pose.position
