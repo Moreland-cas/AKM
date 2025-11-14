@@ -79,6 +79,7 @@ class ManipulateEnv(ReconEnv):
             
             if result_pre is None:
                 self.logger.log(logging.INFO, "Get None planning result in manip_once(), thus do nothing")
+                self.reset_safe(distance=-self.reserved_distance)
                 break
             else:
                 self.switch_mode("cartesian_impedance")
@@ -91,11 +92,16 @@ class ManipulateEnv(ReconEnv):
                 self.open_gripper(target=0.08)
                 
                 self.switch_mode("cartesian_impedance")
-                self.approach(distance=self.reserved_distance + 0.02, speed=0.02)
+                self.approach(distance=self.reserved_distance + 0.01, speed=0.02)
                 
                 # 改为 safe_close
                 self.close_gripper_safe()
                 # self.close_gripper(target=0.0, gripper_force=4)
+                
+                self.update_cur_frame(
+                    init_guess=None,
+                    visualize=visualize
+                )
                 
                 fine_dict_w = self.obj_repr.get_joint_param(
                     resolution="fine",
@@ -111,13 +117,7 @@ class ManipulateEnv(ReconEnv):
                 )
                     
                 if self.not_good_enough(visualize=visualize):
-                    # if self.goal_delta < 0 and num_manip == 1:
-                    #     self.move_dz(-self.reserved_distance)
-                    #     continue
-                    
-                    self.open_gripper(target=0.06)
-                    self.switch_mode("cartesian_impedance")
-                    self.move_dz(-self.reserved_distance)
+                    self.reset_safe(distance=-self.reserved_distance)
                 else:
                     break
     
@@ -147,8 +147,8 @@ class ManipulateEnv(ReconEnv):
 
 
 if __name__ == '__main__':
-    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
-    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
+    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
     with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
         
@@ -156,4 +156,5 @@ if __name__ == '__main__':
     manipEnv.main()
     input("Type anything:")
     manipEnv.reset_safe()
+    manipEnv.delete()
     

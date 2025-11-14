@@ -229,8 +229,8 @@ class ReconEnv(ExploreEnv):
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
 if __name__ == "__main__":
-    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
-    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
+    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
     with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
         

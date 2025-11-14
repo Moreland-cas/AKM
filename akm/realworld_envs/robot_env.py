@@ -519,7 +519,7 @@ class RobotEnv(BaseEnv):
         if joint_type == "revolute":
             assert joint_start is not None, "joint_start cannot be None when joint_type is revolute"
             # Calculate the number of interpolation points based on the moving distance
-            num_interp = max(3, int(moving_distance / np.deg2rad(1)))
+            num_interp = max(3, int(moving_distance / np.deg2rad(2)))
         else:
             num_interp = max(3, int(moving_distance / 0.02))
         
@@ -575,9 +575,9 @@ class RobotEnv(BaseEnv):
         self.crisp_robot.move_to(pose=tgt_pose, speed=speed)
     
     def reset_safe(self, distance=-0.05):
-        self.open_gripper(target=0.06)
+        self.open_gripper(target=0.08)
         self.switch_mode("cartesian_impedance")
-        self.move_dz(distance=distance, speed=0.02)
+        self.move_dz(distance=distance, speed=0.03)
         self.crisp_robot.home()
     
     def reset(self):

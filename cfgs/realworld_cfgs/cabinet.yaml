@@ -41,4 +41,4 @@ manip_env_cfg:
   max_manip: 3
   prismatic_whole_traj_success_thresh: 0.02
   revolute_whole_traj_success_thresh: 5
-  goal_delta: 30
+  goal_delta: 20

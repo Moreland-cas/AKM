@@ -252,8 +252,10 @@ class ExploreEnv(ObjEnv):
         """
         Keep moving when the distance is not enough
         """
-        # self.switch_mode("pull")
-        self.switch_mode("cartesian_impedance")
+        if self.obj_env_cfg["joint_type"] == "prismatic":
+            self.switch_mode("cartesian_impedance")
+        else:
+            self.switch_mode("pull")
         self.move_dz(distance=-self.pertubation_distance, speed=0.02)
         self.recording = False
     
@@ -337,8 +339,8 @@ class ExploreEnv(ObjEnv):
             self.obj_repr.save(save_path)
                     
 if __name__ == "__main__":
-    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
-    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
+    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
     with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
     
