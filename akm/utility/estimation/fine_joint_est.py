@@ -12,6 +12,7 @@ from akm.utility.utils import (
     joint_data_to_transform_torch,
     napari_time_series_transform,
     compute_normals,
+    visualize_pc
 )
 from akm.utility.constants import *
 from akm.utility.estimation.scheduler import Scheduler
@@ -244,18 +245,15 @@ def fine_estimation(
             cur_icp_loss += icp_loss_torch(
                 joint_type=joint_type,
                 Tref2tgt=Tref2tgt,
-                ref_pc=ref_pc[pc_ref_mask],
-                tgt_pc=tgt_pc[pc_tgt_mask],
-                target_normals=target_normals[pc_tgt_mask],
+                # ref_pc=ref_pc[pc_ref_mask],
+                # tgt_pc=tgt_pc[pc_tgt_mask],
+                ref_pc=ref_pc,
+                tgt_pc=tgt_pc,
+                # target_normals=target_normals[pc_tgt_mask],
+                target_normals=target_normals,
                 loss_type="point_to_plane", # point_to_point
                 icp_select_range=0.1
             )
-        
-        if cur_icp_loss.item() == 0:
-            # If it is equal to 0, it means there is no valid data pair at all. 
-            # In this case, you can change the icp_range parameter or exit directly.
-            logger.log(logging.DEBUG, "No valid data pair, exit ICP loop")
-            break
         
         cur_state_dict = {
             "joint_type": joint_type,
@@ -263,6 +261,13 @@ def fine_estimation(
             "joint_start": start_params.detach().cpu().numpy(),
             "joint_states": np.array([states_param.detach().cpu().item() for states_param in states_params])
         }
+        
+        if cur_icp_loss.item() == 0:
+            # If it is equal to 0, it means there is no valid data pair at all. 
+            # In this case, you can change the icp_range parameter or exit directly.
+            logger.log(logging.DEBUG, "No valid data pair, exit ICP loop")
+            return cur_state_dict
+        
         should_early_stop = scheduler.step(cur_icp_loss.item(), cur_state_dict)
         
         cur_lr = [param_group['lr'] for param_group in optimizer.param_groups]
@@ -278,8 +283,64 @@ def fine_estimation(
         optimizer.zero_grad()
         cur_icp_loss.backward()
         optimizer.step()
-        
+    
     if visualize:
+        joint_dir = np.copy(joint_dir)
+        joint_states = np.copy(joint_states)
+        joint_start = np.copy(joint_start)
+        
+        joint_dir_updated = np.copy(scheduler.best_state_dict["joint_dir"])
+        joint_states_updated = np.copy(scheduler.best_state_dict["joint_states"])
+        joint_start_updated = np.copy(scheduler.best_state_dict["joint_start"])
+    
+        transform_seq = [
+            joint_data_to_transform_np(
+                joint_type=joint_type,
+                joint_dir=joint_dir,
+                joint_start=joint_start,
+                joint_state_ref2tgt=cur_state - joint_states[0],
+        ) for cur_state in joint_states] # T, 4, 4 (Tfirst2cur)
+        transform_seq = np.array(transform_seq)
+    
+        # Add transformed_first to each time_stamp
+        pc_ref = moving_pcs[0] # N, 3
+        pc_ref_aug = np.concatenate([pc_ref, np.ones((len(pc_ref), 1))], axis=1)  # (N, 4)
+        
+        transform_seq = transform_seq @ np.linalg.inv(transform_seq[0])
+        pc_ref_transformed = np.einsum('tij,jk->tik', transform_seq, pc_ref_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+        pc_ref_transformed = napari_time_series_transform(pc_ref_transformed) # T*N, d
+        
+        transform_seq_updated = np.array([
+            joint_data_to_transform_np(
+                joint_type=joint_type,
+                joint_dir=joint_dir_updated,
+                joint_start=joint_start_updated,
+                joint_state_ref2tgt=cur_state - joint_states_updated[0],
+        ) for cur_state in joint_states_updated])
+        transform_seq_updated = transform_seq_updated @ np.linalg.inv(transform_seq_updated[0])
+        
+        pc_ref_transformed_updated = np.einsum('tij,jk->tik', transform_seq_updated, pc_ref_aug.T).transpose(0, 2, 1)[:, :, :3] # T, N, 3
+        # pc_ref_transformed_updated = napari_time_series_transform(pc_ref_transformed_updated) # T*N, d
+        
+        # viewer.add_points(moving_pcs, size=size, name='moving_pc', opacity=0.8, face_color="blue")
+        # viewer.add_points(pc_ref_transformed, size=size, name='before icp', opacity=0.8, face_color="red")
+        # viewer.add_points(pc_ref_transformed_updated, size=size, name='after icp', opacity=0.8, face_color="green")
+        # viewer.title = "fine joint estimation using ICP"
+        
+        # joint_start_updated
+        # joint_dir_updated
+        # first_obj_mask = dynamic_seq[0] == MOVING_LABEL
+        obj_pc = depth_image_to_pointcloud(depth_seq[0], dynamic_seq[0] != 0, K) 
+    
+        visualize_pc(
+            points=[obj_pc] + [moving_pcs[i] for i in range(len(moving_pcs))],
+            pivot_point=joint_start_updated,
+            joint_axis=joint_dir_updated,
+            online_viewer=True
+        )
+        
+    if visualize and False:
+        import napari
         joint_dir = np.copy(joint_dir)
         joint_states = np.copy(joint_states)
         joint_start = np.copy(joint_start)

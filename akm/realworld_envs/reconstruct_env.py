@@ -83,9 +83,9 @@ class ReconEnv(ExploreEnv):
             translated_mobile_pc = first_kframe_pc @Tref2tgt[:3, :3].T + Tref2tgt[:3, -1]
             mobile_pc_color = np.array([0, 255, 0]) / 255
             visualize_pc(
-                points=np.concatenate([points, translated_mobile_pc], axis=0),
-                colors=np.concatenate([colors, np.broadcast_to(mobile_pc_color, (translated_mobile_pc.shape[0], 3))], axis=0),
-                point_size=5,
+                points=[points, translated_mobile_pc],
+                colors=[colors, np.broadcast_to(mobile_pc_color, (translated_mobile_pc.shape[0], 3))],
+                point_size=10,
                 online_viewer=True
             )
         
@@ -184,18 +184,18 @@ class ReconEnv(ExploreEnv):
             )
             # coarse
             visualize_pc(
-                points=points,
-                colors=colors/255,
-                point_size=5,
+                points=[points],
+                colors=[colors/255],
+                point_size=10,
                 pivot_point=coarse_jonint_dict["joint_start"],
                 joint_axis=coarse_jonint_dict["joint_dir"],
                 online_viewer=True
             )
             # fine
             visualize_pc(
-                points=points,
-                colors=colors/255,
-                point_size=5,
+                points=[points],
+                colors=[colors/255],
+                point_size=10,
                 pivot_point=fine_jonint_dict["joint_start"],
                 joint_axis=fine_jonint_dict["joint_dir"],
                 online_viewer=True
@@ -229,10 +229,12 @@ class ReconEnv(ExploreEnv):
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
 if __name__ == "__main__":
-    # with open("/home/user/Programs/AKM/akm/realworld_envs/cabinet.yaml", "r") as f:
-    with open("/home/user/Programs/AKM/akm/realworld_envs/drawer.yaml", "r") as f:
+    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
+    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
         
     reconEnv = ReconEnv(cfg=cfg)
     reconEnv.main()
+    reconEnv.delete()
     

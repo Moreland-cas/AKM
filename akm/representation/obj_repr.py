@@ -213,7 +213,8 @@ class Obj_repr(Data):
             opti_joint_start=(joint_type=="revolute"),
             opti_joint_states_mask=np.arange(self.kframes.num_frames())!=0,
             lr=lr, # 1mm
-            gt_joint_dict=self.get_joint_param(resolution="gt", frame="camera"),
+            # gt_joint_dict=self.get_joint_param(resolution="gt", frame="camera"),
+            gt_joint_dict=None,
             visualize=visualize,
             logger=self.logger
         )
@@ -245,9 +246,9 @@ class Obj_repr(Data):
         self.initialize_kframes(num_kframes=num_kframes, save_memory=save_memory)
         self.kframes.segment_obj(obj_description=obj_description, visualize=visualize)
         self.kframes.classify_dynamics(
-            filter=True,
+            filter=False,
             joint_dict=self.coarse_joint_dict,
-            visualize=visualize
+            visualize=True
         )
         self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
         fine_end_time = time.time()
@@ -421,11 +422,11 @@ class Obj_repr(Data):
         query_frame.joint_state = fine_joint_dict["joint_states"][0]
         self.logger.log(logging.INFO, f"Fine estimated joint state: {query_frame.joint_state}")
         
-        if self.frames is not None:
-            manip_first_frame_gt_joint_state = self.frames[0].gt_joint_state
-        else:
-            manip_first_frame_gt_joint_state = self.kframes[0].gt_joint_state
-        self.logger.log(logging.INFO, f"GT joint state: {query_frame.gt_joint_state - manip_first_frame_gt_joint_state}")
+        # if self.frames is not None:
+        #     manip_first_frame_gt_joint_state = self.frames[0].gt_joint_state
+        # else:
+        #     manip_first_frame_gt_joint_state = self.kframes[0].gt_joint_state
+        # self.logger.log(logging.INFO, f"GT joint state: {query_frame.gt_joint_state - manip_first_frame_gt_joint_state}")
        
         self.update_dynamic(query_frame, visualize=visualize)
         return query_frame

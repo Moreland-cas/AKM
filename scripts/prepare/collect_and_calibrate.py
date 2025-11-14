@@ -4,6 +4,7 @@ import time
 import shutil
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from crisp_py.utils.geometry import Pose
 
 from akm.realworld_envs.robot_env import RobotEnv
 from akm.representation.basic_structure import Frame
@@ -16,13 +17,24 @@ def sample_pos():
     """
     rel_dir= np.random.uniform(-0.1, 0.1, (3, ))
     rel_dir = rel_dir / np.linalg.norm(rel_dir)
-    rel_translation = rel_dir * np.random.uniform(0.0, 0.15)
+    rel_translation = rel_dir * np.random.uniform(0.03, 0.15)
     rel_rotation = np.random.uniform(-20, 20, (3, ))
     return rel_translation, rel_rotation
     
-    
+
+def get_tgtPose(curPose):
+    tgt_t, tgt_r = sample_pos()
+    cur_position = curPose.position
+    cur_orientation = curPose.orientation
+    tgt_position = cur_position + tgt_t
+    delta_r = R.from_euler('xyz', tgt_r, degrees=True)
+    tgt_orientation = delta_r * cur_orientation
+    tgtPose = Pose(position=tgt_position, orientation=tgt_orientation)
+    return tgtPose
+
+
 def collect_data(
-    init_qpos=None,
+    init_Tph2w=None,
     save_folder = "/home/user/Programs/AKM/assets/calib_data",
     num_views=30
 ):
@@ -58,39 +70,46 @@ def collect_data(
     }
     
     env = RobotEnv(cfg)
-    env.franky_robot.recover_from_errors()
+    env.open_gripper()
+    # env.crisp_robot.home()
+    speed = 0.03
 
     # Control the robotic arm to follow a fixed trajectory
-    if init_qpos is not None:
-        env.calibrate_reset(init_qpos)
+    init_pose = Pose(position=init_Tph2w[:3, -1], orientation=R.from_matrix(init_Tph2w[:3, :3]))
+    env.switch_mode("cartesian_impedance")
+    env.crisp_robot.move_to(pose=init_pose, speed=speed)
     env.open_gripper(target=0.02)
     input("Make sure the checkerboard is in position before you type anything to close the gripper: ")
     env.close_gripper(gripper_force=60)
 
     num_views_done = 0
     while num_views_done < num_views:
-        try:
-            tgt_t, tgt_r = sample_pos()
-            
-            env.rot_dxyz(tgt_r)
-            env.move_dxyz(tgt_t)
-            
-            # sleep for a while to avoid motion blur
-            time.sleep(1.)
-            f = env.capture_frame(robot_mask=False)
-            f.save(file_path=os.path.join(save_folder, f'{num_views_done}.npy'))
-            
-            # Reset
-            env.move_dxyz(-tgt_t)
-            inv_rot = R.from_euler('xyz', tgt_r, degrees=True).inv().as_euler('xyz', degrees=True)
-            env.rot_dxyz(inv_rot)
-            num_views_done += 1
-        except Exception as e:
-            print(f'Catched Exception: {str(e)}')
-            env.franky_robot.recover_from_errors()
-            env.calibrate_reset(init_qpos)
+        # try:
+        # tgt_t, tgt_r = sample_pos()
+        
+        # env.rot_dxyz(tgt_r, speed=speed)
+        # env.move_dxyz(tgt_t, speed=speed)
+        env.crisp_robot.move_to(pose=get_tgtPose(curPose=init_pose), speed=0.05)
+        
+        # sleep for a while to avoid motion blur
+        time.sleep(1.)
+        f = env.capture_frame(robot_mask=False)
+        f.save(file_path=os.path.join(save_folder, f'{num_views_done}.npy'))
+        
+        # Reset
+        # env.move_dxyz(-tgt_t, speed=speed)
+        # inv_rot = R.from_euler('xyz', tgt_r, degrees=True).inv().as_euler('xyz', degrees=True)
+        # env.rot_dxyz(inv_rot, speed=speed)
+        env.crisp_robot.move_to(pose=init_pose, speed=0.05)
+        num_views_done += 1
+        # except Exception as e:
+        #     print(f'Catched Exception: {str(e)}')
+        #     env.franky_robot.recover_from_errors()
+        #     env.calibrate_reset(init_qpos)
             
     print(f'Collect {num_views} images in {save_folder}.')
+    env.open_gripper()
+    env.delete()
     
     
 def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/AKM/assets/calib_data/', visualize=False):
@@ -117,6 +136,7 @@ def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/AKM/assets/ca
         img = frame.rgb
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         Tph2w = frame.Tph2w
+        print("Tph2w: ", Tph2w)
         
         # Get the position of the corner points of the calibration plate
         objp = np.zeros((XX * YY, 3), np.float32)
@@ -197,32 +217,44 @@ def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/AKM/assets/ca
 
 if __name__ == "__main__":
     calib_folder = "/home/user/Programs/AKM/assets/calib_data"
-    init_qpos=np.array([-2.55179204,  0.95217725,  2.49179559, -2.54909801, -0.31007478,
-        1.89506812, -1.55903886,  0.        ,  0.        ])
-    
-    collect_data(
-        init_qpos=init_qpos,
-        save_folder=calib_folder
-    )
-    K, Tc2w = estimate_intrinsic_extrinsic(calib_folder=calib_folder)
-    print("K:")
-    print(K)
-    print("Tc2w:")
-    print(Tc2w)
-    
-    os.makedirs(os.path.join(calib_folder, 'tmp'), exist_ok=True)
-    np.save(
-        file=os.path.join(calib_folder, 'tmp/K.npy'),
-        arr=K
-    )
-    np.save(
-        file=os.path.join(calib_folder, 'tmp/Tc2w.npy'),
-        arr=Tc2w
-    )
+    collect= True
+    estimate = True
+    test_valid = True
+    if collect:
+        os.makedirs(calib_folder, exist_ok=True)
+        init_Tph2w = np.eye(4)
+        init_Tph2w[:3, -1] = [0.44, -0.26, 0.45]
+        init_Tph2w[:3, :3] = np.array(
+            [[ 0.60, -0.79,  0.11],
+            [-0.80, -0.60,  0.04],
+            [ 0.03, -0.11, -0.99]]
+        )
+        
+        collect_data(
+            init_Tph2w=init_Tph2w,
+            save_folder=calib_folder
+        )
+    if estimate:
+        K, Tc2w = estimate_intrinsic_extrinsic(calib_folder=calib_folder)
+        print("K:")
+        print(K)
+        print("Tc2w:")
+        print(Tc2w)
+        
+        os.makedirs(os.path.join(calib_folder, 'tmp'), exist_ok=True)
+        np.save(
+            file=os.path.join(calib_folder, 'tmp/K.npy'),
+            arr=K
+        )
+        np.save(
+            file=os.path.join(calib_folder, 'tmp/Tc2w.npy'),
+            arr=Tc2w
+        )
     
     # Finally, draw the point cloud in the world coordinate system to verify the accuracy of the world coordinate system estimation
-    test_valid = False
     if test_valid:
+        Tc2w = np.load(os.path.join(calib_folder, 'tmp/Tc2w.npy'))
+        K = np.load(os.path.join(calib_folder, 'tmp/K.npy'))
         f = Frame.load(os.path.join(calib_folder, "0.npy"))
         f.Tw2c = np.linalg.inv(Tc2w)
         f.K = K
@@ -233,9 +265,9 @@ if __name__ == "__main__":
             visualize=False
         )
         visualize_pc(
-            points=pc,
-            point_size=5,
-            colors=colors/255.,
+            points=[pc],
+            point_size=10,
+            # colors=[colors/255.],
             online_viewer=True,
-            visualize_origin=True
+            visualize_origin=True,
         )

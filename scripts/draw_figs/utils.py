@@ -29,28 +29,6 @@ def initialize_napari():
             QTimer().singleShot(time_in_msec, app.quit)
         viewer.close()
 
-def save_list_as_video(image_list, output_path, fps=30):
-    if image_list is None:
-        print(f"Input image list is None, thus skip!")
-        return
-
-    # 获取图像尺寸
-    H, W, _ = image_list[0].shape
-
-    # 定义视频编码器
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 或者 'XVID'
-    out = cv2.VideoWriter(output_path, fourcc, fps, (W, H))
-
-    for frame in image_list:
-        if frame.shape != (H, W, 3):
-            raise ValueError("All frames must have the same shape (H, W, 3)")
-        # OpenCV 使用 BGR 格式，而输入是 RGB，需要转换
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        out.write(frame_bgr)
-
-    out.release()
-    print(f"Video saved to {output_path}")
-    
 def clean_pc_np(
     points: np.ndarray,
     voxel_size=0.01,
@@ -602,30 +580,7 @@ def create_directed_cylinder(start_point, end_point, thickness=0.002, resolution
     cone.paint_uniform_color([0.5, 0.5, 0.5])  
     return [cylinder, cone]
 
-def visualize_pc_simple(
-    points: np.ndarray,
-    colors: np.ndarray,
-    grasp
-):
-    """极简可视化：点云 + 抓取"""
-    # 点云
-    pcd = o3d.t.geometry.PointCloud(o3d.core.Tensor(np.asarray(points)))
-    pcd.point.colors = o3d.core.Tensor(np.asarray(colors)[:, :3])
-    mat = o3d.visualization.rendering.MaterialRecord()
-    mat.shader = "defaultLitTransparency"
-    mat.point_size = 3.0
-    geo = [{"name": "pcd", "geometry": pcd, "material": mat}]
 
-    # 抓取
-    if grasp is not None:
-        g = grasp.to_open3d_geometry()
-        g_mat = o3d.visualization.rendering.MaterialRecord()
-        g_mat.shader = "defaultUnlit"
-        g_mat.base_color = [0., 1., 0., 1.]
-        geo.append({"name": "grasp", "geometry": g, "material": g_mat})
-
-    o3d.visualization.draw(geo, bg_color=(1, 1, 1, 1), width=800, height=600)
-    
 def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None, grasp=None, contact_point=None, post_contact_dirs=None, 
                  bboxes=None, bbox_radius=0.01, tracks_3d=None, tracks_3d_colors=None, pivot_point=None, joint_axis=None,
                  tracks_t_step=1, tracks_n_step=1, tracks_norm_threshold=1e-3, visualize_origin=False,
@@ -649,32 +604,27 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
     """
     geometries_to_draw = []
     
-    # assert isinstance(points, list)
-    # assert isinstance(colors, list)
+    assert isinstance(points, list)
+    assert isinstance(colors, list)
     if point_size is None:
         point_size = [1.0] * len(points)
     elif not isinstance(point_size, list):
         point_size = [point_size] * len(points)
-    if colors is None:
-        colors = [[[0, 0, 1.0]] * len(points[i]) for i in range(len(points))]
+    if not isinstance(colors, list):
+        colors = [colors] * len(points) if colors is not None else [None] * len(points)
     if alpha is None:
         alpha = [1.0] * len(points)
     elif not isinstance(alpha, list):
         alpha = [alpha] * len(points)
     
-    # print("len(points):", len(points))
-    # print("len(colors):", len(colors))
-    # print("len(point_size):", len(point_size))
-    # print("len(alpha):", len(alpha))
-    
-    # if not (len(points) == len(colors) == len(point_size) == len(alpha)):
-    #     raise ValueError("points, colors, point_size and alpha must be the same length")
+    if not (len(points) == len(colors) == len(point_size) == len(alpha)):
+        raise ValueError("points, colors, point_size and alpha must be the same length")
+
     for i, (pts, clr, size, alp) in enumerate(zip(points, colors, point_size, alpha)):
         pts = np.asarray(pts)
-        clr = np.asarray(clr)
         if pts.ndim != 2 or pts.shape[1] != 3:
             raise ValueError(f"points[{i}] must be Nx3")
-        print(pts.shape, clr.shape)
+        print(pts.shape, colors)
         
         pcd = o3d.t.geometry.PointCloud()
         pcd.point.positions = o3d.core.Tensor(pts)
@@ -695,11 +645,7 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         else:
             clr = np.asarray(clr)
             if clr.shape[0] != pts.shape[0]:
-                print(clr)
-                print(clr.shape)
-                print(pts)
-                print(pts.shape)
-                raise ValueError(f"points, colors must be the same length")
+                raise ValueError(f"points, colors, point_size and alpha must be the same length")
             if clr.shape[1] == 3:
                 clr = np.concatenate([clr, np.ones((clr.shape[0], 1)) * alp], axis=1)
             elif clr.shape[1] != 4:
@@ -1942,11 +1888,3 @@ def numpy_to_json(obj):
     elif isinstance(obj, np.ints32):
         return int(obj) # Convert a NumPy int32 to a Python int
     raise TypeError(f"Type {type(obj)} not serializable")
-
-
-if __name__ == "__main__":
-    def frames():
-    # 3 帧 120×160 RGB 图像
-        return [np.random.randint(0, 256, (120, 160, 3), dtype=np.uint8) for _ in range(100)]
-    out_file = "/home/zhangboyuan/Programs/AKM/assets/out.mp4"
-    save_list_as_video(frames(), str(out_file), fps=30)

@@ -12,7 +12,7 @@ ASSET_PATH="/home/user/Programs/AKM/assets"
 PROJECT_ROOT="/home/user/Programs/AKM"
 
 # anygrasp
-RUN_REMOTE_ANYGRASP=False
+RUN_REMOTE_ANYGRASP=True
 
 # SEED
 SEED=666

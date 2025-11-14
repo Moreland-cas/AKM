@@ -173,15 +173,18 @@ class BaseEnv():
             Tc2w_path = os.path.join(calib_folder, "tmp/Tc2w.npy")
             
             self.camera_intrinsic = np.load(K_path)
-            self.camera_extrinsic = np.linalg.inv(np.load(Tc2w_path)) # Tw2c
+            Tc2w = np.load(Tc2w_path)
+            # NOTE: TODO refine Tc2w, camera 在 world 的 x 坐标上应该 + 5cm
+            # Tc2w[0, -1] += 0.04
+            self.camera_extrinsic = np.linalg.inv(Tc2w) # Tw2c
         except Exception as e:
             print("Catched Exception: ", str(e))
             self.camera_intrinsic = None
             self.camera_extrinsic = None
         
         # Warm up, adaptively estimate exposure parameters
-        for _ in range(30):
-            self.capture_frame(visualize=False, robot_mask=False)
+        # for _ in range(30):
+            # self.capture_frame(visualize=False, robot_mask=False, Tph2w=False)
         
     def capture_rgb(self):
         """

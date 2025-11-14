@@ -81,33 +81,42 @@ class ManipulateEnv(ReconEnv):
                 self.logger.log(logging.INFO, "Get None planning result in manip_once(), thus do nothing")
                 break
             else:
-                self.follow_path(result_pre)
+                self.switch_mode("cartesian_impedance")
+                self.move_to(Tph2w=Tph2w_pre)
+                
+                # self.switch_mode("joint_impedance")
+                # self.follow_path(result_pre)
+                
                 self.clear_planner_pc()
-                self.open_gripper(target=0.06)
-                self.approach(distance=self.reserved_distance)
-                self.close_gripper(target=0.0, gripper_force=4)
+                self.open_gripper(target=0.08)
+                
+                self.switch_mode("cartesian_impedance")
+                self.approach(distance=self.reserved_distance + 0.02, speed=0.02)
+                
+                # 改为 safe_close
+                self.close_gripper_safe()
+                # self.close_gripper(target=0.0, gripper_force=4)
                 
                 fine_dict_w = self.obj_repr.get_joint_param(
                     resolution="fine",
                     frame="world"
                 )
                 
-                reaction_motion = Reaction(self.get_force() > 15, JointStopMotion())
+                self.switch_mode("cartesian_impedance")
                 self.move_along_axis(
                     joint_type=fine_dict_w["joint_type"],
                     joint_axis=fine_dict_w["joint_dir"],
                     joint_start=fine_dict_w["joint_start"],
                     moving_distance=self.target_state-self.cur_frame.joint_state,
-                    drop_large_move=False,
-                    reaction_motion=reaction_motion
                 )
                     
                 if self.not_good_enough(visualize=visualize):
-                    if self.goal_delta < 0 and num_manip == 1:
-                        self.move_dz(-self.reserved_distance)
-                        continue
+                    # if self.goal_delta < 0 and num_manip == 1:
+                    #     self.move_dz(-self.reserved_distance)
+                    #     continue
                     
                     self.open_gripper(target=0.06)
+                    self.switch_mode("cartesian_impedance")
                     self.move_dz(-self.reserved_distance)
                 else:
                     break
@@ -119,7 +128,7 @@ class ManipulateEnv(ReconEnv):
         manip_end_state: The algorithm manipulates the object so that its joints reach this value.
         """
         self.goal_delta = goal_delta
-        self.reset_robot()
+        self.reset()
         self.update_cur_frame(
             init_guess=None,
             visualize=False
@@ -138,10 +147,13 @@ class ManipulateEnv(ReconEnv):
 
 
 if __name__ == '__main__':
-    with open("/home/user/Programs/AKM/akm/realworld_envs/drawer.yaml", "r") as f:
+    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
+    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
         
     manipEnv = ManipulateEnv(cfg=cfg)
     manipEnv.main()
-    manipEnv.reset_robot_safe()
+    input("Type anything:")
+    manipEnv.reset_safe()
     

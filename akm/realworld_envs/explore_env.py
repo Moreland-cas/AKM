@@ -5,16 +5,10 @@ import json
 import logging
 import threading
 import numpy as np
-from franky import (
-    CartesianMotion,
-    Affine,
-    ReferenceType,
-    Reaction,
-    CartesianStopMotion,
-)
 
 from akm.utility.utils import (
     camera_to_world,
+    visualize_pc_simple,
     visualize_pc,
     numpy_to_json
 )
@@ -50,7 +44,7 @@ class ExploreEnv(ObjEnv):
         # First get affordance_map_2d, then start to explore and modify affordance_map_2d
         from akm.utility.proposal.ram_proposal import get_ram_affordance_2d
         
-        self.reset_robot()
+        self.reset()
         initial_frame = self.capture_frame()
         
         # Only perform contact transfer for the first time, and reuse directly thereafter
@@ -60,7 +54,8 @@ class ExploreEnv(ObjEnv):
             instruction=self.task_cfg["instruction"],
             obj_description=self.obj_description,
             fully_zeroshot=self.explore_env_cfg["fully_zeroshot"],
-            visualize=visualize,
+            # visualize=visualize,
+            visualize=False,
             logger=self.logger
         )
         
@@ -97,9 +92,9 @@ class ExploreEnv(ObjEnv):
             # Initialize related states, you need to clear the frames obtained previously
             self.obj_repr.clear_frames()
             if self.num_tries == 0:
-                self.reset_robot()
+                self.reset()
             else:
-                self.reset_robot_safe()
+                self.reset_safe(distance=-self.reserved_distance)
             
             self.logger.log(logging.INFO, f"[{self.num_tries + 1}|{self.max_tries}] Start exploring once...")
             actually_tried, explore_uv = self.explore_once(visualize=visualize, idx=self.num_tries)
@@ -184,7 +179,7 @@ class ExploreEnv(ObjEnv):
         cur_frame.detect_grasp(
             use_anygrasp=self.algo_cfg["use_anygrasp"],
             world_frame=True,
-            visualize=visualize,
+            visualize=False,
             asset_path=ASSET_PATH,
             logger=self.logger
         )
@@ -214,16 +209,13 @@ class ExploreEnv(ObjEnv):
             grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
             Tph2w =self.anyGrasp2ph(grasp=grasp)
             Tph2w_pre = self.get_translated_ph(Tph2w, -self.reserved_distance)
-            result_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
+            result_pre, Tph2w_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             if result_pre is not None:
                 if visualize or True:
-                    visualize_pc(
+                    visualize_pc_simple(
                         points=pc_collision_w, 
-                        point_size=5,
                         colors=pc_colors / 255,
                         grasp=grasp, 
-                        contact_point=contact3d_w, 
-                        post_contact_dirs=[dir_out_w]
                     )
                 break
         
@@ -231,12 +223,18 @@ class ExploreEnv(ObjEnv):
         if result_pre is None:
             return False, contact_uv
         
-        self.follow_path(result_pre)
-        self.open_gripper(target=0.06)
+        self.open_gripper(target=0.08)
+        
+        self.switch_mode("cartesian_impedance")
+        self.move_to(Tph2w=Tph2w_pre)
+        
+        # self.switch_mode("joint_impedance")
+        # self.follow_path(result_pre)
+        
         self.clear_planner_pc()
         
-        self.approach(distance=self.reserved_distance)
-        self.close_gripper(target=0.0, gripper_force=4)
+        self.approach(distance=self.reserved_distance + 0.02, speed=0.02)
+        self.close_gripper_safe()
         
         # Execute move asynchronously, and set self.recording to False after execution.
         self.dir_out_w = dir_out_w
@@ -254,29 +252,9 @@ class ExploreEnv(ObjEnv):
         """
         Keep moving when the distance is not enough
         """
-        init_Tph2w = self.robot.get_ee_pose(as_matrix=True)
-        def get_moved_distance():
-            cur_Tph2w = self.robot.get_ee_pose(as_matrix=True)
-            distance = np.linalg.norm(init_Tph2w[:3, -1] - cur_Tph2w[:3, -1])
-            return distance
-        
-        num_tries = 2
-        cur_tries = 0
-        while (cur_tries < num_tries) and (get_moved_distance() < self.pertubation_distance * 0.8):
-            pull_out = CartesianMotion(
-                Affine([0, 0, -self.pertubation_distance / num_tries]), 
-                ReferenceType.Relative, 
-                relative_dynamics_factor=0.05
-            )
-            reaction = Reaction(self.get_force() > 20, CartesianStopMotion())
-            pull_out.add_reaction(reaction)
-            self.franky_robot.move(pull_out, asynchronous=True)
-            self.franky_robot.join_motion()
-            cur_tries += 1
-            self.open_gripper(0.06)
-            self.franky_robot.recover_from_errors()
-            self.close_gripper(target=0.0, gripper_force=4)
-                
+        # self.switch_mode("pull")
+        self.switch_mode("cartesian_impedance")
+        self.move_dz(distance=-self.pertubation_distance, speed=0.02)
         self.recording = False
     
     def check_valid(self, visualize=False): 
@@ -300,47 +278,25 @@ class ExploreEnv(ObjEnv):
         self.obj_repr.frames.track2d_to_3d(filter=True, visualize=visualize)
         self.obj_repr.frames.cluster_track3d(visualize=visualize)
         
-        if visualize:
+        if visualize or True:
+            points, colors = self.obj_repr.frames[0].get_obj_pc(
+                use_robot_mask=True, 
+                use_height_filter=True,
+                world_frame=False,
+                visualize=False
+            )
+            print(points.shape, colors.shape)
+            
             visualize_pc(
-                points=self.obj_repr.frames[0].get_obj_pc(
-                    use_robot_mask=True, 
-                    use_height_filter=True,
-                    world_frame=False,
-                    visualize=False
-                )[0],
-                point_size=5,
-                colors=self.obj_repr.frames[0].get_obj_pc(
-                    use_robot_mask=True, 
-                    use_height_filter=True,
-                    world_frame=False,
-                    visualize=False
-                )[1] / 255.,
+                points=[points],
+                colors=[colors/ 255],
                 tracks_3d=self.obj_repr.frames.track3d_seq,
                 tracks_n_step=None,
                 tracks_t_step=3,
                 tracks_norm_threshold=0.2e-2,
+                online_viewer=True
             )
-            
-            visualize_pc(
-                points=self.obj_repr.frames[0].get_obj_pc(
-                    use_robot_mask=True, 
-                    use_height_filter=True,
-                    world_frame=False,
-                    visualize=False
-                )[0],
-                point_size=5,
-                colors=self.obj_repr.frames[0].get_obj_pc(
-                    use_robot_mask=True, 
-                    use_height_filter=True,
-                    world_frame=False,
-                    visualize=False
-                )[1] / 255.,
-                tracks_3d=self.obj_repr.frames.track3d_seq[:, self.obj_repr.frames.moving_mask, :],
-                tracks_n_step=None,
-                tracks_t_step=3,
-                tracks_norm_threshold=0.2e-2,
-            )
-            
+                        
         moving_tracks = self.obj_repr.frames.track3d_seq[:, self.obj_repr.frames.moving_mask, :]
         mean_delta = np.linalg.norm(moving_tracks[-1] - moving_tracks[0], axis=-1).mean()
         if mean_delta > self.pertubation_distance * self.valid_thresh:
@@ -361,7 +317,7 @@ class ExploreEnv(ObjEnv):
             self.explore_result["joint_type"] = self.obj_env_cfg["joint_type"]
             self.explore_result["exception"] = str(e)
 
-        self.reset_robot_safe()
+        self.reset_safe(distance=-self.reserved_distance)
         
         if self.exp_cfg["save_result"]:
             save_json_path = os.path.join(
@@ -381,8 +337,11 @@ class ExploreEnv(ObjEnv):
             self.obj_repr.save(save_path)
                     
 if __name__ == "__main__":
-    with open("/home/user/Programs/AKM/akm/realworld_envs/drawer.yaml", "r") as f:
+    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
+    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
     
     exploreEnv = ExploreEnv(cfg=cfg)
     exploreEnv.main()
+    exploreEnv.delete()
