@@ -43,7 +43,7 @@ def run_grounded_sam(
 
 if __name__ == "__main__":
     import cv2
-    img = cv2.imread("/home/zhangboyuan/Programs/AKM/assets/dev/cat.jpg")
+    img = cv2.imread("/home/zby/Desktop/image.png")
     import time
     for i in range(10):
         start_time = time.time()
@@ -53,9 +53,9 @@ if __name__ == "__main__":
         #     dino_model=None,
         #     visualize=False,
         # )
-        run_grounded_sam(
+        initial_bbox, initial_mask = run_grounded_sam(
             rgb_image=img,
-            obj_description="cat",
+            obj_description="black drawer",
             positive_points=None,  # np.array([N, 2])
             negative_points=None,
             num_iterations=3,
@@ -65,6 +65,9 @@ if __name__ == "__main__":
             post_process_mask=True,
             visualize=False,
         )
+        from PIL import Image
+        Image.fromarray(initial_mask).show()
         end_time = time.time()
         print(end_time - start_time)
         time.sleep(0.5)
+        break

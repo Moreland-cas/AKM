@@ -2,6 +2,7 @@ import time
 import copy
 import logging
 import numpy as np
+from PIL import Image
 
 from akm.utility.utils import (
     farthest_scale_sampling,
@@ -250,6 +251,13 @@ class Obj_repr(Data):
             joint_dict=self.coarse_joint_dict,
             visualize=True
         )
+        
+        for dynamic_mask in self.kframes.get_dynamic_seq():
+            Image.fromarray(dynamic_mask * 30).show()
+            
+        for rgb in self.kframes.get_rgb_seq():
+            Image.fromarray(rgb).show()
+                
         self.fine_joint_estimation(lr=fine_lr, visualize=visualize)
         fine_end_time = time.time()
         result = None

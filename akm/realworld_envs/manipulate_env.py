@@ -2,7 +2,6 @@ import os
 import yaml
 import logging
 import numpy as np
-from franky import Reaction, JointStopMotion
 
 from akm.utility.constants import *
 from akm.utility.utils import clean_pc_np
@@ -92,9 +91,9 @@ class ManipulateEnv(ReconEnv):
                 self.open_gripper(target=0.08)
                 
                 self.switch_mode("cartesian_impedance")
-                self.approach(distance=self.reserved_distance + 0.01, speed=0.02)
+                self.approach(distance=self.reserved_distance, speed=0.02)
                 
-                # 改为 safe_close
+                # safe_close
                 self.close_gripper_safe()
                 # self.close_gripper(target=0.0, gripper_force=4)
                 
@@ -147,8 +146,7 @@ class ManipulateEnv(ReconEnv):
 
 
 if __name__ == '__main__':
-    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
-    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    cfg_path = "/home/zby/Programs/AKM/cfgs/realworld_cfgs/p1_demo.yaml"
     with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
         

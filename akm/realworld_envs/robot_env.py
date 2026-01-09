@@ -125,11 +125,11 @@ class RobotEnv(BaseEnv):
 
     def move_to(self, Tph2w, speed=0.05):
         """
-        crisp 的默认接口是 crisp 的 Pose, 这个函数负责进行一个转换
+        Crisp's default interface is Crisp's Pose, and this function is responsible for performing a transformation.
         """
         position = Tph2w[:3, -1]
         rotation = Tph2w[:3, :3]
-        # NOTE crisp 定义的 ee 跟 franka Desk 不一样
+        # NOTE: The definition of EE (end-effector) in CRISP is different from that in Franka Desk.
         position += 0.1 * rotation[:, -1]
         tgt_pose = Pose(position=position, orientation=R.from_matrix(rotation))
         self.crisp_robot.move_to(pose=tgt_pose, speed=speed)
@@ -167,7 +167,6 @@ class RobotEnv(BaseEnv):
         Tgrasp2w = np.hstack((R_grasp2w, t_grasp2w[..., None])) # 3, 4
         Tgrasp2w = np.vstack((Tgrasp2w, np.array([0, 0, 0, 1]))) # 4, 4
         # The larger the offset, the deeper the gripper is inserted.
-        # Tph2w = Tgrasp2w @ T_with_offset(offset=-0.14)
         Tph2w = Tgrasp2w @ T_with_offset(offset=-0.1)
         return Tph2w
     
@@ -265,14 +264,13 @@ class RobotEnv(BaseEnv):
 
     def close_gripper_safe(self):
         """
-        用 impedance control 关闭 gripper
+        close gripper with impedance control 
         """
         # change mode to soft impedance
         self.switch_mode(mode="grasp")
         # self.franky_gripper.move(width=0, speed=0.01)
         self.close_gripper(target=0., gripper_force=20, speed=0.01)
         
-        # 此时确定了位置
         cur_Tph2w = self.get_ee_pose(as_matrix=True)
         self.franky_gripper.move(width=0.03, speed=0.02)
         
@@ -360,7 +358,7 @@ class RobotEnv(BaseEnv):
         ee_Rotation = ee_pose.orientation
         z_dir = R.as_matrix(ee_Rotation)[:, -1]
         
-        # NOTE: crisp 返回的 ee_pose 跟 franka Desk 中定义的差 1dm
+        # # NOTE: The ee_pose returned by crisp differs from the one defined in Franka Desk by 1 dm.
         ee_pos = ee_pos - 0.1 * z_dir
         
         if as_matrix:
@@ -377,24 +375,24 @@ class RobotEnv(BaseEnv):
         if mode == "grasp":
             self.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
             self.crisp_robot.cartesian_controller_parameters_client.load_param_config(
-                file_path="/home/user/Programs/AKM/third_party/crisp_py/crisp_py/config/control/grasp_cartesian_impedance.yaml"
+                file_path="/home/zby/Programs/AKM/third_party/crisp_py/crisp_py/config/control/grasp_cartesian_impedance.yaml"
             )
         elif mode == "pull":
             self.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
             self.crisp_robot.cartesian_controller_parameters_client.load_param_config(
-                file_path="/home/user/Programs/AKM/third_party/crisp_py/crisp_py/config/control/pull_cartesian_impedance.yaml"
+                file_path="/home/zby/Programs/AKM/third_party/crisp_py/crisp_py/config/control/pull_cartesian_impedance.yaml"
             )
         elif mode == "approach":
             self.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
             self.crisp_robot.cartesian_controller_parameters_client.load_param_config(
-                file_path="/home/user/Programs/AKM/third_party/crisp_py/crisp_py/config/control/approach_cartesian_impedance.yaml"
+                file_path="/home/zby/Programs/AKM/third_party/crisp_py/crisp_py/config/control/approach_cartesian_impedance.yaml"
             )
         elif mode == "joint_impedance":
             self.crisp_robot.controller_switcher_client.switch_controller("joint_impedance_controller")
         elif mode == "cartesian_impedance":
             self.crisp_robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
             self.crisp_robot.cartesian_controller_parameters_client.load_param_config(
-                file_path="/home/user/Programs/AKM/third_party/crisp_py/crisp_py/config/control/default_cartesian_impedance.yaml"
+                file_path="/home/zby/Programs/AKM/third_party/crisp_py/crisp_py/config/control/default_cartesian_impedance.yaml"
             )
         
     def follow_path(self, result):
@@ -483,7 +481,6 @@ class RobotEnv(BaseEnv):
             return pre_qpos
 
     def move_dz(self, distance=0.05, speed=0.02):
-        # 首先获取当前坐标
         cur_position = self.crisp_robot.end_effector_pose.position
         # print(cur_position)
         cur_Rotation = self.crisp_robot.end_effector_pose.orientation
@@ -497,7 +494,7 @@ class RobotEnv(BaseEnv):
         self.switch_mode("approach")
         self.move_dz(distance=distance, speed=speed)
         
-        # 重置弹簧阻力
+        # Reset the spring resistance.
         cur_Tph2w = self.get_ee_pose(as_matrix=True)
         self.switch_mode(mode="cartesian_impedance")
         self.move_to(cur_Tph2w)
@@ -529,8 +526,6 @@ class RobotEnv(BaseEnv):
         Tph2w = self.get_ee_pose(as_matrix=True) # Tph2w
         ee_pose = Tph2w[:3, -1]
         Rph2w = Tph2w[:3, :3]
-        # scalar_first=False means quat in (x, y, z, w) order
-        # Rph2w = R.from_quat(ee_quat, scalar_first=False).as_matrix() # 3, 3
 
         if joint_type == "prismatic":
             def T_with_delta(delta):
@@ -592,36 +587,3 @@ class RobotEnv(BaseEnv):
         self.pybullet_handle.disconnect()
         self.crisp_robot.shutdown()
         
-
-if __name__ == "__main__":
-    """
-    总结一下需要什么功能
-    1) move to pre-grasp
-    2) approach (降低碰撞的刚度)
-    3) safe-grasp (降低 y 方向刚度然后关闭 gripper, 达到稳定状态之后更新 Tph2w, 重新 move_to 一下)
-    4) move_along_axis (只能稍微有一点 impedance)
-    5) draw_back
-    
-    解耦一下能力：
-    1) 切换 impedance 方式，包括切换到 joint control
-    2) 沿着 z 轴的运动
-    """
-    
-    import yaml
-    with open("/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml") as f:
-        cfg = yaml.safe_load(f)
-    re = RobotEnv(cfg=cfg)
-    print("done")
-    
-    re.crisp_robot.home()
-    re.switch_mode("cartesian_impedance")
-    re.move_dz(distance=0.05, speed=0.03)
-    re.move_along_axis(
-        joint_type="revolute",
-        joint_axis=np.array([1, 0 ,0]),
-        joint_start=np.array([0, 0, 0]),
-        moving_distance=np.deg2rad(-15)
-    )
-
-    re.crisp_robot.home()
-    re.delete()

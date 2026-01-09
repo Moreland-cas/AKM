@@ -8,8 +8,8 @@ UNKNOWN_LABEL = 3
 ACTIVATE_NAPARI=False
 
 # project path
-ASSET_PATH="/home/user/Programs/AKM/assets"
-PROJECT_ROOT="/home/user/Programs/AKM"
+ASSET_PATH="/home/zby/Programs/AKM/assets"
+PROJECT_ROOT="/home/zby/Programs/AKM"
 
 # anygrasp
 RUN_REMOTE_ANYGRASP=True

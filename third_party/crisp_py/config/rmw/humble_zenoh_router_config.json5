@@ -391,7 +391,7 @@
   //       "cert_common_names": [
   //         "example.zenoh.io"
   //       ],
-  //       /// Subjects can be usernames when using user/password authentication
+  //       /// Subjects can be usernames when using zby/password authentication
   //       "usernames": [
   //         "zenoh-example"
   //       ],

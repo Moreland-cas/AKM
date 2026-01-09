@@ -871,6 +871,21 @@ def visualize_pc(points, point_size=1, colors=None, voxel_size=0.01, alpha=None,
         if pivot_point.shape != (3,) or joint_axis.shape != (3,):
             raise ValueError("pivot_point and joint_axis must be vectors of shape (3,)")
         
+        #  place a ball at pivot_point 
+        pivot_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.02)  # 球半径
+        pivot_sphere.translate(pivot_point)
+        pivot_sphere.compute_vertex_normals()   # ⭐ 关键
+        pivot_sphere.paint_uniform_color([0.2, 0.2, 1.0])  # 球颜色：蓝色
+        mat = o3d.visualization.rendering.MaterialRecord()
+        mat.shader = "defaultLit"
+        mat.base_color = [0.2, 0.2, 1.0, 1.0]
+        
+        mat.base_roughness = 0.8
+        mat.base_metallic = 0.6
+        mat.base_reflectance = 0.8
+        
+        geometries_to_draw.append({"name": "pivot_point_sphere", "geometry": pivot_sphere, "material": mat})
+        
         # normalize joint_axis
         joint_axis = joint_axis / np.linalg.norm(joint_axis)
         start_point = pivot_point

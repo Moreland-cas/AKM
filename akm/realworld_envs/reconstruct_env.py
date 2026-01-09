@@ -186,7 +186,7 @@ class ReconEnv(ExploreEnv):
             visualize_pc(
                 points=[points],
                 colors=[colors/255],
-                point_size=10,
+                point_size=20,
                 pivot_point=coarse_jonint_dict["joint_start"],
                 joint_axis=coarse_jonint_dict["joint_dir"],
                 online_viewer=True
@@ -195,7 +195,7 @@ class ReconEnv(ExploreEnv):
             visualize_pc(
                 points=[points],
                 colors=[colors/255],
-                point_size=10,
+                point_size=20,
                 pivot_point=fine_jonint_dict["joint_start"],
                 joint_axis=fine_jonint_dict["joint_dir"],
                 online_viewer=True
@@ -229,8 +229,7 @@ class ReconEnv(ExploreEnv):
                 json.dump(self.recon_result, json_file, ensure_ascii=False, indent=4, default=numpy_to_json)
         
 if __name__ == "__main__":
-    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
-    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    cfg_path = "/home/zby/Programs/AKM/cfgs/realworld_cfgs/p1_demo.yaml"
     with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
         

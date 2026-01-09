@@ -25,8 +25,8 @@ robot.controller_switcher_client.switch_controller("cartesian_impedance_controll
 # robot.controller_switcher_client.switch_controller("joint_impedance_controller")
 
 robot.cartesian_controller_parameters_client.load_param_config(
-    # file_path="/home/user/Programs/crisp_py/crisp_py/config/control/default_cartesian_impedance.yaml"
-    file_path="/home/user/Programs/crisp_py/crisp_py/config/control/soft_cartesian_impedance.yaml"
+    # file_path="/home/zby/Programs/crisp_py/crisp_py/config/control/default_cartesian_impedance.yaml"
+    file_path="/home/zby/Programs/crisp_py/crisp_py/config/control/soft_cartesian_impedance.yaml"
 )
 
 init_ee_pose = robot.end_effector_pose

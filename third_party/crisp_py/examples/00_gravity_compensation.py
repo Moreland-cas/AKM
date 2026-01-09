@@ -16,7 +16,7 @@ robot.home()
 # )
 # robot.controller_switcher_client.switch_controller("cartesian_impedance_controller")
 robot.controller_switcher_client.switch_controller("joint_impedance_controller")
-prefix = "/home/user/Programs/crisp_py/crisp_py/"
+prefix = "/home/zby/Programs/crisp_py/crisp_py/"
 robot.cartesian_controller_parameters_client.load_param_config(
     file_path=prefix + "config/control/soft_cartesian_impedance.yaml"
     # file_path=prefix + "config/control/joint_cartesian_impedance.yaml"

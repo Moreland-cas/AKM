@@ -174,8 +174,6 @@ class BaseEnv():
             
             self.camera_intrinsic = np.load(K_path)
             Tc2w = np.load(Tc2w_path)
-            # NOTE: TODO refine Tc2w, camera 在 world 的 x 坐标上应该 + 5cm
-            # Tc2w[0, -1] += 0.04
             self.camera_extrinsic = np.linalg.inv(Tc2w) # Tw2c
         except Exception as e:
             print("Catched Exception: ", str(e))

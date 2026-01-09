@@ -673,10 +673,6 @@ class Frames(Data):
                 visualize=visualize
             ) 
         
-        if visualize:
-            from PIL import Image
-            for dynamic_mask in self.get_dynamic_seq():
-                Image.fromarray(dynamic_mask * 30).show()
            
     def _visualize_f(self, viewer, prefix="", visualize_robot2d=False):
         rgb_seq = self.get_rgb_seq()

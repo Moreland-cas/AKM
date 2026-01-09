@@ -10,13 +10,16 @@ from akm.realworld_envs.robot_env import RobotEnv
 from akm.representation.basic_structure import Frame
 from akm.utility.utils import visualize_pc
 
+def sample_uniform_sphere():
+    vec = np.random.randn(3)  # 标准正态分布采样
+    vec /= np.linalg.norm(vec)  # 归一化到单位球面
+    return vec
 
 def sample_pos():
     """
     Sample random poses to capture an Image for callibration
     """
-    rel_dir= np.random.uniform(-0.1, 0.1, (3, ))
-    rel_dir = rel_dir / np.linalg.norm(rel_dir)
+    rel_dir = sample_uniform_sphere()
     rel_translation = rel_dir * np.random.uniform(0.03, 0.15)
     rel_rotation = np.random.uniform(-20, 20, (3, ))
     return rel_translation, rel_rotation
@@ -35,7 +38,7 @@ def get_tgtPose(curPose):
 
 def collect_data(
     init_Tph2w=None,
-    save_folder = "/home/user/Programs/AKM/assets/calib_data",
+    save_folder = "/home/zby/Programs/AKM/assets/calib_data",
     num_views=30
 ):
     """
@@ -46,7 +49,7 @@ def collect_data(
     
     cfg = {
         "exp_cfg": {
-            "exp_folder": "/home/user/Programs/AKM/assets",
+            "exp_folder": "/home/zby/Programs/AKM/assets",
             "method_name": "ours",
             "save_cfg": False,
             "save_vis": False,
@@ -61,7 +64,7 @@ def collect_data(
             "phy_timestep": 0.004,
             "use_sapien2": True,
             "planner_timestep": 0.1,
-            "calib_folder": "/home/user/Programs/AKM/assets/calib_data"
+            "calib_folder": "/home/zby/Programs/AKM/assets/calib_data"
         },
         "task_cfg": {
             "task_id": 0,
@@ -112,7 +115,7 @@ def collect_data(
     env.delete()
     
     
-def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/AKM/assets/calib_data/', visualize=False):
+def estimate_intrinsic_extrinsic(calib_folder='/home/zby/Programs/AKM/assets/calib_data/', visualize=False):
     frame_paths = []
 
     for f in os.listdir(calib_folder):
@@ -216,18 +219,18 @@ def estimate_intrinsic_extrinsic(calib_folder='/home/user/Programs/AKM/assets/ca
     return mtx, Tcamera2w
 
 if __name__ == "__main__":
-    calib_folder = "/home/user/Programs/AKM/assets/calib_data"
+    calib_folder = "/home/zby/Programs/AKM/assets/calib_data"
     collect= True
     estimate = True
     test_valid = True
     if collect:
         os.makedirs(calib_folder, exist_ok=True)
         init_Tph2w = np.eye(4)
-        init_Tph2w[:3, -1] = [0.44, -0.26, 0.45]
+        init_Tph2w[:3, -1] = [0.42, -0.09, 0.4]
         init_Tph2w[:3, :3] = np.array(
-            [[ 0.60, -0.79,  0.11],
-            [-0.80, -0.60,  0.04],
-            [ 0.03, -0.11, -0.99]]
+            [[ 0.54, -0.84,  0.05],
+            [-0.84, -0.54,  -0.03],
+            [ 0.05, -0.03, -1.0]]
         )
         
         collect_data(
@@ -267,7 +270,7 @@ if __name__ == "__main__":
         visualize_pc(
             points=[pc],
             point_size=10,
-            # colors=[colors/255.],
+            colors=[colors/255.],
             online_viewer=True,
             visualize_origin=True,
         )

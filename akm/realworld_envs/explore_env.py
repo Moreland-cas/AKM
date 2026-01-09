@@ -54,7 +54,6 @@ class ExploreEnv(ObjEnv):
             instruction=self.task_cfg["instruction"],
             obj_description=self.obj_description,
             fully_zeroshot=self.explore_env_cfg["fully_zeroshot"],
-            # visualize=visualize,
             visualize=False,
             logger=self.logger
         )
@@ -209,9 +208,10 @@ class ExploreEnv(ObjEnv):
             grasp = self.get_rotated_grasp(grasp_w, axis_out_w=dir_out_w)
             Tph2w =self.anyGrasp2ph(grasp=grasp)
             Tph2w_pre = self.get_translated_ph(Tph2w, -self.reserved_distance)
+            
             result_pre, Tph2w_pre = self.plan_path(target_pose=Tph2w_pre, wrt_world=True)
             if result_pre is not None:
-                if visualize or True:
+                if visualize:
                     visualize_pc_simple(
                         points=pc_collision_w, 
                         colors=pc_colors / 255,
@@ -233,7 +233,7 @@ class ExploreEnv(ObjEnv):
         
         self.clear_planner_pc()
         
-        self.approach(distance=self.reserved_distance + 0.02, speed=0.02)
+        self.approach(distance=self.reserved_distance, speed=0.02)
         self.close_gripper_safe()
         
         # Execute move asynchronously, and set self.recording to False after execution.
@@ -287,12 +287,26 @@ class ExploreEnv(ObjEnv):
                 world_frame=False,
                 visualize=False
             )
-            print(points.shape, colors.shape)
             
             visualize_pc(
                 points=[points],
                 colors=[colors/ 255],
                 tracks_3d=self.obj_repr.frames.track3d_seq,
+                tracks_n_step=None,
+                tracks_t_step=3,
+                tracks_norm_threshold=0.2e-2,
+                online_viewer=True
+            )
+            
+            tracks_3d_colors = np.zeros_like(self.obj_repr.frames.track3d_seq[0])
+            tracks_3d_colors[self.obj_repr.frames.moving_mask] += np.array([1, 0, 0])
+            tracks_3d_colors[self.obj_repr.frames.static_mask] += np.array([0, 0, 1])
+            
+            visualize_pc(
+                points=[points],
+                colors=[colors/ 255],
+                tracks_3d=self.obj_repr.frames.track3d_seq,
+                tracks_3d_colors=tracks_3d_colors,
                 tracks_n_step=None,
                 tracks_t_step=3,
                 tracks_norm_threshold=0.2e-2,
@@ -339,8 +353,7 @@ class ExploreEnv(ObjEnv):
             self.obj_repr.save(save_path)
                     
 if __name__ == "__main__":
-    # cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/drawer.yaml"
-    cfg_path = "/home/user/Programs/AKM/cfgs/realworld_cfgs/cabinet.yaml"
+    cfg_path = "/home/zby/Programs/AKM/cfgs/realworld_cfgs/p1_demo.yaml"
     with open(cfg_path, "r") as f:
         cfg = yaml.safe_load(f)
     
