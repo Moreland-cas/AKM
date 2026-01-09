@@ -152,16 +152,19 @@ python scripts/collect_and_calibrate.py
 This script will command the robot to grasp a checkerboard, move the checkerboard to multiple poses while capturing images, then perform hand-eye calibration using OpenCV.
 
 ### 3. Running Three-Stages
-Evaluate the three stages of our pipeline directly on the real robot:
+To evaluate the three stages of our pipeline directly on the real robot, you shoule first prepare a real-world cfg file in `AKM/cfgs/realworld_cfgs`, refer to `cfgs/realworld_cfgs/p1_demo.yaml` for an example.
+
+Then use the following commands to run the three stages:
 ```bash
+cd AKM
 # 1. Exploration
-python scripts/test_rw/test_explore.py  
+python akm/realworld_envs/explore_env.py
 
 # 2. Unsupervised Articulation Modeling
-python scripts/test_rw/test_modelling.py
+python akm/realworld_envs/reconstruct_env.py
 
-# 3. Closed-Loop Manipulation
-python scripts/test_rw/test_manipulate.py
+# 3. Precise Manipulation
+python akm/realworld_envs/manipulate_env.py
 ```
 
 ## Acknowledgement
