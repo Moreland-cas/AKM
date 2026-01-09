@@ -6,7 +6,7 @@
   AKM
 </h1>
 
-Here’s the complete code for our paper “Active Kinematic Modelling for Precise Manipulation of Unseen Articulated Objects,” currently under review at RAL.
+Here’s the complete code for our paper “Active Kinematic Modeling for Precise Manipulation of Unseen Articulated Objects,” accepted at RAL-2026.
 
 <!-- TODO video, paper link -->
 
